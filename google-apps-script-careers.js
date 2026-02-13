@@ -28,7 +28,7 @@
 // ---- CONFIG ----
 const EMAIL_TO = 'rileykopf@luckylandscapes.com';
 const EMAIL_SUBJECT = '🍀 New Job Application — Lucky Landscapes';
-const DRIVE_FOLDER_ID = 'YOUR_GOOGLE_DRIVE_FOLDER_ID_HERE'; // Replace this!
+const DRIVE_FOLDER_ID = '1vR9iTKEONwC5i6D4ugnTlIB_yMYTEx6u'; // Replace this!
 
 // ---- HANDLERS ----
 
