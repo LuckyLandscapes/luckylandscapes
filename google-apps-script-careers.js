@@ -23,6 +23,14 @@
  * 3. Open the folder
  * 4. Copy the ID from the URL: drive.google.com/drive/folders/THIS_IS_THE_ID
  * ============================================================
+ *
+ * AUTHORIZATION REMINDER:
+ * For email to work, you must authorize the script:
+ * 1. In the Apps Script editor, select doPost from the function dropdown
+ * 2. Click ▶ Run — this triggers the authorization prompt
+ * 3. Accept ALL permissions (send email, access sheets, access Drive)
+ * 4. Re-deploy as a NEW VERSION after authorizing
+ * ============================================================
  */
 
 // ---- CONFIG ----
@@ -34,27 +42,22 @@ const DRIVE_FOLDER_ID = '1vR9iTKEONwC5i6D4ugnTlIB_yMYTEx6u'; // Replace this!
 
 function doPost(e) {
     try {
-        // Parse the multipart form data
-        const data = {};
+        // The website sends data as application/x-www-form-urlencoded
+        // which arrives in e.parameter
+        let data = {};
         let resumeBlob = null;
 
-        // Check if it's form data (multipart) or JSON
-        if (e.parameter) {
-            // FormData submission
-            data.fullName = e.parameter.fullName || '';
-            data.email = e.parameter.email || '';
-            data.phone = e.parameter.phone || '';
-            data.position = e.parameter.position || '';
-            data.experience = e.parameter.experience || '';
-            data.whyJoin = e.parameter.whyJoin || '';
-            data.availability = e.parameter.availability || '';
+        if (e.parameter && (e.parameter.fullName || e.parameter.email)) {
+            // Form-encoded submission (URLSearchParams from frontend)
+            data = e.parameter;
 
-            // Handle file upload
-            if (e.parameter.resumeData && e.parameter.resumeName) {
-                const decoded = Utilities.base64Decode(e.parameter.resumeData);
-                resumeBlob = Utilities.newBlob(decoded, e.parameter.resumeType || 'application/pdf', e.parameter.resumeName);
+            // Handle resume file (sent as base64 in form params)
+            if (data.resumeData && data.resumeName) {
+                const decoded = Utilities.base64Decode(data.resumeData);
+                resumeBlob = Utilities.newBlob(decoded, data.resumeType || 'application/pdf', data.resumeName);
             }
-        } else {
+        } else if (e.postData && e.postData.contents) {
+            // Fallback: JSON submission
             const parsed = JSON.parse(e.postData.contents);
             Object.assign(data, parsed);
 

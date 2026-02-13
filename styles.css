@@ -571,6 +571,10 @@ textarea {
     color: var(--sage-light);
     margin-bottom: 1.5rem;
     letter-spacing: .05em;
+    max-width: 100%;
+    text-align: center;
+    flex-wrap: wrap;
+    justify-content: center;
 }
 
 .hero-badge img {
@@ -1066,7 +1070,8 @@ textarea {
     font-family: var(--font-heading);
     font-weight: 700;
     font-size: 1.15rem;
-    word-break: break-all;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 /* Contact Form */
@@ -1679,6 +1684,18 @@ textarea {
         gap: 3rem;
     }
 
+    .cta-info {
+        text-align: center;
+    }
+
+    .cta-info .contact-items {
+        align-items: center;
+    }
+
+    .cta-info .section-label {
+        justify-content: center;
+    }
+
     .contact-item-value {
         font-size: 1rem;
     }
@@ -1773,7 +1790,13 @@ textarea {
 
     .contact-item-value {
         font-size: .9rem;
-        word-break: break-all;
+        overflow-wrap: break-word;
+        word-break: normal;
+    }
+
+    .hero-badge {
+        font-size: .75rem;
+        padding: .4rem 1rem;
     }
 
     .contact-form-card {

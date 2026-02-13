@@ -20,6 +20,14 @@
  * IMPORTANT: After pasting, click Deploy → Manage deployments → Edit → Update
  *            every time you make changes to this script.
  * ============================================================
+ *
+ * AUTHORIZATION REMINDER:
+ * For email to work, you must authorize the script:
+ * 1. In the Apps Script editor, select doPost from the function dropdown
+ * 2. Click ▶ Run — this triggers the authorization prompt
+ * 3. Accept ALL permissions (send email, access sheets)
+ * 4. Re-deploy as a NEW VERSION after authorizing
+ * ============================================================
  */
 
 // ---- CONFIG ----
@@ -30,7 +38,18 @@ const EMAIL_SUBJECT = '🍀 New Quote Request — Lucky Landscapes';
 
 function doPost(e) {
     try {
-        const data = JSON.parse(e.postData.contents);
+        // The website sends data as application/x-www-form-urlencoded
+        // which arrives in e.parameter
+        let data = {};
+
+        if (e.parameter && e.parameter.firstName) {
+            // Form-encoded submission (URLSearchParams from frontend)
+            data = e.parameter;
+        } else if (e.postData && e.postData.contents) {
+            // Fallback: JSON submission
+            data = JSON.parse(e.postData.contents);
+        }
+
         const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
 
         // Append row to sheet

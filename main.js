@@ -10,6 +10,15 @@ import Lenis from 'lenis';
 gsap.registerPlugin(ScrollTrigger);
 
 // ============================================
+// SCROLL TO TOP ON PAGE LOAD
+// ============================================
+// Prevent browser from restoring previous scroll position
+if ('scrollRestoration' in history) {
+    history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
+
+// ============================================
 // LENIS SMOOTH SCROLL
 // ============================================
 const lenis = new Lenis({
@@ -319,8 +328,8 @@ if (!isTeamPage) {
 // ============================================
 // APPS SCRIPT URLs — Replace with your deployed URLs
 // ============================================
-const CONTACT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyolIqWrqNVgm7Ilmzh4pwZjUgf4zhtWKHN33DTsxE7pTS9UawJZELlDj-6GzAIQuwO/exec';
-const CAREERS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx9Ye19SJ_toivznpbSzv3euVH05g55ZeZMi9gEnywwRoNNGf4VJfmIO_zv1ec_YeIa/exec';
+const CONTACT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyJYOqTwi-6KdPaR6oPBN9Tn1PBpcq_67rn7bPtsXwV3HTOFVSuIUGAXbX36CyN0ct59A/exec';
+const CAREERS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxFi4x3V_BUkDCfHrx6UXmTBb3VhOGYt2crQeaNDUd9KWqCSmih7yjfUJ2m0don0fSr/exec';
 
 // ============================================
 // CONTACT FORM HANDLER
@@ -343,11 +352,17 @@ if (contactForm) {
         btn.disabled = true;
 
         try {
-            const res = await fetch(CONTACT_SCRIPT_URL, {
+            // Use URLSearchParams so the body survives no-cors mode
+            // (JSON content-type is not a "simple" header and gets stripped)
+            const params = new URLSearchParams();
+            for (const [key, value] of Object.entries(data)) {
+                params.append(key, value);
+            }
+
+            await fetch(CONTACT_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data),
+                body: params,
             });
 
             // no-cors means we can't read the response, but if fetch didn't throw, it sent
@@ -397,10 +412,18 @@ if (careersForm) {
         btn.disabled = true;
 
         try {
+            // Build URLSearchParams so that data survives no-cors mode
+            // (JSON content-type is not a "simple" header and gets stripped)
+            const params = new URLSearchParams();
+            // Add all text fields
+            for (const [key, value] of Object.entries(data)) {
+                if (key !== 'resume') {
+                    params.append(key, value);
+                }
+            }
+
             // Handle resume file — convert to base64 for Apps Script
             const resumeFile = careersForm.querySelector('#resume').files[0];
-            const payload = { ...data };
-
             if (resumeFile) {
                 const reader = new FileReader();
                 const base64 = await new Promise((resolve, reject) => {
@@ -408,16 +431,15 @@ if (careersForm) {
                     reader.onerror = reject;
                     reader.readAsDataURL(resumeFile);
                 });
-                payload.resumeData = base64;
-                payload.resumeName = resumeFile.name;
-                payload.resumeType = resumeFile.type;
+                params.append('resumeData', base64);
+                params.append('resumeName', resumeFile.name);
+                params.append('resumeType', resumeFile.type);
             }
 
             await fetch(CAREERS_SCRIPT_URL, {
                 method: 'POST',
                 mode: 'no-cors',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+                body: params,
             });
 
             btn.innerHTML = '✓ Application Sent!';
