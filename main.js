@@ -319,7 +319,7 @@ if (!isTeamPage) {
 // ============================================
 // APPS SCRIPT URLs — Replace with your deployed URLs
 // ============================================
-const CONTACT_SCRIPT_URL = 'AKfycbye5e75uBwjgX-_cJUg5BVwT5WM1b7hjAR2R2nHX3KIloDtuix3mX2tc6RdGj_n4PR4';
+const CONTACT_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyolIqWrqNVgm7Ilmzh4pwZjUgf4zhtWKHN33DTsxE7pTS9UawJZELlDj-6GzAIQuwO/exec';
 const CAREERS_SCRIPT_URL = 'YOUR_CAREERS_APPS_SCRIPT_URL_HERE';
 
 // ============================================
