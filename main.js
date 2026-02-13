@@ -317,11 +317,17 @@ if (!isTeamPage) {
 }
 
 // ============================================
+// APPS SCRIPT URLs — Replace with your deployed URLs
+// ============================================
+const CONTACT_SCRIPT_URL = 'AKfycbxobRxKwKlwk5mJeXWqiTGRe2iRWqTGYrGB12rIA9wdnI00XFqSU1FYaRBdeuqeZ4Vl';
+const CAREERS_SCRIPT_URL = 'YOUR_CAREERS_APPS_SCRIPT_URL_HERE';
+
+// ============================================
 // CONTACT FORM HANDLER
 // ============================================
 const contactForm = document.getElementById('contact-form');
 if (contactForm) {
-    contactForm.addEventListener('submit', (e) => {
+    contactForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const data = Object.fromEntries(new FormData(contactForm).entries());
 
@@ -331,18 +337,128 @@ if (contactForm) {
         }
 
         const btn = contactForm.querySelector('.form-submit');
-        const original = btn.innerHTML;
-        btn.innerHTML = '✓ Request Sent!';
-        btn.style.background = '#2D4A22';
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Sending...';
+        btn.classList.add('loading');
         btn.disabled = true;
 
-        setTimeout(() => {
-            btn.innerHTML = original;
-            btn.style.background = '';
-            btn.disabled = false;
+        try {
+            const res = await fetch(CONTACT_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data),
+            });
+
+            // no-cors means we can't read the response, but if fetch didn't throw, it sent
+            btn.innerHTML = '✓ Request Sent!';
+            btn.classList.remove('loading');
+            btn.classList.add('success');
             contactForm.reset();
-        }, 3000);
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('success');
+                btn.disabled = false;
+            }, 4000);
+        } catch (err) {
+            btn.innerHTML = '✕ Error — try again';
+            btn.classList.remove('loading');
+            btn.classList.add('error');
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('error');
+                btn.disabled = false;
+            }, 3000);
+        }
     });
+}
+
+// ============================================
+// CAREERS FORM HANDLER
+// ============================================
+const careersForm = document.getElementById('careers-form');
+if (careersForm) {
+    careersForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(careersForm);
+        const data = Object.fromEntries(formData.entries());
+
+        if (!data.fullName || !data.email) {
+            alert('Please fill in at least your name and email.');
+            return;
+        }
+
+        const btn = careersForm.querySelector('.form-submit');
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<span class="spinner"></span> Submitting...';
+        btn.classList.add('loading');
+        btn.disabled = true;
+
+        try {
+            // Handle resume file — convert to base64 for Apps Script
+            const resumeFile = careersForm.querySelector('#resume').files[0];
+            const payload = { ...data };
+
+            if (resumeFile) {
+                const reader = new FileReader();
+                const base64 = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(resumeFile);
+                });
+                payload.resumeData = base64;
+                payload.resumeName = resumeFile.name;
+                payload.resumeType = resumeFile.type;
+            }
+
+            await fetch(CAREERS_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            btn.innerHTML = '✓ Application Sent!';
+            btn.classList.remove('loading');
+            btn.classList.add('success');
+            careersForm.reset();
+
+            // Clear file input label
+            const fileLabel = careersForm.querySelector('.file-name');
+            if (fileLabel) fileLabel.textContent = 'No file chosen';
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('success');
+                btn.disabled = false;
+            }, 4000);
+        } catch (err) {
+            btn.innerHTML = '✕ Error — try again';
+            btn.classList.remove('loading');
+            btn.classList.add('error');
+
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.classList.remove('error');
+                btn.disabled = false;
+            }, 3000);
+        }
+    });
+
+    // Custom file input display
+    const resumeInput = document.getElementById('resume');
+    if (resumeInput) {
+        resumeInput.addEventListener('change', () => {
+            const label = careersForm.querySelector('.file-name');
+            if (label) {
+                label.textContent = resumeInput.files.length > 0
+                    ? resumeInput.files[0].name
+                    : 'No file chosen';
+            }
+        });
+    }
 }
 
 // ============================================

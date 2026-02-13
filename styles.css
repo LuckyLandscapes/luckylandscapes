@@ -84,6 +84,8 @@ body {
     color: var(--charcoal);
     background: var(--cream);
     overflow-x: hidden;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 h1,
@@ -1064,6 +1066,7 @@ textarea {
     font-family: var(--font-heading);
     font-weight: 700;
     font-size: 1.15rem;
+    word-break: break-all;
 }
 
 /* Contact Form */
@@ -1154,6 +1157,87 @@ textarea {
 
 .form-submit:active {
     transform: scale(.98);
+}
+
+/* Form button states */
+.form-submit.loading {
+    background: var(--gray-500);
+    cursor: wait;
+    pointer-events: none;
+}
+
+.form-submit.success {
+    background: var(--forest);
+    cursor: default;
+}
+
+.form-submit.error {
+    background: #c0392b;
+    cursor: default;
+}
+
+/* Spinner */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid rgba(255, 255, 255, .3);
+    border-top-color: var(--white);
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* File Upload */
+.file-upload-wrap {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.file-upload-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .65rem 1.25rem;
+    background: var(--gray-100);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-sm);
+    font-size: .9rem;
+    font-weight: 600;
+    color: var(--gray-700);
+    cursor: pointer;
+    transition: all var(--t-fast);
+}
+
+.file-upload-btn:hover {
+    background: var(--gray-200);
+    border-color: var(--clover);
+    color: var(--clover);
+}
+
+.file-name {
+    font-size: .85rem;
+    color: var(--gray-500);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
 
 /* ============================================
@@ -1567,6 +1651,10 @@ textarea {
         display: flex;
     }
 
+    .nav-logo-text {
+        font-size: 1.15rem;
+    }
+
     .about-grid {
         grid-template-columns: 1fr;
         gap: 1.5rem;
@@ -1589,6 +1677,10 @@ textarea {
     .cta-grid {
         grid-template-columns: 1fr;
         gap: 3rem;
+    }
+
+    .contact-item-value {
+        font-size: 1rem;
     }
 
     .stats-grid {
@@ -1618,9 +1710,29 @@ textarea {
     .cta-banner-content {
         padding: 3rem 1.5rem;
     }
+
+    .cta-banner-content h2 {
+        font-size: clamp(1.4rem, 5vw, 2rem);
+    }
+
+    .hero-content {
+        padding: 1.5rem 1rem;
+    }
 }
 
 @media (max-width:480px) {
+    .section-title {
+        font-size: clamp(1.6rem, 6vw, 2rem);
+    }
+
+    .hero-title {
+        font-size: clamp(1.8rem, 7vw, 2.5rem);
+    }
+
+    .hero-sub {
+        font-size: .95rem;
+    }
+
     .services-grid {
         grid-template-columns: 1fr;
     }
@@ -1652,5 +1764,19 @@ textarea {
         flex-direction: column;
         text-align: center;
         align-items: center;
+    }
+
+    .contact-item {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .contact-item-value {
+        font-size: .9rem;
+        word-break: break-all;
+    }
+
+    .contact-form-card {
+        padding: 1.5rem;
     }
 }
