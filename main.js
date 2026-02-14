@@ -500,3 +500,195 @@ if (window.innerWidth > 768) {
         });
     });
 }
+
+// ============================================
+// PROJECT LIGHTBOX / GALLERY
+// ============================================
+const projectData = [
+    {
+        title: 'Custom Paver Patio',
+        tag: 'Hardscaping',
+        desc: 'A stunning custom paver patio designed to extend this family\'s outdoor living space. We selected premium interlocking pavers with a complementary border pattern, creating a durable and beautiful surface perfect for entertaining.',
+        images: [
+            'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+    {
+        title: 'Stone Retaining Wall',
+        tag: 'Hardscaping',
+        desc: 'This natural stone retaining wall solved a significant grading challenge while adding striking visual appeal. Multiple tiers create planting opportunities and transform a steep slope into usable yard space.',
+        images: [
+            'https://images.unsplash.com/photo-1592420982531-15e71418cb2a?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+    {
+        title: 'Full Lawn Restoration',
+        tag: 'Landscaping',
+        desc: 'A complete lawn renovation that brought this yard back to life. Starting with soil preparation and grading, we installed fresh sod with a professional irrigation setup for a lush, green result that the homeowners love.',
+        images: [
+            'https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1592150621744-aca64f48394a?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600438337956-5feb827da8f3?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+    {
+        title: 'Garden Bed Design',
+        tag: 'Planting',
+        desc: 'Custom-designed garden beds featuring a curated selection of perennials and ornamental grasses. We used premium mulch and landscape edging to create clean lines that frame the property beautifully.',
+        images: [
+            'https://images.unsplash.com/photo-1621262981503-45f8e0bd6028?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1598902108854-d1446a8a5665?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+    {
+        title: 'Composite Deck Build',
+        tag: 'Construction',
+        desc: 'A beautiful composite deck built to maximize outdoor living space. Featuring low-maintenance materials, integrated lighting, and a multi-level design that flows seamlessly from the home to the backyard.',
+        images: [
+            'https://images.unsplash.com/photo-1599629959669-02685732145b?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+    {
+        title: 'Seasonal Cleanup & Mulching',
+        tag: 'Maintenance',
+        desc: 'A comprehensive seasonal cleanup that included bush trimming, leaf removal, fresh mulch installation, and bed edging. The property went from overgrown to polished in just one day.',
+        images: [
+            'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1621262981503-45f8e0bd6028?auto=format&fit=crop&q=80&w=1200',
+            'https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1200',
+        ],
+    },
+];
+
+const lightbox = document.getElementById('project-lightbox');
+const lightboxBackdrop = document.getElementById('lightbox-backdrop');
+const lightboxClose = document.getElementById('lightbox-close');
+const lightboxMainImg = document.getElementById('lightbox-main-img');
+const lightboxTitle = document.getElementById('lightbox-title');
+const lightboxTag = document.getElementById('lightbox-tag');
+const lightboxDesc = document.getElementById('lightbox-desc');
+const lightboxDots = document.getElementById('lightbox-dots');
+const lightboxPrev = document.getElementById('lightbox-prev');
+const lightboxNext = document.getElementById('lightbox-next');
+const lightboxCta = document.getElementById('lightbox-cta');
+
+let currentProject = null;
+let currentImageIndex = 0;
+
+function updateLightboxImage() {
+    if (!currentProject) return;
+    const images = currentProject.images;
+    lightboxMainImg.style.opacity = '0';
+    setTimeout(() => {
+        lightboxMainImg.src = images[currentImageIndex];
+        lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
+        lightboxMainImg.style.opacity = '1';
+    }, 150);
+
+    // Update dots
+    const dots = lightboxDots.querySelectorAll('.lightbox-dot');
+    dots.forEach((dot, i) => {
+        dot.classList.toggle('active', i === currentImageIndex);
+    });
+}
+
+function openLightbox(projectIndex) {
+    currentProject = projectData[projectIndex];
+    currentImageIndex = 0;
+
+    if (!currentProject || !lightbox) return;
+
+    // Populate info
+    lightboxTitle.textContent = currentProject.title;
+    lightboxTag.textContent = currentProject.tag;
+    lightboxDesc.textContent = currentProject.desc;
+
+    // Create dots
+    lightboxDots.innerHTML = '';
+    currentProject.images.forEach((_, i) => {
+        const dot = document.createElement('button');
+        dot.className = 'lightbox-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', `View image ${i + 1}`);
+        dot.addEventListener('click', () => {
+            currentImageIndex = i;
+            updateLightboxImage();
+        });
+        lightboxDots.appendChild(dot);
+    });
+
+    // Set first image
+    lightboxMainImg.src = currentProject.images[0];
+    lightboxMainImg.alt = `${currentProject.title} — photo 1`;
+    lightboxMainImg.style.opacity = '1';
+
+    // Show lightbox
+    lightbox.classList.add('active');
+    lenis.stop();
+}
+
+function closeLightbox() {
+    if (!lightbox) return;
+    lightbox.classList.remove('active');
+    lenis.start();
+    currentProject = null;
+}
+
+// Gallery item click handlers
+if (lightbox) {
+    document.querySelectorAll('.gallery-item[data-project]').forEach(item => {
+        item.addEventListener('click', () => {
+            const idx = parseInt(item.dataset.project, 10);
+            openLightbox(idx);
+        });
+    });
+
+    // Navigation
+    if (lightboxPrev) {
+        lightboxPrev.addEventListener('click', () => {
+            if (!currentProject) return;
+            currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
+            updateLightboxImage();
+        });
+    }
+
+    if (lightboxNext) {
+        lightboxNext.addEventListener('click', () => {
+            if (!currentProject) return;
+            currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
+            updateLightboxImage();
+        });
+    }
+
+    // Close handlers
+    if (lightboxClose) lightboxClose.addEventListener('click', closeLightbox);
+    if (lightboxBackdrop) lightboxBackdrop.addEventListener('click', closeLightbox);
+
+    document.addEventListener('keydown', (e) => {
+        if (!lightbox.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft' && lightboxPrev) lightboxPrev.click();
+        if (e.key === 'ArrowRight' && lightboxNext) lightboxNext.click();
+    });
+
+    // CTA button closes lightbox and scrolls to contact
+    if (lightboxCta) {
+        lightboxCta.addEventListener('click', (e) => {
+            e.preventDefault();
+            closeLightbox();
+            setTimeout(() => {
+                const target = document.querySelector('#contact');
+                if (target) {
+                    const navH = navbar ? navbar.offsetHeight : 80;
+                    lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
+                }
+            }, 300);
+        });
+    }
+}

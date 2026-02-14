@@ -23,8 +23,8 @@
     <link rel="icon" type="image/png" href="/images/Icon.png" />
 
     <!-- Styles (Vite injects CSS from main.js import) -->
-  <script type="module" crossorigin src="/assets/main-D1d9hYml.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-C19PPFdr.css">
+  <script type="module" crossorigin src="/assets/main-DeEZdUBM.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-Diu8w3lA.css">
 </head>
 
 <body>
@@ -349,7 +349,7 @@
             </div>
 
             <div class="gallery-grid stagger-children">
-                <div class="gallery-item gallery-item-tall">
+                <div class="gallery-item gallery-item-tall" data-project="0">
                     <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=800"
                         alt="Beautiful paver patio project" loading="lazy" />
                     <div class="gallery-overlay">
@@ -358,7 +358,7 @@
                     </div>
                 </div>
 
-                <div class="gallery-item">
+                <div class="gallery-item" data-project="1">
                     <img src="https://images.unsplash.com/photo-1592420982531-15e71418cb2a?auto=format&fit=crop&q=80&w=800"
                         alt="Stone retaining wall" loading="lazy" />
                     <div class="gallery-overlay">
@@ -367,7 +367,7 @@
                     </div>
                 </div>
 
-                <div class="gallery-item">
+                <div class="gallery-item" data-project="2">
                     <img src="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=800"
                         alt="Manicured lawn and landscaping" loading="lazy" />
                     <div class="gallery-overlay">
@@ -376,7 +376,7 @@
                     </div>
                 </div>
 
-                <div class="gallery-item">
+                <div class="gallery-item" data-project="3">
                     <img src="https://images.unsplash.com/photo-1621262981503-45f8e0bd6028?auto=format&fit=crop&q=80&w=800"
                         alt="Garden bed installation" loading="lazy" />
                     <div class="gallery-overlay">
@@ -385,7 +385,7 @@
                     </div>
                 </div>
 
-                <div class="gallery-item gallery-item-tall">
+                <div class="gallery-item gallery-item-tall" data-project="4">
                     <img src="https://images.unsplash.com/photo-1599629959669-02685732145b?auto=format&fit=crop&q=80&w=800"
                         alt="Deck construction" loading="lazy" />
                     <div class="gallery-overlay">
@@ -394,7 +394,7 @@
                     </div>
                 </div>
 
-                <div class="gallery-item">
+                <div class="gallery-item" data-project="5">
                     <img src="https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=800"
                         alt="Mulch and bush trimming project" loading="lazy" />
                     <div class="gallery-overlay">
@@ -550,6 +550,57 @@
             </div>
         </div>
     </section>
+
+    <!-- ==================== PROJECT LIGHTBOX ==================== -->
+    <div class="project-lightbox" id="project-lightbox">
+        <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
+        <div class="lightbox-container">
+            <button class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+            </button>
+
+            <div class="lightbox-content">
+                <!-- Left — Image Carousel -->
+                <div class="lightbox-images">
+                    <div class="lightbox-img-wrap">
+                        <img id="lightbox-main-img" src="" alt="" />
+                    </div>
+                    <button class="lightbox-nav lightbox-prev" id="lightbox-prev" aria-label="Previous image">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m15 18-6-6 6-6" />
+                        </svg>
+                    </button>
+                    <button class="lightbox-nav lightbox-next" id="lightbox-next" aria-label="Next image">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="m9 18 6-6-6-6" />
+                        </svg>
+                    </button>
+                    <div class="lightbox-dots" id="lightbox-dots"></div>
+                </div>
+
+                <!-- Right — Project Info -->
+                <div class="lightbox-info">
+                    <span class="lightbox-tag" id="lightbox-tag"></span>
+                    <h2 class="lightbox-title" id="lightbox-title"></h2>
+                    <p class="lightbox-desc" id="lightbox-desc"></p>
+                    <a href="#contact" class="btn btn-primary btn-lg lightbox-cta" id="lightbox-cta">
+                        Get a Free Quote
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ==================== FOOTER ==================== -->
     <footer class="footer">
