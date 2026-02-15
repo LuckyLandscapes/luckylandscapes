@@ -1,8 +1,8 @@
 {
   "name": "luckylandscapes",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Lucky Landscapes — Professional landscaping services in Southeast Nebraska",
+  "main": "main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
