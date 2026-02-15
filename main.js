@@ -254,7 +254,7 @@ if (aboutCards.length > 0) {
 // GSAP — TEAM CARDS
 // ============================================
 const teamCards = document.querySelectorAll('.team-card');
-if (teamCards.length > 0) {
+if (teamCards.length > 0 && window.innerWidth > 768) {
     teamCards.forEach((card, i) => {
         gsap.from(card, {
             x: i % 2 === 0 ? -40 : 40,
@@ -273,7 +273,7 @@ if (teamCards.length > 0) {
 // GSAP — CTA SECTION PARALLAX
 // ============================================
 const ctaSection = document.querySelector('.cta-section');
-if (ctaSection) {
+if (ctaSection && window.innerWidth > 768) {
     gsap.from('.cta-info', {
         x: -60,
         duration: 1,

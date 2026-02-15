@@ -1911,6 +1911,23 @@ textarea {
         font-size: 1rem;
     }
 
+    /* Disable horizontal reveal animations on mobile — use vertical instead */
+    .reveal-left {
+        transform: translateY(40px);
+    }
+
+    .reveal-left.revealed {
+        transform: translateY(0);
+    }
+
+    .reveal-right {
+        transform: translateY(40px);
+    }
+
+    .reveal-right.revealed {
+        transform: translateY(0);
+    }
+
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 1.5rem;
