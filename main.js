@@ -584,11 +584,12 @@ function buildGalleryGrid() {
         item.className = 'gallery-item';
         item.dataset.project = index;
 
-        // Image element — starts with a transparent placeholder, real src set via preloader
+        // Image element — starts empty, real src set via lazy loader
         const img = document.createElement('img');
         img.dataset.src = src; // store real src for lazy loading
         img.alt = `${project.title} — ${project.tag}`;
         img.loading = 'lazy';
+        img.className = 'gallery-img-lazy'; // mark as not-yet-loaded for CSS skeleton
 
         // Overlay
         const overlay = document.createElement('div');
@@ -627,7 +628,7 @@ if (galleryItemsForAnim.length > 0) {
 }
 
 // ============================================
-// GALLERY IMAGE PRELOADING (IntersectionObserver)
+// GALLERY IMAGE PRELOADING
 // ============================================
 const preloadedSrcs = new Set();
 
@@ -637,12 +638,14 @@ function preloadImage(src) {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = resolve;
-        img.onerror = resolve;
+        img.onerror = resolve; // resolve even on error so we never hang
         img.src = src;
     });
 }
 
-// Lazy-load gallery grid images as they approach the viewport
+// ============================================
+// LAZY LOADING — Gallery grid images (IntersectionObserver)
+// ============================================
 const lazyImageObserver = new IntersectionObserver(
     (entries) => {
         entries.forEach((entry) => {
@@ -650,13 +653,20 @@ const lazyImageObserver = new IntersectionObserver(
                 const img = entry.target;
                 const realSrc = img.dataset.src;
                 if (realSrc) {
-                    // Fade-in effect: set opacity 0, load, then fade in
-                    img.style.opacity = '0';
-                    img.src = realSrc;
-                    img.onload = () => {
-                        img.style.opacity = '1';
+                    const tempImg = new Image();
+                    tempImg.onload = () => {
+                        img.src = realSrc;
+                        img.classList.remove('gallery-img-lazy');
+                        img.classList.add('gallery-img-loaded');
                         preloadedSrcs.add(realSrc);
                     };
+                    tempImg.onerror = () => {
+                        // Still set the src so the browser can show its own fallback
+                        img.src = realSrc;
+                        img.classList.remove('gallery-img-lazy');
+                        img.classList.add('gallery-img-loaded');
+                    };
+                    tempImg.src = realSrc;
                     img.removeAttribute('data-src');
                 }
                 lazyImageObserver.unobserve(img);
@@ -687,29 +697,65 @@ const lightboxDots = document.getElementById('lightbox-dots');
 const lightboxPrev = document.getElementById('lightbox-prev');
 const lightboxNext = document.getElementById('lightbox-next');
 const lightboxCta = document.getElementById('lightbox-cta');
+const lightboxImgWrap = lightboxMainImg ? lightboxMainImg.parentElement : null;
 
 let currentProject = null;
 let currentImageIndex = 0;
+let isTransitioning = false; // prevent rapid clicks from stacking transitions
 
-function updateLightboxImage() {
-    if (!currentProject) return;
+function showLightboxLoading() {
+    if (lightboxImgWrap) lightboxImgWrap.classList.add('is-loading');
+}
+
+function hideLightboxLoading() {
+    if (lightboxImgWrap) lightboxImgWrap.classList.remove('is-loading');
+}
+
+function updateLightboxImage(direction) {
+    if (!currentProject || isTransitioning) return;
     const images = currentProject.images;
     const src = getImageSrc(images[currentImageIndex]);
 
-    // Fade out, swap image, fade in on load
-    lightboxMainImg.style.opacity = '0';
-    const tempImg = new Image();
-    tempImg.onload = () => {
-        lightboxMainImg.src = src;
-        lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
-        // Small delay so the browser paints the new src before fading in
-        requestAnimationFrame(() => {
-            lightboxMainImg.style.opacity = '1';
-        });
-    };
-    tempImg.src = src;
+    isTransitioning = true;
 
-    // Update dots
+    // Phase 1: Fade out current image
+    lightboxMainImg.classList.remove('lb-visible');
+    lightboxMainImg.classList.add('lb-hidden');
+
+    // Phase 2: After fade-out completes, swap src and fade in
+    setTimeout(() => {
+        // Clear old src immediately so stale image never shows
+        lightboxMainImg.removeAttribute('src');
+        showLightboxLoading();
+
+        const tempImg = new Image();
+        tempImg.onload = () => {
+            lightboxMainImg.src = src;
+            lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
+            hideLightboxLoading();
+
+            // Use rAF to ensure the browser has the new image painted
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    lightboxMainImg.classList.remove('lb-hidden');
+                    lightboxMainImg.classList.add('lb-visible');
+                    isTransitioning = false;
+                });
+            });
+        };
+        tempImg.onerror = () => {
+            // Fallback: show image even if preload fails
+            lightboxMainImg.src = src;
+            lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
+            hideLightboxLoading();
+            lightboxMainImg.classList.remove('lb-hidden');
+            lightboxMainImg.classList.add('lb-visible');
+            isTransitioning = false;
+        };
+        tempImg.src = src;
+    }, 250); // match the CSS fade-out duration
+
+    // Update dots immediately (they should reflect the new selection)
     const dots = lightboxDots.querySelectorAll('.lightbox-dot');
     dots.forEach((dot, i) => {
         dot.classList.toggle('active', i === currentImageIndex);
@@ -726,13 +772,21 @@ function preloadProjectImages(project) {
 function openLightbox(projectIndex) {
     currentProject = projectData[projectIndex];
     currentImageIndex = 0;
+    isTransitioning = false;
 
     if (!currentProject || !lightbox) return;
+
+    // ► IMMEDIATELY clear old image so stale gallery photos never show
+    lightboxMainImg.removeAttribute('src');
+    lightboxMainImg.alt = '';
+    lightboxMainImg.classList.remove('lb-visible');
+    lightboxMainImg.classList.add('lb-hidden');
+    showLightboxLoading();
 
     // Preload all images for this project
     preloadProjectImages(currentProject);
 
-    // Populate info
+    // Populate info (text updates instantly)
     lightboxTitle.textContent = currentProject.title;
     lightboxTag.textContent = currentProject.tag;
     lightboxDesc.textContent = currentProject.desc;
@@ -744,28 +798,33 @@ function openLightbox(projectIndex) {
         dot.className = 'lightbox-dot' + (i === 0 ? ' active' : '');
         dot.setAttribute('aria-label', `View image ${i + 1}`);
         dot.addEventListener('click', () => {
+            if (i === currentImageIndex) return;
             currentImageIndex = i;
             updateLightboxImage();
         });
         lightboxDots.appendChild(dot);
     });
 
-    // Set first image with proper onload handling
+    // Load first image — preload then fade in
     const firstSrc = getImageSrc(currentProject.images[0]);
-    lightboxMainImg.style.opacity = '0';
     const tempImg = new Image();
     tempImg.onload = () => {
         lightboxMainImg.src = firstSrc;
         lightboxMainImg.alt = `${currentProject.title} — photo 1`;
+        hideLightboxLoading();
         requestAnimationFrame(() => {
-            lightboxMainImg.style.opacity = '1';
+            requestAnimationFrame(() => {
+                lightboxMainImg.classList.remove('lb-hidden');
+                lightboxMainImg.classList.add('lb-visible');
+            });
         });
     };
     tempImg.onerror = () => {
-        // Fallback: still show the image even if preload fails
         lightboxMainImg.src = firstSrc;
         lightboxMainImg.alt = `${currentProject.title} — photo 1`;
-        lightboxMainImg.style.opacity = '1';
+        hideLightboxLoading();
+        lightboxMainImg.classList.remove('lb-hidden');
+        lightboxMainImg.classList.add('lb-visible');
     };
     tempImg.src = firstSrc;
 
@@ -779,6 +838,14 @@ function closeLightbox() {
     lightbox.classList.remove('active');
     lenis.start();
     currentProject = null;
+    isTransitioning = false;
+
+    // Clear image so next open doesn't flash old content
+    if (lightboxMainImg) {
+        lightboxMainImg.removeAttribute('src');
+        lightboxMainImg.classList.remove('lb-visible');
+        lightboxMainImg.classList.add('lb-hidden');
+    }
 }
 
 // Gallery item click handlers (event delegation on the grid)
@@ -795,7 +862,7 @@ if (lightbox && galleryGrid) {
         lightboxPrev.addEventListener('click', () => {
             if (!currentProject) return;
             currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
-            updateLightboxImage();
+            updateLightboxImage('left');
         });
     }
 
@@ -803,7 +870,7 @@ if (lightbox && galleryGrid) {
         lightboxNext.addEventListener('click', () => {
             if (!currentProject) return;
             currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
-            updateLightboxImage();
+            updateLightboxImage('right');
         });
     }
 
@@ -814,9 +881,43 @@ if (lightbox && galleryGrid) {
     document.addEventListener('keydown', (e) => {
         if (!lightbox.classList.contains('active')) return;
         if (e.key === 'Escape') closeLightbox();
-        if (e.key === 'ArrowLeft' && lightboxPrev) lightboxPrev.click();
-        if (e.key === 'ArrowRight' && lightboxNext) lightboxNext.click();
+        if (e.key === 'ArrowLeft' && lightboxPrev) {
+            if (!currentProject) return;
+            currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
+            updateLightboxImage('left');
+        }
+        if (e.key === 'ArrowRight' && lightboxNext) {
+            if (!currentProject) return;
+            currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
+            updateLightboxImage('right');
+        }
     });
+
+    // Touch swipe support for lightbox
+    let touchStartX = 0;
+    let touchEndX = 0;
+    const lightboxImages = document.querySelector('.lightbox-images');
+    if (lightboxImages) {
+        lightboxImages.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        lightboxImages.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            const swipeDistance = touchStartX - touchEndX;
+            if (Math.abs(swipeDistance) > 50 && currentProject) {
+                if (swipeDistance > 0) {
+                    // Swipe left → next image
+                    currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
+                    updateLightboxImage('right');
+                } else {
+                    // Swipe right → prev image
+                    currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
+                    updateLightboxImage('left');
+                }
+            }
+        }, { passive: true });
+    }
 
     // CTA button closes lightbox and scrolls to contact
     if (lightboxCta) {
