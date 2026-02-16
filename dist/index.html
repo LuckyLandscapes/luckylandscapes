@@ -20,11 +20,17 @@
     <meta property="og:url" content="https://luckylandscapes.com" />
 
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/images/favicon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon-O4K6UDxw.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32x32-D9qwP_a9.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16x16-9x3SlAnV.png">
+    <link rel="manifest" href="/assets/site-BwHFeIBa.webmanifest">
+    <!-- Preconnect to Google Fonts for faster font loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 
     <!-- Styles (Vite injects CSS from main.js import) -->
-  <script type="module" crossorigin src="/assets/main-1jWM3L5U.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-DcLCHP1_.css">
+  <script type="module" crossorigin src="/assets/main-DzmyuFT7.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-gJP06BAu.css">
 </head>
 
 <body>
@@ -32,7 +38,7 @@
     <!-- ==================== PRELOADER ==================== -->
     <div class="preloader" id="preloader">
         <div class="preloader-inner">
-            <img src="/images/Icon.png" alt="" class="preloader-logo" />
+            <img src="/images/Icon.png" alt="" class="preloader-logo" fetchpriority="high" />
             <div class="preloader-bar">
                 <div class="preloader-bar-fill"></div>
             </div>
@@ -77,10 +83,9 @@
     <header class="hero" id="hero">
         <!-- Video Background -->
         <div class="hero-video-wrap">
-            <video class="hero-video" autoplay muted loop playsinline
+            <video class="hero-video" id="hero-video" muted loop playsinline preload="none"
                 poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
-                <source src="https://videos.pexels.com/video-files/2491284/2491284-hd_1920_1080_24fps.mp4"
-                    type="video/mp4" />
+                <source src="/images/heromain.mp4" type="video/mp4" />
             </video>
             <div class="hero-overlay"></div>
         </div>
