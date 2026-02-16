@@ -510,9 +510,8 @@ const projectData = [
         tag: 'Construction',
         desc: 'A custom built deck designed to extend this family\'s outdoor living space. We selected premium composite materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
         images: [
-            'public/images/megandeck/1.png',
-            'public/images/megandeck/2.png',
-            'public/images/megandeck/3.png',
+            '/images/megandeck/1.png',
+            '/images/megandeck/2.png',
         ],
     },
     {
@@ -540,8 +539,8 @@ const projectData = [
         tag: 'Seasonal Cleanup',
         desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting.',
         images: [
-            'public/images/LawnRestore/after.jpg',
-            'public/images/LawnRestore/before.png',
+            '/images/LawnRestore/after.jpg',
+            '/images/LawnRestore/before.png',
         ],
     },
     {
@@ -549,10 +548,10 @@ const projectData = [
         tag: 'Landscaping',
         desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the front yard.',
         images: [
-            'public/images/gardenbed/1.jpg',
-            'public/images/gardenbed/2.jpg',
-            'public/images/gardenbed/3.jpg',
-            'public/images/gardenbed/4.jpg',
+            '/images/gardenbed/1.jpg',
+            '/images/gardenbed/2.jpg',
+            '/images/gardenbed/3.jpg',
+            '/images/gardenbed/4.jpg',
         ],
     },
     {
