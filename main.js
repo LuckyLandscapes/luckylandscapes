@@ -515,23 +515,24 @@ const projectData = [
         ],
     },
     {
-        title: 'Stone Retaining Wall',
+        title: 'Brick Garden Walls',
         tag: 'Hardscaping',
-        desc: 'This natural stone retaining wall solved a significant grading challenge while adding striking visual appeal. Multiple tiers create planting opportunities and transform a steep slope into usable yard space.',
+        desc: 'This brick garden wall solved a significant grading challenge while adding striking visual appeal.',
         images: [
-            'https://images.unsplash.com/photo-1592420982531-15e71418cb2a?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600585154526-990dced4db0d?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600573472591-ee6b68d14c68?auto=format&fit=crop&q=80&w=1200',
+            '/images/bricklaying/1.jpg',
+            '/images/bricklaying/2.jpg',
+            '/images/bricklaying/3.jpg',
         ],
     },
     {
-        title: 'Full Lawn Restoration',
-        tag: 'Landscaping',
-        desc: 'A complete lawn renovation that brought this yard back to life. Starting with soil preparation and grading, we installed fresh sod with a professional irrigation setup for a lush, green result that the homeowners love.',
+        title: 'Lawn Maintenance',
+        tag: 'Maintenance',
+        desc: 'Regular lawn maintenance to keep your lawn looking its best. Includes mowing, edging, trimming, blowing, and hedge trimming.',
         images: [
-            'https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1592150621744-aca64f48394a?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600438337956-5feb827da8f3?auto=format&fit=crop&q=80&w=1200',
+            '/images/lawncare/1.jpg',
+            '/images/lawncare/2.jpg',
+            '/images/lawncare/3.jpg',
+            '/images/lawncare/4.jpg',
         ],
     },
     {
@@ -539,8 +540,8 @@ const projectData = [
         tag: 'Seasonal Cleanup',
         desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting.',
         images: [
-            '/images/LawnRestore/after.jpg',
-            '/images/LawnRestore/before.png',
+            '/images/LawnRestore/after.webp',
+            '/images/LawnRestore/before.webp',
         ],
     },
     {
@@ -555,13 +556,13 @@ const projectData = [
         ],
     },
     {
-        title: 'Seasonal Cleanup & Mulching',
-        tag: 'Maintenance',
-        desc: 'A comprehensive seasonal cleanup that included bush trimming, leaf removal, fresh mulch installation, and bed edging. The property went from overgrown to polished in just one day.',
+        title: 'Design & Build',
+        tag: 'Landscaping',
+        desc: 'Transforming outdoor spaces with thoughtful design and expert construction. From concept to completion, we create landscapes that enhance beauty and functionality.',
         images: [
-            'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1621262981503-45f8e0bd6028?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1200',
+            '/images/landscapedesign/3.png',
+            '/images/landscapedesign/1.jpg',
+            '/images/landscapedesign/2.jpg',
         ],
     },
 ];
