@@ -548,10 +548,10 @@ const projectData = [
         tag: 'Landscaping',
         desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the front yard.',
         images: [
-            '/images/gardenbed/1.jpg',
-            '/images/gardenbed/2.jpg',
-            '/images/gardenbed/3.jpg',
-            '/images/gardenbed/4.jpg',
+            '/images/gardenbed/1.webp',
+            '/images/gardenbed/2.webp',
+            '/images/gardenbed/3.webp',
+            '/images/gardenbed/4.webp',
         ],
     },
     {
