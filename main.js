@@ -506,13 +506,13 @@ if (window.innerWidth > 768) {
 // ============================================
 const projectData = [
     {
-        title: 'Custom Paver Patio',
-        tag: 'Hardscaping',
-        desc: 'A stunning custom paver patio designed to extend this family\'s outdoor living space. We selected premium interlocking pavers with a complementary border pattern, creating a durable and beautiful surface perfect for entertaining.',
+        title: 'Custom Built Deck',
+        tag: 'Construction',
+        desc: 'A custom built deck designed to extend this family\'s outdoor living space. We selected premium composite materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
         images: [
-            'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&q=80&w=1200',
+            'public/images/megandeck/1.png',
+            'public/images/megandeck/2.png',
+            'public/images/megandeck/3.png',
         ],
     },
     {
@@ -536,23 +536,23 @@ const projectData = [
         ],
     },
     {
-        title: 'Garden Bed Design',
-        tag: 'Planting',
-        desc: 'Custom-designed garden beds featuring a curated selection of perennials and ornamental grasses. We used premium mulch and landscape edging to create clean lines that frame the property beautifully.',
+        title: 'Lawn Cleanup',
+        tag: 'Seasonal Cleanup',
+        desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting.',
         images: [
-            'https://images.unsplash.com/photo-1621262981503-45f8e0bd6028?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1598902108854-d1446a8a5665?auto=format&fit=crop&q=80&w=1200',
+            'public/images/LawnRestore/after.jpg',
+            'public/images/LawnRestore/before.png',
         ],
     },
     {
-        title: 'Composite Deck Build',
-        tag: 'Construction',
-        desc: 'A beautiful composite deck built to maximize outdoor living space. Featuring low-maintenance materials, integrated lighting, and a multi-level design that flows seamlessly from the home to the backyard.',
+        title: 'Garden Beds',
+        tag: 'Landscaping',
+        desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the front yard.',
         images: [
-            'https://images.unsplash.com/photo-1599629959669-02685732145b?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600210491892-03d54c0aaf87?auto=format&fit=crop&q=80&w=1200',
-            'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?auto=format&fit=crop&q=80&w=1200',
+            'public/images/gardenbed/1.jpg',
+            'public/images/gardenbed/2.jpg',
+            'public/images/gardenbed/3.jpg',
+            'public/images/gardenbed/4.jpg',
         ],
     },
     {
