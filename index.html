@@ -24,10 +24,6 @@
     <link rel="icon" type="image/png" sizes="32x32" href="public/images/favicons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="public/images/favicons/favicon-16x16.png">
     <link rel="manifest" href="public/images/favicons/site.webmanifest">
-    <!-- Preconnect to Google Fonts for faster font loading -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-
     <!-- Styles (Vite injects CSS from main.js import) -->
     <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -37,7 +33,7 @@
     <!-- ==================== PRELOADER ==================== -->
     <div class="preloader" id="preloader">
         <div class="preloader-inner">
-            <img src="/images/Icon.png" alt="" class="preloader-logo" fetchpriority="high" />
+            <img src="/images/Icon.png" alt="" class="preloader-logo" />
             <div class="preloader-bar">
                 <div class="preloader-bar-fill"></div>
             </div>
@@ -82,7 +78,7 @@
     <header class="hero" id="hero">
         <!-- Video Background -->
         <div class="hero-video-wrap">
-            <video class="hero-video" id="hero-video" muted loop playsinline preload="none"
+            <video class="hero-video" autoplay muted loop playsinline
                 poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
                 <source src="/images/heromain.mp4" type="video/mp4" />
             </video>

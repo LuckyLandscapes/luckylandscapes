@@ -47,7 +47,7 @@ if (preloader) {
             preloader.classList.add('done');
             // Enable animations after preloader clears
             document.body.classList.add('loaded');
-        }, 400);
+        }, 800);
     });
 
     // Fallback: hide preloader after 4s even if load event doesn't fire
@@ -149,47 +149,6 @@ const revealObs = new IntersectionObserver(
 );
 
 revealEls.forEach(el => revealObs.observe(el));
-
-// ============================================
-// SMART VIDEO LOADER — Connection-aware loading
-// ============================================
-const heroVideo = document.getElementById('hero-video');
-if (heroVideo) {
-    const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-    const slow = conn && (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g');
-    const medium = conn && conn.effectiveType === '3g';
-
-    if (slow) {
-        // On 2g / slow-2g: never load the video — poster stays visible
-        heroVideo.removeAttribute('src');
-        heroVideo.querySelectorAll('source').forEach(s => s.remove());
-    } else if (medium) {
-        // On 3g: load the video but only play after enough has buffered
-        heroVideo.preload = 'auto';
-        heroVideo.addEventListener('canplaythrough', () => {
-            heroVideo.play().catch(() => { });
-        }, { once: true });
-    } else {
-        // 4g, WiFi, or API unavailable — load normally with autoplay
-        heroVideo.preload = 'auto';
-        heroVideo.autoplay = true;
-        // Nudge playback in case autoplay attr was added too late
-        heroVideo.play().catch(() => { });
-    }
-
-    // Pause video when scrolled out of view (saves CPU/battery)
-    const videoObserver = new IntersectionObserver(
-        ([entry]) => {
-            if (entry.isIntersecting) {
-                heroVideo.play().catch(() => { });
-            } else {
-                heroVideo.pause();
-            }
-        },
-        { threshold: 0.15 }
-    );
-    videoObserver.observe(heroVideo);
-}
 
 // ============================================
 // GSAP — HERO PARALLAX

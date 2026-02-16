@@ -18,7 +18,7 @@
     --cream: #F7F5F0;
     --white: #FFFFFF;
     --off-white: #FAFAF8;
-
+    --lucky-text: #41a100;
     /* Neutrals */
     --gray-50: #F9FAFB;
     --gray-100: #F3F4F6;
@@ -535,7 +535,6 @@ textarea {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    object-position: center;
     filter: blur(2px) brightness(.85);
     transform: scale(1.05);
     /* prevent blur edge artifacts */
@@ -545,9 +544,9 @@ textarea {
     position: absolute;
     inset: 0;
     background: linear-gradient(135deg,
-            rgba(30, 53, 22, .82) 0%,
-            rgba(45, 74, 34, .62) 40%,
-            rgba(0, 0, 0, .50) 100%);
+            rgba(30, 53, 22, .72) 0%,
+            rgba(45, 74, 34, .50) 40%,
+            rgba(0, 0, 0, .38) 100%);
 }
 
 .hero-content {
@@ -562,7 +561,7 @@ textarea {
     display: inline-flex;
     align-items: center;
     gap: .5rem;
-    background: rgba(255, 255, 255, .18);
+    background: rgba(255, 255, 255, .12);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, .2);
     border-radius: var(--radius-full);
@@ -591,7 +590,6 @@ textarea {
     margin-bottom: 1.25rem;
     line-height: 1.1;
     letter-spacing: -.02em;
-    text-shadow: 0 2px 12px rgba(0, 0, 0, .35);
 }
 
 .hero-title-line {
@@ -599,18 +597,17 @@ textarea {
 }
 
 .hero-title .highlight {
-    color: var(--sage-light);
+    color: var(--lucky-text);
     font-style: normal;
 }
 
 .hero-sub {
     font-size: clamp(1.05rem, 2vw, 1.3rem);
-    color: rgba(255, 255, 255, .9);
+    color: rgba(255, 255, 255, .8);
     font-weight: 300;
     max-width: 600px;
     margin: 0 auto 2.5rem;
     line-height: 1.6;
-    text-shadow: 0 1px 8px rgba(0, 0, 0, .3);
 }
 
 .hero-buttons {
@@ -1961,14 +1958,6 @@ textarea {
 
     .cta-banner-content h2 {
         font-size: clamp(1.4rem, 5vw, 2rem);
-    }
-
-    .hero {
-        min-height: 100svh;
-    }
-
-    .hero-video {
-        filter: brightness(.85);
     }
 
     .hero-content {
