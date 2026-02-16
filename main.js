@@ -510,8 +510,8 @@ const projectData = [
         tag: 'Construction',
         desc: 'A custom built deck designed to extend this family\'s outdoor living space. We selected premium composite materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
         images: [
-            '/images/megandeck/1.png',
-            '/images/megandeck/2.png',
+            '/images/megandeck/1.webp',
+            '/images/megandeck/2.webp',
         ],
     },
     {
@@ -519,9 +519,9 @@ const projectData = [
         tag: 'Hardscaping',
         desc: 'This brick garden wall solved a significant grading challenge while adding striking visual appeal.',
         images: [
-            '/images/bricklaying/1.jpg',
-            '/images/bricklaying/2.jpg',
-            '/images/bricklaying/3.jpg',
+            '/images/bricklaying/1.webp',
+            '/images/bricklaying/2.webp',
+            '/images/bricklaying/3.webp',
         ],
     },
     {
@@ -529,10 +529,10 @@ const projectData = [
         tag: 'Maintenance',
         desc: 'Regular lawn maintenance to keep your lawn looking its best. Includes mowing, edging, trimming, blowing, and hedge trimming.',
         images: [
-            '/images/lawncare/1.jpg',
-            '/images/lawncare/2.jpg',
-            '/images/lawncare/3.jpg',
-            '/images/lawncare/4.jpg',
+            '/images/lawncare/1.webp',
+            '/images/lawncare/2.webp',
+            '/images/lawncare/3.webp',
+            '/images/lawncare/4.webp',
         ],
     },
     {
@@ -560,9 +560,9 @@ const projectData = [
         tag: 'Landscaping',
         desc: 'Transforming outdoor spaces with thoughtful design and expert construction. From concept to completion, we create landscapes that enhance beauty and functionality.',
         images: [
-            '/images/landscapedesign/3.png',
-            '/images/landscapedesign/1.jpg',
-            '/images/landscapedesign/2.jpg',
+            '/images/landscapedesign/3.webp',
+            '/images/landscapedesign/1.webp',
+            '/images/landscapedesign/2.webp',
         ],
     },
 ];
