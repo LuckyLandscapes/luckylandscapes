@@ -1576,7 +1576,7 @@ textarea {
 .team-hero-bg {
     position: absolute;
     inset: 0;
-    background: url('https://images.unsplash.com/photo-1556761175-5973dc0f32e7?auto=format&fit=crop&q=80&w=1920') center/cover;
+    background: url('/images/banner.jpg') center/cover;
     opacity: .15;
 }
 
