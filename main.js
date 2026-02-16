@@ -210,25 +210,7 @@ if (serviceCards.length > 0) {
     });
 }
 
-// ============================================
-// GSAP — GALLERY ITEMS
-// ============================================
-const galleryItems = document.querySelectorAll('.gallery-item');
-if (galleryItems.length > 0) {
-    galleryItems.forEach((item, i) => {
-        gsap.from(item, {
-            scale: 0.92,
-            duration: 0.7,
-            ease: 'power2.out',
-            delay: i * 0.08,
-            scrollTrigger: {
-                trigger: item,
-                start: 'top 88%',
-                toggleActions: 'play none none none',
-            },
-        });
-    });
-}
+// (GSAP gallery item animations are initialized after buildGalleryGrid below)
 
 // ============================================
 // GSAP — ABOUT CARDS
@@ -502,12 +484,17 @@ if (window.innerWidth > 768) {
 }
 
 // ============================================
-// PROJECT LIGHTBOX / GALLERY
+// PROJECT LIGHTBOX / GALLERY — Data-driven system
 // ============================================
+// ► TO ADD/REMOVE/REORDER PROJECTS: just edit this array.
+//   The gallery grid AND lightbox are auto-generated from it.
+//   Each image can optionally have a mobile variant (for <1024px).
+//   If no mobile variant is provided, the desktop image is used.
 const projectData = [
     {
         title: 'Custom Built Deck',
         tag: 'Construction',
+        cover: 1, // index of the image shown in the gallery grid
         desc: 'A custom built deck designed to extend this family\'s outdoor living space. We selected premium composite materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
         images: [
             '/images/megandeck/1.webp',
@@ -517,6 +504,7 @@ const projectData = [
     {
         title: 'Brick Garden Walls',
         tag: 'Hardscaping',
+        cover: 2,
         desc: 'This brick garden wall solved a significant grading challenge while adding striking visual appeal.',
         images: [
             '/images/bricklaying/1.webp',
@@ -527,6 +515,7 @@ const projectData = [
     {
         title: 'Lawn Maintenance',
         tag: 'Maintenance',
+        cover: 0,
         desc: 'Regular lawn maintenance to keep your lawn looking its best. Includes mowing, edging, trimming, blowing, and hedge trimming.',
         images: [
             '/images/lawncare/1.webp',
@@ -538,6 +527,7 @@ const projectData = [
     {
         title: 'Lawn Cleanup',
         tag: 'Seasonal Cleanup',
+        cover: 0,
         desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting.',
         images: [
             '/images/LawnRestore/after.webp',
@@ -547,6 +537,7 @@ const projectData = [
     {
         title: 'Garden Beds',
         tag: 'Landscaping',
+        cover: 1,
         desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the front yard.',
         images: [
             '/images/gardenbed/1.webp',
@@ -558,6 +549,7 @@ const projectData = [
     {
         title: 'Design & Build',
         tag: 'Landscaping',
+        cover: 0,
         desc: 'Transforming outdoor spaces with thoughtful design and expert construction. From concept to completion, we create landscapes that enhance beauty and functionality.',
         images: [
             '/images/landscapedesign/3.webp',
@@ -567,6 +559,123 @@ const projectData = [
     },
 ];
 
+// ============================================
+// AUTO-GENERATE GALLERY GRID
+// ============================================
+const galleryGrid = document.getElementById('gallery-grid');
+
+function getImageSrc(img) {
+    // img can be a string (simple path) or an object { desktop, mobile }
+    if (typeof img === 'string') return img;
+    const isMobile = window.innerWidth <= 1024;
+    return (isMobile && img.mobile) ? img.mobile : img.desktop;
+}
+
+function buildGalleryGrid() {
+    if (!galleryGrid) return;
+    galleryGrid.innerHTML = '';
+
+    projectData.forEach((project, index) => {
+        const coverIdx = project.cover ?? 0;
+        const coverImg = project.images[coverIdx] ?? project.images[0];
+        const src = getImageSrc(coverImg);
+
+        const item = document.createElement('div');
+        item.className = 'gallery-item';
+        item.dataset.project = index;
+
+        // Image element — starts with a transparent placeholder, real src set via preloader
+        const img = document.createElement('img');
+        img.dataset.src = src; // store real src for lazy loading
+        img.alt = `${project.title} — ${project.tag}`;
+        img.loading = 'lazy';
+
+        // Overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'gallery-overlay';
+        overlay.innerHTML = `
+            <span class="gallery-label">${project.title}</span>
+            <span class="gallery-tag">${project.tag}</span>
+        `;
+
+        item.appendChild(img);
+        item.appendChild(overlay);
+        galleryGrid.appendChild(item);
+    });
+}
+
+buildGalleryGrid();
+
+// ============================================
+// GSAP — GALLERY ITEMS (after dynamic generation)
+// ============================================
+const galleryItemsForAnim = document.querySelectorAll('.gallery-item');
+if (galleryItemsForAnim.length > 0) {
+    galleryItemsForAnim.forEach((item, i) => {
+        gsap.from(item, {
+            scale: 0.92,
+            duration: 0.7,
+            ease: 'power2.out',
+            delay: i * 0.08,
+            scrollTrigger: {
+                trigger: item,
+                start: 'top 88%',
+                toggleActions: 'play none none none',
+            },
+        });
+    });
+}
+
+// ============================================
+// GALLERY IMAGE PRELOADING (IntersectionObserver)
+// ============================================
+const preloadedSrcs = new Set();
+
+function preloadImage(src) {
+    if (!src || preloadedSrcs.has(src)) return Promise.resolve();
+    preloadedSrcs.add(src);
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = resolve;
+        img.onerror = resolve;
+        img.src = src;
+    });
+}
+
+// Lazy-load gallery grid images as they approach the viewport
+const lazyImageObserver = new IntersectionObserver(
+    (entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                const img = entry.target;
+                const realSrc = img.dataset.src;
+                if (realSrc) {
+                    // Fade-in effect: set opacity 0, load, then fade in
+                    img.style.opacity = '0';
+                    img.src = realSrc;
+                    img.onload = () => {
+                        img.style.opacity = '1';
+                        preloadedSrcs.add(realSrc);
+                    };
+                    img.removeAttribute('data-src');
+                }
+                lazyImageObserver.unobserve(img);
+            }
+        });
+    },
+    { rootMargin: '300px 0px', threshold: 0.01 }
+);
+
+// Observe all gallery images for lazy loading
+if (galleryGrid) {
+    galleryGrid.querySelectorAll('img[data-src]').forEach((img) => {
+        lazyImageObserver.observe(img);
+    });
+}
+
+// ============================================
+// LIGHTBOX
+// ============================================
 const lightbox = document.getElementById('project-lightbox');
 const lightboxBackdrop = document.getElementById('lightbox-backdrop');
 const lightboxClose = document.getElementById('lightbox-close');
@@ -585,12 +694,20 @@ let currentImageIndex = 0;
 function updateLightboxImage() {
     if (!currentProject) return;
     const images = currentProject.images;
+    const src = getImageSrc(images[currentImageIndex]);
+
+    // Fade out, swap image, fade in on load
     lightboxMainImg.style.opacity = '0';
-    setTimeout(() => {
-        lightboxMainImg.src = images[currentImageIndex];
+    const tempImg = new Image();
+    tempImg.onload = () => {
+        lightboxMainImg.src = src;
         lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
-        lightboxMainImg.style.opacity = '1';
-    }, 150);
+        // Small delay so the browser paints the new src before fading in
+        requestAnimationFrame(() => {
+            lightboxMainImg.style.opacity = '1';
+        });
+    };
+    tempImg.src = src;
 
     // Update dots
     const dots = lightboxDots.querySelectorAll('.lightbox-dot');
@@ -599,11 +716,21 @@ function updateLightboxImage() {
     });
 }
 
+function preloadProjectImages(project) {
+    if (!project) return;
+    project.images.forEach((img) => {
+        preloadImage(getImageSrc(img));
+    });
+}
+
 function openLightbox(projectIndex) {
     currentProject = projectData[projectIndex];
     currentImageIndex = 0;
 
     if (!currentProject || !lightbox) return;
+
+    // Preload all images for this project
+    preloadProjectImages(currentProject);
 
     // Populate info
     lightboxTitle.textContent = currentProject.title;
@@ -623,10 +750,24 @@ function openLightbox(projectIndex) {
         lightboxDots.appendChild(dot);
     });
 
-    // Set first image
-    lightboxMainImg.src = currentProject.images[0];
-    lightboxMainImg.alt = `${currentProject.title} — photo 1`;
-    lightboxMainImg.style.opacity = '1';
+    // Set first image with proper onload handling
+    const firstSrc = getImageSrc(currentProject.images[0]);
+    lightboxMainImg.style.opacity = '0';
+    const tempImg = new Image();
+    tempImg.onload = () => {
+        lightboxMainImg.src = firstSrc;
+        lightboxMainImg.alt = `${currentProject.title} — photo 1`;
+        requestAnimationFrame(() => {
+            lightboxMainImg.style.opacity = '1';
+        });
+    };
+    tempImg.onerror = () => {
+        // Fallback: still show the image even if preload fails
+        lightboxMainImg.src = firstSrc;
+        lightboxMainImg.alt = `${currentProject.title} — photo 1`;
+        lightboxMainImg.style.opacity = '1';
+    };
+    tempImg.src = firstSrc;
 
     // Show lightbox
     lightbox.classList.add('active');
@@ -640,13 +781,13 @@ function closeLightbox() {
     currentProject = null;
 }
 
-// Gallery item click handlers
-if (lightbox) {
-    document.querySelectorAll('.gallery-item[data-project]').forEach(item => {
-        item.addEventListener('click', () => {
-            const idx = parseInt(item.dataset.project, 10);
-            openLightbox(idx);
-        });
+// Gallery item click handlers (event delegation on the grid)
+if (lightbox && galleryGrid) {
+    galleryGrid.addEventListener('click', (e) => {
+        const item = e.target.closest('.gallery-item[data-project]');
+        if (!item) return;
+        const idx = parseInt(item.dataset.project, 10);
+        openLightbox(idx);
     });
 
     // Navigation
