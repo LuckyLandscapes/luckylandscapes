@@ -1576,7 +1576,7 @@ textarea {
 .team-hero-bg {
     position: absolute;
     inset: 0;
-    background: url('') center/cover;
+    background: url('/images/banner.jpg') center/cover;
     opacity: .15;
 }
 
