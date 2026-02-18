@@ -11,6 +11,8 @@ export default defineConfig({
                 main: resolve(__dirname, 'index.html'),
                 team: resolve(__dirname, 'team.html'),
                 careers: resolve(__dirname, 'careers.html'),
+                privacy: resolve(__dirname, 'privacy.html'),
+                terms: resolve(__dirname, 'terms.html'),
             },
         },
     },
