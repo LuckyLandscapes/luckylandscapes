@@ -2433,13 +2433,14 @@ body.promo-active .mobile-menu {
 /* ---- Promo Banner Responsive ---- */
 @media (max-width: 768px) {
     .promo-banner-inner {
-        padding: .55rem 2.5rem .55rem .75rem;
-        gap: .5rem;
+        flex-wrap: wrap;
+        padding: .6rem 2.2rem .6rem .75rem;
+        gap: .35rem .5rem;
     }
 
     .promo-banner-text {
         font-size: .78rem;
-        gap: .25rem;
+        gap: .2rem;
     }
 
     .promo-banner-separator {
@@ -2447,16 +2448,16 @@ body.promo-active .mobile-menu {
     }
 
     .promo-banner-icon {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .promo-banner-cta {
-        padding: .3rem .8rem;
-        font-size: .7rem;
+        padding: .35rem 1rem;
+        font-size: .72rem;
     }
 
     .promo-banner-close {
-        right: .4rem;
+        right: .35rem;
         width: 24px;
         height: 24px;
         font-size: 1.1rem;
@@ -2464,11 +2465,40 @@ body.promo-active .mobile-menu {
 }
 
 @media (max-width: 480px) {
+    .promo-banner-inner {
+        flex-direction: column;
+        align-items: center;
+        padding: .5rem 2rem .6rem .5rem;
+        gap: .3rem;
+    }
+
+    .promo-banner-icon {
+        display: none;
+    }
+
     .promo-banner-text {
-        font-size: .72rem;
+        font-size: .73rem;
+        gap: .15rem;
+        justify-content: center;
     }
 
     .promo-banner-cta {
-        display: none;
+        width: auto;
+        padding: .4rem 1.4rem;
+        font-size: .72rem;
+        margin-top: .1rem;
+    }
+
+    .promo-banner-close {
+        top: .35rem;
+        right: .3rem;
+        transform: none;
+        width: 22px;
+        height: 22px;
+        font-size: 1rem;
+    }
+
+    .promo-banner-close:hover {
+        transform: scale(1.1);
     }
 }
