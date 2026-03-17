@@ -934,3 +934,66 @@ if (lightbox && galleryGrid) {
         });
     }
 }
+
+// ============================================
+// ST. PATRICK'S DAY PROMO BANNER
+// ============================================
+(function initPromoBanner() {
+    const PROMO_END = new Date('2026-03-31T23:59:59');
+    const now = new Date();
+
+    // Auto-expire: don't show anything if the promo period is over
+    if (now > PROMO_END) return;
+
+    const banner = document.getElementById('promo-banner');
+    const closeBtn = document.getElementById('promo-banner-close');
+    const heroBadge = document.getElementById('hero-badge');
+    const heroBadgeText = document.getElementById('hero-badge-text');
+
+    // ---- Hero Badge Swap (index page only) ----
+    if (heroBadge && heroBadgeText) {
+        heroBadgeText.innerHTML = '☘️ St. Patrick\'s Day Special — <span class="promo-badge-highlight">20% Off</span> Any Service!';
+        heroBadge.classList.add('hero-badge--promo');
+    }
+
+    // ---- Promo Banner ----
+    if (!banner) return;
+
+    // Show the banner (always shows on page load — dismiss only hides for current view)
+    banner.style.display = '';
+
+    // Measure the banner height and set a CSS variable for offsetting the navbar
+    function updatePromoHeight() {
+        const h = banner.offsetHeight;
+        document.documentElement.style.setProperty('--promo-height', h + 'px');
+    }
+    updatePromoHeight();
+    window.addEventListener('resize', updatePromoHeight);
+
+    // Add class to body so CSS can offset the navbar
+    document.body.classList.add('promo-active');
+
+    // Close button
+    if (closeBtn) {
+        closeBtn.addEventListener('click', () => {
+            banner.style.display = 'none';
+            document.body.classList.remove('promo-active');
+            // Refresh ScrollTrigger positions since layout shifted
+            ScrollTrigger.refresh();
+        });
+    }
+
+    // CTA "Claim Offer" — on the index page, smooth-scroll to contact
+    const ctaBtn = document.getElementById('promo-banner-cta');
+    if (ctaBtn) {
+        ctaBtn.addEventListener('click', (e) => {
+            const contactSection = document.querySelector('#contact');
+            if (contactSection) {
+                e.preventDefault();
+                const navH = navbar ? navbar.offsetHeight : 80;
+                lenis.scrollTo(contactSection, { offset: -navH - 10, duration: 1.4 });
+            }
+            // On other pages the href="/#contact" will navigate normally
+        });
+    }
+})();

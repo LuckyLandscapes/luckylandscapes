@@ -30,6 +30,22 @@
 
 <body>
 
+    <!-- ==================== ST. PATRICK'S DAY PROMO BANNER ==================== -->
+    <div class="promo-banner" id="promo-banner" style="display:none;">
+        <div class="promo-banner-inner">
+            <div class="promo-banner-shimmer"></div>
+            <span class="promo-banner-icon">☘️</span>
+            <p class="promo-banner-text">
+                <strong>St. Patrick's Day Special!</strong>
+                <span class="promo-banner-separator">—</span>
+                <span>20% off any service for new customers.</span>
+                <span class="promo-banner-urgency">Offer ends March 31st!</span>
+            </p>
+            <a href="#contact" class="promo-banner-cta" id="promo-banner-cta">Claim Offer</a>
+            <button class="promo-banner-close" id="promo-banner-close" aria-label="Close promo banner">&times;</button>
+        </div>
+    </div>
+
     <!-- ==================== PRELOADER ==================== -->
     <div class="preloader" id="preloader">
         <div class="preloader-inner">
@@ -86,9 +102,10 @@
         </div>
 
         <div class="hero-content">
-            <div class="hero-badge">
+            <!-- Hero badge — JS swaps to promo version during sale period -->
+            <div class="hero-badge" id="hero-badge">
                 <img src="/images/Icon.png" alt="" />
-                Southeast Nebraska's Trusted Team
+                <span id="hero-badge-text">Southeast Nebraska's Trusted Team</span>
             </div>
 
             <h1 class="hero-title">
@@ -305,8 +322,8 @@
                             <path d="M22 10a3 3 0 0 0-3-3h-.2" />
                         </svg>
                     </div>
-                    <h3>Bush Trimming</h3>
-                    <p>Shape and prune hedges for health and curb appeal.</p>
+                    <h3>Junk Removal</h3>
+                    <p>Remove debris and unwanted items from your property.</p>
                 </div>
 
                 <div class="service-card">
@@ -469,7 +486,7 @@
                                     <option>Mowing & Maintenance</option>
                                     <option>Garden Beds / Mulch</option>
                                     <option>Plant Transplants</option>
-                                    <option>Bush Trimming</option>
+                                    <option>Junk Removal</option>
                                     <option>Leaf Removal</option>
                                     <option>Deck / Patio</option>
                                     <option>Full Landscape Design</option>
