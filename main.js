@@ -522,6 +522,8 @@ const projectData = [
             '/images/lawncare/2.webp',
             '/images/lawncare/3.webp',
             '/images/lawncare/4.webp',
+            '/images/lawncare/5.webp',
+            '/images/lawncare/6.webp',
         ],
     },
     {
