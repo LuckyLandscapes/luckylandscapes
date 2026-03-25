@@ -13,6 +13,7 @@ export default defineConfig({
                 careers: resolve(__dirname, 'careers.html'),
                 privacy: resolve(__dirname, 'privacy.html'),
                 terms: resolve(__dirname, 'terms.html'),
+                quote: resolve(__dirname, 'quote.html'),
             },
         },
     },

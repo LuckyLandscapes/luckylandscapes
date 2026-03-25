@@ -267,7 +267,7 @@
                     <p>Structural and decorative walls to maximize your yard.</p>
                 </div>
 
-                <div class="service-card">
+                <a href="/quote.html" class="service-card service-card-link">
                     <div class="service-icon">
                         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -278,9 +278,10 @@
                             <path d="M14.8 14.8 20 20" />
                         </svg>
                     </div>
-                    <h3>Mowing & Edging</h3>
+                    <h3>Mowing &amp; Edging</h3>
                     <p>Professional lawn maintenance for a pristine look.</p>
-                </div>
+                    <span class="service-card-cta">Get Instant Quote →</span>
+                </a>
 
                 <div class="service-card">
                     <div class="service-icon">
@@ -449,72 +450,148 @@
                     </div>
                 </div>
 
-                <!-- Right — Form -->
+                <!-- Right — Service Quote Cards -->
                 <div class="reveal-right">
-                    <div class="contact-form-card">
-                        <h3>Get a Free Quote</h3>
-                        <p class="form-sub">We'll get back to you within 24 hours.</p>
+                    <div class="contact-services-card">
+                        <h3>Get an Instant Quote</h3>
+                        <p class="form-sub">Select a service to get your price in seconds.</p>
 
-                        <form id="contact-form">
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="firstName">First Name</label>
-                                    <input type="text" id="firstName" name="firstName" placeholder="John" required />
-                                </div>
-                                <div class="form-group">
-                                    <label for="lastName">Last Name</label>
-                                    <input type="text" id="lastName" name="lastName" placeholder="Doe" />
-                                </div>
-                            </div>
+                        <div class="contact-service-grid">
+                            <a href="/quote.html?service=mowing" class="contact-svc-btn">
+                                <span class="csb-icon">🌿</span>
+                                <span class="csb-text">Mowing Package</span>
+                            </a>
+                            <a href="/quote.html?service=fertilizer" class="contact-svc-btn">
+                                <span class="csb-icon">🌱</span>
+                                <span class="csb-text">Fertilizer</span>
+                            </a>
+                            <a href="/quote.html?service=cleanup" class="contact-svc-btn">
+                                <span class="csb-icon">🍂</span>
+                                <span class="csb-text">Fall Cleanup</span>
+                            </a>
+                            <a href="/quote.html?service=allinone" class="contact-svc-btn csb-featured">
+                                <span class="csb-badge">Best Value</span>
+                                <span class="csb-icon">🍀</span>
+                                <span class="csb-text">All-In-One</span>
+                            </a>
+                            <a href="/quote.html?service=gardenbeds" class="contact-svc-btn">
+                                <span class="csb-icon">🌺</span>
+                                <span class="csb-text">Garden Beds</span>
+                            </a>
+                            <a href="/quote.html?service=edging" class="contact-svc-btn">
+                                <span class="csb-icon">📐</span>
+                                <span class="csb-text">Bed Edging</span>
+                            </a>
+                            <a href="/quote.html?service=pavers" class="contact-svc-btn">
+                                <span class="csb-icon">🧱</span>
+                                <span class="csb-text">Pavers</span>
+                            </a>
+                            <a href="/quote.html?service=retaining" class="contact-svc-btn">
+                                <span class="csb-icon">🪨</span>
+                                <span class="csb-text">Retaining Walls</span>
+                            </a>
+                            <a href="/quote.html?service=decks" class="contact-svc-btn">
+                                <span class="csb-icon">🏡</span>
+                                <span class="csb-text">Decks & Patios</span>
+                            </a>
+                            <a href="/quote.html?service=transplants" class="contact-svc-btn">
+                                <span class="csb-icon">🌿</span>
+                                <span class="csb-text">Transplants</span>
+                            </a>
+                            <a href="/quote.html?service=junk" class="contact-svc-btn">
+                                <span class="csb-icon">🚛</span>
+                                <span class="csb-text">Junk Removal</span>
+                            </a>
+                            <a href="/quote.html?service=leaf" class="contact-svc-btn">
+                                <span class="csb-icon">🍃</span>
+                                <span class="csb-text">Leaf Removal</span>
+                            </a>
+                            <a href="/quote.html?service=landscape" class="contact-svc-btn">
+                                <span class="csb-icon">🌳</span>
+                                <span class="csb-text">Landscape Design</span>
+                            </a>
+                        </div>
 
-                            <div class="form-group">
-                                <label for="email">Email</label>
-                                <input type="email" id="email" name="email" placeholder="john@example.com" required />
-                            </div>
-
-                            <div class="form-group">
-                                <label for="phone">Phone</label>
-                                <input type="tel" id="phone" name="phone" placeholder="(402) 555-1234" />
-                            </div>
-
-                            <div class="form-group">
-                                <label for="service">Service Interested In</label>
-                                <select id="service" name="service">
-                                    <option value="">Select a service...</option>
-                                    <option>Paver Project</option>
-                                    <option>Retaining Wall</option>
-                                    <option>Mowing & Maintenance</option>
-                                    <option>Garden Beds / Mulch</option>
-                                    <option>Plant Transplants</option>
-                                    <option>Junk Removal</option>
-                                    <option>Leaf Removal</option>
-                                    <option>Deck / Patio</option>
-                                    <option>Full Landscape Design</option>
-                                    <option>Other</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="message">Message</label>
-                                <textarea id="message" name="message"
-                                    placeholder="Tell us about your project..."></textarea>
-                            </div>
-
-                            <button type="submit" class="form-submit">
-                                Send Request
-                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M5 12h14" />
-                                    <path d="m12 5 7 7-7 7" />
-                                </svg>
-                            </button>
-                        </form>
+                        <button type="button" class="contact-general-btn" id="open-general-form">
+                            💬 Not sure? Send a general message instead
+                        </button>
                     </div>
                 </div>
             </div>
         </div>
     </section>
+
+    <!-- ==================== GENERAL CONTACT FORM MODAL ==================== -->
+    <div class="general-form-modal" id="general-form-modal">
+        <div class="gfm-backdrop" id="gfm-backdrop"></div>
+        <div class="gfm-content">
+            <button type="button" class="gfm-close" id="gfm-close" aria-label="Close form">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6 6 18" />
+                    <path d="m6 6 12 12" />
+                </svg>
+            </button>
+            <h3>Send Us a Message</h3>
+            <p class="form-sub">We'll get back to you within 24 hours.</p>
+
+            <form id="contact-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="firstName">First Name</label>
+                        <input type="text" id="firstName" name="firstName" placeholder="John" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name</label>
+                        <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" placeholder="john@example.com" required />
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone</label>
+                    <input type="tel" id="phone" name="phone" placeholder="(402) 555-1234" />
+                </div>
+
+                <div class="form-group">
+                    <label for="service">Service Interested In</label>
+                    <select id="service" name="service">
+                        <option value="">Select a service...</option>
+                        <option>Paver Project</option>
+                        <option>Retaining Wall</option>
+                        <option>Mowing & Maintenance</option>
+                        <option>Garden Beds / Mulch</option>
+                        <option>Plant Transplants</option>
+                        <option>Junk Removal</option>
+                        <option>Leaf Removal</option>
+                        <option>Deck / Patio</option>
+                        <option>Full Landscape Design</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="message">Message</label>
+                    <textarea id="message" name="message"
+                        placeholder="Tell us about your project..."></textarea>
+                </div>
+
+                <button type="submit" class="form-submit">
+                    Send Request
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M5 12h14" />
+                        <path d="m12 5 7 7-7 7" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+    </div>
 
     <!-- ==================== PROJECT LIGHTBOX ==================== -->
     <div class="project-lightbox" id="project-lightbox">
