@@ -1045,7 +1045,7 @@ if (lightbox && galleryGrid) {
                 const navH = navbar ? navbar.offsetHeight : 80;
                 lenis.scrollTo(contactSection, { offset: -navH - 10, duration: 1.4 });
             }
-    // On other pages the href="/#contact" will navigate normally
+            // On other pages the href="/#contact" will navigate normally
         });
     }
 })();
@@ -1061,54 +1061,60 @@ if (quoteForm) {
     const PRICING = {
         mowing: {
             label: 'Mowing Package', unit: '/ visit',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined,{minimumFractionDigits:2})} · 31 mows (Apr–Oct)`,
+            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 31 mows (Apr–Oct)`,
             calc: (d) => {
                 const sqft = parseFloat(d.sqft) || 0;
                 const perVisit = sqft * 0.005;
-                return { perUnit: perVisit, total: perVisit * 31, mowCount: 31, breakdown: [
-                    { label: `Base mowing (${sqft.toLocaleString()} sq ft × $0.005)`, val: perVisit },
-                    { label: 'Per visit', val: perVisit, bold: true },
-                    { label: 'Season total (31 mows)', val: perVisit * 31, bold: true },
-                ]};
+                return {
+                    perUnit: perVisit, total: perVisit * 31, mowCount: 31, breakdown: [
+                        { label: `Base mowing (${sqft.toLocaleString()} sq ft × $0.005)`, val: perVisit },
+                        { label: 'Per visit', val: perVisit, bold: true },
+                        { label: 'Season total (31 mows)', val: perVisit * 31, bold: true },
+                    ]
+                };
             },
             inputs: ['sqft'],
             perks: ['🍀 31 professional mows (April through October)', '🌿 Weed eating & edging included',
-                     '💡 Personalized lawn care advice & best practices', '📅 Priority scheduling — never wait for a slot',
-                     '👷 Consistent crew who knows your property', '🚫 Cancel anytime — no long-term contracts'],
+                '💡 Personalized lawn care advice & best practices', '📅 Priority scheduling — never wait for a slot',
+                '👷 Consistent crew who knows your property', '🚫 Cancel anytime — no long-term contracts'],
         },
         fertilizer: {
             label: 'Fertilizer Package', unit: '/ application',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined,{minimumFractionDigits:2})} · 4 applications`,
+            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 4 applications`,
             calc: (d) => {
                 const sqft = parseFloat(d.sqft) || 0;
                 const perApp = sqft * 0.008;
-                return { perUnit: perApp, total: perApp * 4, breakdown: [
-                    { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008)`, val: perApp },
-                    { label: 'Per application', val: perApp, bold: true },
-                    { label: 'Season total (4 applications)', val: perApp * 4, bold: true },
-                ]};
+                return {
+                    perUnit: perApp, total: perApp * 4, breakdown: [
+                        { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008)`, val: perApp },
+                        { label: 'Per application', val: perApp, bold: true },
+                        { label: 'Season total (4 applications)', val: perApp * 4, bold: true },
+                    ]
+                };
             },
             inputs: ['sqft'],
             perks: ['🌱 Keep your lawn thick, green, and healthy', '📅 4 applications: April, June, August, October',
-                     '🧪 Professional-grade fertilizer', '💡 Customized for your lawn\'s needs',
-                     '🚫 No contracts — cancel anytime'],
+                '🧪 Professional-grade fertilizer', '💡 Customized for your lawn\'s needs',
+                '🚫 No contracts — cancel anytime'],
         },
         cleanup: {
             label: 'Fall Yard Cleanup', unit: '/ service',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined,{minimumFractionDigits:2})} · 6 cleanups`,
+            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 6 cleanups`,
             calc: (d) => {
                 const sqft = parseFloat(d.sqft) || 0;
                 const perService = sqft * 0.02;
-                return { perUnit: perService, total: perService * 6, breakdown: [
-                    { label: `Cleanup (${sqft.toLocaleString()} sq ft × $0.02)`, val: perService },
-                    { label: 'Per service', val: perService, bold: true },
-                    { label: 'Season total (6 services)', val: perService * 6, bold: true },
-                ]};
+                return {
+                    perUnit: perService, total: perService * 6, breakdown: [
+                        { label: `Cleanup (${sqft.toLocaleString()} sq ft × $0.02)`, val: perService },
+                        { label: 'Per service', val: perService, bold: true },
+                        { label: 'Season total (6 services)', val: perService * 6, bold: true },
+                    ]
+                };
             },
             inputs: ['sqft'],
             perks: ['🍂 Remove leaves, sticks, and yard debris', '🧹 Weed eating & sidewalk edging',
-                     '📅 6 services: Nov–Mar', '🏡 Keep your yard looking great year-round',
-                     '🚫 No contracts — cancel anytime'],
+                '📅 6 services: Nov–Mar', '🏡 Keep your yard looking great year-round',
+                '🚫 No contracts — cancel anytime'],
         },
         allinone: {
             label: 'All-In-One Package', unit: '/ season',
@@ -1119,18 +1125,20 @@ if (quoteForm) {
                 const fert = 0.008 * sqft * 4;
                 const clean = 0.02 * sqft * 6;
                 const total = mowing + fert + clean;
-                return { perUnit: total, total, breakdown: [
-                    { label: `Mowing (${sqft.toLocaleString()} sq ft × $0.005 × 31)`, val: mowing },
-                    { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008 × 4)`, val: fert },
-                    { label: `Fall Cleanup (${sqft.toLocaleString()} sq ft × $0.02 × 6)`, val: clean },
-                    { label: 'Season total', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `Mowing (${sqft.toLocaleString()} sq ft × $0.005 × 31)`, val: mowing },
+                        { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008 × 4)`, val: fert },
+                        { label: `Fall Cleanup (${sqft.toLocaleString()} sq ft × $0.02 × 6)`, val: clean },
+                        { label: 'Season total', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['sqft'],
             perks: ['🍀 Everything in Mowing, Fertilizer & Cleanup packages',
-                     '🌿 31 mows + 4 fertilizer apps + 6 cleanups',
-                     '💡 Year-round lawn care advice', '📅 Priority scheduling',
-                     '👷 Consistent crew', '💰 Best overall value'],
+                '🌿 31 mows + 4 fertilizer apps + 6 cleanups',
+                '💡 Year-round lawn care advice', '📅 Priority scheduling',
+                '👷 Consistent crew', '💰 Best overall value'],
         },
         gardenbeds: {
             label: 'Garden Beds & Mulch', unit: 'total',
@@ -1140,19 +1148,21 @@ if (quoteForm) {
                 const bedType = d.bedType || 'new3';
                 const grade = d.bedMaterial || 'basic';
                 const rates = {
-                    new3:    { basic: 2.00, mid: 2.50, premium: 3.00 },
+                    new3: { basic: 2.00, mid: 2.50, premium: 3.00 },
                     fresh15: { basic: 2.00, mid: 2.25, premium: 2.50 },
-                    rock2:   { basic: 4.00, mid: 2.25, premium: 2.50 },
+                    rock2: { basic: 4.00, mid: 2.25, premium: 2.50 },
                 };
                 const typeNames = { new3: 'New Beds (3")', fresh15: 'Freshen Up (1.5")', rock2: 'Rock (2")' };
                 const gradeNames = { basic: 'Basic / Non-colored', mid: 'Mid-range / Colored', premium: 'Premium / Cyprus' };
                 const rate = rates[bedType]?.[grade] ?? 2.00;
                 const total = sqft * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${typeNames[bedType]} — ${gradeNames[grade]}`, val: null },
-                    { label: `${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)}/sq ft`, val: total },
-                    { label: 'Project total', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${typeNames[bedType]} — ${gradeNames[grade]}`, val: null },
+                        { label: `${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)}/sq ft`, val: total },
+                        { label: 'Project total', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['gardenbeds'],
         },
@@ -1166,11 +1176,13 @@ if (quoteForm) {
                 const names = { vinyl: 'Vinyl', steel: 'Steel', concrete: 'Concrete' };
                 const rate = rates[mat] ?? 3.50;
                 const total = lf * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${names[mat]} edging`, val: null },
-                    { label: `${lf.toLocaleString()} linear ft × $${rate.toFixed(2)}/LF`, val: total },
-                    { label: 'Project total', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${names[mat]} edging`, val: null },
+                        { label: `${lf.toLocaleString()} linear ft × $${rate.toFixed(2)}/LF`, val: total },
+                        { label: 'Project total', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['edging'],
         },
@@ -1184,12 +1196,14 @@ if (quoteForm) {
                 const names = { basic: 'Standard Concrete', mid: 'Interlocking', premium: 'Natural Stone / Brick' };
                 const rate = rates[grade] ?? 10;
                 const total = sqft * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${names[grade]} pavers`, val: null },
-                    { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                    { label: 'Material + labor + profit', val: null },
-                    { label: 'Project estimate', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${names[grade]} pavers`, val: null },
+                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
+                        { label: 'Material + labor + profit', val: null },
+                        { label: 'Project estimate', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['pavers'],
         },
@@ -1205,12 +1219,14 @@ if (quoteForm) {
                 const names = { block: 'Standard Block', stone: 'Natural Stone', boulder: 'Boulder' };
                 const rate = rates[mat] ?? 25;
                 const total = sqft * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${names[mat]} wall`, val: null },
-                    { label: `${len} ft long × ${ht} ft high = ${sqft.toLocaleString()} sq ft face`, val: null },
-                    { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                    { label: 'Project estimate', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${names[mat]} wall`, val: null },
+                        { label: `${len} ft long × ${ht} ft high = ${sqft.toLocaleString()} sq ft face`, val: null },
+                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
+                        { label: 'Project estimate', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['retaining'],
         },
@@ -1224,11 +1240,13 @@ if (quoteForm) {
                 const names = { basic: 'Pressure-treated Wood', mid: 'Cedar / Composite', premium: 'Trex / Hardwood' };
                 const rate = rates[grade] ?? 15;
                 const total = sqft * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${names[grade]}`, val: null },
-                    { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                    { label: 'Project estimate', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${names[grade]}`, val: null },
+                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
+                        { label: 'Project estimate', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['decks'],
         },
@@ -1288,11 +1306,13 @@ if (quoteForm) {
                 const sqft = parseFloat(d.sqft) || 0;
                 const rate = 0.015;
                 const total = sqft * rate;
-                return { perUnit: total, total, breakdown: [
-                    { label: `Leaf removal (${sqft.toLocaleString()} sq ft × $0.015)`, val: total },
-                    { label: 'Includes blowing, raking & haul-off', val: null },
-                    { label: 'Project estimate', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `Leaf removal (${sqft.toLocaleString()} sq ft × $0.015)`, val: total },
+                        { label: 'Includes blowing, raking & haul-off', val: null },
+                        { label: 'Project estimate', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['sqft'],
         },
@@ -1308,12 +1328,14 @@ if (quoteForm) {
                 const rate = rates[scope] ?? 3.00;
                 const install = sqft * rate;
                 const total = consultFee + install;
-                return { perUnit: total, total, breakdown: [
-                    { label: `${scopeNames[scope]} design`, val: null },
-                    { label: `Design consultation`, val: consultFee },
-                    { label: `Installation (${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)})`, val: install },
-                    { label: 'Project estimate', val: total, bold: true },
-                ]};
+                return {
+                    perUnit: total, total, breakdown: [
+                        { label: `${scopeNames[scope]} design`, val: null },
+                        { label: `Design consultation`, val: consultFee },
+                        { label: `Installation (${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)})`, val: install },
+                        { label: 'Project estimate', val: total, bold: true },
+                    ]
+                };
             },
             inputs: ['landscape'],
         },
@@ -1324,7 +1346,7 @@ if (quoteForm) {
     let calcResult = null;
 
     // --- DOM refs ---
-    const allSteps = ['quote-step-1','quote-step-2','quote-step-3','quote-step-4-accept','quote-step-4-decline']
+    const allSteps = ['quote-step-1', 'quote-step-2', 'quote-step-3', 'quote-step-4-accept', 'quote-step-4-decline']
         .map(id => document.getElementById(id));
     const progressFill = document.getElementById('quote-progress-fill');
     const stepDots = document.querySelectorAll('.quote-step-dot');
@@ -1480,7 +1502,7 @@ if (quoteForm) {
         let html = '';
         calcResult.breakdown.forEach(row => {
             const cls = row.bold ? ' total' : '';
-            const valStr = row.val !== null ? `$${row.val.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}` : '';
+            const valStr = row.val !== null ? `$${row.val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
             html += `<div class="breakdown-row${cls}"><span>${row.label}</span><span class="breakdown-val">${valStr}</span></div>`;
         });
         breakdownEl.innerHTML = html;
@@ -1656,4 +1678,221 @@ if (quoteForm) {
         showStep(allSteps[3]);
         spawnConfetti();
     });
+
+    // ============================================
+    // CLICKABLE STEP DOTS — Back Navigation
+    // ============================================
+    stepDots.forEach(dot => {
+        dot.addEventListener('click', () => {
+            const clickedStep = parseInt(dot.dataset.step, 10);
+            // Only allow navigating to completed (past) steps
+            if (!dot.classList.contains('completed')) return;
+
+            if (clickedStep === 1) {
+                // Reset hero title
+                if (heroTitle) heroTitle.innerHTML = 'Get Your Instant<br/>Quote in <em class="highlight">Seconds</em>';
+                if (heroSub) heroSub.textContent = 'Select a service, tell us about your project, and we\'ll give you an instant, transparent price.';
+                setProgress(1);
+                showStep(allSteps[0]);
+            } else if (clickedStep === 2) {
+                setProgress(2);
+                showStep(allSteps[1]);
+            } else if (clickedStep === 3) {
+                setProgress(3);
+                showStep(allSteps[2]);
+                populateQuote();
+            }
+        });
+    });
+
+    // ============================================
+    // PHONE AUTO-FORMAT (xxx) xxx-xxxx
+    // ============================================
+    const phoneInput = document.getElementById('q-phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', (e) => {
+            let val = e.target.value.replace(/\D/g, ''); // strip non-digits
+            if (val.length > 10) val = val.slice(0, 10);
+
+            let formatted = '';
+            if (val.length > 0) formatted += '(' + val.slice(0, 3);
+            if (val.length >= 3) formatted += ') ';
+            if (val.length > 3) formatted += val.slice(3, 6);
+            if (val.length >= 6) formatted += '-';
+            if (val.length > 6) formatted += val.slice(6, 10);
+
+            e.target.value = formatted;
+
+            // Remove error state on valid input
+            const group = phoneInput.closest('.form-group');
+            if (val.length === 10) {
+                group.classList.remove('has-error');
+            }
+        });
+
+        phoneInput.addEventListener('blur', () => {
+            const digits = phoneInput.value.replace(/\D/g, '');
+            const group = phoneInput.closest('.form-group');
+            if (digits.length > 0 && digits.length < 10) {
+                group.classList.add('has-error');
+            } else {
+                group.classList.remove('has-error');
+            }
+        });
+    }
+
+    // ============================================
+    // EMAIL VALIDATION
+    // ============================================
+    const emailInput = document.getElementById('q-email');
+    if (emailInput) {
+        emailInput.addEventListener('blur', () => {
+            const val = emailInput.value.trim();
+            const group = emailInput.closest('.form-group');
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (val.length > 0 && !emailRegex.test(val)) {
+                group.classList.add('has-error');
+            } else {
+                group.classList.remove('has-error');
+            }
+        });
+
+        emailInput.addEventListener('input', () => {
+            const val = emailInput.value.trim();
+            const group = emailInput.closest('.form-group');
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (emailRegex.test(val)) {
+                group.classList.remove('has-error');
+            }
+        });
+    }
+
+    // ============================================
+    // NUMBER-ONLY ENFORCEMENT on sqft/dimension fields
+    // ============================================
+    const numericInputs = quoteForm.querySelectorAll('input[type="number"]');
+    numericInputs.forEach(input => {
+        input.addEventListener('keydown', (e) => {
+            // Allow: backspace, delete, tab, escape, enter, decimal point, arrows
+            const allowed = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight',
+                'ArrowUp', 'ArrowDown', 'Home', 'End', '.'];
+            if (allowed.includes(e.key)) return;
+            // Allow Ctrl/Cmd+A, C, V, X
+            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) return;
+            // Block non-numeric
+            if (!/^\d$/.test(e.key)) {
+                e.preventDefault();
+            }
+        });
+    });
+
+    // ============================================
+    // ADDRESS AUTOCOMPLETE (Nominatim / OpenStreetMap)
+    // ============================================
+    const addressInput = document.getElementById('q-address');
+    const suggestionsEl = document.getElementById('address-suggestions');
+
+    if (addressInput && suggestionsEl) {
+        let debounceTimer = null;
+        let focusedIdx = -1;
+        let currentResults = [];
+
+        function renderSuggestions(results) {
+            currentResults = results;
+            focusedIdx = -1;
+            if (results.length === 0) {
+                suggestionsEl.classList.remove('visible');
+                suggestionsEl.innerHTML = '';
+                return;
+            }
+
+            suggestionsEl.innerHTML = results.map((r, i) => {
+                const parts = r.display_name.split(', ');
+                const main = parts.slice(0, 2).join(', ');
+                const sub = parts.slice(2).join(', ');
+                return `<div class="address-suggestion-item" data-idx="${i}">
+                    <span class="addr-icon">📍</span>
+                    <div class="addr-text">
+                        <strong>${main}</strong>
+                        <span>${sub}</span>
+                    </div>
+                </div>`;
+            }).join('');
+
+            suggestionsEl.classList.add('visible');
+
+            // Click handlers
+            suggestionsEl.querySelectorAll('.address-suggestion-item').forEach(item => {
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    const idx = parseInt(item.dataset.idx, 10);
+                    selectAddress(currentResults[idx]);
+                });
+            });
+        }
+
+        function selectAddress(result) {
+            addressInput.value = result.display_name;
+            suggestionsEl.classList.remove('visible');
+            suggestionsEl.innerHTML = '';
+            currentResults = [];
+        }
+
+        async function searchAddress(query) {
+            if (query.length < 3) {
+                suggestionsEl.classList.remove('visible');
+                return;
+            }
+
+            suggestionsEl.innerHTML = '<div class="addr-loading">Searching...</div>';
+            suggestionsEl.classList.add('visible');
+
+            try {
+                const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
+                const res = await fetch(url, {
+                    headers: { 'Accept-Language': 'en-US,en' }
+                });
+                const data = await res.json();
+                renderSuggestions(data);
+            } catch (err) {
+                suggestionsEl.innerHTML = '<div class="addr-loading">Unable to search — type your full address</div>';
+                setTimeout(() => suggestionsEl.classList.remove('visible'), 2000);
+            }
+        }
+
+        addressInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            const val = addressInput.value.trim();
+            if (val.length < 3) {
+                suggestionsEl.classList.remove('visible');
+                return;
+            }
+            debounceTimer = setTimeout(() => searchAddress(val), 350);
+        });
+
+        addressInput.addEventListener('keydown', (e) => {
+            const items = suggestionsEl.querySelectorAll('.address-suggestion-item');
+            if (!items.length) return;
+
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
+                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                focusedIdx = Math.max(focusedIdx - 1, 0);
+                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
+            } else if (e.key === 'Enter' && focusedIdx >= 0) {
+                e.preventDefault();
+                selectAddress(currentResults[focusedIdx]);
+            } else if (e.key === 'Escape') {
+                suggestionsEl.classList.remove('visible');
+            }
+        });
+
+        addressInput.addEventListener('blur', () => {
+            // Small delay to allow click on suggestion
+            setTimeout(() => suggestionsEl.classList.remove('visible'), 200);
+        });
+    }
 }

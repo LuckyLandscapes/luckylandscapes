@@ -3318,133 +3318,48 @@ body.promo-active .mobile-menu {
     color: var(--clover-dark);
 }
 
-/* Not Sure? Link */
-.quote-notsure-link {
-    display: block;
-    text-align: center;
-    margin-top: 1rem;
-    font-size: .85rem;
-    color: var(--gray-400);
-    font-weight: 500;
-    transition: color var(--t-fast);
-    text-decoration: none;
-}
-
-.quote-notsure-link:hover {
-    color: var(--clover);
-}
-
-/* ============================================
-   HOME PAGE — CONTACT SERVICE GRID
-   ============================================ */
-
-.contact-services-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 1.2rem;
-    padding: 2rem;
-}
-
-.contact-services-card h3 {
-    font-size: 1.4rem;
-    margin-bottom: .25rem;
-    color: var(--white);
-}
-
-.contact-service-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: .6rem;
-    margin-top: 1.25rem;
-}
-
-.contact-svc-btn {
+/* Not Sure? Button */
+.quote-notsure-btn {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: .3rem;
-    padding: .75rem .5rem;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    justify-content: center;
+    gap: .5rem;
+    margin-top: 1.5rem;
+    padding: .9rem 1.5rem;
+    font-size: .95rem;
+    font-weight: 600;
+    color: var(--gray-600);
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
     border-radius: .75rem;
     text-decoration: none;
-    color: var(--gray-300);
     transition: all var(--t-fast);
     cursor: pointer;
-    text-align: center;
-    position: relative;
 }
 
-.contact-svc-btn:hover {
-    background: rgba(107, 142, 78, 0.15);
-    border-color: var(--sage);
-    color: var(--white);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(107, 142, 78, 0.2);
-}
-
-.csb-icon {
-    font-size: 1.3rem;
-    line-height: 1;
-}
-
-.csb-text {
-    font-size: .72rem;
-    font-weight: 600;
-    line-height: 1.2;
-    letter-spacing: -.01em;
-}
-
-.csb-featured {
-    border-color: rgba(107, 142, 78, 0.35);
-    background: rgba(107, 142, 78, 0.08);
-}
-
-.csb-badge {
-    position: absolute;
-    top: -.4rem;
-    right: -.3rem;
-    background: var(--clover);
-    color: var(--white);
-    font-size: .55rem;
+.quote-notsure-btn span {
+    color: var(--clover);
     font-weight: 700;
-    padding: .15rem .4rem;
-    border-radius: 100px;
-    text-transform: uppercase;
-    letter-spacing: .03em;
 }
 
-.contact-general-btn {
-    display: block;
-    width: 100%;
-    margin-top: 1rem;
-    padding: .8rem 1rem;
-    background: transparent;
-    border: 1px dashed rgba(255, 255, 255, 0.15);
-    border-radius: .75rem;
-    color: var(--gray-400);
-    font-size: .85rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--t-fast);
-    font-family: inherit;
-}
-
-.contact-general-btn:hover {
-    border-color: var(--sage);
-    color: var(--sage-light);
+.quote-notsure-btn:hover {
     background: rgba(107, 142, 78, 0.06);
+    border-color: var(--clover);
+    color: var(--charcoal);
+    transform: translateY(-1px);
 }
 
-/* Mobile: 2 columns */
-@media (max-width: 768px) {
-    .contact-service-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .contact-services-card {
-        padding: 1.5rem;
-    }
+.quote-notsure-btn:hover span {
+    color: var(--forest);
 }
+
+.quote-notsure-btn--sm {
+    font-size: .85rem;
+    padding: .7rem 1.2rem;
+    margin-top: .75rem;
+}
+
+
 
 /* ============================================
    GENERAL CONTACT FORM MODAL
@@ -3540,76 +3455,77 @@ body.promo-active .mobile-menu {
 .service-group-label {
     font-size: .85rem;
     font-weight: 700;
-    color: var(--sage-light);
+    color: var(--forest);
     text-transform: uppercase;
     letter-spacing: .06em;
     margin-bottom: .6rem;
     padding-bottom: .4rem;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    border-bottom: 1px solid var(--gray-200);
 }
 
 .service-select-cards {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-    gap: .65rem;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: .85rem;
 }
 
 .service-select-card {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: .3rem;
-    padding: 1rem .75rem;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: .75rem;
+    gap: .45rem;
+    padding: 1.35rem 1rem;
+    background: var(--gray-50);
+    border: 2px solid var(--gray-200);
+    border-radius: .85rem;
     cursor: pointer;
     font-family: inherit;
-    color: var(--gray-300);
+    color: var(--charcoal);
     text-align: center;
     transition: all var(--t-fast);
     position: relative;
 }
 
 .service-select-card:hover {
-    background: rgba(107, 142, 78, 0.12);
-    border-color: var(--sage);
-    color: var(--white);
+    background: rgba(107, 142, 78, 0.06);
+    border-color: var(--clover);
+    color: var(--forest-deep);
     transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(107, 142, 78, 0.2);
+    box-shadow: 0 6px 20px rgba(107, 142, 78, 0.15);
 }
 
 .ssc-icon {
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     line-height: 1;
 }
 
 .ssc-title {
-    font-size: .85rem;
+    font-size: 1rem;
     font-weight: 700;
-    color: inherit;
+    color: var(--charcoal);
+    line-height: 1.25;
 }
 
 .ssc-desc {
-    font-size: .72rem;
-    color: var(--gray-400);
-    line-height: 1.3;
+    font-size: .82rem;
+    color: var(--gray-500);
+    line-height: 1.35;
 }
 
 .ssc-featured {
-    border-color: rgba(107, 142, 78, 0.35);
-    background: rgba(107, 142, 78, 0.08);
+    border-color: var(--clover);
+    background: rgba(107, 142, 78, 0.06);
 }
 
 .ssc-badge {
     position: absolute;
-    top: -.45rem;
-    right: -.3rem;
+    top: -.5rem;
+    right: -.35rem;
     background: var(--clover);
     color: var(--white);
-    font-size: .6rem;
+    font-size: .65rem;
     font-weight: 700;
-    padding: .2rem .5rem;
+    padding: .25rem .6rem;
     border-radius: 100px;
     text-transform: uppercase;
     letter-spacing: .03em;
@@ -3626,12 +3542,392 @@ body.promo-active .mobile-menu {
         grid-template-columns: repeat(2, 1fr);
     }
     .service-select-card {
-        padding: .8rem .5rem;
+        padding: 1.1rem .75rem;
     }
     .ssc-icon {
-        font-size: 1.3rem;
+        font-size: 1.5rem;
     }
     .ssc-title {
-        font-size: .78rem;
+        font-size: .88rem;
     }
-}
+    .ssc-desc {
+        font-size: .75rem;
+    }
+    .quote-notsure-btn {
+        font-size: .85rem;
+        padding: .75rem 1rem;
+    }
+}
+
+/* ============================================
+   ADDRESS AUTOCOMPLETE
+   ============================================ */
+.address-autocomplete-wrap {
+    position: relative;
+}
+
+.address-suggestions {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    background: var(--white);
+    border: 1px solid var(--gray-200);
+    border-top: none;
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.address-suggestions.visible {
+    display: block;
+}
+
+.address-suggestion-item {
+    padding: .75rem 1rem;
+    font-size: .9rem;
+    color: var(--charcoal);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    transition: background .15s;
+    border-bottom: 1px solid var(--gray-100);
+}
+
+.address-suggestion-item:last-child {
+    border-bottom: none;
+}
+
+.address-suggestion-item:hover,
+.address-suggestion-item.focused {
+    background: rgba(107, 142, 78, .08);
+    color: var(--forest-deep);
+}
+
+.address-suggestion-item .addr-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--sage);
+    font-size: 1rem;
+}
+
+.address-suggestion-item .addr-text {
+    flex: 1;
+    line-height: 1.35;
+}
+
+.address-suggestion-item .addr-text strong {
+    display: block;
+    font-weight: 600;
+    font-size: .88rem;
+}
+
+.address-suggestion-item .addr-text span {
+    font-size: .78rem;
+    color: var(--gray-500);
+}
+
+.address-suggestions .addr-loading {
+    padding: .75rem 1rem;
+    text-align: center;
+    color: var(--gray-400);
+    font-size: .85rem;
+}
+
+/* ============================================
+   FORM VALIDATION ERRORS
+   ============================================ */
+.form-error {
+    display: none;
+    font-size: .78rem;
+    color: #d32f2f;
+    margin-top: .3rem;
+    font-weight: 500;
+}
+
+.form-group.has-error input,
+.form-group.has-error select,
+.form-group.has-error textarea {
+    border-color: #d32f2f;
+    box-shadow: 0 0 0 3px rgba(211, 47, 47, .1);
+}
+
+.form-group.has-error .form-error {
+    display: block;
+}
+
+/* ============================================
+   CLICKABLE STEP DOTS
+   ============================================ */
+.quote-step-dot.completed {
+    cursor: pointer;
+}
+
+.quote-step-dot.completed:hover {
+    opacity: 1;
+}
+
+.quote-step-dot.completed:hover .step-num {
+    background: var(--clover);
+    color: var(--white);
+    transform: scale(1.1);
+}
+
+/* ============================================
+   HOME PAGE — INSTANT QUOTE CARD (Redesigned)
+   ============================================ */
+
+.contact-quote-card {
+    position: relative;
+    border-radius: 1.25rem;
+    overflow: hidden;
+    background: linear-gradient(160deg, #1b3d14 0%, #0f2a0a 50%, #1a3a12 100%);
+    box-shadow:
+        0 20px 60px rgba(0, 0, 0, .35),
+        0 0 0 1px rgba(107, 142, 78, .2),
+        inset 0 1px 0 rgba(255, 255, 255, .05);
+}
+
+/* Animated glow ring */
+.cqc-glow {
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    background: conic-gradient(
+        from 0deg,
+        transparent 0%,
+        rgba(107, 142, 78, .5) 15%,
+        transparent 30%,
+        transparent 70%,
+        rgba(107, 142, 78, .3) 85%,
+        transparent 100%
+    );
+    z-index: 0;
+    animation: cqcGlowSpin 6s linear infinite;
+    opacity: .6;
+}
+
+@keyframes cqcGlowSpin {
+    to { transform: rotate(360deg); }
+}
+
+.cqc-inner {
+    position: relative;
+    z-index: 1;
+    background: linear-gradient(160deg, #1b3d14 0%, #0f2a0a 50%, #1a3a12 100%);
+    border-radius: calc(1.25rem - 2px);
+    margin: 2px;
+    padding: 2.25rem 2rem 1.75rem;
+}
+
+/* Header */
+.cqc-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.cqc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    background: rgba(107, 142, 78, .2);
+    border: 1px solid rgba(107, 142, 78, .35);
+    border-radius: 100px;
+    padding: .35rem .9rem;
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--sage-light);
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-bottom: 1rem;
+}
+
+.cqc-badge svg {
+    color: var(--sage-light);
+}
+
+.cqc-header h3 {
+    font-size: 1.65rem;
+    font-weight: 800;
+    color: var(--white);
+    margin-bottom: .6rem;
+    line-height: 1.2;
+}
+
+.cqc-header h3 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--sage-light), #a4d65e);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.cqc-header p {
+    color: rgba(255, 255, 255, .55);
+    font-size: .92rem;
+    line-height: 1.55;
+    max-width: 340px;
+    margin: 0 auto;
+}
+
+/* Stats Row */
+.cqc-stats {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    background: rgba(255, 255, 255, .04);
+    border: 1px solid rgba(255, 255, 255, .06);
+    border-radius: .85rem;
+    padding: .9rem .5rem;
+    margin-bottom: 1.5rem;
+}
+
+.cqc-stat {
+    flex: 1;
+    text-align: center;
+}
+
+.cqc-stat-num {
+    display: block;
+    font-family: var(--font-heading);
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--white);
+    line-height: 1;
+    margin-bottom: .2rem;
+}
+
+.cqc-stat-label {
+    font-size: .72rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, .4);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+}
+
+.cqc-stat-divider {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, .1);
+    flex-shrink: 0;
+}
+
+/* CTA Button */
+.cqc-cta-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .6rem;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, var(--clover), var(--sage));
+    color: var(--white);
+    font-size: 1.05rem;
+    font-weight: 700;
+    font-family: inherit;
+    border: none;
+    border-radius: .75rem;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all .3s cubic-bezier(.4, 0, .2, 1);
+    box-shadow:
+        0 4px 16px rgba(107, 142, 78, .3),
+        0 1px 3px rgba(0, 0, 0, .2);
+}
+
+.cqc-cta-btn:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow:
+        0 8px 28px rgba(107, 142, 78, .4),
+        0 2px 6px rgba(0, 0, 0, .25);
+    background: linear-gradient(135deg, var(--sage), var(--clover));
+}
+
+.cqc-cta-btn:active {
+    transform: translateY(0) scale(.99);
+}
+
+/* Trust Signals */
+.cqc-trust {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .4rem .9rem;
+    margin-top: 1.25rem;
+}
+
+.cqc-trust-item {
+    display: flex;
+    align-items: center;
+    gap: .35rem;
+    font-size: .8rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, .5);
+}
+
+.cqc-trust-item svg {
+    color: var(--sage-light);
+    flex-shrink: 0;
+}
+
+/* General Button (bottom of card) */
+.contact-general-btn {
+    display: block;
+    width: 100%;
+    padding: 1rem 1.5rem;
+    background: rgba(255, 255, 255, .03);
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, .06);
+    color: rgba(255, 255, 255, .45);
+    font-size: .88rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all .25s;
+    font-family: inherit;
+    position: relative;
+    z-index: 1;
+    border-radius: 0 0 1.25rem 1.25rem;
+}
+
+.contact-general-btn:hover {
+    background: rgba(255, 255, 255, .06);
+    color: rgba(255, 255, 255, .85);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .cqc-inner {
+        padding: 1.75rem 1.25rem 1.5rem;
+    }
+
+    .cqc-header h3 {
+        font-size: 1.4rem;
+    }
+
+    .cqc-stat-num {
+        font-size: 1.15rem;
+    }
+
+    .cqc-cta-btn {
+        font-size: .95rem;
+        padding: .9rem 1.25rem;
+    }
+
+    .cqc-trust {
+        gap: .35rem .6rem;
+    }
+
+    .cqc-trust-item {
+        font-size: .75rem;
+    }
+}
+
