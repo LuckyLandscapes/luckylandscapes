@@ -62,9 +62,10 @@ if (preloader) {
 // ============================================
 const navbar = document.getElementById('navbar');
 const isTeamPage = window.location.pathname.includes('team');
+const isSubPage = window.location.pathname.includes('services/') || window.location.pathname.includes('gallery') || window.location.pathname.includes('careers') || window.location.pathname.includes('privacy') || window.location.pathname.includes('terms');
 
 function handleNavScroll() {
-    if (isTeamPage) return; // Team page nav is always scrolled
+    if (isTeamPage || isSubPage) return; // Sub-pages nav is always scrolled
     if (window.scrollY > 60) {
         navbar.classList.add('scrolled');
     } else {
@@ -378,20 +379,19 @@ if (contactForm) {
 const serviceSelect = document.getElementById('service');
 if (serviceSelect) {
     const serviceRoutes = {
-        'Mowing & Maintenance': 'mowing',
-        'Garden Beds / Mulch': 'gardenbeds',
-        'Plant Transplants': 'transplants',
-        'Junk Removal': 'junk',
-        'Leaf Removal': 'leaf',
-        'Paver Project': 'pavers',
-        'Retaining Wall': 'retaining',
-        'Deck / Patio': 'decks',
-        'Full Landscape Design': 'landscape',
+        'Mowing & Maintenance': 'lawn',
+        'Garden Beds / Mulch': 'garden',
+        'Plant Transplants': 'garden',
+        'Junk Removal': 'cleanup',
+        'Leaf Removal': 'cleanup',
+        'Paver Project': 'hardscape',
+        'Retaining Wall': 'hardscape',
+        'Full Landscape Design': 'design',
     };
     serviceSelect.addEventListener('change', () => {
         const route = serviceRoutes[serviceSelect.value];
         if (route) {
-            window.location.href = `/quote.html?service=${route}`;
+            window.location.href = `/quote.html?category=${route}`;
         }
     });
 }
@@ -660,6 +660,70 @@ function buildGalleryGrid() {
 buildGalleryGrid();
 
 // ============================================
+// GALLERY PAGE — Full grid with filter
+// ============================================
+const galleryPageGrid = document.getElementById('gallery-page-grid');
+const galleryFilterBar = document.getElementById('gallery-filter-bar');
+
+function buildGalleryPageGrid(filterTag) {
+    if (!galleryPageGrid) return;
+    galleryPageGrid.innerHTML = '';
+
+    const filtered = filterTag === 'all'
+        ? projectData
+        : projectData.filter(p => p.tag === filterTag);
+
+    filtered.forEach((project, _i) => {
+        const realIndex = projectData.indexOf(project); // Keep original index for lightbox
+        const coverIdx = project.cover ?? 0;
+        const coverImg = project.images[coverIdx] ?? project.images[0];
+        const src = getImageSrc(coverImg);
+
+        const card = document.createElement('div');
+        card.className = 'gallery-page-card';
+        card.dataset.project = realIndex;
+
+        card.innerHTML = `
+            <img src="${src}" alt="${project.title} — ${project.tag}" loading="lazy" />
+            <span class="gallery-page-card-tag">${project.tag}</span>
+            <div class="gallery-page-card-overlay">
+                <span class="gallery-page-card-title">${project.title}</span>
+                <span class="gallery-page-card-desc">${project.desc}</span>
+            </div>
+        `;
+
+        galleryPageGrid.appendChild(card);
+    });
+}
+
+if (galleryPageGrid) {
+    buildGalleryPageGrid('all');
+
+    // Filter button clicks
+    if (galleryFilterBar) {
+        galleryFilterBar.addEventListener('click', (e) => {
+            const btn = e.target.closest('.gallery-filter-btn');
+            if (!btn) return;
+            const filter = btn.dataset.filter;
+
+            // Update active state
+            galleryFilterBar.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            buildGalleryPageGrid(filter);
+        });
+    }
+
+    // Gallery page lightbox click handler
+    galleryPageGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.gallery-page-card[data-project]');
+        if (!card) return;
+        const idx = parseInt(card.dataset.project, 10);
+        openLightbox(idx);
+    });
+}
+
+// ============================================
 // GSAP — GALLERY ITEMS (after dynamic generation)
 // ============================================
 const galleryItemsForAnim = document.querySelectorAll('.gallery-item');
@@ -900,7 +964,7 @@ function closeLightbox() {
     }
 }
 
-// Gallery item click handlers (event delegation on the grid)
+// Gallery item click handlers (event delegation on the homepage grid)
 if (lightbox && galleryGrid) {
     galleryGrid.addEventListener('click', (e) => {
         const item = e.target.closest('.gallery-item[data-project]');
@@ -908,7 +972,10 @@ if (lightbox && galleryGrid) {
         const idx = parseInt(item.dataset.project, 10);
         openLightbox(idx);
     });
+}
 
+// Lightbox controls — bind whenever lightbox exists (works on both homepage & gallery page)
+if (lightbox) {
     // Navigation
     if (lightboxPrev) {
         lightboxPrev.addEventListener('click', () => {
@@ -971,17 +1038,14 @@ if (lightbox && galleryGrid) {
         }, { passive: true });
     }
 
-    // CTA button closes lightbox and scrolls to contact
+    // CTA button closes lightbox and navigates to quote
     if (lightboxCta) {
         lightboxCta.addEventListener('click', (e) => {
             e.preventDefault();
             closeLightbox();
+            const href = lightboxCta.getAttribute('href') || '/quote.html';
             setTimeout(() => {
-                const target = document.querySelector('#contact');
-                if (target) {
-                    const navH = navbar ? navbar.offsetHeight : 80;
-                    lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
-                }
+                window.location.href = href;
             }, 300);
         });
     }
@@ -1051,579 +1115,223 @@ if (lightbox && galleryGrid) {
 })();
 
 // ============================================
-// MULTI-SERVICE QUOTE WIZARD
+// GUIDED QUESTIONNAIRE WIZARD
 // ============================================
 const QUOTES_SCRIPT_URL = ''; // ← Paste your deployed Apps Script URL here
 
-const quoteForm = document.getElementById('quote-form');
-if (quoteForm) {
-    // --- PRICING CONFIG ---
-    const PRICING = {
-        mowing: {
-            label: 'Mowing Package', unit: '/ visit',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 31 mows (Apr–Oct)`,
-            calc: (d) => {
-                const sqft = parseFloat(d.sqft) || 0;
-                const perVisit = sqft * 0.005;
-                return {
-                    perUnit: perVisit, total: perVisit * 31, mowCount: 31, breakdown: [
-                        { label: `Base mowing (${sqft.toLocaleString()} sq ft × $0.005)`, val: perVisit },
-                        { label: 'Per visit', val: perVisit, bold: true },
-                        { label: 'Season total (31 mows)', val: perVisit * 31, bold: true },
-                    ]
-                };
-            },
-            inputs: ['sqft'],
-            perks: ['🍀 31 professional mows (April through October)', '🌿 Weed eating & edging included',
-                '💡 Personalized lawn care advice & best practices', '📅 Priority scheduling — never wait for a slot',
-                '👷 Consistent crew who knows your property', '🚫 Cancel anytime — no long-term contracts'],
-        },
-        fertilizer: {
-            label: 'Fertilizer Package', unit: '/ application',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 4 applications`,
-            calc: (d) => {
-                const sqft = parseFloat(d.sqft) || 0;
-                const perApp = sqft * 0.008;
-                return {
-                    perUnit: perApp, total: perApp * 4, breakdown: [
-                        { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008)`, val: perApp },
-                        { label: 'Per application', val: perApp, bold: true },
-                        { label: 'Season total (4 applications)', val: perApp * 4, bold: true },
-                    ]
-                };
-            },
-            inputs: ['sqft'],
-            perks: ['🌱 Keep your lawn thick, green, and healthy', '📅 4 applications: April, June, August, October',
-                '🧪 Professional-grade fertilizer', '💡 Customized for your lawn\'s needs',
-                '🚫 No contracts — cancel anytime'],
-        },
-        cleanup: {
-            label: 'Fall Yard Cleanup', unit: '/ service',
-            totalLabel: (c) => `Season Total: $${c.total.toLocaleString(undefined, { minimumFractionDigits: 2 })} · 6 cleanups`,
-            calc: (d) => {
-                const sqft = parseFloat(d.sqft) || 0;
-                const perService = sqft * 0.02;
-                return {
-                    perUnit: perService, total: perService * 6, breakdown: [
-                        { label: `Cleanup (${sqft.toLocaleString()} sq ft × $0.02)`, val: perService },
-                        { label: 'Per service', val: perService, bold: true },
-                        { label: 'Season total (6 services)', val: perService * 6, bold: true },
-                    ]
-                };
-            },
-            inputs: ['sqft'],
-            perks: ['🍂 Remove leaves, sticks, and yard debris', '🧹 Weed eating & sidewalk edging',
-                '📅 6 services: Nov–Mar', '🏡 Keep your yard looking great year-round',
-                '🚫 No contracts — cancel anytime'],
-        },
-        allinone: {
-            label: 'All-In-One Package', unit: '/ season',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.sqft) || 0;
-                const mowing = 0.005 * sqft * 31;
-                const fert = 0.008 * sqft * 4;
-                const clean = 0.02 * sqft * 6;
-                const total = mowing + fert + clean;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `Mowing (${sqft.toLocaleString()} sq ft × $0.005 × 31)`, val: mowing },
-                        { label: `Fertilizer (${sqft.toLocaleString()} sq ft × $0.008 × 4)`, val: fert },
-                        { label: `Fall Cleanup (${sqft.toLocaleString()} sq ft × $0.02 × 6)`, val: clean },
-                        { label: 'Season total', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['sqft'],
-            perks: ['🍀 Everything in Mowing, Fertilizer & Cleanup packages',
-                '🌿 31 mows + 4 fertilizer apps + 6 cleanups',
-                '💡 Year-round lawn care advice', '📅 Priority scheduling',
-                '👷 Consistent crew', '💰 Best overall value'],
-        },
-        gardenbeds: {
-            label: 'Garden Beds & Mulch', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.bedSqft) || 0;
-                const bedType = d.bedType || 'new3';
-                const grade = d.bedMaterial || 'basic';
-                const rates = {
-                    new3: { basic: 2.00, mid: 2.50, premium: 3.00 },
-                    fresh15: { basic: 2.00, mid: 2.25, premium: 2.50 },
-                    rock2: { basic: 4.00, mid: 2.25, premium: 2.50 },
-                };
-                const typeNames = { new3: 'New Beds (3")', fresh15: 'Freshen Up (1.5")', rock2: 'Rock (2")' };
-                const gradeNames = { basic: 'Basic / Non-colored', mid: 'Mid-range / Colored', premium: 'Premium / Cyprus' };
-                const rate = rates[bedType]?.[grade] ?? 2.00;
-                const total = sqft * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${typeNames[bedType]} — ${gradeNames[grade]}`, val: null },
-                        { label: `${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)}/sq ft`, val: total },
-                        { label: 'Project total', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['gardenbeds'],
-        },
-        edging: {
-            label: 'Garden Bed Edging', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const lf = parseFloat(d.edgeLF) || 0;
-                const mat = d.edgeMaterial || 'vinyl';
-                const rates = { vinyl: 3.50, steel: 4.85, concrete: 7.50 };
-                const names = { vinyl: 'Vinyl', steel: 'Steel', concrete: 'Concrete' };
-                const rate = rates[mat] ?? 3.50;
-                const total = lf * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${names[mat]} edging`, val: null },
-                        { label: `${lf.toLocaleString()} linear ft × $${rate.toFixed(2)}/LF`, val: total },
-                        { label: 'Project total', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['edging'],
-        },
-        pavers: {
-            label: 'Paver Project', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.paverSqft) || 0;
-                const grade = d.paverGrade || 'basic';
-                const rates = { basic: 10, mid: 14, premium: 18 };
-                const names = { basic: 'Standard Concrete', mid: 'Interlocking', premium: 'Natural Stone / Brick' };
-                const rate = rates[grade] ?? 10;
-                const total = sqft * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${names[grade]} pavers`, val: null },
-                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                        { label: 'Material + labor + profit', val: null },
-                        { label: 'Project estimate', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['pavers'],
-        },
-        retaining: {
-            label: 'Retaining Wall', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const len = parseFloat(d.wallLength) || 0;
-                const ht = parseFloat(d.wallHeight) || 0;
-                const sqft = len * ht;
-                const mat = d.wallMaterial || 'block';
-                const rates = { block: 25, stone: 35, boulder: 45 };
-                const names = { block: 'Standard Block', stone: 'Natural Stone', boulder: 'Boulder' };
-                const rate = rates[mat] ?? 25;
-                const total = sqft * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${names[mat]} wall`, val: null },
-                        { label: `${len} ft long × ${ht} ft high = ${sqft.toLocaleString()} sq ft face`, val: null },
-                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                        { label: 'Project estimate', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['retaining'],
-        },
-        decks: {
-            label: 'Deck / Patio', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.deckSqft) || 0;
-                const grade = d.deckGrade || 'basic';
-                const rates = { basic: 15, mid: 22, premium: 30 };
-                const names = { basic: 'Pressure-treated Wood', mid: 'Cedar / Composite', premium: 'Trex / Hardwood' };
-                const rate = rates[grade] ?? 15;
-                const total = sqft * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${names[grade]}`, val: null },
-                        { label: `${sqft.toLocaleString()} sq ft × $${rate}/sq ft`, val: total },
-                        { label: 'Project estimate', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['decks'],
-        },
-        transplants: {
-            label: 'Plant Transplants', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sm = parseInt(d.smallPlants) || 0;
-                const md = parseInt(d.medPlants) || 0;
-                const lg = parseInt(d.largePlants) || 0;
-                const xl = parseInt(d.treePlants) || 0;
-                const prices = { sm: 20, md: 45, lg: 75, xl: 150 };
-                const smTotal = sm * prices.sm;
-                const mdTotal = md * prices.md;
-                const lgTotal = lg * prices.lg;
-                const xlTotal = xl * prices.xl;
-                const total = smTotal + mdTotal + lgTotal + xlTotal;
-                const breakdown = [];
-                if (sm > 0) breakdown.push({ label: `Small plants (${sm} × $${prices.sm})`, val: smTotal });
-                if (md > 0) breakdown.push({ label: `Medium plants (${md} × $${prices.md})`, val: mdTotal });
-                if (lg > 0) breakdown.push({ label: `Large plants (${lg} × $${prices.lg})`, val: lgTotal });
-                if (xl > 0) breakdown.push({ label: `Trees / XL transplants (${xl} × $${prices.xl})`, val: xlTotal });
-                if (breakdown.length === 0) breakdown.push({ label: 'Please add at least one plant', val: 0 });
-                breakdown.push({ label: 'Project estimate', val: total, bold: true });
-                return { perUnit: total, total, breakdown };
-            },
-            inputs: ['transplants'],
-        },
-        junk: {
-            label: 'Junk Removal', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const size = d.junkSize || 'quarter';
-                const type = d.junkType || 'yard';
-                const baseRates = { quarter: 125, half: 200, full: 350, xl: 600 };
-                const sizeNames = { quarter: '¼ Truck Load', half: '½ Truck Load', full: 'Full Truck Load', xl: 'XL — Multiple Loads' };
-                const typeMultiplier = { yard: 1.0, mixed: 1.15, heavy: 1.35 };
-                const typeNames = { yard: 'Yard Waste', mixed: 'Mixed Materials', heavy: 'Heavy Materials' };
-                const base = baseRates[size] ?? 125;
-                const mult = typeMultiplier[type] ?? 1.0;
-                const total = Math.round(base * mult);
-                const breakdown = [
-                    { label: `${sizeNames[size]}`, val: base },
-                ];
-                if (mult !== 1.0) {
-                    breakdown.push({ label: `${typeNames[type]} (×${mult})`, val: total });
-                }
-                breakdown.push({ label: 'Project estimate', val: total, bold: true });
-                return { perUnit: total, total, breakdown };
-            },
-            inputs: ['junk'],
-        },
-        leaf: {
-            label: 'Leaf Removal', unit: 'total',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.sqft) || 0;
-                const rate = 0.015;
-                const total = sqft * rate;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `Leaf removal (${sqft.toLocaleString()} sq ft × $0.015)`, val: total },
-                        { label: 'Includes blowing, raking & haul-off', val: null },
-                        { label: 'Project estimate', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['sqft'],
-        },
-        landscape: {
-            label: 'Full Landscape Design', unit: 'estimate',
-            totalLabel: () => '',
-            calc: (d) => {
-                const sqft = parseFloat(d.yardSqft) || 0;
-                const scope = d.designScope || 'partial';
-                const consultFee = 200;
-                const rates = { partial: 3.00, full: 4.50, premium: 7.00 };
-                const scopeNames = { partial: 'Partial (front or back)', full: 'Full Property', premium: 'Premium + Hardscaping' };
-                const rate = rates[scope] ?? 3.00;
-                const install = sqft * rate;
-                const total = consultFee + install;
-                return {
-                    perUnit: total, total, breakdown: [
-                        { label: `${scopeNames[scope]} design`, val: null },
-                        { label: `Design consultation`, val: consultFee },
-                        { label: `Installation (${sqft.toLocaleString()} sq ft × $${rate.toFixed(2)})`, val: install },
-                        { label: 'Project estimate', val: total, bold: true },
-                    ]
-                };
-            },
-            inputs: ['landscape'],
-        },
-    };
-
+const qzCategoryBtns = document.querySelectorAll('#qz-categories .qz-option-card, .qz-notsure-btn[data-category]');
+if (qzCategoryBtns.length > 0) {
     // --- STATE ---
-    let selectedService = null;
-    let calcResult = null;
+    let qzCategory = null;
+    let qzProjectType = null;
 
     // --- DOM refs ---
-    const allSteps = ['quote-step-1', 'quote-step-2', 'quote-step-3', 'quote-step-4-accept', 'quote-step-4-decline']
-        .map(id => document.getElementById(id));
+    const allSteps = [
+        document.getElementById('quote-step-1'),
+        document.getElementById('quote-step-2a'),
+        document.getElementById('quote-step-2b'),
+        document.getElementById('quote-step-3'),
+        document.getElementById('quote-step-4'),
+    ];
     const progressFill = document.getElementById('quote-progress-fill');
     const stepDots = document.querySelectorAll('.quote-step-dot');
     const heroTitle = document.getElementById('quote-hero-title');
     const heroSub = document.getElementById('quote-hero-sub');
-    const serviceTypeInput = document.getElementById('q-serviceType');
-    const conditionGroup = document.getElementById('condition-group');
 
-    // --- Input group visibility map ---
-    const inputGroupMap = {
-        sqft: document.getElementById('input-sqft'),
-        gardenbeds: document.getElementById('input-gardenbeds'),
-        edging: document.getElementById('input-edging'),
-        pavers: document.getElementById('input-pavers'),
-        retaining: document.getElementById('input-retaining'),
-        decks: document.getElementById('input-decks'),
-        transplants: document.getElementById('input-transplants'),
-        junk: document.getElementById('input-junk'),
-        landscape: document.getElementById('input-landscape'),
+    const questionGroups = {
+        lawn: document.getElementById('qz-lawn'),
+        garden: document.getElementById('qz-garden'),
+        hardscape: document.getElementById('qz-hardscape'),
+        cleanup: document.getElementById('qz-cleanup'),
+        design: document.getElementById('qz-design'),
+        custom: document.getElementById('qz-custom'),
+        notsure: document.getElementById('qz-notsure'),
     };
 
-    // --- Step navigation helpers ---
+    const categoryLabels = {
+        lawn: { title: 'Lawn Care', icon: '🌿' },
+        garden: { title: 'Garden & Beds', icon: '🌺' },
+        hardscape: { title: 'Hardscaping', icon: '🧱' },
+        cleanup: { title: 'Property Cleanup', icon: '🧹' },
+        design: { title: 'Landscape Design', icon: '🎨' },
+        custom: { title: 'Custom Project', icon: '🔧' },
+        notsure: { title: 'Free Consultation', icon: '🤔' },
+    };
+
+    // Categories that show the New vs Repair step
+    const needsProjectType = ['lawn', 'garden', 'hardscape'];
+
+    // --- Step navigation ---
     function setProgress(step) {
         const pct = step === 1 ? 25 : step === 2 ? 50 : step === 3 ? 75 : 100;
-        progressFill.style.width = pct + '%';
-        stepDots.forEach((dot) => {
-            const dotStep = parseInt(dot.dataset.step, 10);
+        if (progressFill) progressFill.style.width = pct + '%';
+        stepDots.forEach(dot => {
+            const ds = parseInt(dot.dataset.step, 10);
             dot.classList.remove('active', 'completed');
-            if (dotStep === step) dot.classList.add('active');
-            else if (dotStep < step) dot.classList.add('completed');
+            if (ds === step) dot.classList.add('active');
+            else if (ds < step) dot.classList.add('completed');
         });
     }
 
     function showStep(stepEl) {
         allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
-        stepEl.classList.remove('quote-step-hidden');
-        stepEl.style.animation = 'none';
-        stepEl.offsetHeight;
-        stepEl.style.animation = '';
-        const quoteSection = document.getElementById('quote-section');
-        if (quoteSection) {
+        if (stepEl) {
+            stepEl.classList.remove('quote-step-hidden');
+            stepEl.style.animation = 'none';
+            stepEl.offsetHeight; // reflow
+            stepEl.style.animation = '';
+        }
+        const qs = document.getElementById('quote-section');
+        if (qs) {
             const navH = navbar ? navbar.offsetHeight : 80;
-            lenis.scrollTo(quoteSection, { offset: -navH - 20, duration: .8 });
+            lenis.scrollTo(qs, { offset: -navH - 20, duration: 0.8 });
         }
     }
 
-    function showInputGroups(service) {
-        // Hide all service-specific inputs
-        Object.values(inputGroupMap).forEach(el => { if (el) el.style.display = 'none'; });
-        // Show inputs for this service
-        const config = PRICING[service];
-        if (!config) return;
-        config.inputs.forEach(key => {
-            if (inputGroupMap[key]) inputGroupMap[key].style.display = '';
-        });
-        // Show condition dropdown only for mowing
-        if (conditionGroup) {
-            conditionGroup.style.display = (service === 'mowing') ? '' : 'none';
-        }
+    function showQuestionGroup(category) {
+        Object.values(questionGroups).forEach(g => { if (g) g.style.display = 'none'; });
+        if (questionGroups[category]) questionGroups[category].style.display = '';
+        // Show description wrap
+        const descWrap = document.getElementById('qz-description-wrap');
+        if (descWrap) descWrap.style.display = '';
+        // Show continue button and back button
+        const nextBtn = document.getElementById('qz-next-to-contact');
+        const backBtn = document.getElementById('back-to-step2a');
+        if (nextBtn) nextBtn.style.display = '';
+        if (backBtn) backBtn.style.display = needsProjectType.includes(category) ? '' : 'none';
+        // Show lawn condition for repair
+        const condWrap = document.getElementById('qz-lawn-condition-wrap');
+        if (condWrap) condWrap.style.display = (category === 'lawn' && qzProjectType === 'repair') ? '' : 'none';
     }
 
-    function updateHero(service) {
-        const config = PRICING[service];
-        if (!config || !heroTitle) return;
-        heroTitle.innerHTML = `Get Your <em class="highlight">${config.label}</em><br/>Quote in Seconds`;
-        if (heroSub) heroSub.textContent = 'Tell us about your project and we\'ll give you an instant, transparent price.';
+    function updateHero(category) {
+        const info = categoryLabels[category];
+        if (!info || !heroTitle) return;
+        heroTitle.innerHTML = `Your <em class="highlight">${info.title}</em><br/>Quote Starts Here`;
+        if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you.';
     }
 
-    // --- Service selection (Step 1 → Step 2) ---
-    const serviceCards = document.querySelectorAll('.service-select-card');
-    serviceCards.forEach(card => {
-        card.addEventListener('click', () => {
-            selectedService = card.dataset.service;
-            serviceTypeInput.value = selectedService;
-            showInputGroups(selectedService);
-            updateHero(selectedService);
-            setProgress(2);
-            showStep(allSteps[1]); // Step 2
+    // --- Step 1: Category selection ---
+    qzCategoryBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            qzCategory = btn.dataset.category;
+            qzProjectType = null;
+            updateHero(qzCategory);
+
+            if (needsProjectType.includes(qzCategory)) {
+                // Show New vs Repair step
+                const t = document.getElementById('step2a-title');
+                const s = document.getElementById('step2a-sub');
+                const info = categoryLabels[qzCategory];
+                if (t) t.textContent = `Is Your ${info.title} Project New or Repair?`;
+                if (s) s.textContent = 'This helps us understand the scope and give you a better quote.';
+                setProgress(2);
+                showStep(allSteps[1]); // step 2a
+            } else {
+                // Skip to questions directly
+                showQuestionGroup(qzCategory);
+                setProgress(2);
+                showStep(allSteps[2]); // step 2b
+            }
         });
     });
 
-    // --- URL param auto-select ---
-    const urlParams = new URLSearchParams(window.location.search);
-    const preselected = urlParams.get('service');
-    if (preselected && PRICING[preselected]) {
-        selectedService = preselected;
-        serviceTypeInput.value = selectedService;
-        showInputGroups(selectedService);
-        updateHero(selectedService);
-        setProgress(2);
-        // Directly show step 2, skip step 1
-        allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
-        allSteps[1].classList.remove('quote-step-hidden');
+    // --- Step 2a: Project type selection ---
+    const projectTypeBtns = document.querySelectorAll('#qz-project-type .qz-option-card, #quote-step-2a .qz-notsure-btn[data-projecttype]');
+    projectTypeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            qzProjectType = btn.dataset.projecttype;
+            showQuestionGroup(qzCategory);
+            setProgress(2);
+            showStep(allSteps[2]); // step 2b
+        });
+    });
+
+    // --- Back buttons ---
+    const backToStep1 = document.getElementById('back-to-step1');
+    if (backToStep1) {
+        backToStep1.addEventListener('click', () => {
+            qzCategory = null;
+            qzProjectType = null;
+            if (heroTitle) heroTitle.innerHTML = 'Let\'s Build Your<br/><em class="highlight">Dream Yard</em> Together';
+            if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you. It only takes 2 minutes.';
+            setProgress(1);
+            showStep(allSteps[0]);
+        });
     }
 
-    // --- Collect form data ---
-    function getFormData() {
-        const data = Object.fromEntries(new FormData(quoteForm).entries());
-        data.service = selectedService;
-        data.serviceLabel = PRICING[selectedService]?.label || selectedService;
-        if (calcResult) {
-            data.quoteTotal = calcResult.total.toFixed(2);
-            data.quotePerUnit = calcResult.perUnit.toFixed(2);
+    const backToStep2a = document.getElementById('back-to-step2a');
+    if (backToStep2a) {
+        backToStep2a.addEventListener('click', () => {
+            if (needsProjectType.includes(qzCategory)) {
+                setProgress(2);
+                showStep(allSteps[1]); // step 2a
+            } else {
+                setProgress(1);
+                showStep(allSteps[0]); // step 1
+            }
+        });
+    }
+
+    const backToStep2b = document.getElementById('back-to-step2b');
+    if (backToStep2b) {
+        backToStep2b.addEventListener('click', () => {
+            setProgress(2);
+            showStep(allSteps[2]); // step 2b
+        });
+    }
+
+    // --- Continue to contact ---
+    const nextToContact = document.getElementById('qz-next-to-contact');
+    if (nextToContact) {
+        nextToContact.addEventListener('click', () => {
+            setProgress(3);
+            showStep(allSteps[3]); // step 3
+        });
+    }
+
+    // --- Collect all questionnaire data ---
+    function collectData() {
+        const data = {};
+        data.category = qzCategory || '';
+        data.categoryLabel = categoryLabels[qzCategory]?.title || qzCategory || '';
+        data.projectType = qzProjectType || '';
+
+        // Collect all checkboxes and selects from the active question group
+        const group = questionGroups[qzCategory];
+        if (group) {
+            group.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+                data[cb.name] = cb.value;
+            });
+            group.querySelectorAll('select').forEach(sel => {
+                if (sel.value) data[sel.name] = sel.value;
+            });
+        }
+
+        // Description
+        const desc = document.getElementById('qz-description');
+        if (desc && desc.value.trim()) data.project_description = desc.value.trim();
+
+        // Contact form
+        const form = document.getElementById('quote-form');
+        if (form) {
+            const fd = new FormData(form);
+            for (const [k, v] of fd.entries()) {
+                if (v) data[k] = v;
+            }
         }
         return data;
     }
 
-    // --- Calculate & display quote ---
-    function populateQuote() {
-        const config = PRICING[selectedService];
-        if (!config) return;
-
-        const data = getFormData();
-        calcResult = config.calc(data);
-
-        // Animate price counter
-        const priceDisplay = document.getElementById('price-display');
-        const priceUnit = document.getElementById('price-unit');
-        const targetVal = Math.round(calcResult.perUnit);
-
-        priceUnit.textContent = config.unit;
-
-        gsap.fromTo(priceDisplay, { textContent: 0 }, {
-            textContent: targetVal,
-            duration: 1.2,
-            ease: 'power2.out',
-            snap: { textContent: 1 },
-            onUpdate() { priceDisplay.textContent = Math.round(parseFloat(priceDisplay.textContent)).toLocaleString(); },
-            onComplete() {
-                priceDisplay.textContent = calcResult.perUnit % 1 === 0
-                    ? calcResult.perUnit.toLocaleString()
-                    : calcResult.perUnit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            }
-        });
-
-        // Total badge
-        const totalBadge = document.getElementById('quote-total-badge');
-        const totalWrap = document.getElementById('quote-total-wrap');
-        const totalText = config.totalLabel(calcResult);
-        if (totalText) {
-            totalBadge.innerHTML = totalText;
-            totalWrap.style.display = '';
-        } else {
-            totalWrap.style.display = 'none';
-        }
-
-        // Result label
-        const resultLabel = document.getElementById('quote-result-label');
-        if (resultLabel) resultLabel.textContent = `Your Estimated ${config.label} Price`;
-
-        // Build breakdown
-        const breakdownEl = document.getElementById('quote-breakdown');
-        let html = '';
-        calcResult.breakdown.forEach(row => {
-            const cls = row.bold ? ' total' : '';
-            const valStr = row.val !== null ? `$${row.val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '';
-            html += `<div class="breakdown-row${cls}"><span>${row.label}</span><span class="breakdown-val">${valStr}</span></div>`;
-        });
-        breakdownEl.innerHTML = html;
-
-        // Perks
-        const perksEl = document.getElementById('quote-perks');
-        const perksTitle = document.getElementById('perks-title');
-        const perksList = document.getElementById('perks-list');
-        if (config.perks && config.perks.length > 0) {
-            perksEl.style.display = '';
-            perksTitle.textContent = `Your ${config.label} Includes`;
-            perksList.innerHTML = config.perks.map(p => `<li>✓ ${p}</li>`).join('');
-        } else {
-            perksEl.style.display = 'none';
-        }
-    }
-
-    // --- Step 2 → Step 3 (See My Quote) ---
-    document.getElementById('quote-next-2').addEventListener('click', () => {
-        // Validate required contact fields
-        const firstName = document.getElementById('q-firstName').value.trim();
-        const lastName = document.getElementById('q-lastName').value.trim();
-        const email = document.getElementById('q-email').value.trim();
-        const phone = document.getElementById('q-phone').value.trim();
-
-        if (!firstName || !lastName || !email || !phone) {
-            quoteForm.reportValidity();
-            return;
-        }
-
-        // Validate service-specific required fields
-        const config = PRICING[selectedService];
-        if (!config) return;
-
-        let valid = true;
-        if (config.inputs.includes('sqft')) {
-            if (!(parseFloat(document.getElementById('q-sqft').value) > 0)) {
-                document.getElementById('q-sqft').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('gardenbeds')) {
-            if (!(parseFloat(document.getElementById('q-bedSqft').value) > 0)) {
-                document.getElementById('q-bedSqft').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('edging')) {
-            if (!(parseFloat(document.getElementById('q-edgeLF').value) > 0)) {
-                document.getElementById('q-edgeLF').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('pavers')) {
-            if (!(parseFloat(document.getElementById('q-paverSqft').value) > 0)) {
-                document.getElementById('q-paverSqft').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('retaining')) {
-            const l = parseFloat(document.getElementById('q-wallLength').value);
-            const h = parseFloat(document.getElementById('q-wallHeight').value);
-            if (!(l > 0) || !(h > 0)) {
-                document.getElementById(l > 0 ? 'q-wallHeight' : 'q-wallLength').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('decks')) {
-            if (!(parseFloat(document.getElementById('q-deckSqft').value) > 0)) {
-                document.getElementById('q-deckSqft').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('transplants')) {
-            const sm = parseInt(document.getElementById('q-smallPlants').value) || 0;
-            const md = parseInt(document.getElementById('q-medPlants').value) || 0;
-            const lg = parseInt(document.getElementById('q-largePlants').value) || 0;
-            const xl = parseInt(document.getElementById('q-treePlants').value) || 0;
-            if (sm + md + lg + xl <= 0) {
-                document.getElementById('q-smallPlants').focus();
-                valid = false;
-            }
-        }
-        if (config.inputs.includes('landscape')) {
-            if (!(parseFloat(document.getElementById('q-yardSqft').value) > 0)) {
-                document.getElementById('q-yardSqft').focus();
-                valid = false;
-            }
-        }
-
-        if (!valid) {
-            quoteForm.reportValidity();
-            return;
-        }
-
-        setProgress(3);
-        showStep(allSteps[2]); // Step 3
-        populateQuote();
-    });
-
-    // --- Step 3 → Back to Step 2 ---
-    document.getElementById('quote-back-3').addEventListener('click', () => {
-        setProgress(2);
-        showStep(allSteps[1]);
-    });
-
-    // --- Submit to Google Sheet ---
-    async function submitQuote(decision) {
-        const data = getFormData();
-        data.decision = decision;
-
+    // --- Submit to Google Sheets ---
+    async function submitQuestionnaire(data) {
         if (!QUOTES_SCRIPT_URL) {
-            console.warn('QUOTES_SCRIPT_URL not set — skipping Google Sheets submission');
+            console.warn('QUOTES_SCRIPT_URL not set — skipping submission');
             return;
         }
-
         try {
             const params = new URLSearchParams();
-            for (const [key, value] of Object.entries(data)) {
-                params.append(key, value);
-            }
+            for (const [k, v] of Object.entries(data)) params.append(k, v);
             await fetch(QUOTES_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params });
         } catch (err) {
             console.error('Quote submission error:', err);
@@ -1651,147 +1359,101 @@ if (quoteForm) {
         }
     }
 
-    // --- Accept ---
-    document.getElementById('quote-accept').addEventListener('click', async () => {
-        const btn = document.getElementById('quote-accept');
-        btn.innerHTML = '<span class="spinner"></span> Submitting...';
-        btn.disabled = true;
-        await submitQuote('accepted');
-        setProgress(4);
-        showStep(allSteps[3]); // Step 4A
-        spawnConfetti();
-    });
+    // --- Form submission ---
+    const quoteForm = document.getElementById('quote-form');
+    if (quoteForm) {
+        quoteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-    // --- Decline ---
-    document.getElementById('quote-decline').addEventListener('click', async () => {
-        await submitQuote('declined');
-        setProgress(4);
-        showStep(allSteps[4]); // Step 4B
-    });
+            const firstName = document.getElementById('q-firstName').value.trim();
+            const lastName = document.getElementById('q-lastName').value.trim();
+            const email = document.getElementById('q-email').value.trim();
+            const phone = document.getElementById('q-phone').value.trim();
 
-    // --- Changed My Mind ---
-    document.getElementById('quote-changed-mind').addEventListener('click', async () => {
-        const btn = document.getElementById('quote-changed-mind');
-        btn.innerHTML = '<span class="spinner"></span> Let\'s go!';
-        btn.disabled = true;
-        await submitQuote('accepted (changed mind)');
-        showStep(allSteps[3]);
-        spawnConfetti();
-    });
-
-    // ============================================
-    // CLICKABLE STEP DOTS — Back Navigation
-    // ============================================
-    stepDots.forEach(dot => {
-        dot.addEventListener('click', () => {
-            const clickedStep = parseInt(dot.dataset.step, 10);
-            // Only allow navigating to completed (past) steps
-            if (!dot.classList.contains('completed')) return;
-
-            if (clickedStep === 1) {
-                // Reset hero title
-                if (heroTitle) heroTitle.innerHTML = 'Get Your Instant<br/>Quote in <em class="highlight">Seconds</em>';
-                if (heroSub) heroSub.textContent = 'Select a service, tell us about your project, and we\'ll give you an instant, transparent price.';
-                setProgress(1);
-                showStep(allSteps[0]);
-            } else if (clickedStep === 2) {
-                setProgress(2);
-                showStep(allSteps[1]);
-            } else if (clickedStep === 3) {
-                setProgress(3);
-                showStep(allSteps[2]);
-                populateQuote();
+            if (!firstName || !lastName || !email || !phone) {
+                quoteForm.reportValidity();
+                return;
             }
-        });
-    });
 
-    // ============================================
-    // PHONE AUTO-FORMAT (xxx) xxx-xxxx
-    // ============================================
+            // Phone validation
+            const digits = phone.replace(/\D/g, '');
+            if (digits.length < 10) {
+                const pg = document.getElementById('q-phone').closest('.form-group');
+                if (pg) pg.classList.add('has-error');
+                document.getElementById('q-phone').focus();
+                return;
+            }
+
+            // Email validation
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(email)) {
+                const eg = document.getElementById('q-email').closest('.form-group');
+                if (eg) eg.classList.add('has-error');
+                document.getElementById('q-email').focus();
+                return;
+            }
+
+            const btn = document.getElementById('qz-submit');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span> Submitting...';
+            btn.disabled = true;
+
+            const data = collectData();
+            await submitQuestionnaire(data);
+
+            setProgress(4);
+            showStep(allSteps[4]); // step 4
+            spawnConfetti();
+
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        });
+    }
+
+    // --- Phone auto-format ---
     const phoneInput = document.getElementById('q-phone');
     if (phoneInput) {
         phoneInput.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/\D/g, ''); // strip non-digits
+            let val = e.target.value.replace(/\D/g, '');
             if (val.length > 10) val = val.slice(0, 10);
-
             let formatted = '';
             if (val.length > 0) formatted += '(' + val.slice(0, 3);
             if (val.length >= 3) formatted += ') ';
             if (val.length > 3) formatted += val.slice(3, 6);
             if (val.length >= 6) formatted += '-';
             if (val.length > 6) formatted += val.slice(6, 10);
-
             e.target.value = formatted;
-
-            // Remove error state on valid input
             const group = phoneInput.closest('.form-group');
-            if (val.length === 10) {
-                group.classList.remove('has-error');
-            }
+            if (val.length === 10) group.classList.remove('has-error');
         });
-
         phoneInput.addEventListener('blur', () => {
             const digits = phoneInput.value.replace(/\D/g, '');
             const group = phoneInput.closest('.form-group');
-            if (digits.length > 0 && digits.length < 10) {
-                group.classList.add('has-error');
-            } else {
-                group.classList.remove('has-error');
-            }
+            if (digits.length > 0 && digits.length < 10) group.classList.add('has-error');
+            else group.classList.remove('has-error');
         });
     }
 
-    // ============================================
-    // EMAIL VALIDATION
-    // ============================================
+    // --- Email validation ---
     const emailInput = document.getElementById('q-email');
     if (emailInput) {
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         emailInput.addEventListener('blur', () => {
             const val = emailInput.value.trim();
             const group = emailInput.closest('.form-group');
-            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (val.length > 0 && !emailRegex.test(val)) {
-                group.classList.add('has-error');
-            } else {
-                group.classList.remove('has-error');
-            }
+            if (val.length > 0 && !emailRegex.test(val)) group.classList.add('has-error');
+            else group.classList.remove('has-error');
         });
-
         emailInput.addEventListener('input', () => {
             const val = emailInput.value.trim();
             const group = emailInput.closest('.form-group');
-            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (emailRegex.test(val)) {
-                group.classList.remove('has-error');
-            }
+            if (emailRegex.test(val)) group.classList.remove('has-error');
         });
     }
 
-    // ============================================
-    // NUMBER-ONLY ENFORCEMENT on sqft/dimension fields
-    // ============================================
-    const numericInputs = quoteForm.querySelectorAll('input[type="number"]');
-    numericInputs.forEach(input => {
-        input.addEventListener('keydown', (e) => {
-            // Allow: backspace, delete, tab, escape, enter, decimal point, arrows
-            const allowed = ['Backspace', 'Delete', 'Tab', 'Escape', 'Enter', 'ArrowLeft', 'ArrowRight',
-                'ArrowUp', 'ArrowDown', 'Home', 'End', '.'];
-            if (allowed.includes(e.key)) return;
-            // Allow Ctrl/Cmd+A, C, V, X
-            if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) return;
-            // Block non-numeric
-            if (!/^\d$/.test(e.key)) {
-                e.preventDefault();
-            }
-        });
-    });
-
-    // ============================================
-    // ADDRESS AUTOCOMPLETE (Nominatim / OpenStreetMap)
-    // ============================================
+    // --- Address autocomplete (Nominatim) ---
     const addressInput = document.getElementById('q-address');
     const suggestionsEl = document.getElementById('address-suggestions');
-
     if (addressInput && suggestionsEl) {
         let debounceTimer = null;
         let focusedIdx = -1;
@@ -1805,28 +1467,20 @@ if (quoteForm) {
                 suggestionsEl.innerHTML = '';
                 return;
             }
-
             suggestionsEl.innerHTML = results.map((r, i) => {
                 const parts = r.display_name.split(', ');
                 const main = parts.slice(0, 2).join(', ');
                 const sub = parts.slice(2).join(', ');
                 return `<div class="address-suggestion-item" data-idx="${i}">
                     <span class="addr-icon">📍</span>
-                    <div class="addr-text">
-                        <strong>${main}</strong>
-                        <span>${sub}</span>
-                    </div>
+                    <div class="addr-text"><strong>${main}</strong><span>${sub}</span></div>
                 </div>`;
             }).join('');
-
             suggestionsEl.classList.add('visible');
-
-            // Click handlers
             suggestionsEl.querySelectorAll('.address-suggestion-item').forEach(item => {
                 item.addEventListener('mousedown', (e) => {
                     e.preventDefault();
-                    const idx = parseInt(item.dataset.idx, 10);
-                    selectAddress(currentResults[idx]);
+                    selectAddress(currentResults[parseInt(item.dataset.idx, 10)]);
                 });
             });
         }
@@ -1839,22 +1493,15 @@ if (quoteForm) {
         }
 
         async function searchAddress(query) {
-            if (query.length < 3) {
-                suggestionsEl.classList.remove('visible');
-                return;
-            }
-
+            if (query.length < 3) { suggestionsEl.classList.remove('visible'); return; }
             suggestionsEl.innerHTML = '<div class="addr-loading">Searching...</div>';
             suggestionsEl.classList.add('visible');
-
             try {
                 const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
-                const res = await fetch(url, {
-                    headers: { 'Accept-Language': 'en-US,en' }
-                });
+                const res = await fetch(url, { headers: { 'Accept-Language': 'en-US,en' } });
                 const data = await res.json();
                 renderSuggestions(data);
-            } catch (err) {
+            } catch {
                 suggestionsEl.innerHTML = '<div class="addr-loading">Unable to search — type your full address</div>';
                 setTimeout(() => suggestionsEl.classList.remove('visible'), 2000);
             }
@@ -1863,36 +1510,62 @@ if (quoteForm) {
         addressInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             const val = addressInput.value.trim();
-            if (val.length < 3) {
-                suggestionsEl.classList.remove('visible');
-                return;
-            }
+            if (val.length < 3) { suggestionsEl.classList.remove('visible'); return; }
             debounceTimer = setTimeout(() => searchAddress(val), 350);
         });
 
         addressInput.addEventListener('keydown', (e) => {
             const items = suggestionsEl.querySelectorAll('.address-suggestion-item');
             if (!items.length) return;
-
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
-                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                focusedIdx = Math.max(focusedIdx - 1, 0);
-                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
-            } else if (e.key === 'Enter' && focusedIdx >= 0) {
-                e.preventDefault();
-                selectAddress(currentResults[focusedIdx]);
-            } else if (e.key === 'Escape') {
-                suggestionsEl.classList.remove('visible');
-            }
+            if (e.key === 'ArrowDown') { e.preventDefault(); focusedIdx = Math.min(focusedIdx + 1, items.length - 1); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIdx = Math.max(focusedIdx - 1, 0); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
+            else if (e.key === 'Enter' && focusedIdx >= 0) { e.preventDefault(); selectAddress(currentResults[focusedIdx]); }
+            else if (e.key === 'Escape') { suggestionsEl.classList.remove('visible'); }
         });
 
         addressInput.addEventListener('blur', () => {
-            // Small delay to allow click on suggestion
             setTimeout(() => suggestionsEl.classList.remove('visible'), 200);
         });
+    }
+
+    // --- Clickable step dots ---
+    stepDots.forEach(dot => {
+        dot.addEventListener('click', () => {
+            const clickedStep = parseInt(dot.dataset.step, 10);
+            if (!dot.classList.contains('completed')) return;
+            if (clickedStep === 1) {
+                if (heroTitle) heroTitle.innerHTML = 'Let\'s Build Your<br/><em class="highlight">Dream Yard</em> Together';
+                if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you. It only takes 2 minutes.';
+                setProgress(1);
+                showStep(allSteps[0]);
+            } else if (clickedStep === 2) {
+                setProgress(2);
+                showStep(allSteps[2]); // step 2b (questions)
+            } else if (clickedStep === 3) {
+                setProgress(3);
+                showStep(allSteps[3]);
+            }
+        });
+    });
+
+    // --- URL param auto-select ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedCat = urlParams.get('category');
+    if (preselectedCat && categoryLabels[preselectedCat]) {
+        qzCategory = preselectedCat;
+        updateHero(qzCategory);
+        if (needsProjectType.includes(qzCategory)) {
+            const t = document.getElementById('step2a-title');
+            const info = categoryLabels[qzCategory];
+            if (t) t.textContent = `Is Your ${info.title} Project New or Repair?`;
+            setProgress(2);
+            allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
+            allSteps[1].classList.remove('quote-step-hidden');
+        } else {
+            showQuestionGroup(qzCategory);
+            setProgress(2);
+            allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
+            allSteps[2].classList.remove('quote-step-hidden');
+        }
     }
 }
