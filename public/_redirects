@@ -1,0 +1,2 @@
+# Redirect www to non-www (canonical domain)
+https://www.luckylandscapes.com/* https://luckylandscapes.com/:splat 301

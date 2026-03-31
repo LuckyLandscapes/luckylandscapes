@@ -6,24 +6,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <!-- SEO -->
-    <title>Get Your Free Project Quote — Lucky Landscapes</title>
+    <title>Get Your Free Landscaping Quote in Lincoln, NE — Lucky Landscapes</title>
     <meta name="description"
-        content="Tell us about your project and get a personalized quote from Lucky Landscapes. Lawn care, garden beds, pavers, retaining walls, and more in Southeast Nebraska." />
-    <meta name="keywords"
-        content="landscaping quote, lawn care quote, paver quote, garden bed quote, Southeast Nebraska, Lucky Landscapes" />
+        content="Get a free, no-obligation landscaping quote from Lucky Landscapes in Lincoln, Nebraska. Lawn care, garden beds, pavers, retaining walls, landscape design & more. Takes just 2 minutes!" />
+    <link rel="canonical" href="https://luckylandscapes.com/quote.html" />
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Get Your Free Project Quote — Lucky Landscapes" />
+    <meta property="og:title" content="Get Your Free Landscaping Quote — Lucky Landscapes" />
     <meta property="og:description"
-        content="Answer a few quick questions and we'll craft a personalized quote for your project." />
+        content="Answer a few quick questions and get a personalized landscaping quote for your Lincoln, NE project. 100% free, no obligation." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://luckylandscapes.com/quote.html" />
+    <meta property="og:image" content="https://luckylandscapes.com/images/og-card.png" />
+    <meta property="og:site_name" content="Lucky Landscapes" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Get Your Free Landscaping Quote — Lucky Landscapes" />
+    <meta name="twitter:description" content="Free landscaping quotes for Lincoln, NE homeowners. Takes just 2 minutes!" />
+    <meta name="twitter:image" content="https://luckylandscapes.com/images/og-card.png" />
 
     <!-- Favicon -->
     <link rel="apple-touch-icon" sizes="180x180" href="/images/favicons/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/images/favicons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/images/favicons/favicon-16x16.png">
     <link rel="manifest" href="/images/favicons/site.webmanifest">
+
+    <!-- Structured Data: Service -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Get Your Free Landscaping Quote",
+      "description": "Request a free, personalized landscaping quote from Lucky Landscapes in Lincoln, NE.",
+      "url": "https://luckylandscapes.com/quote.html",
+      "provider": {
+        "@type": "LandscapingBusiness",
+        "name": "Lucky Landscapes",
+        "telephone": "+1-402-405-5475",
+        "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" }
+      },
+      "potentialAction": {
+        "@type": "QuoteAction",
+        "target": "https://luckylandscapes.com/quote.html",
+        "name": "Request a Free Quote"
+      }
+    }
+    </script>
+
     <link rel="stylesheet" href="/styles.css" />
 </head>
 
@@ -72,6 +102,8 @@
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote.html" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
     </div>
+
+    <main>
 
     <!-- ==================== QUOTE HERO ==================== -->
     <section class="quote-hero">
@@ -245,6 +277,52 @@
                             </div>
                         </div>
 
+                        <!-- Add-on services (shown when mowing or complete is selected) -->
+                        <div class="qz-addon-wrap" id="qz-lawn-addons">
+                            <div class="qz-addon-label">Add-On Services</div>
+                            <div class="qz-addon-grid">
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="lawn_edging" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">📐</span>
+                                        <span class="qz-check-title">Sidewalk & Driveway Edging</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="lawn_trimming" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">✂️</span>
+                                        <span class="qz-check-title">String Trimming / Weedeating</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="lawn_hedges" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🌳</span>
+                                        <span class="qz-check-title">Hedge & Shrub Trimming</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="lawn_blowing" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🧹</span>
+                                        <span class="qz-check-title">Blowing & Cleanup</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="qz-question" id="qz-lawn-frequency-wrap" style="display:none;">
+                            <label class="qz-label" for="qz-lawn-frequency">How often do you want mowing service?</label>
+                            <select id="qz-lawn-frequency" name="lawn_frequency" class="qz-select">
+                                <option value="">Select frequency...</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Bi-weekly (every 2 weeks)</option>
+                                <option value="onetime">One-time mow</option>
+                                <option value="unsure">Not sure yet</option>
+                            </select>
+                        </div>
+
                         <div class="qz-question">
                             <label class="qz-label" for="qz-lawn-size">How big is your lawn? <span class="label-optional">(approximate)</span></label>
                             <select id="qz-lawn-size" name="lawn_size" class="qz-select">
@@ -311,12 +389,37 @@
                         </div>
 
                         <div class="qz-question">
-                            <label class="qz-label" for="qz-garden-material">Any material preference?</label>
+                            <label class="qz-label" for="qz-garden-beds-count">How many beds? <span class="label-optional">(approximate)</span></label>
+                            <select id="qz-garden-beds-count" name="garden_beds_count" class="qz-select">
+                                <option value="">Select one...</option>
+                                <option value="1-2">1–2 beds</option>
+                                <option value="3-5">3–5 beds</option>
+                                <option value="6+">6+ beds</option>
+                                <option value="unsure">Not sure</option>
+                            </select>
+                        </div>
+
+                        <!-- Dynamic material options — updated by JS based on selected services -->
+                        <div class="qz-question" id="qz-garden-material-wrap">
+                            <label class="qz-label" for="qz-garden-material">Material preference?</label>
                             <select id="qz-garden-material" name="garden_material" class="qz-select">
                                 <option value="">No preference / not sure</option>
                                 <option value="mulch">Mulch (basic or colored)</option>
                                 <option value="rock">Rock / stone</option>
                                 <option value="premium">Premium / Cyprus mulch</option>
+                            </select>
+                        </div>
+
+                        <!-- Edging material (shown only when edging is checked) -->
+                        <div class="qz-question" id="qz-garden-edging-material-wrap" style="display:none;">
+                            <label class="qz-label" for="qz-garden-edging-material">Edging material preference?</label>
+                            <select id="qz-garden-edging-material" name="garden_edging_material" class="qz-select">
+                                <option value="">No preference / not sure</option>
+                                <option value="vinyl">Vinyl edging</option>
+                                <option value="steel">Steel edging</option>
+                                <option value="aluminum">Aluminum edging</option>
+                                <option value="concrete">Concrete / paver border</option>
+                                <option value="stone">Natural stone edging</option>
                             </select>
                         </div>
                     </div>
@@ -342,7 +445,62 @@
                                         <span class="qz-check-desc">Block, stone, or boulder</span>
                                     </span>
                                 </label>
+                                <label class="qz-check-card">
+                                    <input type="checkbox" name="hard_outdoor" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🔥</span>
+                                        <span class="qz-check-title">Outdoor Living Space</span>
+                                        <span class="qz-check-desc">Fire pit, seating wall, kitchen</span>
+                                    </span>
+                                </label>
                             </div>
+                        </div>
+
+                        <!-- Paver sub-options (shown when pavers is checked) -->
+                        <div class="qz-addon-wrap" id="qz-hard-paver-type-wrap">
+                            <div class="qz-addon-label">Paver Project Type</div>
+                            <div class="qz-addon-grid">
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_paver_patio" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🏡</span>
+                                        <span class="qz-check-title">Patio</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_paver_driveway" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🚗</span>
+                                        <span class="qz-check-title">Driveway</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_paver_walkway" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🚶</span>
+                                        <span class="qz-check-title">Walkway</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_paver_pool" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🏊</span>
+                                        <span class="qz-check-title">Pool Deck</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Wall height (shown when retaining walls is checked) -->
+                        <div class="qz-question" id="qz-hard-wall-height-wrap" style="display:none;">
+                            <label class="qz-label" for="qz-hard-wall-height">Estimated wall height?</label>
+                            <select id="qz-hard-wall-height" name="hard_wall_height" class="qz-select">
+                                <option value="">Select one...</option>
+                                <option value="under2">Under 2 feet</option>
+                                <option value="2-4">2–4 feet</option>
+                                <option value="4plus">4+ feet</option>
+                                <option value="unsure">Not sure</option>
+                            </select>
                         </div>
 
                         <div class="qz-question">
@@ -406,6 +564,26 @@
                                 <option value="small">Small — A few bags or a wheelbarrow</option>
                                 <option value="medium">Medium — Half a truck load</option>
                                 <option value="large">Large — Full truck load or more</option>
+                                <option value="unsure">Not sure</option>
+                            </select>
+                        </div>
+
+                        <div class="qz-question">
+                            <label class="qz-label" for="qz-cleanup-urgency">When do you need this done?</label>
+                            <select id="qz-cleanup-urgency" name="cleanup_urgency" class="qz-select">
+                                <option value="">Select timeframe...</option>
+                                <option value="asap">ASAP — As soon as possible</option>
+                                <option value="thisweek">This week</option>
+                                <option value="2weeks">Within 2 weeks</option>
+                                <option value="flexible">Flexible / no rush</option>
+                            </select>
+                        </div>
+
+                        <div class="qz-question">
+                            <label class="qz-label" for="qz-cleanup-access">Is the area easily accessible?</label>
+                            <select id="qz-cleanup-access" name="cleanup_access" class="qz-select">
+                                <option value="easy">Yes — Easy access</option>
+                                <option value="limited">Limited access (narrow gate, steep hill, etc.)</option>
                                 <option value="unsure">Not sure</option>
                             </select>
                         </div>
@@ -475,6 +653,28 @@
                                     <span>✨ Other / Not Sure</span>
                                 </label>
                             </div>
+                        </div>
+
+                        <div class="qz-question">
+                            <label class="qz-label" for="qz-design-style">What style do you prefer?</label>
+                            <select id="qz-design-style" name="design_style" class="qz-select">
+                                <option value="">No preference / not sure</option>
+                                <option value="modern">Modern — Clean lines, minimal</option>
+                                <option value="traditional">Traditional — Classic, timeless</option>
+                                <option value="natural">Natural / Rustic — Organic, relaxed</option>
+                                <option value="lowmaint">Low-Maintenance — Easy care</option>
+                            </select>
+                        </div>
+
+                        <div class="qz-question">
+                            <label class="qz-label" for="qz-design-timeline">When are you hoping to start?</label>
+                            <select id="qz-design-timeline" name="design_timeline" class="qz-select">
+                                <option value="">Select timeframe...</option>
+                                <option value="asap">As soon as possible</option>
+                                <option value="1-3months">Next 1–3 months</option>
+                                <option value="3-6months">Next 3–6 months</option>
+                                <option value="exploring">Just exploring options</option>
+                            </select>
                         </div>
 
                         <div class="qz-question">
@@ -581,7 +781,7 @@
                 </div>
 
                 <button type="button" class="form-submit quote-next-btn" id="qz-next-to-contact">
-                    Continue
+                    Next Step
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                         stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M5 12h14" />
@@ -676,7 +876,7 @@
                     </div>
 
                     <button type="submit" class="form-submit quote-next-btn" id="qz-submit">
-                        Submit My Project
+                        Get My Free Quote
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14" />
@@ -750,6 +950,8 @@
         </div>
     </section>
 
+    </main>
+
     <!-- ==================== FOOTER ==================== -->
     <footer class="footer">
         <div class="container">
@@ -773,18 +975,18 @@
 
                 <div class="footer-nav">
                     <h4>Services</h4>
-                    <a href="/quote.html">Lawn Care</a>
-                    <a href="/quote.html">Garden & Beds</a>
-                    <a href="/quote.html">Paver Projects</a>
-                    <a href="/quote.html">Retaining Walls</a>
-                    <a href="/quote.html">Landscape Design</a>
+                    <a href="/services/lawn-care.html">Lawn Care</a>
+                    <a href="/services/garden-beds.html">Garden &amp; Beds</a>
+                    <a href="/services/hardscaping.html">Hardscaping</a>
+                    <a href="/services/property-cleanup.html">Property Cleanup</a>
+                    <a href="/services/landscape-design.html">Landscape Design</a>
                 </div>
 
                 <div class="footer-contact">
                     <h4>Contact</h4>
                     <p>(402) 405-5475</p>
                     <p>rileykopf@luckylandscapes.com</p>
-                    <p>Southeast Nebraska</p>
+                    <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
                         <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook">
                             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"

@@ -550,6 +550,7 @@ const projectData = [
             '/images/megandeck/1.webp',
             '/images/megandeck/2.webp',
         ],
+        inProgress: true,
     },
     {
         title: 'Brick Garden Walls',
@@ -636,6 +637,14 @@ function buildGalleryGrid() {
         item.className = 'gallery-item';
         item.dataset.project = index;
 
+        // In Progress chip
+        if (project.inProgress) {
+            const chip = document.createElement('div');
+            chip.className = 'gallery-progress-chip';
+            chip.innerHTML = '<span class="gallery-progress-dot"></span> In Progress';
+            item.appendChild(chip);
+        }
+
         // Image element — starts empty, real src set via lazy loader
         const img = document.createElement('img');
         img.dataset.src = src; // store real src for lazy loading
@@ -683,7 +692,12 @@ function buildGalleryPageGrid(filterTag) {
         card.className = 'gallery-page-card';
         card.dataset.project = realIndex;
 
+        const chipHTML = project.inProgress
+            ? '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>'
+            : '';
+
         card.innerHTML = `
+            ${chipHTML}
             <img src="${src}" alt="${project.title} — ${project.tag}" loading="lazy" />
             <span class="gallery-page-card-tag">${project.tag}</span>
             <div class="gallery-page-card-overlay">
@@ -1280,6 +1294,56 @@ if (qzCategoryBtns.length > 0) {
             showStep(allSteps[2]); // step 2b
         });
     }
+
+    // ============================================
+    // DYNAMIC QUESTION TOGGLING — Show/hide conditional sections based on checkbox state
+    // ============================================
+
+    // --- Lawn Care: show add-ons when mowing or complete is checked ---
+    const lawnMow = document.querySelector('input[name="lawn_mowing"]');
+    const lawnComplete = document.querySelector('input[name="lawn_complete"]');
+    const lawnAddonsWrap = document.getElementById('qz-lawn-addons');
+    const lawnFreqWrap = document.getElementById('qz-lawn-frequency-wrap');
+
+    function updateLawnAddons() {
+        if (!lawnAddonsWrap) return;
+        const show = (lawnMow?.checked || lawnComplete?.checked);
+        lawnAddonsWrap.classList.toggle('visible', show);
+        // Show frequency selector when mowing is checked
+        if (lawnFreqWrap) lawnFreqWrap.style.display = (lawnMow?.checked || lawnComplete?.checked) ? '' : 'none';
+    }
+    if (lawnMow) lawnMow.addEventListener('change', updateLawnAddons);
+    if (lawnComplete) lawnComplete.addEventListener('change', updateLawnAddons);
+
+    // --- Garden & Beds: show edging material when edging is checked ---
+    const gardenEdging = document.querySelector('input[name="garden_edging"]');
+    const gardenEdgingMaterialWrap = document.getElementById('qz-garden-edging-material-wrap');
+
+    function updateGardenEdging() {
+        if (!gardenEdgingMaterialWrap) return;
+        gardenEdgingMaterialWrap.style.display = gardenEdging?.checked ? '' : 'none';
+    }
+    if (gardenEdging) gardenEdging.addEventListener('change', updateGardenEdging);
+
+    // --- Hardscaping: show paver sub-options when pavers is checked ---
+    const hardPavers = document.querySelector('input[name="hard_pavers"]');
+    const hardPaverTypeWrap = document.getElementById('qz-hard-paver-type-wrap');
+
+    function updateHardPavers() {
+        if (!hardPaverTypeWrap) return;
+        hardPaverTypeWrap.classList.toggle('visible', hardPavers?.checked || false);
+    }
+    if (hardPavers) hardPavers.addEventListener('change', updateHardPavers);
+
+    // --- Hardscaping: show wall height when retaining walls is checked ---
+    const hardRetaining = document.querySelector('input[name="hard_retaining"]');
+    const hardWallHeightWrap = document.getElementById('qz-hard-wall-height-wrap');
+
+    function updateHardRetaining() {
+        if (!hardWallHeightWrap) return;
+        hardWallHeightWrap.style.display = hardRetaining?.checked ? '' : 'none';
+    }
+    if (hardRetaining) hardRetaining.addEventListener('change', updateHardRetaining);
 
     // --- Continue to contact ---
     const nextToContact = document.getElementById('qz-next-to-contact');
