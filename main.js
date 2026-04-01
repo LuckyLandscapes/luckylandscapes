@@ -669,44 +669,71 @@ function buildGalleryGrid() {
 buildGalleryGrid();
 
 // ============================================
-// GALLERY PAGE — Full grid with filter
+// GALLERY PAGE — Flat photo gallery (easy to add new photos!)
 // ============================================
+// ► TO ADD A NEW PHOTO: just add one line to the galleryPhotos array below.
+// ► Categories: 'Hardscaping', 'Landscaping', 'Lawn Care', 'Construction', 'Cleanup'
+const galleryPhotos = [
+    // === Construction ===
+    { src: '/images/megandeck/1.webp', category: 'Construction', caption: 'Custom composite deck build' },
+    { src: '/images/megandeck/2.webp', category: 'Construction', caption: 'Deck framing & border detail' },
+
+    // === Hardscaping ===
+    { src: '/images/bricklaying/1.webp', category: 'Hardscaping', caption: 'Brick garden wall foundation' },
+    { src: '/images/bricklaying/2.webp', category: 'Hardscaping', caption: 'Brick wall construction' },
+    { src: '/images/bricklaying/3.webp', category: 'Hardscaping', caption: 'Finished brick retaining wall' },
+
+    // === Lawn Care ===
+    { src: '/images/lawncare/1.webp', category: 'Lawn Care', caption: 'Fresh-cut residential lawn' },
+    { src: '/images/lawncare/2.webp', category: 'Lawn Care', caption: 'Crisp edging & trim work' },
+    { src: '/images/lawncare/3.webp', category: 'Lawn Care', caption: 'Backyard mow & detail' },
+    { src: '/images/lawncare/4.webp', category: 'Lawn Care', caption: 'Full property mow service' },
+    { src: '/images/lawncare/5.webp', category: 'Lawn Care', caption: 'Manicured front yard' },
+    { src: '/images/lawncare/6.webp', category: 'Lawn Care', caption: 'Weekly maintenance service' },
+
+    // === Cleanup ===
+    { src: '/images/LawnRestore/after.webp', category: 'Cleanup', caption: 'Yard restoration — after' },
+    { src: '/images/LawnRestore/before.webp', category: 'Cleanup', caption: 'Yard restoration — before' },
+
+    // === Landscaping ===
+    { src: '/images/gardenbed/1.webp', category: 'Landscaping', caption: 'Garden bed installation' },
+    { src: '/images/gardenbed/2.webp', category: 'Landscaping', caption: 'Mulch & edging detail' },
+    { src: '/images/gardenbed/3.webp', category: 'Landscaping', caption: 'Front yard bed design' },
+    { src: '/images/gardenbed/4.webp', category: 'Landscaping', caption: 'Finished garden beds' },
+    { src: '/images/landscapedesign/3.webp', category: 'Landscaping', caption: 'Full landscape transformation' },
+    { src: '/images/landscapedesign/1.webp', category: 'Landscaping', caption: 'Landscape design in progress' },
+    { src: '/images/landscapedesign/2.webp', category: 'Landscaping', caption: 'Design & build result' },
+];
+
 const galleryPageGrid = document.getElementById('gallery-page-grid');
 const galleryFilterBar = document.getElementById('gallery-filter-bar');
+
+let currentGalleryFilter = 'all';
+let filteredGalleryPhotos = [...galleryPhotos];
 
 function buildGalleryPageGrid(filterTag) {
     if (!galleryPageGrid) return;
     galleryPageGrid.innerHTML = '';
+    currentGalleryFilter = filterTag;
 
-    const filtered = filterTag === 'all'
-        ? projectData
-        : projectData.filter(p => p.tag === filterTag);
+    filteredGalleryPhotos = filterTag === 'all'
+        ? [...galleryPhotos]
+        : galleryPhotos.filter(p => p.category === filterTag);
 
-    filtered.forEach((project, _i) => {
-        const realIndex = projectData.indexOf(project); // Keep original index for lightbox
-        const coverIdx = project.cover ?? 0;
-        const coverImg = project.images[coverIdx] ?? project.images[0];
-        const src = getImageSrc(coverImg);
+    filteredGalleryPhotos.forEach((photo, idx) => {
+        const item = document.createElement('div');
+        item.className = 'gallery-photo-item';
+        item.dataset.idx = idx;
 
-        const card = document.createElement('div');
-        card.className = 'gallery-page-card';
-        card.dataset.project = realIndex;
-
-        const chipHTML = project.inProgress
-            ? '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>'
-            : '';
-
-        card.innerHTML = `
-            ${chipHTML}
-            <img src="${src}" alt="${project.title} — ${project.tag}" loading="lazy" />
-            <span class="gallery-page-card-tag">${project.tag}</span>
-            <div class="gallery-page-card-overlay">
-                <span class="gallery-page-card-title">${project.title}</span>
-                <span class="gallery-page-card-desc">${project.desc}</span>
+        item.innerHTML = `
+            <img src="${photo.src}" alt="${photo.caption}" loading="lazy" />
+            <span class="gallery-photo-tag">${photo.category}</span>
+            <div class="gallery-photo-overlay">
+                <span class="gallery-photo-caption">${photo.caption}</span>
             </div>
         `;
 
-        galleryPageGrid.appendChild(card);
+        galleryPageGrid.appendChild(item);
     });
 }
 
@@ -720,7 +747,6 @@ if (galleryPageGrid) {
             if (!btn) return;
             const filter = btn.dataset.filter;
 
-            // Update active state
             galleryFilterBar.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
 
@@ -728,13 +754,76 @@ if (galleryPageGrid) {
         });
     }
 
-    // Gallery page lightbox click handler
+    // Gallery page photo lightbox
+    const gplLightbox = document.getElementById('gallery-photo-lightbox');
+    const gplImg = document.getElementById('gpl-img');
+    const gplCaption = document.getElementById('gpl-caption');
+    const gplCounter = document.getElementById('gpl-counter');
+    const gplClose = document.getElementById('gpl-close');
+    const gplPrev = document.getElementById('gpl-prev');
+    const gplNext = document.getElementById('gpl-next');
+    let gplIndex = 0;
+
+    function showGplPhoto(idx) {
+        gplIndex = idx;
+        const photo = filteredGalleryPhotos[idx];
+        if (!photo) return;
+        gplImg.src = photo.src;
+        gplImg.alt = photo.caption;
+        gplCaption.textContent = photo.caption;
+        gplCounter.textContent = `${idx + 1} / ${filteredGalleryPhotos.length}`;
+    }
+
+    function openGpl(idx) {
+        showGplPhoto(idx);
+        gplLightbox.classList.add('active');
+        lenis.stop();
+    }
+
+    function closeGpl() {
+        gplLightbox.classList.remove('active');
+        lenis.start();
+    }
+
     galleryPageGrid.addEventListener('click', (e) => {
-        const card = e.target.closest('.gallery-page-card[data-project]');
-        if (!card) return;
-        const idx = parseInt(card.dataset.project, 10);
-        openLightbox(idx);
+        const item = e.target.closest('.gallery-photo-item');
+        if (!item) return;
+        openGpl(parseInt(item.dataset.idx, 10));
     });
+
+    if (gplClose) gplClose.addEventListener('click', closeGpl);
+    if (gplLightbox) gplLightbox.addEventListener('click', (e) => {
+        if (e.target === gplLightbox) closeGpl();
+    });
+
+    if (gplPrev) gplPrev.addEventListener('click', () => {
+        gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length;
+        showGplPhoto(gplIndex);
+    });
+
+    if (gplNext) gplNext.addEventListener('click', () => {
+        gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length;
+        showGplPhoto(gplIndex);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (!gplLightbox || !gplLightbox.classList.contains('active')) return;
+        if (e.key === 'Escape') closeGpl();
+        if (e.key === 'ArrowLeft') { gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length; showGplPhoto(gplIndex); }
+        if (e.key === 'ArrowRight') { gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length; showGplPhoto(gplIndex); }
+    });
+
+    // Touch swipe on gallery lightbox
+    let gplTouchStartX = 0;
+    gplLightbox.addEventListener('touchstart', (e) => { gplTouchStartX = e.changedTouches[0].screenX; }, { passive: true });
+    gplLightbox.addEventListener('touchend', (e) => {
+        const diff = gplTouchStartX - e.changedTouches[0].screenX;
+        if (Math.abs(diff) > 50) {
+            if (diff > 0) { gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length; }
+            else { gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length; }
+            showGplPhoto(gplIndex);
+        }
+    }, { passive: true });
 }
 
 // ============================================
@@ -1069,7 +1158,7 @@ if (lightbox) {
 // ============================================
 // GUIDED QUESTIONNAIRE WIZARD
 // ============================================
-const QUOTES_SCRIPT_URL = ''; // ← Paste your deployed Apps Script URL here
+const QUOTES_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwB-7peAjT_cYSONjylBKFMKPMax95KK0ZWtOY0_DfDAX64_L80XV76hBmtmjL07Svd/exec'; // ← Paste your deployed Apps Script URL here
 
 const qzCategoryBtns = document.querySelectorAll('#qz-categories .qz-option-card, .qz-notsure-btn[data-category]');
 if (qzCategoryBtns.length > 0) {
@@ -1269,19 +1358,77 @@ if (qzCategoryBtns.length > 0) {
 
     function updateHardPavers() {
         if (!hardPaverTypeWrap) return;
-        hardPaverTypeWrap.classList.toggle('visible', hardPavers?.checked || false);
+        hardPaverTypeWrap.style.display = hardPavers?.checked ? '' : 'none';
     }
     if (hardPavers) hardPavers.addEventListener('change', updateHardPavers);
+    // Init
+    if (hardPaverTypeWrap) hardPaverTypeWrap.style.display = 'none';
 
-    // --- Hardscaping: show wall height when retaining walls is checked ---
+    // --- Hardscaping: show wall details when retaining walls is checked ---
     const hardRetaining = document.querySelector('input[name="hard_retaining"]');
-    const hardWallHeightWrap = document.getElementById('qz-hard-wall-height-wrap');
+    const hardWallWrap = document.getElementById('qz-hard-wall-wrap');
 
     function updateHardRetaining() {
-        if (!hardWallHeightWrap) return;
-        hardWallHeightWrap.style.display = hardRetaining?.checked ? '' : 'none';
+        if (!hardWallWrap) return;
+        hardWallWrap.style.display = hardRetaining?.checked ? '' : 'none';
     }
     if (hardRetaining) hardRetaining.addEventListener('change', updateHardRetaining);
+
+    // --- Hardscaping: show outdoor living features when outdoor is checked ---
+    const hardOutdoor = document.querySelector('input[name="hard_outdoor"]');
+    const hardOutdoorWrap = document.getElementById('qz-hard-outdoor-wrap');
+
+    function updateHardOutdoor() {
+        if (!hardOutdoorWrap) return;
+        hardOutdoorWrap.style.display = hardOutdoor?.checked ? '' : 'none';
+    }
+    if (hardOutdoor) hardOutdoor.addEventListener('change', updateHardOutdoor);
+
+    // --- Photo upload handling ---
+    const photoInput = document.getElementById('q-photos');
+    const uploadTrigger = document.getElementById('qz-upload-trigger');
+    const uploadPreview = document.getElementById('qz-upload-preview');
+    let selectedPhotos = [];
+
+    if (uploadTrigger && photoInput) {
+        uploadTrigger.addEventListener('click', () => photoInput.click());
+
+        photoInput.addEventListener('change', () => {
+            const newFiles = Array.from(photoInput.files);
+            // Limit to 5 total, max 10MB each
+            for (const file of newFiles) {
+                if (selectedPhotos.length >= 5) break;
+                if (file.size > 10 * 1024 * 1024) continue; // Skip files > 10MB
+                if (!file.type.startsWith('image/')) continue;
+                selectedPhotos.push(file);
+            }
+            photoInput.value = ''; // Reset so same file can be re-selected
+            renderPhotoPreview();
+        });
+    }
+
+    function renderPhotoPreview() {
+        if (!uploadPreview) return;
+        uploadPreview.innerHTML = '';
+        selectedPhotos.forEach((file, idx) => {
+            const thumb = document.createElement('div');
+            thumb.className = 'qz-upload-thumb';
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            img.alt = file.name;
+            const removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'qz-upload-thumb-remove';
+            removeBtn.textContent = '✕';
+            removeBtn.addEventListener('click', () => {
+                selectedPhotos.splice(idx, 1);
+                renderPhotoPreview();
+            });
+            thumb.appendChild(img);
+            thumb.appendChild(removeBtn);
+            uploadPreview.appendChild(thumb);
+        });
+    }
 
     // --- Continue to contact ---
     const nextToContact = document.getElementById('qz-next-to-contact');
@@ -1314,15 +1461,36 @@ if (qzCategoryBtns.length > 0) {
         const desc = document.getElementById('qz-description');
         if (desc && desc.value.trim()) data.project_description = desc.value.trim();
 
-        // Contact form
+        // Contact form fields
         const form = document.getElementById('quote-form');
         if (form) {
             const fd = new FormData(form);
             for (const [k, v] of fd.entries()) {
-                if (v) data[k] = v;
+                if (v && k !== 'photos') data[k] = v;
             }
         }
+
+        // Photo file names (for the spreadsheet)
+        if (selectedPhotos.length > 0) {
+            data.photoCount = selectedPhotos.length;
+            data.photoNames = selectedPhotos.map(f => f.name).join(', ');
+        }
+
         return data;
+    }
+
+    // Convert photos to base64 for sending to Google Drive
+    async function getPhotoData() {
+        const photoData = [];
+        for (const file of selectedPhotos) {
+            const reader = new FileReader();
+            const b64 = await new Promise((resolve) => {
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.readAsDataURL(file);
+            });
+            photoData.push({ name: file.name, type: file.type, data: b64 });
+        }
+        return photoData;
     }
 
     // --- Submit to Google Sheets ---
@@ -1332,9 +1500,17 @@ if (qzCategoryBtns.length > 0) {
             return;
         }
         try {
-            const params = new URLSearchParams();
-            for (const [k, v] of Object.entries(data)) params.append(k, v);
-            await fetch(QUOTES_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params });
+            const payload = { ...data };
+            // Include photos as base64 if present
+            if (selectedPhotos.length > 0) {
+                payload.photos = await getPhotoData();
+            }
+            await fetch(QUOTES_SCRIPT_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain' },
+                body: JSON.stringify(payload)
+            });
         } catch (err) {
             console.error('Quote submission error:', err);
         }

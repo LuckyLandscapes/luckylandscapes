@@ -489,18 +489,121 @@
                                     </span>
                                 </label>
                             </div>
+                            <div class="qz-question" style="margin-top: 1rem;">
+                                <label class="qz-label" for="qz-hard-paver-material">Paver material preference?</label>
+                                <select id="qz-hard-paver-material" name="hard_paver_material" class="qz-select">
+                                    <option value="">No preference / not sure</option>
+                                    <option value="concrete">Concrete pavers</option>
+                                    <option value="brick">Brick pavers</option>
+                                    <option value="interlocking">Interlocking pavers</option>
+                                    <option value="natural_stone">Natural stone (flagstone, bluestone)</option>
+                                    <option value="travertine">Travertine</option>
+                                    <option value="porcelain">Porcelain pavers</option>
+                                </select>
+                            </div>
                         </div>
 
-                        <!-- Wall height (shown when retaining walls is checked) -->
-                        <div class="qz-question" id="qz-hard-wall-height-wrap" style="display:none;">
-                            <label class="qz-label" for="qz-hard-wall-height">Estimated wall height?</label>
-                            <select id="qz-hard-wall-height" name="hard_wall_height" class="qz-select">
-                                <option value="">Select one...</option>
-                                <option value="under2">Under 2 feet</option>
-                                <option value="2-4">2–4 feet</option>
-                                <option value="4plus">4+ feet</option>
-                                <option value="unsure">Not sure</option>
-                            </select>
+                        <!-- Retaining wall sub-options (shown when retaining walls is checked) -->
+                        <div class="qz-addon-wrap" id="qz-hard-wall-wrap" style="display:none;">
+                            <div class="qz-addon-label">Retaining Wall Details</div>
+                            <div class="qz-question">
+                                <label class="qz-label" for="qz-hard-wall-height">Estimated wall height?</label>
+                                <select id="qz-hard-wall-height" name="hard_wall_height" class="qz-select">
+                                    <option value="">Select one...</option>
+                                    <option value="under2">Under 2 feet</option>
+                                    <option value="2-4">2–4 feet</option>
+                                    <option value="4plus">4+ feet</option>
+                                    <option value="unsure">Not sure</option>
+                                </select>
+                            </div>
+                            <div class="qz-question">
+                                <label class="qz-label" for="qz-hard-wall-length">Estimated wall length?</label>
+                                <select id="qz-hard-wall-length" name="hard_wall_length" class="qz-select">
+                                    <option value="">Select one...</option>
+                                    <option value="under20">Under 20 feet</option>
+                                    <option value="20-50">20–50 feet</option>
+                                    <option value="50plus">50+ feet</option>
+                                    <option value="unsure">Not sure</option>
+                                </select>
+                            </div>
+                            <div class="qz-question">
+                                <label class="qz-label" for="qz-hard-wall-material">Wall material preference?</label>
+                                <select id="qz-hard-wall-material" name="hard_wall_material" class="qz-select">
+                                    <option value="">No preference / not sure</option>
+                                    <option value="concrete_block">Concrete block (Versa-Lok, Allan Block)</option>
+                                    <option value="natural_stone">Natural stone</option>
+                                    <option value="boulder">Boulder</option>
+                                    <option value="brick">Brick</option>
+                                    <option value="timber">Timber / railroad tie</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Outdoor living sub-options (shown when outdoor living is checked) -->
+                        <div class="qz-addon-wrap" id="qz-hard-outdoor-wrap" style="display:none;">
+                            <div class="qz-addon-label">Outdoor Living Features</div>
+                            <div class="qz-addon-grid">
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_firepit" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🔥</span>
+                                        <span class="qz-check-title">Fire Pit</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_fireplace" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🏛️</span>
+                                        <span class="qz-check-title">Outdoor Fireplace</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_kitchen" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🍳</span>
+                                        <span class="qz-check-title">Kitchen / Grill</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_seating" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🪑</span>
+                                        <span class="qz-check-title">Seating Wall</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_pergola" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">🏗️</span>
+                                        <span class="qz-check-title">Pergola / Arbor</span>
+                                    </span>
+                                </label>
+                                <label class="qz-check-card qz-check-card--sm">
+                                    <input type="checkbox" name="hard_outdoor_other" value="yes" />
+                                    <span class="qz-check-inner">
+                                        <span class="qz-check-icon">✨</span>
+                                        <span class="qz-check-title">Other</span>
+                                    </span>
+                                </label>
+                            </div>
+                            <div class="qz-question" style="margin-top: 1rem;">
+                                <label class="qz-label" for="qz-hard-outdoor-material">Material preference?</label>
+                                <select id="qz-hard-outdoor-material" name="hard_outdoor_material" class="qz-select">
+                                    <option value="">No preference / not sure</option>
+                                    <option value="basic">Standard concrete pavers / block</option>
+                                    <option value="mid">Interlocking pavers / natural stone</option>
+                                    <option value="premium">Premium — Natural stone / brick / boulder</option>
+                                </select>
+                            </div>
+                            <div class="qz-question">
+                                <label class="qz-label" for="qz-hard-outdoor-covered">Covered or uncovered?</label>
+                                <select id="qz-hard-outdoor-covered" name="hard_outdoor_covered" class="qz-select">
+                                    <option value="">Not sure yet</option>
+                                    <option value="uncovered">Uncovered (open air)</option>
+                                    <option value="covered">Covered (pergola, roof, etc.)</option>
+                                    <option value="partial">Partially covered</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="qz-question">
@@ -511,16 +614,6 @@
                                 <option value="medium">Medium — 200 to 500 sq ft</option>
                                 <option value="large">Large — 500+ sq ft</option>
                                 <option value="unsure">Not sure</option>
-                            </select>
-                        </div>
-
-                        <div class="qz-question">
-                            <label class="qz-label" for="qz-hard-material">Material preference?</label>
-                            <select id="qz-hard-material" name="hard_material" class="qz-select">
-                                <option value="">No preference / not sure</option>
-                                <option value="basic">Standard concrete pavers / block</option>
-                                <option value="mid">Interlocking pavers / natural stone</option>
-                                <option value="premium">Premium — Natural stone / brick / boulder</option>
                             </select>
                         </div>
                     </div>
@@ -843,6 +936,47 @@
                         <label for="q-notes">Anything else we should know? <span class="label-optional">(optional)</span></label>
                         <textarea id="q-notes" name="notes" placeholder="Preferred timeline, budget, specific concerns..."
                             rows="3"></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="q-contact-method">Preferred contact method?</label>
+                            <select id="q-contact-method" name="contactMethod">
+                                <option value="any">No preference</option>
+                                <option value="call">Phone call</option>
+                                <option value="text">Text message</option>
+                                <option value="email">Email</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="q-best-time">Best time to reach you?</label>
+                            <select id="q-best-time" name="bestTime">
+                                <option value="anytime">Anytime</option>
+                                <option value="morning">Morning (8am–12pm)</option>
+                                <option value="afternoon">Afternoon (12pm–5pm)</option>
+                                <option value="evening">Evening (5pm–8pm)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="q-photos">Upload photos of your property <span class="label-optional">(optional — up to 5 photos)</span></label>
+                        <div class="qz-photo-upload" id="qz-photo-upload">
+                            <input type="file" id="q-photos" name="photos" accept="image/*" multiple
+                                style="display:none;" />
+                            <button type="button" class="qz-upload-btn" id="qz-upload-trigger">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="17 8 12 3 7 8" />
+                                    <line x1="12" x2="12" y1="3" y2="15" />
+                                </svg>
+                                Choose Photos
+                            </button>
+                            <span class="qz-upload-hint">JPG, PNG, HEIC — max 10MB each</span>
+                            <div class="qz-upload-preview" id="qz-upload-preview"></div>
+                        </div>
                     </div>
 
                     <!-- Trust signals -->
