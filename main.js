@@ -79,6 +79,30 @@ if (navbar) {
 }
 
 // ============================================
+// STICKY MOBILE CTA BAR
+// ============================================
+const stickyMobileCta = document.getElementById('sticky-mobile-cta');
+if (stickyMobileCta) {
+    let stickyVisible = false;
+    function handleStickyCta() {
+        const showAfter = 400;
+        const footer = document.querySelector('.footer');
+        const footerTop = footer ? footer.getBoundingClientRect().top : Infinity;
+        const shouldShow = window.scrollY > showAfter && footerTop > window.innerHeight;
+
+        if (shouldShow && !stickyVisible) {
+            stickyMobileCta.classList.add('visible');
+            stickyVisible = true;
+        } else if (!shouldShow && stickyVisible) {
+            stickyMobileCta.classList.remove('visible');
+            stickyVisible = false;
+        }
+    }
+    window.addEventListener('scroll', handleStickyCta, { passive: true });
+    handleStickyCta();
+}
+
+// ============================================
 // MOBILE MENU
 // ============================================
 const navToggle = document.getElementById('nav-toggle');
@@ -706,19 +730,14 @@ const galleryPhotos = [
 ];
 
 const galleryPageGrid = document.getElementById('gallery-page-grid');
-const galleryFilterBar = document.getElementById('gallery-filter-bar');
 
-let currentGalleryFilter = 'all';
 let filteredGalleryPhotos = [...galleryPhotos];
 
-function buildGalleryPageGrid(filterTag) {
+function buildGalleryPageGrid() {
     if (!galleryPageGrid) return;
     galleryPageGrid.innerHTML = '';
-    currentGalleryFilter = filterTag;
 
-    filteredGalleryPhotos = filterTag === 'all'
-        ? [...galleryPhotos]
-        : galleryPhotos.filter(p => p.category === filterTag);
+    filteredGalleryPhotos = [...galleryPhotos];
 
     filteredGalleryPhotos.forEach((photo, idx) => {
         const item = document.createElement('div');
@@ -727,7 +746,7 @@ function buildGalleryPageGrid(filterTag) {
 
         item.innerHTML = `
             <img src="${photo.src}" alt="${photo.caption}" loading="lazy" />
-            <span class="gallery-photo-tag">${photo.category}</span>
+            <span class="gallery-photo-tag gallery-photo-tag--visible">${photo.category}</span>
             <div class="gallery-photo-overlay">
                 <span class="gallery-photo-caption">${photo.caption}</span>
             </div>
@@ -738,21 +757,7 @@ function buildGalleryPageGrid(filterTag) {
 }
 
 if (galleryPageGrid) {
-    buildGalleryPageGrid('all');
-
-    // Filter button clicks
-    if (galleryFilterBar) {
-        galleryFilterBar.addEventListener('click', (e) => {
-            const btn = e.target.closest('.gallery-filter-btn');
-            if (!btn) return;
-            const filter = btn.dataset.filter;
-
-            galleryFilterBar.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            buildGalleryPageGrid(filter);
-        });
-    }
+    buildGalleryPageGrid();
 
     // Gallery page photo lightbox
     const gplLightbox = document.getElementById('gallery-photo-lightbox');
@@ -1351,6 +1356,26 @@ if (qzCategoryBtns.length > 0) {
         gardenEdgingMaterialWrap.style.display = gardenEdging?.checked ? '' : 'none';
     }
     if (gardenEdging) gardenEdging.addEventListener('change', updateGardenEdging);
+
+    // --- Garden & Beds: show plant details when planting is checked ---
+    const gardenPlanting = document.querySelector('input[name="garden_planting"]');
+    const gardenPlantWrap = document.getElementById('qz-garden-plant-wrap');
+
+    function updateGardenPlanting() {
+        if (!gardenPlantWrap) return;
+        gardenPlantWrap.style.display = gardenPlanting?.checked ? '' : 'none';
+    }
+    if (gardenPlanting) gardenPlanting.addEventListener('change', updateGardenPlanting);
+
+    // --- Garden & Beds: show mulch details when garden beds is checked ---
+    const gardenBeds = document.querySelector('input[name="garden_beds"]');
+    const gardenMulchWrap = document.getElementById('qz-garden-mulch-wrap');
+
+    function updateGardenMulch() {
+        if (!gardenMulchWrap) return;
+        gardenMulchWrap.style.display = gardenBeds?.checked ? '' : 'none';
+    }
+    if (gardenBeds) gardenBeds.addEventListener('change', updateGardenMulch);
 
     // --- Hardscaping: show paver sub-options when pavers is checked ---
     const hardPavers = document.querySelector('input[name="hard_pavers"]');

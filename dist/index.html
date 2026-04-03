@@ -26,7 +26,8 @@
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Lucky Landscapes | #1 Landscaping & Lawn Care in Lincoln, NE" />
-    <meta name="twitter:description" content="Lincoln, Nebraska's trusted landscaping company. Lawn care, hardscaping, garden beds & more. Free estimates!" />
+    <meta name="twitter:description"
+        content="Lincoln, Nebraska's trusted landscaping company. Lawn care, hardscaping, garden beds & more. Free estimates!" />
     <meta name="twitter:image" content="https://luckylandscapes.com/images/og-card.png" />
 
     <!-- Favicon -->
@@ -34,12 +35,12 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/images/favicons/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/images/favicons/favicon-16x16.png">
     <link rel="manifest" href="/images/favicons/site.webmanifest">
-
+    <link rel="icon" href="/images/favicon-144x144.png">
     <!-- Structured Data: LocalBusiness -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LandscapingBusiness",
+      "@type": ["LocalBusiness", "LandscapingBusiness"],
       "name": "Lucky Landscapes",
       "url": "https://luckylandscapes.com",
       "logo": "https://luckylandscapes.com/images/Icon.png",
@@ -47,17 +48,32 @@
       "description": "Lucky Landscapes is Lincoln, Nebraska's trusted landscaping company offering lawn care, paver patios, retaining walls, garden beds, landscape design, property cleanup, and more.",
       "telephone": "+1-402-405-5475",
       "email": "rileykopf@luckylandscapes.com",
-      "areaServed": {
-        "@type": "City",
-        "name": "Lincoln",
-        "addressRegion": "NE",
-        "addressCountry": "US"
-      },
+      "foundingDate": "2023",
+      "openingHours": ["Mo-Fr 07:00-19:00", "Sa 08:00-17:00"],
+      "paymentAccepted": "Cash, Credit Card, Venmo, Zelle",
+      "areaServed": [
+        { "@type": "City", "name": "Lincoln", "addressRegion": "NE", "addressCountry": "US" },
+        { "@type": "City", "name": "Waverly", "addressRegion": "NE" },
+        { "@type": "City", "name": "Hickman", "addressRegion": "NE" },
+        { "@type": "City", "name": "Bennet", "addressRegion": "NE" },
+        { "@type": "City", "name": "Seward", "addressRegion": "NE" },
+        { "@type": "City", "name": "Crete", "addressRegion": "NE" },
+        { "@type": "City", "name": "Milford", "addressRegion": "NE" },
+        { "@type": "City", "name": "Malcolm", "addressRegion": "NE" },
+        { "@type": "City", "name": "Firth", "addressRegion": "NE" },
+        {
+          "@type": "GeoCircle",
+          "geoMidpoint": { "@type": "GeoCoordinates", "latitude": 40.8136, "longitude": -96.7026 },
+          "geoRadius": "50000"
+        }
+      ],
       "address": {
         "@type": "PostalAddress",
         "addressLocality": "Lincoln",
         "addressRegion": "NE",
-        "addressCountry": "US"
+        "addressCountry": "US",
+        "streetAddress": "109 South Canopy ST",
+        "postalCode": "68508"
       },
       "geo": {
         "@type": "GeoCoordinates",
@@ -71,6 +87,26 @@
         "reviewCount": "3",
         "bestRating": "5"
       },
+      "review": [
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Burdette Schoen" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "Lucky Landscapes helped me overseed my lawn last fall that was in terrible condition. They also did a lot of landscaping for me last year and were wonderful to work with. Great guys and reasonable priced."
+        },
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Trent Jenkins" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "Hard workers who get the job done. Fair price for good work."
+        },
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Than Aye" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "I was looking through a couple of landscapers, and these guys gave a pretty good price! They did my mulch for me in my backyard and the results were great as expected!"
+        }
+      ],
       "sameAs": [
         "https://www.facebook.com/luckylandscapes",
         "https://www.instagram.com/lucky.landscapes/",
@@ -81,11 +117,11 @@
         "@type": "OfferCatalog",
         "name": "Landscaping Services",
         "itemListElement": [
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build" } }
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care", "description": "Weekly mowing, seasonal cleanups, leaf removal, year-round maintenance" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch", "description": "Garden bed installation, mulching, edging, plant transplanting" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls", "description": "Paver patios, walkways, driveways, retaining walls, outdoor living" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal", "description": "Junk removal, debris hauling, overgrown yard restoration" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build", "description": "Complete outdoor transformations from concept to completion" } }
         ]
       }
     }
@@ -141,9 +177,9 @@
     }
     </script>
 
-    <!-- Styles -->
-  <script type="module" crossorigin src="/assets/main-D9_QK9bd.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/main-cvTUT4D_.css">
+    <!-- Styles -->
+  <script type="module" crossorigin src="/assets/main-DlbL3DK6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/main-k-jMsKRk.css">
 </head>
 
 <body>
@@ -195,648 +231,214 @@
 
     <main>
 
-    <!-- ==================== HERO ==================== -->
-    <header class="hero" id="hero">
-        <!-- Video Background -->
-        <div class="hero-video-wrap">
-            <video class="hero-video" autoplay muted loop playsinline
-                poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
-                <source src="/images/heromain.mp4" type="video/mp4" />
-            </video>
-            <div class="hero-overlay"></div>
-        </div>
-
-        <div class="hero-content">
-            <!-- Hero badge — JS swaps to promo version during sale period -->
-            <div class="hero-badge" id="hero-badge">
-                <img src="/images/Icon.png" alt="" />
-                <span id="hero-badge-text">Lincoln, Nebraska's Trusted Team</span>
+        <!-- ==================== HERO ==================== -->
+        <header class="hero" id="hero">
+            <!-- Video Background -->
+            <div class="hero-video-wrap">
+                <video class="hero-video" autoplay muted loop playsinline
+                    poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
+                    <source src="/images/heromain.mp4" type="video/mp4" />
+                </video>
+                <div class="hero-overlay"></div>
             </div>
 
-            <h1 class="hero-title">
-                <span class="hero-title-line">Creating Outdoor Spaces</span>
-                <span class="hero-title-line">You'll Feel <em class="highlight">Lucky</em> to Have</span>
-            </h1>
-
-            <p class="hero-sub">
-                From stunning paver patios to perfectly manicured lawns — we bring
-                craftsmanship, reliability, and a personal touch to every project.
-            </p>
-
-            <div class="hero-buttons">
-                <a href="/quote.html" class="btn btn-primary btn-lg">
-                    Get Your Free Estimate
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                    </svg>
-                </a>
-                <a href="/quote.html" class="btn btn-outline btn-lg">See Our Services</a>
-            </div>
-        </div>
-
-        <div class="hero-scroll-indicator">
-            <span>Scroll</span>
-            <div class="scroll-line"></div>
-        </div>
-    </header>
-
-    <!-- ==================== STATS BAR ==================== -->
-    <section class="stats-bar">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-number" data-count="50">0</span><span class="stat-suffix">+</span>
-                    <span class="stat-label">Projects Completed</span>
+            <div class="hero-content">
+                <!-- Hero badge — JS swaps to promo version during sale period -->
+                <div class="hero-badge" id="hero-badge">
+                    <img src="/images/Icon.png" alt="" />
+                    <span id="hero-badge-text">Lincoln, Nebraska's Trusted Team</span>
                 </div>
-                <div class="stat-item">
-                    <span class="stat-number" data-count="100">0</span><span class="stat-suffix">%</span>
-                    <span class="stat-label">Client Satisfaction</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" data-count="3">0</span><span class="stat-suffix">+</span>
-                    <span class="stat-label">Years Experience</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-number" data-count="8">0</span><span class="stat-suffix"></span>
-                    <span class="stat-label">Service Categories</span>
-                </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- ==================== ABOUT / WHY US ==================== -->
-    <section class="about-section" id="about">
-        <div class="container">
-            <div class="about-header reveal">
-                <p class="section-label">Why Choose Us</p>
-                <h2 class="section-title">Built on Quality,<br />Driven by Passion</h2>
-                <p class="section-subtitle mx-auto">
-                    Lucky Landscapes is a Lincoln, Nebraska landscaping company built by a crew of friends who love transforming outdoor spaces. We treat
-                    every yard like our own, with real care and craftsmanship.
+                <h1 class="hero-title">
+                    <span class="hero-title-line">Creating Outdoor Spaces</span>
+                    <span class="hero-title-line">You'll Feel <em class="highlight">Lucky</em> to Have</span>
+                </h1>
+
+                <p class="hero-sub">
+                    From stunning paver patios to perfectly manicured lawns — we bring
+                    craftsmanship, reliability, and a personal touch to every project.
                 </p>
-            </div>
 
-            <div class="about-grid stagger-children">
-                <div class="about-card">
-                    <div class="about-card-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
-                            <circle cx="12" cy="12" r="3" />
+                <div class="hero-buttons">
+                    <a href="/quote.html" class="btn btn-primary btn-lg">
+                        Get Your Free Estimate
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
                         </svg>
-                    </div>
-                    <h3>Detail Oriented</h3>
-                    <p>We treat every property as if it were our own — clean cuts, crisp edges, and polished finishes
-                        every time.</p>
-                </div>
-
-                <div class="about-card">
-                    <div class="about-card-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path
-                                d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
-                            <path d="m14.5 12.5 2-2" />
-                            <path d="m11.5 9.5 2-2" />
-                            <path d="m8.5 6.5 2-2" />
-                            <path d="m17.5 15.5 2-2" />
-                        </svg>
-                    </div>
-                    <h3>Custom Designs</h3>
-                    <p>Tailored solutions that fit your budget, style, and the unique character of your land.</p>
-                </div>
-
-                <div class="about-card">
-                    <div class="about-card-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m11 17 2 2a1 1 0 1 0 3-3" />
-                            <path
-                                d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 0 3 3l1.5-1.5" />
-                            <path d="m2 2 20 20" />
-                            <path d="M8 8a3 3 0 0 0 0 4.24" />
-                            <path d="M16 16a3 3 0 0 0 0-4.24" />
-                        </svg>
-                    </div>
-                    <h3>Reliable Service</h3>
-                    <p>We show up on time, communicate clearly, and don't leave until you're completely satisfied.</p>
+                    </a>
+                    <a href="/quote.html" class="btn btn-outline btn-lg">See Our Services</a>
                 </div>
             </div>
-        </div>
-    </section>
 
-    <!-- ==================== SERVICES ==================== -->
-    <section class="home-services-section" id="services">
-        <div class="home-services-bg"></div>
-        <div class="container">
-            <div class="home-services-header reveal">
-                <p class="section-label section-label--light">What We Do</p>
-                <h2 class="section-title section-title--light">Our Services</h2>
-                <p class="section-subtitle mx-auto section-subtitle--light">
-                    From routine lawn care to full landscape transformations — we bring craftsmanship and care to every
-                    project.
-                </p>
+            <div class="hero-scroll-indicator">
+                <span>Scroll</span>
+                <div class="scroll-line"></div>
             </div>
+        </header>
 
-            <div class="home-services-grid stagger-children">
-                <a href="/services/lawn-care.html" class="home-service-card">
-                    <div class="home-service-icon">🌿</div>
-                    <h3>Lawn Care</h3>
-                    <p>Weekly mowing, seasonal cleanups, leaf removal, and year-round maintenance packages.</p>
-                    <span class="home-service-link">Learn More →</span>
-                </a>
-                <a href="/services/garden-beds.html" class="home-service-card">
-                    <div class="home-service-icon">🌺</div>
-                    <h3>Garden & Beds</h3>
-                    <p>Garden bed installation, mulching, edging, and plant transplanting to elevate your curb appeal.
+        <!-- ==================== STATS BAR ==================== -->
+        <section class="stats-bar">
+            <div class="container">
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="50">0</span><span class="stat-suffix">+</span>
+                        <span class="stat-label">Projects Completed</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="100">0</span><span class="stat-suffix">%</span>
+                        <span class="stat-label">Client Satisfaction</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="3">0</span><span class="stat-suffix">+</span>
+                        <span class="stat-label">Years Experience</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" data-count="8">0</span><span class="stat-suffix"></span>
+                        <span class="stat-label">Service Categories</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== BOOKING BANNER ==================== -->
+        <section class="booking-banner">
+            <div class="container">
+                <div class="booking-banner-inner">
+                    <p class="booking-banner-text">🏗️ <span>Now booking spring & summer projects!</span> Get your free quote before the schedule fills up.</p>
+                    <a href="/quote.html" class="btn btn-primary">Get a Free Quote</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== ABOUT / WHY US ==================== -->
+        <section class="about-section" id="about">
+            <div class="container">
+                <div class="about-header reveal">
+                    <p class="section-label">Why Choose Us</p>
+                    <h2 class="section-title">Built on Quality,<br />Driven by Passion</h2>
+                    <p class="section-subtitle mx-auto">
+                        Lucky Landscapes is a Lincoln, Nebraska landscaping company built by a crew of friends who love
+                        transforming outdoor spaces. We treat
+                        every yard like our own, with real care and craftsmanship.
                     </p>
-                    <span class="home-service-link">Learn More →</span>
-                </a>
-                <a href="/services/hardscaping.html" class="home-service-card">
-                    <div class="home-service-icon">🧱</div>
-                    <h3>Hardscaping</h3>
-                    <p>Paver patios, walkways, retaining walls, and outdoor living structures built to last.</p>
-                    <span class="home-service-link">Learn More →</span>
-                </a>
-                <a href="/services/property-cleanup.html" class="home-service-card">
-                    <div class="home-service-icon">🧹</div>
-                    <h3>Property Cleanup</h3>
-                    <p>Junk removal, debris hauling, overgrown yard restoration — fast and affordable.</p>
-                    <span class="home-service-link">Learn More →</span>
-                </a>
-                <a href="/services/landscape-design.html" class="home-service-card home-service-card--featured">
-                    <div class="home-service-badge">Most Popular</div>
-                    <div class="home-service-icon">🎨</div>
-                    <h3>Landscape Design</h3>
-                    <p>Complete design & build — from concept to a stunning finished outdoor space.</p>
-                    <span class="home-service-link">Learn More →</span>
-                </a>
-                <a href="/quote.html?category=custom" class="home-service-card">
-                    <div class="home-service-icon">🔧</div>
-                    <h3>Custom Project</h3>
-                    <p>Mix of services or something unique? Tell us your vision and we'll make it happen.</p>
-                    <span class="home-service-link">Get a Quote →</span>
-                </a>
-            </div>
-
-            <div class="home-services-cta reveal" style="text-align:center; margin-top: 3rem;">
-                <a href="/quote.html" class="btn btn-primary btn-lg">
-                    Browse All Services &amp; Get a Quote
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== GOOGLE REVIEWS ==================== -->
-    <section class="reviews-section" id="reviews">
-        <div class="container">
-            <div class="reviews-header reveal">
-                <p class="section-label">What Our Customers Say</p>
-                <h2 class="section-title">Trusted by Homeowners<br />Across Lincoln, NE</h2>
-                <div class="reviews-overall">
-                    <div class="reviews-stars">
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                        <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
-                            <path
-                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
-                    </div>
-                    <span class="reviews-rating-text">5.0 on Google</span>
                 </div>
-            </div>
 
-            <div class="reviews-grid stagger-children" id="reviews-grid">
-                <div class="review-card">
-                    <div class="review-stars">★★★★★</div>
-                    <p class="review-text">"Lucky Landscapes helped me overseed my lawn last fall that was in terrible
-                        condition. It looked great last fall and currently it is looking better everyday, didn't have
-                        much moisture this winter!! They also did a lot of landscaping for me last year and were
-                        wonderful to work with. They advise but also listen to what you want. Great guys and reasonable
-                        priced. Will keep using them for my lawn/landscape needs."</p>
-                    <div class="review-author">
-                        <div class="review-avatar">BS</div>
-                        <div>
-                            <p class="review-name">Burdette Schoen</p>
-                            <p class="review-date">3 days ago</p>
+                <div class="about-grid stagger-children">
+                    <div class="about-card">
+                        <div class="about-card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path
+                                    d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
                         </div>
-                        <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                            viewBox="0 0 24 24">
-                            <path
-                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                                fill="#4285F4" />
-                            <path
-                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                fill="#34A853" />
-                            <path
-                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                fill="#FBBC05" />
-                            <path
-                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                fill="#EA4335" />
-                        </svg>
+                        <h3>Detail Oriented</h3>
+                        <p>We treat every property as if it were our own — clean cuts, crisp edges, and polished
+                            finishes
+                            every time.</p>
                     </div>
-                </div>
-                <div class="review-card">
-                    <div class="review-stars">★★★★★</div>
-                    <p class="review-text">"Hard workers who get the job done. Fair price for good work."</p>
-                    <div class="review-author">
-                        <div class="review-avatar">TJ</div>
-                        <div>
-                            <p class="review-name">Trent Jenkins</p>
-                            <p class="review-date">5 days ago</p>
+
+                    <div class="about-card">
+                        <div class="about-card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path
+                                    d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z" />
+                                <path d="m14.5 12.5 2-2" />
+                                <path d="m11.5 9.5 2-2" />
+                                <path d="m8.5 6.5 2-2" />
+                                <path d="m17.5 15.5 2-2" />
+                            </svg>
                         </div>
-                        <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                            viewBox="0 0 24 24">
-                            <path
-                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                                fill="#4285F4" />
-                            <path
-                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                fill="#34A853" />
-                            <path
-                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                fill="#FBBC05" />
-                            <path
-                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                fill="#EA4335" />
-                        </svg>
+                        <h3>Custom Designs</h3>
+                        <p>Tailored solutions that fit your budget, style, and the unique character of your land.</p>
                     </div>
-                </div>
-                <div class="review-card">
-                    <div class="review-stars">★★★★★</div>
-                    <p class="review-text">"I was looking through a couple of landscapers, and these guys gave a pretty
-                        good price! They did my mulch for me in my backyard and the results were great as expected!"</p>
-                    <div class="review-author">
-                        <div class="review-avatar">TA</div>
-                        <div>
-                            <p class="review-name">Than Aye</p>
-                            <p class="review-date">A week ago</p>
+
+                    <div class="about-card">
+                        <div class="about-card-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="m11 17 2 2a1 1 0 1 0 3-3" />
+                                <path
+                                    d="m14 14 2.5 2.5a1 1 0 1 0 3-3l-3.88-3.88a3 3 0 0 0-4.24 0l-.88.88a1 1 0 1 0 3 3l1.5-1.5" />
+                                <path d="m2 2 20 20" />
+                                <path d="M8 8a3 3 0 0 0 0 4.24" />
+                                <path d="M16 16a3 3 0 0 0 0-4.24" />
+                            </svg>
                         </div>
-                        <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
-                            viewBox="0 0 24 24">
-                            <path
-                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                                fill="#4285F4" />
-                            <path
-                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                                fill="#34A853" />
-                            <path
-                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                                fill="#FBBC05" />
-                            <path
-                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                                fill="#EA4335" />
-                        </svg>
+                        <h3>Reliable Service</h3>
+                        <p>We show up on time, communicate clearly, and don't leave until you're completely satisfied.
+                        </p>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <div class="reviews-cta reveal" style="text-align:center; margin-top: 2.5rem;">
-                <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank" rel="noopener"
-                    class="btn btn-secondary">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
-                        <path
-                            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-                            fill="#4285F4" />
-                        <path
-                            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                            fill="#34A853" />
-                        <path
-                            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                            fill="#FBBC05" />
-                        <path
-                            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                            fill="#EA4335" />
-                    </svg>
-                    See All Reviews on Google
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== GALLERY / RECENT PROJECTS ==================== -->
-    <section class="gallery-section" id="gallery">
-        <div class="container">
-            <div class="gallery-header reveal">
-                <p class="section-label">Our Work</p>
-                <h2 class="section-title">Recent Projects</h2>
-                <p class="section-subtitle mx-auto">
-                    A glimpse at some of the outdoor transformations we've brought to life.
-                </p>
-            </div>
-
-            <div class="gallery-grid stagger-children" id="gallery-grid">
-                <!-- Auto-generated by JS from projectData -->
-            </div>
-
-            <div class="gallery-cta reveal" style="text-align:center; margin-top: 3rem; padding-bottom: 1rem;">
-                <a href="/gallery.html" class="btn btn-primary btn-lg">
-                    View Full Gallery
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== CTA BANNER ==================== -->
-    <section class="cta-banner">
-        <div class="container">
-            <div class="cta-banner-content reveal">
-                <h2>Ready to Transform Your Yard?</h2>
-                <p>Let's talk about your vision and make it a reality — no pressure, always free estimates for Lincoln homeowners.</p>
-                <a href="/quote.html" class="btn btn-primary btn-lg">
-                    Get Your Free Estimate Now
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                    </svg>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== CONTACT ==================== -->
-    <section class="cta-section" id="contact">
-        <div class="container">
-            <div class="cta-grid">
-                <!-- Left — Info -->
-                <div class="cta-info reveal-left">
-                    <p class="section-label section-label--light">Get in Touch</p>
-                    <h2>Ready to Transform<br />Your Yard?</h2>
-                    <p>Whether you have a question, need advice, or want to start planning your project — we'd love to
-                        hear from you. Free estimates, no pressure, just honest help.</p>
-
-                    <div class="contact-items">
-                        <div class="contact-item">
-                            <div class="contact-item-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path
-                                        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="contact-item-label">Call Us</p>
-                                <p class="contact-item-value">(402) 405-5475</p>
-                            </div>
-                        </div>
-
-                        <div class="contact-item">
-                            <div class="contact-item-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <rect width="20" height="16" x="2" y="4" rx="2" />
-                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="contact-item-label">Email Us</p>
-                                <p class="contact-item-value">rileykopf@luckylandscapes.com</p>
-                            </div>
-                        </div>
-
-                        <div class="contact-item">
-                            <div class="contact-item-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path
-                                        d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
-                                    <circle cx="12" cy="10" r="3" />
-                                </svg>
-                            </div>
-                            <div>
-                                <p class="contact-item-label">Service Area</p>
-                                <p class="contact-item-value">Lincoln, NE &amp; Surrounding Areas</p>
-                            </div>
-                        </div>
-                    </div>
+        <!-- ==================== SERVICES ==================== -->
+        <section class="home-services-section" id="services">
+            <div class="home-services-bg"></div>
+            <div class="container">
+                <div class="home-services-header reveal">
+                    <p class="section-label section-label--light">What We Do</p>
+                    <h2 class="section-title section-title--light">Our Services</h2>
+                    <p class="section-subtitle mx-auto section-subtitle--light">
+                        From routine lawn care to full landscape transformations — we bring craftsmanship and care to
+                        every
+                        project.
+                    </p>
                 </div>
 
-                <!-- Right — Instant Quote CTA -->
-                <div class="reveal-right">
-                    <div class="contact-quote-card">
-                        <div class="cqc-glow"></div>
-                        <div class="cqc-inner">
-                            <div class="cqc-header">
-                                <div class="cqc-badge">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                                    </svg>
-                                    Free Quote
-                                </div>
-                                <h3>Your Quote in <em>Minutes</em></h3>
-                                <p>Answer a few quick questions about your project and we'll craft a personalized quote
-                                    within 24 hours.</p>
-                            </div>
-
-                            <div class="cqc-stats">
-                                <div class="cqc-stat">
-                                    <span class="cqc-stat-num">7+</span>
-                                    <span class="cqc-stat-label">Services</span>
-                                </div>
-                                <div class="cqc-stat-divider"></div>
-                                <div class="cqc-stat">
-                                    <span class="cqc-stat-num">$0</span>
-                                    <span class="cqc-stat-label">Always Free</span>
-                                </div>
-                                <div class="cqc-stat-divider"></div>
-                                <div class="cqc-stat">
-                                    <span class="cqc-stat-num">2min</span>
-                                    <span class="cqc-stat-label">Avg. Time</span>
-                                </div>
-                            </div>
-
-                            <a href="/quote.html" class="cqc-cta-btn">
-                                Start Your Free Quote
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                    stroke-linejoin="round">
-                                    <path d="M5 12h14" />
-                                    <path d="m12 5 7 7-7 7" />
-                                </svg>
-                            </a>
-
-                            <div class="cqc-trust">
-                                <div class="cqc-trust-item">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
-                                        <path d="m9 12 2 2 4-4" />
-                                    </svg>
-                                    No hidden fees
-                                </div>
-                                <div class="cqc-trust-item">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M20 6 9 17l-5-5" />
-                                    </svg>
-                                    100% transparent
-                                </div>
-                                <div class="cqc-trust-item">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
-                                        stroke-linejoin="round">
-                                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                                    </svg>
-                                    Zero obligation
-                                </div>
-                            </div>
-                        </div>
-
-                        <button type="button" class="contact-general-btn" id="open-general-form">
-                            💬 Prefer to send a message? Contact us directly
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- ==================== GENERAL CONTACT FORM MODAL ==================== -->
-    <div class="general-form-modal" id="general-form-modal">
-        <div class="gfm-backdrop" id="gfm-backdrop"></div>
-        <div class="gfm-content">
-            <button type="button" class="gfm-close" id="gfm-close" aria-label="Close form">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                </svg>
-            </button>
-            <h3>Send Us a Message</h3>
-            <p class="form-sub">We'll get back to you within 24 hours.</p>
-
-            <form id="contact-form">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="firstName">First Name</label>
-                        <input type="text" id="firstName" name="firstName" placeholder="John" required />
-                    </div>
-                    <div class="form-group">
-                        <label for="lastName">Last Name</label>
-                        <input type="text" id="lastName" name="lastName" placeholder="Doe" />
-                    </div>
+                <div class="home-services-grid stagger-children">
+                    <a href="/services/lawn-care.html" class="home-service-card">
+                        <div class="home-service-icon">🌿</div>
+                        <h3>Lawn Care</h3>
+                        <p>Weekly mowing, seasonal cleanups, leaf removal, and year-round maintenance packages.</p>
+                        <span class="home-service-link">Learn More →</span>
+                    </a>
+                    <a href="/services/garden-beds.html" class="home-service-card">
+                        <div class="home-service-icon">🌺</div>
+                        <h3>Garden & Beds</h3>
+                        <p>Garden bed installation, mulching, edging, and plant transplanting to elevate your curb
+                            appeal.
+                        </p>
+                        <span class="home-service-link">Learn More →</span>
+                    </a>
+                    <a href="/services/hardscaping.html" class="home-service-card">
+                        <div class="home-service-icon">🧱</div>
+                        <h3>Hardscaping</h3>
+                        <p>Paver patios, walkways, retaining walls, and outdoor living structures built to last.</p>
+                        <span class="home-service-link">Learn More →</span>
+                    </a>
+                    <a href="/services/property-cleanup.html" class="home-service-card">
+                        <div class="home-service-icon">🧹</div>
+                        <h3>Property Cleanup</h3>
+                        <p>Junk removal, debris hauling, overgrown yard restoration — fast and affordable.</p>
+                        <span class="home-service-link">Learn More →</span>
+                    </a>
+                    <a href="/services/landscape-design.html" class="home-service-card home-service-card--featured">
+                        <div class="home-service-badge">Most Popular</div>
+                        <div class="home-service-icon">🎨</div>
+                        <h3>Landscape Design</h3>
+                        <p>Complete design & build — from concept to a stunning finished outdoor space.</p>
+                        <span class="home-service-link">Learn More →</span>
+                    </a>
+                    <a href="/quote.html?category=custom" class="home-service-card">
+                        <div class="home-service-icon">🔧</div>
+                        <h3>Custom Project</h3>
+                        <p>Mix of services or something unique? Tell us your vision and we'll make it happen.</p>
+                        <span class="home-service-link">Get a Quote →</span>
+                    </a>
                 </div>
 
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" placeholder="john@example.com" required />
-                </div>
-
-                <div class="form-group">
-                    <label for="phone">Phone</label>
-                    <input type="tel" id="phone" name="phone" placeholder="(402) 555-1234" />
-                </div>
-
-                <div class="form-group">
-                    <label for="service">Service Interested In</label>
-                    <select id="service" name="service">
-                        <option value="">Select a service...</option>
-                        <option>Paver Project</option>
-                        <option>Retaining Wall</option>
-                        <option>Mowing & Maintenance</option>
-                        <option>Garden Beds / Mulch</option>
-                        <option>Plant Transplants</option>
-                        <option>Junk Removal</option>
-                        <option>Leaf Removal</option>
-
-                        <option>Full Landscape Design</option>
-                        <option>Other</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="message">Message</label>
-                    <textarea id="message" name="message" placeholder="Tell us about your project..."></textarea>
-                </div>
-
-                <button type="submit" class="form-submit">
-                    Send My Message
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M5 12h14" />
-                        <path d="m12 5 7 7-7 7" />
-                    </svg>
-                </button>
-            </form>
-        </div>
-    </div>
-
-    <!-- ==================== PROJECT LIGHTBOX ==================== -->
-    <div class="project-lightbox" id="project-lightbox">
-        <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
-        <div class="lightbox-container">
-            <button class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
-                    stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18 6 6 18" />
-                    <path d="m6 6 12 12" />
-                </svg>
-            </button>
-
-            <div class="lightbox-content">
-                <!-- Left — Image Carousel -->
-                <div class="lightbox-images">
-                    <div class="lightbox-img-wrap">
-                        <img id="lightbox-main-img" src="" alt="" />
-                    </div>
-                    <button class="lightbox-nav lightbox-prev" id="lightbox-prev" aria-label="Previous image">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m15 18-6-6 6-6" />
-                        </svg>
-                    </button>
-                    <button class="lightbox-nav lightbox-next" id="lightbox-next" aria-label="Next image">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m9 18 6-6-6-6" />
-                        </svg>
-                    </button>
-                    <div class="lightbox-dots" id="lightbox-dots"></div>
-                </div>
-
-                <!-- Right — Project Info -->
-                <div class="lightbox-info">
-                    <span class="lightbox-tag" id="lightbox-tag"></span>
-                    <h2 class="lightbox-title" id="lightbox-title"></h2>
-                    <p class="lightbox-desc" id="lightbox-desc"></p>
-                    <a href="#contact" class="btn btn-primary btn-lg lightbox-cta" id="lightbox-cta">
-                        Get a Free Quote
+                <div class="home-services-cta reveal" style="text-align:center; margin-top: 3rem;">
+                    <a href="/quote.html" class="btn btn-primary btn-lg">
+                        Browse All Services &amp; Get a Quote
                         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M5 12h14" />
@@ -845,57 +447,535 @@
                     </a>
                 </div>
             </div>
-        </div>
-    </div>
+        </section>
 
-    <!-- ==================== FAQ SECTION (GEO / AI-Optimized) ==================== -->
-    <section class="faq-section" id="faq">
-        <div class="container">
-            <div class="faq-header reveal">
-                <p class="section-label">Frequently Asked Questions</p>
-                <h2 class="section-title">Got Questions?<br />We've Got Answers</h2>
+        <!-- ==================== GOOGLE REVIEWS ==================== -->
+        <section class="reviews-section" id="reviews">
+            <div class="container">
+                <div class="reviews-header reveal">
+                    <p class="section-label">What Our Customers Say</p>
+                    <h2 class="section-title">Trusted by Homeowners<br />Across Lincoln, NE</h2>
+                    <div class="reviews-overall">
+                        <div class="reviews-stars">
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                                <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                                <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                                <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                                <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                            <svg viewBox="0 0 24 24" fill="currentColor" width="24" height="24">
+                                <path
+                                    d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                            </svg>
+                        </div>
+                        <span class="reviews-rating-text">5.0 on Google</span>
+                    </div>
+                </div>
+
+                <div class="reviews-grid stagger-children" id="reviews-grid">
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Lucky Landscapes helped me overseed my lawn last fall that was in
+                            terrible
+                            condition. It looked great last fall and currently it is looking better everyday, didn't
+                            have
+                            much moisture this winter!! They also did a lot of landscaping for me last year and were
+                            wonderful to work with. They advise but also listen to what you want. Great guys and
+                            reasonable
+                            priced. Will keep using them for my lawn/landscape needs."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">BS</div>
+                            <div>
+                                <p class="review-name">Burdette Schoen</p>
+                                <p class="review-date">3 days ago</p>
+                            </div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                                    fill="#4285F4" />
+                                <path
+                                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                    fill="#34A853" />
+                                <path
+                                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                    fill="#FBBC05" />
+                                <path
+                                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                    fill="#EA4335" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Hard workers who get the job done. Fair price for good work."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">TJ</div>
+                            <div>
+                                <p class="review-name">Trent Jenkins</p>
+                                <p class="review-date">5 days ago</p>
+                            </div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                                    fill="#4285F4" />
+                                <path
+                                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                    fill="#34A853" />
+                                <path
+                                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                    fill="#FBBC05" />
+                                <path
+                                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                    fill="#EA4335" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"I was looking through a couple of landscapers, and these guys gave a
+                            pretty
+                            good price! They did my mulch for me in my backyard and the results were great as expected!"
+                        </p>
+                        <div class="review-author">
+                            <div class="review-avatar">TA</div>
+                            <div>
+                                <p class="review-name">Than Aye</p>
+                                <p class="review-date">A week ago</p>
+                            </div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20"
+                                viewBox="0 0 24 24">
+                                <path
+                                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                                    fill="#4285F4" />
+                                <path
+                                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                    fill="#34A853" />
+                                <path
+                                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                    fill="#FBBC05" />
+                                <path
+                                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                    fill="#EA4335" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="reviews-cta reveal" style="text-align:center; margin-top: 2.5rem;">
+                    <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank" rel="noopener"
+                        class="btn btn-secondary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
+                            <path
+                                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+                                fill="#4285F4" />
+                            <path
+                                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                                fill="#34A853" />
+                            <path
+                                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                                fill="#FBBC05" />
+                            <path
+                                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                                fill="#EA4335" />
+                        </svg>
+                        See All Reviews on Google
+                    </a>
+                </div>
             </div>
-            <div class="faq-grid stagger-children">
-                <details class="faq-item" open>
-                    <summary class="faq-question">What landscaping services does Lucky Landscapes offer in Lincoln, NE?</summary>
-                    <div class="faq-answer">
-                        <p>Lucky Landscapes offers a full range of landscaping services in Lincoln, Nebraska and surrounding areas, including:</p>
-                        <ul>
-                            <li><strong>Lawn Care</strong> — Weekly mowing, seasonal cleanups, leaf removal, and year-round maintenance packages</li>
-                            <li><strong>Garden Beds &amp; Mulch</strong> — New bed installation, mulching, edging, and plant transplanting</li>
-                            <li><strong>Hardscaping</strong> — Paver patios, walkways, retaining walls, and outdoor living structures</li>
-                            <li><strong>Property Cleanup</strong> — Junk removal, debris hauling, and overgrown yard restoration</li>
-                            <li><strong>Full Landscape Design &amp; Build</strong> — Complete outdoor transformations from concept to completion</li>
-                        </ul>
+        </section>
+
+        <!-- ==================== GALLERY / RECENT PROJECTS ==================== -->
+        <section class="gallery-section" id="gallery">
+            <div class="container">
+                <div class="gallery-header reveal">
+                    <p class="section-label">Our Work</p>
+                    <h2 class="section-title">Recent Projects</h2>
+                    <p class="section-subtitle mx-auto">
+                        A glimpse at some of the outdoor transformations we've brought to life.
+                    </p>
+                </div>
+
+                <div class="gallery-grid stagger-children" id="gallery-grid">
+                    <!-- Auto-generated by JS from projectData -->
+                </div>
+
+                <div class="gallery-cta reveal" style="text-align:center; margin-top: 3rem; padding-bottom: 1rem;">
+                    <a href="/gallery.html" class="btn btn-primary btn-lg">
+                        View Full Gallery
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CTA BANNER ==================== -->
+        <section class="cta-banner">
+            <div class="container">
+                <div class="cta-banner-content reveal">
+                    <h2>Ready to Transform Your Yard?</h2>
+                    <p>Let's talk about your vision and make it a reality — no pressure, always free estimates for
+                        Lincoln homeowners.</p>
+                    <a href="/quote.html" class="btn btn-primary btn-lg">
+                        Get Your Free Estimate Now
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CONTACT ==================== -->
+        <section class="cta-section" id="contact">
+            <div class="container">
+                <div class="cta-grid">
+                    <!-- Left — Info -->
+                    <div class="cta-info reveal-left">
+                        <p class="section-label section-label--light">Get in Touch</p>
+                        <h2>Ready to Transform<br />Your Yard?</h2>
+                        <p>Whether you have a question, need advice, or want to start planning your project — we'd love
+                            to
+                            hear from you. Free estimates, no pressure, just honest help.</p>
+
+                        <div class="contact-items">
+                            <div class="contact-item">
+                                <div class="contact-item-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path
+                                            d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="contact-item-label">Call Us</p>
+                                    <p class="contact-item-value">(402) 405-5475</p>
+                                </div>
+                            </div>
+
+                            <div class="contact-item">
+                                <div class="contact-item-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <rect width="20" height="16" x="2" y="4" rx="2" />
+                                        <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="contact-item-label">Email Us</p>
+                                    <p class="contact-item-value">rileykopf@luckylandscapes.com</p>
+                                </div>
+                            </div>
+
+                            <div class="contact-item">
+                                <div class="contact-item-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path
+                                            d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" />
+                                        <circle cx="12" cy="10" r="3" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <p class="contact-item-label">Service Area</p>
+                                    <p class="contact-item-value">Lincoln, NE &amp; Surrounding Areas</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                </details>
-                <details class="faq-item">
-                    <summary class="faq-question">Does Lucky Landscapes provide free estimates?</summary>
-                    <div class="faq-answer">
-                        <p>Yes! We provide 100% free, no-obligation estimates for all of our services. You can <a href="/quote.html">request a quote online</a> in about 2 minutes, or call us directly at <a href="tel:+14024055475">(402) 405-5475</a>. We typically respond within 24 hours.</p>
+
+                    <!-- Right — Instant Quote CTA -->
+                    <div class="reveal-right">
+                        <div class="contact-quote-card">
+                            <div class="cqc-glow"></div>
+                            <div class="cqc-inner">
+                                <div class="cqc-header">
+                                    <div class="cqc-badge">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                                        </svg>
+                                        Free Quote
+                                    </div>
+                                    <h3>Your Quote in <em>Minutes</em></h3>
+                                    <p>Answer a few quick questions about your project and we'll craft a personalized
+                                        quote
+                                        within 24 hours.</p>
+                                </div>
+
+                                <div class="cqc-stats">
+                                    <div class="cqc-stat">
+                                        <span class="cqc-stat-num">7+</span>
+                                        <span class="cqc-stat-label">Services</span>
+                                    </div>
+                                    <div class="cqc-stat-divider"></div>
+                                    <div class="cqc-stat">
+                                        <span class="cqc-stat-num">$0</span>
+                                        <span class="cqc-stat-label">Always Free</span>
+                                    </div>
+                                    <div class="cqc-stat-divider"></div>
+                                    <div class="cqc-stat">
+                                        <span class="cqc-stat-num">2min</span>
+                                        <span class="cqc-stat-label">Avg. Time</span>
+                                    </div>
+                                </div>
+
+                                <a href="/quote.html" class="cqc-cta-btn">
+                                    Start Your Free Quote
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                        stroke-linejoin="round">
+                                        <path d="M5 12h14" />
+                                        <path d="m12 5 7 7-7 7" />
+                                    </svg>
+                                </a>
+
+                                <div class="cqc-trust">
+                                    <div class="cqc-trust-item">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" />
+                                            <path d="m9 12 2 2 4-4" />
+                                        </svg>
+                                        No hidden fees
+                                    </div>
+                                    <div class="cqc-trust-item">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M20 6 9 17l-5-5" />
+                                        </svg>
+                                        100% transparent
+                                    </div>
+                                    <div class="cqc-trust-item">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                                            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                                            stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                                        </svg>
+                                        Zero obligation
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="button" class="contact-general-btn" id="open-general-form">
+                                💬 Prefer to send a message? Contact us directly
+                            </button>
+                        </div>
                     </div>
-                </details>
-                <details class="faq-item">
-                    <summary class="faq-question">What areas does Lucky Landscapes serve?</summary>
-                    <div class="faq-answer">
-                        <p>We primarily serve <strong>Lincoln, Nebraska</strong> and the surrounding areas. Contact us to confirm service availability for your specific location.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== GENERAL CONTACT FORM MODAL ==================== -->
+        <div class="general-form-modal" id="general-form-modal">
+            <div class="gfm-backdrop" id="gfm-backdrop"></div>
+            <div class="gfm-content">
+                <button type="button" class="gfm-close" id="gfm-close" aria-label="Close form">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg>
+                </button>
+                <h3>Send Us a Message</h3>
+                <p class="form-sub">We'll get back to you within 24 hours.</p>
+
+                <form id="contact-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="firstName">First Name</label>
+                            <input type="text" id="firstName" name="firstName" placeholder="John" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="lastName">Last Name</label>
+                            <input type="text" id="lastName" name="lastName" placeholder="Doe" />
+                        </div>
                     </div>
-                </details>
-                <details class="faq-item">
-                    <summary class="faq-question">How quickly can Lucky Landscapes start my project?</summary>
-                    <div class="faq-answer">
-                        <p>Most cleanup and lawn care jobs can be scheduled within the same week. For larger projects like hardscaping and landscape design, we typically begin within 1–3 weeks depending on the scope and season. <a href="/quote.html">Get a free quote</a> to discuss your timeline.</p>
+
+                    <div class="form-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" placeholder="john@example.com" required />
                     </div>
-                </details>
-                <details class="faq-item">
-                    <summary class="faq-question">Is Lucky Landscapes insured?</summary>
-                    <div class="faq-answer">
-                        <p>Yes, Lucky Landscapes is fully insured to protect both our team and your property during every project. Your peace of mind is our priority.</p>
+
+                    <div class="form-group">
+                        <label for="phone">Phone</label>
+                        <input type="tel" id="phone" name="phone" placeholder="(402) 555-1234" />
                     </div>
-                </details>
+
+                    <div class="form-group">
+                        <label for="service">Service Interested In</label>
+                        <select id="service" name="service">
+                            <option value="">Select a service...</option>
+                            <option>Paver Project</option>
+                            <option>Retaining Wall</option>
+                            <option>Mowing & Maintenance</option>
+                            <option>Garden Beds / Mulch</option>
+                            <option>Plant Transplants</option>
+                            <option>Junk Removal</option>
+                            <option>Leaf Removal</option>
+
+                            <option>Full Landscape Design</option>
+                            <option>Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="message">Message</label>
+                        <textarea id="message" name="message" placeholder="Tell us about your project..."></textarea>
+                    </div>
+
+                    <button type="submit" class="form-submit">
+                        Send My Message
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14" />
+                            <path d="m12 5 7 7-7 7" />
+                        </svg>
+                    </button>
+                </form>
             </div>
         </div>
-    </section>
+
+        <!-- ==================== PROJECT LIGHTBOX ==================== -->
+        <div class="project-lightbox" id="project-lightbox">
+            <div class="lightbox-backdrop" id="lightbox-backdrop"></div>
+            <div class="lightbox-container">
+                <button class="lightbox-close" id="lightbox-close" aria-label="Close lightbox">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg>
+                </button>
+
+                <div class="lightbox-content">
+                    <!-- Left — Image Carousel -->
+                    <div class="lightbox-images">
+                        <div class="lightbox-img-wrap">
+                            <img id="lightbox-main-img" src="" alt="" />
+                        </div>
+                        <button class="lightbox-nav lightbox-prev" id="lightbox-prev" aria-label="Previous image">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="m15 18-6-6 6-6" />
+                            </svg>
+                        </button>
+                        <button class="lightbox-nav lightbox-next" id="lightbox-next" aria-label="Next image">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="m9 18 6-6-6-6" />
+                            </svg>
+                        </button>
+                        <div class="lightbox-dots" id="lightbox-dots"></div>
+                    </div>
+
+                    <!-- Right — Project Info -->
+                    <div class="lightbox-info">
+                        <span class="lightbox-tag" id="lightbox-tag"></span>
+                        <h2 class="lightbox-title" id="lightbox-title"></h2>
+                        <p class="lightbox-desc" id="lightbox-desc"></p>
+                        <a href="#contact" class="btn btn-primary btn-lg lightbox-cta" id="lightbox-cta">
+                            Get a Free Quote
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                                stroke-linejoin="round">
+                                <path d="M5 12h14" />
+                                <path d="m12 5 7 7-7 7" />
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== FAQ SECTION (GEO / AI-Optimized) ==================== -->
+        <section class="faq-section" id="faq">
+            <div class="container">
+                <div class="faq-header reveal">
+                    <p class="section-label">Frequently Asked Questions</p>
+                    <h2 class="section-title">Got Questions?<br />We've Got Answers</h2>
+                </div>
+                <div class="faq-grid stagger-children">
+                    <details class="faq-item" open>
+                        <summary class="faq-question">What landscaping services does Lucky Landscapes offer in Lincoln,
+                            NE?</summary>
+                        <div class="faq-answer">
+                            <p>Lucky Landscapes offers a full range of landscaping services in Lincoln, Nebraska and
+                                surrounding areas, including:</p>
+                            <ul>
+                                <li><strong>Lawn Care</strong> — Weekly mowing, seasonal cleanups, leaf removal, and
+                                    year-round maintenance packages</li>
+                                <li><strong>Garden Beds &amp; Mulch</strong> — New bed installation, mulching, edging,
+                                    and plant transplanting</li>
+                                <li><strong>Hardscaping</strong> — Paver patios, walkways, retaining walls, and outdoor
+                                    living structures</li>
+                                <li><strong>Property Cleanup</strong> — Junk removal, debris hauling, and overgrown yard
+                                    restoration</li>
+                                <li><strong>Full Landscape Design &amp; Build</strong> — Complete outdoor
+                                    transformations from concept to completion</li>
+                            </ul>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">Does Lucky Landscapes provide free estimates?</summary>
+                        <div class="faq-answer">
+                            <p>Yes! We provide 100% free, no-obligation estimates for all of our services. You can <a
+                                    href="/quote.html">request a quote online</a> in about 2 minutes, or call us
+                                directly at <a href="tel:+14024055475">(402) 405-5475</a>. We typically respond within
+                                24 hours.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">What areas does Lucky Landscapes serve?</summary>
+                        <div class="faq-answer">
+                            <p>We primarily serve <strong>Lincoln, Nebraska</strong> and the surrounding areas. Contact
+                                us to confirm service availability for your specific location.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">How quickly can Lucky Landscapes start my project?</summary>
+                        <div class="faq-answer">
+                            <p>Most cleanup and lawn care jobs can be scheduled within the same week. For larger
+                                projects like hardscaping and landscape design, we typically begin within 1–3 weeks
+                                depending on the scope and season. <a href="/quote.html">Get a free quote</a> to discuss
+                                your timeline.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">Is Lucky Landscapes insured?</summary>
+                        <div class="faq-answer">
+                            <p>Yes, Lucky Landscapes is fully insured to protect both our team and your property during
+                                every project. Your peace of mind is our priority.</p>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </section>
 
     </main>
 
@@ -981,7 +1061,13 @@
         </div>
     </footer>
 
-    <!-- Entry Point -->
+    <!-- Sticky Mobile CTA Bar -->
+    <div class="sticky-mobile-cta" id="sticky-mobile-cta">
+        <a href="/quote.html" class="btn btn-primary">Free Quote</a>
+        <a href="tel:+14024055475" class="sticky-phone-link">📞 (402) 405-5475</a>
+    </div>
+
+    <!-- Entry Point -->
 
 </body>
 

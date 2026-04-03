@@ -1,14 +1,12 @@
 # Lucky Landscapes — robots.txt
-# Allow all crawlers including AI search engines
+# Allow all crawlers including AI search engines and social bots
 
 User-agent: *
 Allow: /
+Crawl-delay: 1
 
-# Explicitly allow AI search crawlers
-User-agent: OAI-SearchBot
-Allow: /
-
-User-agent: ChatGPT-User
+# === Google ===
+User-agent: Googlebot
 Allow: /
 
 User-agent: Google-Extended
@@ -17,13 +15,59 @@ Allow: /
 User-agent: GoogleOther
 Allow: /
 
-User-agent: PerplexityBot
+User-agent: Google-InspectionTool
 Allow: /
 
+User-agent: Storebot-Google
+Allow: /
+
+# === Bing / Microsoft ===
+User-agent: Bingbot
+Allow: /
+
+User-agent: msnbot
+Allow: /
+
+# === OpenAI ===
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: GPTBot
+Allow: /
+
+# === Anthropic ===
 User-agent: anthropic-ai
 Allow: /
 
 User-agent: ClaudeBot
+Allow: /
+
+# === Perplexity ===
+User-agent: PerplexityBot
+Allow: /
+
+# === Meta / Facebook ===
+User-agent: Meta-ExternalAgent
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+User-agent: facebookexternalhit
+Allow: /
+
+# === Apple ===
+User-agent: Applebot
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+# === Other AI & Search Crawlers ===
+User-agent: Amazonbot
 Allow: /
 
 User-agent: Bytespider
@@ -32,7 +76,37 @@ Allow: /
 User-agent: CCBot
 Allow: /
 
-User-agent: Applebot-Extended
+User-agent: cohere-ai
+Allow: /
+
+User-agent: YouBot
+Allow: /
+
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: YandexBot
+Allow: /
+
+User-agent: Sogou
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-agent: ia_archiver
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: PetalBot
 Allow: /
 
 Sitemap: https://luckylandscapes.com/sitemap.xml

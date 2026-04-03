@@ -40,7 +40,7 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
+      "@type": ["LocalBusiness", "LandscapingBusiness"],
       "name": "Lucky Landscapes",
       "url": "https://luckylandscapes.com",
       "logo": "https://luckylandscapes.com/images/Icon.png",
@@ -48,12 +48,25 @@
       "description": "Lucky Landscapes is Lincoln, Nebraska's trusted landscaping company offering lawn care, paver patios, retaining walls, garden beds, landscape design, property cleanup, and more.",
       "telephone": "+1-402-405-5475",
       "email": "rileykopf@luckylandscapes.com",
-      "areaServed": {
-        "@type": "City",
-        "name": "Lincoln",
-        "addressRegion": "NE",
-        "addressCountry": "US"
-      },
+      "foundingDate": "2023",
+      "openingHours": ["Mo-Fr 07:00-19:00", "Sa 08:00-17:00"],
+      "paymentAccepted": "Cash, Credit Card, Venmo, Zelle",
+      "areaServed": [
+        { "@type": "City", "name": "Lincoln", "addressRegion": "NE", "addressCountry": "US" },
+        { "@type": "City", "name": "Waverly", "addressRegion": "NE" },
+        { "@type": "City", "name": "Hickman", "addressRegion": "NE" },
+        { "@type": "City", "name": "Bennet", "addressRegion": "NE" },
+        { "@type": "City", "name": "Seward", "addressRegion": "NE" },
+        { "@type": "City", "name": "Crete", "addressRegion": "NE" },
+        { "@type": "City", "name": "Milford", "addressRegion": "NE" },
+        { "@type": "City", "name": "Malcolm", "addressRegion": "NE" },
+        { "@type": "City", "name": "Firth", "addressRegion": "NE" },
+        {
+          "@type": "GeoCircle",
+          "geoMidpoint": { "@type": "GeoCoordinates", "latitude": 40.8136, "longitude": -96.7026 },
+          "geoRadius": "50000"
+        }
+      ],
       "address": {
         "@type": "PostalAddress",
         "addressLocality": "Lincoln",
@@ -68,12 +81,32 @@
         "longitude": -96.7026
       },
       "priceRange": "$$",
-      "LocalBusiness": {
-        "@type": "LocalBusiness,
+      "aggregateRating": {
+        "@type": "AggregateRating",
         "ratingValue": "5.0",
         "reviewCount": "3",
         "bestRating": "5"
       },
+      "review": [
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Burdette Schoen" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "Lucky Landscapes helped me overseed my lawn last fall that was in terrible condition. They also did a lot of landscaping for me last year and were wonderful to work with. Great guys and reasonable priced."
+        },
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Trent Jenkins" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "Hard workers who get the job done. Fair price for good work."
+        },
+        {
+          "@type": "Review",
+          "author": { "@type": "Person", "name": "Than Aye" },
+          "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+          "reviewBody": "I was looking through a couple of landscapers, and these guys gave a pretty good price! They did my mulch for me in my backyard and the results were great as expected!"
+        }
+      ],
       "sameAs": [
         "https://www.facebook.com/luckylandscapes",
         "https://www.instagram.com/lucky.landscapes/",
@@ -84,11 +117,11 @@
         "@type": "OfferCatalog",
         "name": "Landscaping Services",
         "itemListElement": [
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build" } }
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care", "description": "Weekly mowing, seasonal cleanups, leaf removal, year-round maintenance" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch", "description": "Garden bed installation, mulching, edging, plant transplanting" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls", "description": "Paver patios, walkways, driveways, retaining walls, outdoor living" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal", "description": "Junk removal, debris hauling, overgrown yard restoration" } },
+          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build", "description": "Complete outdoor transformations from concept to completion" } }
         ]
       }
     }
@@ -264,6 +297,16 @@
                         <span class="stat-number" data-count="8">0</span><span class="stat-suffix"></span>
                         <span class="stat-label">Service Categories</span>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== BOOKING BANNER ==================== -->
+        <section class="booking-banner">
+            <div class="container">
+                <div class="booking-banner-inner">
+                    <p class="booking-banner-text">🏗️ <span>Now booking spring & summer projects!</span> Get your free quote before the schedule fills up.</p>
+                    <a href="/quote.html" class="btn btn-primary">Get a Free Quote</a>
                 </div>
             </div>
         </section>
@@ -1016,6 +1059,12 @@
             </div>
         </div>
     </footer>
+
+    <!-- Sticky Mobile CTA Bar -->
+    <div class="sticky-mobile-cta" id="sticky-mobile-cta">
+        <a href="/quote.html" class="btn btn-primary">Free Quote</a>
+        <a href="tel:+14024055475" class="sticky-phone-link">📞 (402) 405-5475</a>
+    </div>
 
     <!-- Entry Point -->
     <script type="module" src="/main.js"></script>
