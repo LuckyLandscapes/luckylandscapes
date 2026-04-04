@@ -79,6 +79,30 @@ if (navbar) {
 }
 
 // ============================================
+// STICKY MOBILE CTA BAR
+// ============================================
+const stickyMobileCta = document.getElementById('sticky-mobile-cta');
+if (stickyMobileCta) {
+    let stickyVisible = false;
+    function handleStickyCta() {
+        const showAfter = 400;
+        const footer = document.querySelector('.footer');
+        const footerTop = footer ? footer.getBoundingClientRect().top : Infinity;
+        const shouldShow = window.scrollY > showAfter && footerTop > window.innerHeight;
+
+        if (shouldShow && !stickyVisible) {
+            stickyMobileCta.classList.add('visible');
+            stickyVisible = true;
+        } else if (!shouldShow && stickyVisible) {
+            stickyMobileCta.classList.remove('visible');
+            stickyVisible = false;
+        }
+    }
+    window.addEventListener('scroll', handleStickyCta, { passive: true });
+    handleStickyCta();
+}
+
+// ============================================
 // MOBILE MENU
 // ============================================
 const navToggle = document.getElementById('nav-toggle');
@@ -117,15 +141,29 @@ mobileLinks.forEach(link => {
 // ============================================
 // SMOOTH SCROLL FOR ANCHOR LINKS
 // ============================================
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+// Handle both #hash and /#hash links (the latter is used in nav links)
+const isHomePage = window.location.pathname === '/' || window.location.pathname === '/index.html';
+
+document.querySelectorAll('a[href^="#"], a[href^="/#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         const href = this.getAttribute('href');
         if (href === '#' || !href) return;
-        const target = document.querySelector(href);
-        if (target) {
-            e.preventDefault();
-            const navH = navbar ? navbar.offsetHeight : 80;
-            lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
+
+        // Extract the hash part: "/#about" → "#about", "#about" → "#about"
+        const hash = href.startsWith('/#') ? href.slice(1) : href;
+
+        // Only smooth-scroll if we're already on the homepage
+        if (hash.startsWith('#') && isHomePage) {
+            const target = document.querySelector(hash);
+            if (target) {
+                e.preventDefault();
+                // Close mobile menu if open
+                if (mobileMenu && mobileMenu.classList.contains('open')) closeMenu();
+                const navH = navbar ? navbar.offsetHeight : 80;
+                lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
+                // Update URL without reloading
+                history.pushState(null, '', hash);
+            }
         }
     });
 });
@@ -610,19 +648,6 @@ const projectData = [
             '/images/landscapedesign/2.webp',
         ],
     },
-    {
-        title: 'Retaining Wall',
-        tag: 'Hardscaping',
-        cover: 0,
-        desc: 'A professionally built retaining wall that manages grade changes while adding curb appeal. Engineered for structural integrity and built to last through Nebraska\'s seasons.',
-        images: [
-            '/images/retainingwall/1.webp',
-            '/images/retainingwall/2.webp',
-            '/images/retainingwall/3.webp',
-            '/images/retainingwall/4.webp',
-            '/images/retainingwall/5.webp',
-        ],
-    },
 ];
 
 // ============================================
@@ -696,13 +721,6 @@ const galleryPhotos = [
     { src: '/images/bricklaying/2.webp', category: 'Hardscaping', caption: 'Brick wall construction' },
     { src: '/images/bricklaying/3.webp', category: 'Hardscaping', caption: 'Finished brick retaining wall' },
 
-    // === Retaining Walls ===
-    { src: '/images/retainingwall/1.webp', category: 'Hardscaping', caption: 'Retaining wall — structural base' },
-    { src: '/images/retainingwall/2.webp', category: 'Hardscaping', caption: 'Retaining wall — block courses' },
-    { src: '/images/retainingwall/3.webp', category: 'Hardscaping', caption: 'Retaining wall — grade transition' },
-    { src: '/images/retainingwall/4.webp', category: 'Hardscaping', caption: 'Retaining wall — finished project' },
-    { src: '/images/retainingwall/5.webp', category: 'Hardscaping', caption: 'Retaining wall — landscaping integration' },
-
     // === Lawn Care ===
     { src: '/images/lawncare/1.webp', category: 'Lawn Care', caption: 'Fresh-cut residential lawn' },
     { src: '/images/lawncare/2.webp', category: 'Lawn Care', caption: 'Crisp edging & trim work' },
@@ -726,72 +744,23 @@ const galleryPhotos = [
 ];
 
 const galleryPageGrid = document.getElementById('gallery-page-grid');
-const galleryFilterBar = document.getElementById('gallery-filter-bar');
 
-let currentGalleryFilter = 'all';
 let filteredGalleryPhotos = [...galleryPhotos];
-let currentGalleryPage = 1;
-const GALLERY_ITEMS_PER_PAGE = 12;
 
-function getTotalGalleryPages() {
-    return Math.ceil(filteredGalleryPhotos.length / GALLERY_ITEMS_PER_PAGE);
-}
-
-function buildGalleryPagination() {
-    const paginationEl = document.getElementById('gallery-pagination');
-    if (!paginationEl) return;
-    const totalPages = getTotalGalleryPages();
-
-    if (totalPages <= 1) {
-        paginationEl.innerHTML = '';
-        return;
-    }
-
-    let html = '';
-    html += `<button class="gallery-page-btn gallery-page-prev${currentGalleryPage <= 1 ? ' disabled' : ''}" data-action="prev" ${currentGalleryPage <= 1 ? 'disabled' : ''}>
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-        Prev
-    </button>`;
-
-    for (let i = 1; i <= totalPages; i++) {
-        html += `<button class="gallery-page-num${i === currentGalleryPage ? ' active' : ''}" data-page="${i}">${i}</button>`;
-    }
-
-    html += `<button class="gallery-page-btn gallery-page-next${currentGalleryPage >= totalPages ? ' disabled' : ''}" data-action="next" ${currentGalleryPage >= totalPages ? 'disabled' : ''}>
-        Next
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-    </button>`;
-
-    paginationEl.innerHTML = html;
-}
-
-function buildGalleryPageGrid(filterTag, page) {
+function buildGalleryPageGrid() {
     if (!galleryPageGrid) return;
     galleryPageGrid.innerHTML = '';
-    currentGalleryFilter = filterTag;
 
-    filteredGalleryPhotos = filterTag === 'all'
-        ? [...galleryPhotos]
-        : galleryPhotos.filter(p => p.category === filterTag);
+    filteredGalleryPhotos = [...galleryPhotos];
 
-    if (page !== undefined) currentGalleryPage = page;
-    const totalPages = getTotalGalleryPages();
-    if (currentGalleryPage > totalPages) currentGalleryPage = totalPages;
-    if (currentGalleryPage < 1) currentGalleryPage = 1;
-
-    const start = (currentGalleryPage - 1) * GALLERY_ITEMS_PER_PAGE;
-    const end = start + GALLERY_ITEMS_PER_PAGE;
-    const pagePhotos = filteredGalleryPhotos.slice(start, end);
-
-    pagePhotos.forEach((photo, idx) => {
-        const globalIdx = start + idx;
+    filteredGalleryPhotos.forEach((photo, idx) => {
         const item = document.createElement('div');
         item.className = 'gallery-photo-item';
-        item.dataset.idx = globalIdx;
+        item.dataset.idx = idx;
 
         item.innerHTML = `
             <img src="${photo.src}" alt="${photo.caption}" loading="lazy" />
-            <span class="gallery-photo-tag">${photo.category}</span>
+            <span class="gallery-photo-tag gallery-photo-tag--visible">${photo.category}</span>
             <div class="gallery-photo-overlay">
                 <span class="gallery-photo-caption">${photo.caption}</span>
             </div>
@@ -799,55 +768,10 @@ function buildGalleryPageGrid(filterTag, page) {
 
         galleryPageGrid.appendChild(item);
     });
-
-    buildGalleryPagination();
 }
 
 if (galleryPageGrid) {
-    buildGalleryPageGrid('all', 1);
-
-    // Filter button clicks
-    if (galleryFilterBar) {
-        galleryFilterBar.addEventListener('click', (e) => {
-            const btn = e.target.closest('.gallery-filter-btn');
-            if (!btn) return;
-            const filter = btn.dataset.filter;
-
-            galleryFilterBar.querySelectorAll('.gallery-filter-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            buildGalleryPageGrid(filter, 1);
-        });
-    }
-
-    // Pagination click handlers
-    const paginationEl = document.getElementById('gallery-pagination');
-    if (paginationEl) {
-        paginationEl.addEventListener('click', (e) => {
-            const btn = e.target.closest('[data-action], [data-page]');
-            if (!btn) return;
-
-            if (btn.dataset.action === 'prev' && currentGalleryPage > 1) {
-                currentGalleryPage--;
-                buildGalleryPageGrid(currentGalleryFilter, currentGalleryPage);
-            } else if (btn.dataset.action === 'next' && currentGalleryPage < getTotalGalleryPages()) {
-                currentGalleryPage++;
-                buildGalleryPageGrid(currentGalleryFilter, currentGalleryPage);
-            } else if (btn.dataset.page) {
-                const p = parseInt(btn.dataset.page, 10);
-                if (p !== currentGalleryPage) {
-                    buildGalleryPageGrid(currentGalleryFilter, p);
-                }
-            }
-
-            // Scroll to top of gallery grid
-            const gridSection = document.querySelector('.gallery-page-grid-section');
-            if (gridSection) {
-                const navH = navbar ? navbar.offsetHeight : 80;
-                lenis.scrollTo(gridSection, { offset: -navH - 10, duration: 0.8 });
-            }
-        });
-    }
+    buildGalleryPageGrid();
 
     // Gallery page photo lightbox
     const gplLightbox = document.getElementById('gallery-photo-lightbox');
@@ -1446,6 +1370,26 @@ if (qzCategoryBtns.length > 0) {
         gardenEdgingMaterialWrap.style.display = gardenEdging?.checked ? '' : 'none';
     }
     if (gardenEdging) gardenEdging.addEventListener('change', updateGardenEdging);
+
+    // --- Garden & Beds: show plant details when planting is checked ---
+    const gardenPlanting = document.querySelector('input[name="garden_planting"]');
+    const gardenPlantWrap = document.getElementById('qz-garden-plant-wrap');
+
+    function updateGardenPlanting() {
+        if (!gardenPlantWrap) return;
+        gardenPlantWrap.style.display = gardenPlanting?.checked ? '' : 'none';
+    }
+    if (gardenPlanting) gardenPlanting.addEventListener('change', updateGardenPlanting);
+
+    // --- Garden & Beds: show mulch details when garden beds is checked ---
+    const gardenBeds = document.querySelector('input[name="garden_beds"]');
+    const gardenMulchWrap = document.getElementById('qz-garden-mulch-wrap');
+
+    function updateGardenMulch() {
+        if (!gardenMulchWrap) return;
+        gardenMulchWrap.style.display = gardenBeds?.checked ? '' : 'none';
+    }
+    if (gardenBeds) gardenBeds.addEventListener('change', updateGardenMulch);
 
     // --- Hardscaping: show paver sub-options when pavers is checked ---
     const hardPavers = document.querySelector('input[name="hard_pavers"]');

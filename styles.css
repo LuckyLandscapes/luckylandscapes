@@ -5946,3 +5946,242 @@ body.promo-active .mobile-menu {
         font-size: .9rem;
     }
 }
+
+/* ═══════════════════════════════════════════════════════
+   GALLERY — Always-visible tags
+   ═══════════════════════════════════════════════════════ */
+.gallery-photo-tag--visible {
+    opacity: 1 !important;
+}
+
+/* ═══════════════════════════════════════════════════════
+   GALLERY — Social Follow CTA
+   ═══════════════════════════════════════════════════════ */
+.gallery-social-cta {
+    padding: 4rem 0;
+    background: var(--white);
+}
+
+.gallery-social-inner {
+    text-align: center;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.gallery-social-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+}
+
+.gallery-social-inner h2 {
+    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+    margin-bottom: 1rem;
+}
+
+.gallery-social-inner p {
+    color: var(--gray-500);
+    font-size: 1.05rem;
+    line-height: 1.7;
+    margin-bottom: 2rem;
+}
+
+.gallery-social-links {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════
+   STICKY MOBILE CTA BAR
+   ═══════════════════════════════════════════════════════ */
+.sticky-mobile-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 900;
+    background: rgba(255, 255, 255, .96);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 -4px 20px rgba(0, 0, 0, .08);
+    padding: .75rem 1rem;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: .75rem;
+    transform: translateY(100%);
+    transition: transform .4s var(--ease-out);
+}
+
+.sticky-mobile-cta.visible {
+    transform: translateY(0);
+}
+
+.sticky-mobile-cta .btn {
+    flex: 1;
+    font-size: .88rem;
+    padding: .75rem 1rem;
+    max-width: 200px;
+}
+
+.sticky-mobile-cta .sticky-phone-link {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: .88rem;
+    color: var(--charcoal);
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+}
+
+@media (max-width: 768px) {
+    .sticky-mobile-cta {
+        display: flex;
+    }
+    /* Add bottom padding to body so sticky bar doesn't overlap footer */
+    body {
+        padding-bottom: 70px;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   URGENCY / BOOKING BANNER
+   ═══════════════════════════════════════════════════════ */
+.booking-banner {
+    background: linear-gradient(135deg, var(--forest-deep) 0%, var(--forest) 100%);
+    padding: 1.25rem 0;
+    text-align: center;
+}
+
+.booking-banner-inner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.booking-banner-text {
+    color: var(--white);
+    font-weight: 600;
+    font-size: .95rem;
+}
+
+.booking-banner-text span {
+    color: var(--sage-light);
+}
+
+.booking-banner .btn {
+    font-size: .82rem;
+    padding: .55rem 1.4rem;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SERVICE PAGE — Process Section
+   ═══════════════════════════════════════════════════════ */
+.svc-process {
+    padding: var(--section-pad);
+    background: var(--cream);
+}
+
+.svc-process-header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+.svc-process-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2rem;
+    counter-reset: step;
+}
+
+.svc-process-step {
+    text-align: center;
+    position: relative;
+}
+
+.svc-process-num {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--sage-light), var(--clover));
+    color: var(--white);
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+}
+
+.svc-process-step h3 {
+    font-size: 1.05rem;
+    margin-bottom: .5rem;
+}
+
+.svc-process-step p {
+    color: var(--gray-500);
+    font-size: .9rem;
+    line-height: 1.6;
+}
+
+/* Connecting line between steps */
+.svc-process-step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 28px;
+    left: calc(50% + 36px);
+    width: calc(100% - 72px);
+    height: 2px;
+    background: var(--gray-200);
+}
+
+@media (max-width: 768px) {
+    .svc-process-steps {
+        grid-template-columns: 1fr 1fr;
+        gap: 2rem 1.5rem;
+    }
+    .svc-process-step:not(:last-child)::after {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .svc-process-steps {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   TRUST BADGES ROW
+   ═══════════════════════════════════════════════════════ */
+.trust-badges {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    flex-wrap: wrap;
+    padding: 2rem 0;
+}
+
+.trust-badge-item {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: .88rem;
+    font-weight: 600;
+    color: var(--gray-600);
+}
+
+.trust-badge-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--gray-100);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+}
