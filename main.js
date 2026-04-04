@@ -141,15 +141,29 @@ mobileLinks.forEach(link => {
 // ============================================
 // SMOOTH SCROLL FOR ANCHOR LINKS
 // ============================================
-document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+// Handle both #hash and /#hash links (the latter is used in nav links)
+const isHomePage = window.location.pathname === '/' || window.location.pathname === '/index.html';
+
+document.querySelectorAll('a[href^="#"], a[href^="/#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         const href = this.getAttribute('href');
         if (href === '#' || !href) return;
-        const target = document.querySelector(href);
-        if (target) {
-            e.preventDefault();
-            const navH = navbar ? navbar.offsetHeight : 80;
-            lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
+
+        // Extract the hash part: "/#about" → "#about", "#about" → "#about"
+        const hash = href.startsWith('/#') ? href.slice(1) : href;
+
+        // Only smooth-scroll if we're already on the homepage
+        if (hash.startsWith('#') && isHomePage) {
+            const target = document.querySelector(hash);
+            if (target) {
+                e.preventDefault();
+                // Close mobile menu if open
+                if (mobileMenu && mobileMenu.classList.contains('open')) closeMenu();
+                const navH = navbar ? navbar.offsetHeight : 80;
+                lenis.scrollTo(target, { offset: -navH - 10, duration: 1.4 });
+                // Update URL without reloading
+                history.pushState(null, '', hash);
+            }
         }
     });
 });
