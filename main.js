@@ -648,6 +648,19 @@ const projectData = [
             '/images/landscapedesign/2.webp',
         ],
     },
+    {
+        title: 'Retaining Wall',
+        tag: 'Hardscaping',
+        cover: 0,
+        desc: 'Professionally built retaining walls that solve grade challenges and add lasting curb appeal. Engineered for strength and designed for beauty.',
+        images: [
+            '/images/retainingwall/1.webp',
+            '/images/retainingwall/2.webp',
+            '/images/retainingwall/3.webp',
+            '/images/retainingwall/4.webp',
+            '/images/retainingwall/5.webp',
+        ],
+    },
 ];
 
 // ============================================
@@ -741,22 +754,42 @@ const galleryPhotos = [
     { src: '/images/landscapedesign/3.webp', category: 'Landscaping', caption: 'Full landscape transformation' },
     { src: '/images/landscapedesign/1.webp', category: 'Landscaping', caption: 'Landscape design in progress' },
     { src: '/images/landscapedesign/2.webp', category: 'Landscaping', caption: 'Design & build result' },
+
+    // === Retaining Walls ===
+    { src: '/images/retainingwall/1.webp', category: 'Hardscaping', caption: 'Retaining wall build' },
+    { src: '/images/retainingwall/2.webp', category: 'Hardscaping', caption: 'Retaining wall in progress' },
+    { src: '/images/retainingwall/3.webp', category: 'Hardscaping', caption: 'Retaining wall foundation' },
+    { src: '/images/retainingwall/4.webp', category: 'Hardscaping', caption: 'Finished retaining wall' },
+    { src: '/images/retainingwall/5.webp', category: 'Hardscaping', caption: 'Retaining wall landscaping' },
 ];
 
 const galleryPageGrid = document.getElementById('gallery-page-grid');
+const galleryPagination = document.getElementById('gallery-pagination');
 
 let filteredGalleryPhotos = [...galleryPhotos];
+const PHOTOS_PER_PAGE = 8;
+let currentGalleryPage = 0;
+
+function getTotalPages() {
+    return Math.ceil(filteredGalleryPhotos.length / PHOTOS_PER_PAGE);
+}
+
+function getPagePhotos(page) {
+    const start = page * PHOTOS_PER_PAGE;
+    return filteredGalleryPhotos.slice(start, start + PHOTOS_PER_PAGE);
+}
 
 function buildGalleryPageGrid() {
     if (!galleryPageGrid) return;
     galleryPageGrid.innerHTML = '';
 
-    filteredGalleryPhotos = [...galleryPhotos];
+    const pagePhotos = getPagePhotos(currentGalleryPage);
 
-    filteredGalleryPhotos.forEach((photo, idx) => {
+    pagePhotos.forEach((photo, idx) => {
+        const globalIdx = currentGalleryPage * PHOTOS_PER_PAGE + idx;
         const item = document.createElement('div');
         item.className = 'gallery-photo-item';
-        item.dataset.idx = idx;
+        item.dataset.idx = globalIdx;
 
         item.innerHTML = `
             <img src="${photo.src}" alt="${photo.caption}" loading="lazy" />
@@ -767,6 +800,55 @@ function buildGalleryPageGrid() {
         `;
 
         galleryPageGrid.appendChild(item);
+    });
+
+    buildPagination();
+}
+
+function buildPagination() {
+    if (!galleryPagination) return;
+    const totalPages = getTotalPages();
+    if (totalPages <= 1) {
+        galleryPagination.innerHTML = '';
+        return;
+    }
+
+    let html = '';
+
+    // Prev button
+    html += `<button class="gp-btn gp-prev" ${currentGalleryPage === 0 ? 'disabled' : ''} data-page="${currentGalleryPage - 1}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+    </button>`;
+
+    // Page numbers
+    for (let i = 0; i < totalPages; i++) {
+        html += `<button class="gp-btn gp-num ${i === currentGalleryPage ? 'active' : ''}" data-page="${i}">${i + 1}</button>`;
+    }
+
+    // Next button
+    html += `<button class="gp-btn gp-next" ${currentGalleryPage === totalPages - 1 ? 'disabled' : ''} data-page="${currentGalleryPage + 1}">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </button>`;
+
+    // Page info
+    html += `<div class="gp-info">Page ${currentGalleryPage + 1} of ${totalPages}</div>`;
+
+    galleryPagination.innerHTML = html;
+
+    // Add click listeners
+    galleryPagination.querySelectorAll('.gp-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const page = parseInt(btn.dataset.page, 10);
+            if (isNaN(page) || page < 0 || page >= totalPages) return;
+            currentGalleryPage = page;
+            buildGalleryPageGrid();
+            // Scroll to top of gallery grid
+            const gridSection = document.querySelector('.gallery-page-grid-section');
+            if (gridSection) {
+                const navH = navbar ? navbar.offsetHeight : 80;
+                window.scrollTo({ top: gridSection.offsetTop - navH - 20, behavior: 'smooth' });
+            }
+        });
     });
 }
 
