@@ -872,7 +872,7 @@ textarea {
    GALLERY
    ============================================ */
 .gallery-section {
-    padding: var(--section-pad);
+    padding: 6rem 0 2rem;
     background: var(--white);
 }
 
@@ -5968,7 +5968,7 @@ body.promo-active .mobile-menu {
    GALLERY — Social Follow CTA
    ═══════════════════════════════════════════════════════ */
 .gallery-social-cta {
-    padding: 4rem 0;
+    padding: 2.5rem 0;
     background: var(--white);
 }
 
@@ -5978,28 +5978,68 @@ body.promo-active .mobile-menu {
     margin: 0 auto;
 }
 
-.gallery-social-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-}
-
 .gallery-social-inner h2 {
-    font-size: clamp(1.8rem, 3.5vw, 2.5rem);
-    margin-bottom: 1rem;
+    font-size: clamp(1.6rem, 3vw, 2.2rem);
+    margin-bottom: .75rem;
 }
 
 .gallery-social-inner p {
     color: var(--gray-500);
-    font-size: 1.05rem;
+    font-size: 1rem;
     line-height: 1.7;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
 }
 
-.gallery-social-links {
+.gallery-social-tiles {
     display: flex;
-    gap: 1rem;
+    gap: .75rem;
     justify-content: center;
     flex-wrap: wrap;
+}
+
+.gallery-social-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    background: var(--cream);
+    color: var(--charcoal);
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    transition: all var(--t-normal) var(--ease-out);
+    min-width: 100px;
+}
+
+.gallery-social-tile svg {
+    color: var(--clover);
+    transition: transform var(--t-fast);
+}
+
+.gallery-social-tile:hover {
+    border-color: var(--clover);
+    background: var(--white);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .08);
+}
+
+.gallery-social-tile:hover svg {
+    transform: scale(1.15);
+}
+
+@media (max-width: 480px) {
+    .gallery-social-tile {
+        padding: .75rem 1rem;
+        min-width: 80px;
+        font-size: .78rem;
+    }
+    .gallery-social-tile svg {
+        width: 20px;
+        height: 20px;
+    }
 }
 
 /* ═══════════════════════════════════════════════════════

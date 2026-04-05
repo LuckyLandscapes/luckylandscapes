@@ -648,19 +648,6 @@ const projectData = [
             '/images/landscapedesign/2.webp',
         ],
     },
-    {
-        title: 'Retaining Wall',
-        tag: 'Hardscaping',
-        cover: 0,
-        desc: 'Professionally built retaining walls that solve grade challenges and add lasting curb appeal. Engineered for strength and designed for beauty.',
-        images: [
-            '/images/retainingwall/1.webp',
-            '/images/retainingwall/2.webp',
-            '/images/retainingwall/3.webp',
-            '/images/retainingwall/4.webp',
-            '/images/retainingwall/5.webp',
-        ],
-    },
 ];
 
 // ============================================
