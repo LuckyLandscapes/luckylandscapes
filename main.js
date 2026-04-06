@@ -1737,28 +1737,140 @@ if (qzCategoryBtns.length > 0) {
         });
     }
 
-    // --- Address autocomplete (Nominatim) ---
+    // --- Address autocomplete (Nominatim) + Mini Map ---
     const addressInput = document.getElementById('q-address');
     const suggestionsEl = document.getElementById('address-suggestions');
+    const mapWrap = document.getElementById('address-map-wrap');
+    const mapEl = document.getElementById('address-minimap');
+    const mapLabel = document.getElementById('address-map-label');
+
     if (addressInput && suggestionsEl) {
         let debounceTimer = null;
         let focusedIdx = -1;
         let currentResults = [];
+        let miniMap = null;
+        let miniMapMarker = null;
+
+        // Custom green lucky clover pin SVG
+        const luckyPinSvg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
+            <defs>
+                <filter id="pinShadow" x="-20%" y="-10%" width="140%" height="130%">
+                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
+                </filter>
+            </defs>
+            <path d="M20 51 C20 51 3 31 3 18 A17 17 0 0 1 37 18 C37 31 20 51 20 51Z" fill="#4a7c34" filter="url(#pinShadow)"/>
+            <path d="M20 49 C20 49 5 30 5 18.5 A15 15 0 0 1 35 18.5 C35 30 20 49 20 49Z" fill="#6B8E4E"/>
+            <circle cx="20" cy="18" r="11" fill="rgba(255,255,255,0.2)"/>
+            <!-- Four-leaf clover -->
+            <g transform="translate(20,18)" fill="#fff">
+                <ellipse cx="0" cy="-4" rx="3.2" ry="4" opacity="0.95"/>
+                <ellipse cx="0" cy="4" rx="3.2" ry="4" opacity="0.95"/>
+                <ellipse cx="-4" cy="0" rx="4" ry="3.2" opacity="0.95"/>
+                <ellipse cx="4" cy="0" rx="4" ry="3.2" opacity="0.95"/>
+                <circle cx="0" cy="0" r="2" fill="#6B8E4E"/>
+            </g>
+        </svg>`;
+
+        const luckyPinIcon = typeof L !== 'undefined' ? L.icon({
+            iconUrl: 'data:image/svg+xml;base64,' + btoa(luckyPinSvg),
+            iconSize: [40, 52],
+            iconAnchor: [20, 52],
+            popupAnchor: [0, -52]
+        }) : null;
+
+        function initMiniMap(lat, lon) {
+            if (!mapEl || typeof L === 'undefined') return;
+
+            mapWrap.style.display = '';
+            // Trigger reflow for animation
+            requestAnimationFrame(() => {
+                mapWrap.classList.add('visible');
+            });
+
+            if (!miniMap) {
+                miniMap = L.map(mapEl, {
+                    zoomControl: false,
+                    attributionControl: false,
+                    dragging: false,
+                    scrollWheelZoom: false,
+                    doubleClickZoom: false,
+                    touchZoom: false,
+                    boxZoom: false,
+                    keyboard: false
+                }).setView([lat, lon], 16);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                }).addTo(miniMap);
+
+                // Subtle attribution
+                L.control.attribution({ prefix: false, position: 'bottomright' })
+                    .addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>')
+                    .addTo(miniMap);
+
+                miniMapMarker = L.marker([lat, lon], { icon: luckyPinIcon }).addTo(miniMap);
+            } else {
+                miniMap.setView([lat, lon], 16);
+                miniMapMarker.setLatLng([lat, lon]);
+            }
+
+            // Force map to recalculate size after reveal animation
+            setTimeout(() => {
+                miniMap.invalidateSize();
+            }, 350);
+        }
+
+        function hideMiniMap() {
+            if (mapWrap) {
+                mapWrap.classList.remove('visible');
+                setTimeout(() => {
+                    mapWrap.style.display = 'none';
+                }, 300);
+            }
+        }
+
+        function formatAddress(result) {
+            const addr = result.address || {};
+            const parts = [];
+            // Street
+            const house = addr.house_number || '';
+            const road = addr.road || '';
+            if (road) parts.push((house ? house + ' ' : '') + road);
+            // City
+            const city = addr.city || addr.town || addr.village || addr.hamlet || '';
+            if (city) parts.push(city);
+            // State abbreviated
+            const state = addr.state || '';
+            const zip = addr.postcode || '';
+            if (state || zip) parts.push((state ? state : '') + (zip ? ' ' + zip : ''));
+            return parts.join(', ') || result.display_name;
+        }
 
         function renderSuggestions(results) {
             currentResults = results;
             focusedIdx = -1;
             if (results.length === 0) {
                 suggestionsEl.classList.remove('visible');
-                suggestionsEl.innerHTML = '';
+                suggestionsEl.innerHTML = '<div class="addr-no-results"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> No addresses found — try a more specific search</div>';
+                suggestionsEl.classList.add('visible');
+                setTimeout(() => {
+                    suggestionsEl.classList.remove('visible');
+                }, 3000);
                 return;
             }
             suggestionsEl.innerHTML = results.map((r, i) => {
-                const parts = r.display_name.split(', ');
-                const main = parts.slice(0, 2).join(', ');
-                const sub = parts.slice(2).join(', ');
+                const addr = r.address || {};
+                const house = addr.house_number || '';
+                const road = addr.road || '';
+                const main = road ? (house ? house + ' ' : '') + road : r.display_name.split(',')[0];
+                const city = addr.city || addr.town || addr.village || '';
+                const state = addr.state || '';
+                const sub = [city, state].filter(Boolean).join(', ');
                 return `<div class="address-suggestion-item" data-idx="${i}">
-                    <span class="addr-icon">📍</span>
+                    <span class="addr-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    </span>
                     <div class="addr-text"><strong>${main}</strong><span>${sub}</span></div>
                 </div>`;
             }).join('');
@@ -1772,45 +1884,147 @@ if (qzCategoryBtns.length > 0) {
         }
 
         function selectAddress(result) {
-            addressInput.value = result.display_name;
+            const formatted = formatAddress(result);
+            addressInput.value = formatted;
             suggestionsEl.classList.remove('visible');
             suggestionsEl.innerHTML = '';
             currentResults = [];
+
+            // Show minimap
+            const lat = parseFloat(result.lat);
+            const lon = parseFloat(result.lon);
+            if (!isNaN(lat) && !isNaN(lon)) {
+                initMiniMap(lat, lon);
+                if (mapLabel) {
+                    mapLabel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${formatted}`;
+                }
+            }
+
+            // Pulse the input green briefly
+            addressInput.classList.add('addr-confirmed');
+            setTimeout(() => addressInput.classList.remove('addr-confirmed'), 1500);
         }
 
+        let currentAbort = null;
+
         async function searchAddress(query) {
-            if (query.length < 3) { suggestionsEl.classList.remove('visible'); return; }
-            suggestionsEl.innerHTML = '<div class="addr-loading">Searching...</div>';
+            if (query.length < 3) {
+                suggestionsEl.classList.remove('visible');
+                return;
+            }
+
+            // Abort any in-flight request
+            if (currentAbort) currentAbort.abort();
+            currentAbort = new AbortController();
+            const signal = currentAbort.signal;
+
+            suggestionsEl.innerHTML = '<div class="addr-loading"><span class="addr-loading-spinner"></span> Searching addresses...</div>';
             suggestionsEl.classList.add('visible');
+
             try {
-                const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
-                const res = await fetch(url, { headers: { 'Accept-Language': 'en-US,en' } });
-                const data = await res.json();
-                renderSuggestions(data);
-            } catch {
-                suggestionsEl.innerHTML = '<div class="addr-loading">Unable to search — type your full address</div>';
-                setTimeout(() => suggestionsEl.classList.remove('visible'), 2000);
+                // Fire two parallel searches: one biased to NE, one general
+                const neUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=7&countrycodes=us&viewbox=-104.1,43.0,-95.3,40.0&bounded=1&q=${encodeURIComponent(query)}`;
+                const usUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
+
+                const [neRes, usRes] = await Promise.allSettled([
+                    fetch(neUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
+                    fetch(usUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } })
+                ]);
+
+                if (signal.aborted) return;
+
+                let neData = [];
+                let usData = [];
+                if (neRes.status === 'fulfilled' && neRes.value.ok) {
+                    neData = await neRes.value.json();
+                }
+                if (usRes.status === 'fulfilled' && usRes.value.ok) {
+                    usData = await usRes.value.json();
+                }
+
+                if (signal.aborted) return;
+
+                // Merge & deduplicate: NE results first, then other US results
+                const seen = new Set();
+                const merged = [];
+
+                // Add Nebraska results first
+                for (const r of neData) {
+                    const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        r._fromNE = true;
+                        merged.push(r);
+                    }
+                }
+
+                // Add remaining US results
+                for (const r of usData) {
+                    const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        merged.push(r);
+                    }
+                }
+
+                // Sort: Nebraska results first, then by importance
+                merged.sort((a, b) => {
+                    const aIsNE = (a.address?.state || '').toLowerCase().includes('nebraska');
+                    const bIsNE = (b.address?.state || '').toLowerCase().includes('nebraska');
+                    if (aIsNE && !bIsNE) return -1;
+                    if (!aIsNE && bIsNE) return 1;
+                    return (parseFloat(b.importance) || 0) - (parseFloat(a.importance) || 0);
+                });
+
+                renderSuggestions(merged.slice(0, 6));
+            } catch (e) {
+                if (e.name === 'AbortError') return;
+                suggestionsEl.innerHTML = '<div class="addr-loading addr-error"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Unable to search — type your full address</div>';
+                setTimeout(() => suggestionsEl.classList.remove('visible'), 3000);
             }
         }
 
         addressInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
             const val = addressInput.value.trim();
-            if (val.length < 3) { suggestionsEl.classList.remove('visible'); return; }
-            debounceTimer = setTimeout(() => searchAddress(val), 350);
+            if (val.length < 3) {
+                suggestionsEl.classList.remove('visible');
+                if (currentAbort) currentAbort.abort();
+                return;
+            }
+            debounceTimer = setTimeout(() => searchAddress(val), 250);
         });
 
         addressInput.addEventListener('keydown', (e) => {
             const items = suggestionsEl.querySelectorAll('.address-suggestion-item');
             if (!items.length) return;
-            if (e.key === 'ArrowDown') { e.preventDefault(); focusedIdx = Math.min(focusedIdx + 1, items.length - 1); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIdx = Math.max(focusedIdx - 1, 0); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
-            else if (e.key === 'Enter' && focusedIdx >= 0) { e.preventDefault(); selectAddress(currentResults[focusedIdx]); }
-            else if (e.key === 'Escape') { suggestionsEl.classList.remove('visible'); }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
+                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
+                items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                focusedIdx = Math.max(focusedIdx - 1, 0);
+                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
+                items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
+            } else if (e.key === 'Enter' && focusedIdx >= 0) {
+                e.preventDefault();
+                selectAddress(currentResults[focusedIdx]);
+            } else if (e.key === 'Escape') {
+                suggestionsEl.classList.remove('visible');
+            }
         });
 
         addressInput.addEventListener('blur', () => {
             setTimeout(() => suggestionsEl.classList.remove('visible'), 200);
+        });
+
+        // Clear map if address is deleted
+        addressInput.addEventListener('input', () => {
+            if (addressInput.value.trim().length === 0) {
+                hideMiniMap();
+            }
         });
     }
 

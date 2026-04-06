@@ -28,10 +28,12 @@
     <meta name="twitter:image" content="https://luckylandscapes.com/images/og-card.png" />
 
     <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/images/favicons/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/images/favicons/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/images/favicons/favicon-16x16.png">
-    <link rel="manifest" href="/images/favicons/site.webmanifest">
+    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="MyWebSite" />
+    <link rel="manifest" href="/favicon/site.webmanifest" />
 
     <!-- Structured Data: Service -->
     <script type="application/ld+json">
@@ -54,6 +56,12 @@
       }
     }
     </script>
+
+    <!-- Leaflet Map (for address mini-map) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
     <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -1246,10 +1254,18 @@
                         <div class="form-group address-autocomplete-wrap">
                             <label for="q-address">Property Address <span
                                     class="label-optional">(optional)</span></label>
-                            <input type="text" id="q-address" name="address" placeholder="Start typing your address..."
-                                autocomplete="off" />
+                            <div class="address-input-row">
+                                <svg class="address-input-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                                <input type="text" id="q-address" name="address" placeholder="Start typing your Lincoln, NE address..."
+                                    autocomplete="off" />
+                            </div>
                             <div class="address-suggestions" id="address-suggestions"></div>
+                            <div class="address-map-wrap" id="address-map-wrap" style="display:none;">
+                                <div id="address-minimap" class="address-minimap"></div>
+                                <div class="address-map-label" id="address-map-label"></div>
+                            </div>
                         </div>
+
 
                         <div class="form-group">
                             <label for="q-notes">Anything else we should know? <span
