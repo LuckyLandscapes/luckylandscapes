@@ -14,48 +14,99 @@ const SEED_CUSTOMERS = [
 ];
 
 const SEED_QUOTES = [
-  { id: 'q1', quoteNumber: 1001, customerId: 'c1', status: 'accepted', category: 'Lawn Care', total: 1850, createdAt: '2025-10-01', items: [
-    { name: 'Weekly Mowing (Season)', quantity: 1, unit: 'season', unitPrice: 1200, total: 1200 },
-    { name: 'Seasonal Cleanup ×2', quantity: 2, unit: 'visit', unitPrice: 225, total: 450 },
-    { name: 'Hedge Trimming', quantity: 1, unit: 'visit', unitPrice: 200, total: 200 },
-  ]},
-  { id: 'q2', quoteNumber: 1002, customerId: 'c2', status: 'accepted', category: 'Hardscaping', total: 4200, createdAt: '2025-11-10', items: [
-    { name: 'Paver Patio (280 sqft)', quantity: 280, unit: 'sqft', unitPrice: 12, total: 3360 },
-    { name: 'Polymeric Sand', quantity: 1, unit: 'bag', unitPrice: 40, total: 40 },
-    { name: 'Base Material & Prep', quantity: 1, unit: 'lot', unitPrice: 800, total: 800 },
-  ]},
-  { id: 'q3', quoteNumber: 1003, customerId: 'c3', status: 'accepted', category: 'Garden & Beds', total: 780, createdAt: '2026-01-20', items: [
-    { name: 'Premium Black Mulch', quantity: 6, unit: 'cu yd', unitPrice: 85, total: 510 },
-    { name: 'Bed Edging', quantity: 45, unit: 'ft', unitPrice: 4, total: 180 },
-    { name: 'Weed Barrier Fabric', quantity: 1, unit: 'roll', unitPrice: 90, total: 90 },
-  ]},
-  { id: 'q4', quoteNumber: 1004, customerId: 'c4', status: 'sent', category: 'Landscape Design', total: 8500, createdAt: '2026-04-01', items: [
-    { name: 'Design Consultation & Plan', quantity: 1, unit: 'project', unitPrice: 500, total: 500 },
-    { name: 'Front Yard Landscaping', quantity: 1, unit: 'project', unitPrice: 3500, total: 3500 },
-    { name: 'Backyard Patio + Fire Pit', quantity: 1, unit: 'project', unitPrice: 4500, total: 4500 },
-  ]},
-  { id: 'q5', quoteNumber: 1005, customerId: 'c5', status: 'draft', category: 'Hardscaping', total: 3200, createdAt: '2026-04-10', items: [
-    { name: 'Retaining Wall (30 ft, 3 ft high)', quantity: 90, unit: 'face ft', unitPrice: 30, total: 2700 },
-    { name: 'Drainage System', quantity: 1, unit: 'lot', unitPrice: 500, total: 500 },
-  ]},
+  {
+    id: 'q1', quoteNumber: 1001, customerId: 'c1', status: 'accepted', category: 'Lawn Care', total: 1850, createdAt: '2025-10-01', items: [
+      { name: 'Weekly Mowing (Season)', quantity: 1, unit: 'season', unitPrice: 1200, total: 1200 },
+      { name: 'Seasonal Cleanup ×2', quantity: 2, unit: 'visit', unitPrice: 225, total: 450 },
+      { name: 'Hedge Trimming', quantity: 1, unit: 'visit', unitPrice: 200, total: 200 },
+    ]
+  },
+  {
+    id: 'q2', quoteNumber: 1002, customerId: 'c2', status: 'accepted', category: 'Hardscaping', total: 4200, createdAt: '2025-11-10', items: [
+      { name: 'Paver Patio (280 sqft)', quantity: 280, unit: 'sqft', unitPrice: 12, total: 3360 },
+      { name: 'Polymeric Sand', quantity: 1, unit: 'bag', unitPrice: 40, total: 40 },
+      { name: 'Base Material & Prep', quantity: 1, unit: 'lot', unitPrice: 800, total: 800 },
+    ]
+  },
+  {
+    id: 'q3', quoteNumber: 1003, customerId: 'c3', status: 'accepted', category: 'Garden & Beds', total: 780, createdAt: '2026-01-20', items: [
+      { name: 'Premium Black Mulch', quantity: 6, unit: 'cu yd', unitPrice: 85, total: 510 },
+      { name: 'Bed Edging', quantity: 45, unit: 'ft', unitPrice: 4, total: 180 },
+      { name: 'Weed Barrier Fabric', quantity: 1, unit: 'roll', unitPrice: 90, total: 90 },
+    ]
+  },
+  {
+    id: 'q4', quoteNumber: 1004, customerId: 'c4', status: 'sent', category: 'Landscape Design', total: 8500, createdAt: '2026-04-01', items: [
+      { name: 'Design Consultation & Plan', quantity: 1, unit: 'project', unitPrice: 500, total: 500 },
+      { name: 'Front Yard Landscaping', quantity: 1, unit: 'project', unitPrice: 3500, total: 3500 },
+      { name: 'Backyard Patio + Fire Pit', quantity: 1, unit: 'project', unitPrice: 4500, total: 4500 },
+    ]
+  },
+  {
+    id: 'q5', quoteNumber: 1005, customerId: 'c5', status: 'draft', category: 'Hardscaping', total: 3200, createdAt: '2026-04-10', items: [
+      { name: 'Retaining Wall (30 ft, 3 ft high)', quantity: 90, unit: 'face ft', unitPrice: 30, total: 2700 },
+      { name: 'Drainage System', quantity: 1, unit: 'lot', unitPrice: 500, total: 500 },
+    ]
+  },
 ];
 
 const SEED_MATERIALS = [
-  { id: 'm1', category: 'Mulch', name: 'Premium Black Mulch', description: 'Rich black dyed hardwood mulch. Most popular color choice.', unit: 'cu yd', costLow: 45, costHigh: 85, supplier: 'Midwest Mulch Supply', image: '🖤' },
-  { id: 'm2', category: 'Mulch', name: 'Brown Mulch', description: 'Natural brown hardwood mulch. Classic, warm tone.', unit: 'cu yd', costLow: 40, costHigh: 75, supplier: 'Midwest Mulch Supply', image: '🤎' },
-  { id: 'm3', category: 'Mulch', name: 'Red Cedar Mulch', description: 'Naturally aromatic cedar with rich red hue. Repels insects.', unit: 'cu yd', costLow: 55, costHigh: 95, supplier: 'Midwest Mulch Supply', image: '❤️' },
-  { id: 'm4', category: 'Mulch', name: 'Cypress Mulch', description: 'Premium cypress blend. Long-lasting, natural blonde color.', unit: 'cu yd', costLow: 60, costHigh: 100, supplier: 'Midwest Mulch Supply', image: '💛' },
-  { id: 'm5', category: 'Rock & Stone', name: 'River Rock (1-3")', description: 'Smooth, rounded river rock. Great for beds and drainage.', unit: 'ton', costLow: 120, costHigh: 280, supplier: 'Lincoln Landscape Supply', image: '🪨' },
-  { id: 'm6', category: 'Rock & Stone', name: 'Limestone Gravel', description: 'Crushed limestone, great base material or decorative use.', unit: 'ton', costLow: 65, costHigh: 140, supplier: 'Lincoln Landscape Supply', image: '⬜' },
-  { id: 'm7', category: 'Rock & Stone', name: 'Flagstone', description: 'Natural flagstone slabs for patios, walkways, and stepping stones.', unit: 'sqft', costLow: 4, costHigh: 12, supplier: 'Lincoln Landscape Supply', image: '🟫' },
-  { id: 'm8', category: 'Pavers', name: 'Concrete Pavers', description: 'Standard interlocking concrete pavers. Available in multiple colors.', unit: 'sqft', costLow: 3, costHigh: 8, supplier: 'Belgard / Pavestone', image: '🧱' },
-  { id: 'm9', category: 'Pavers', name: 'Brick Pavers', description: 'Classic clay brick pavers. Timeless look and extreme durability.', unit: 'sqft', costLow: 6, costHigh: 15, supplier: 'Pine Hall Brick', image: '🔴' },
-  { id: 'm10', category: 'Pavers', name: 'Natural Stone Pavers', description: 'Premium bluestone or travertine pavers. High-end finish.', unit: 'sqft', costLow: 10, costHigh: 25, supplier: 'Various', image: '💎' },
-  { id: 'm11', category: 'Edging', name: 'Vinyl Edging', description: 'Flexible vinyl landscape edging. Budget-friendly option.', unit: 'ft', costLow: 1, costHigh: 3, supplier: 'Various', image: '〰️' },
-  { id: 'm12', category: 'Edging', name: 'Steel Edging', description: 'Professional-grade steel edging. Clean lines, very durable.', unit: 'ft', costLow: 3, costHigh: 6, supplier: 'Col-Met', image: '➖' },
-  { id: 'm13', category: 'Edging', name: 'Aluminum Edging', description: 'Lightweight aluminum. Won\'t rust, easy to shape curves.', unit: 'ft', costLow: 3, costHigh: 7, supplier: 'Sure-Loc', image: '🔲' },
-  { id: 'm14', category: 'Retaining Wall', name: 'Versa-Lok Block', description: 'Engineered retaining wall block. Standard for structural walls.', unit: 'face ft', costLow: 18, costHigh: 35, supplier: 'Versa-Lok', image: '🧊' },
-  { id: 'm15', category: 'Retaining Wall', name: 'Natural Boulder', description: 'Large natural boulders for rustic retaining walls.', unit: 'ton', costLow: 200, costHigh: 500, supplier: 'Local Quarry', image: '🪨' },
+  // ========== MULCH (Outdoor Solutions) ==========
+  { id: 'm1', category: 'Mulch', name: 'Aromatic Cedar', description: 'Premium aromatic cedar mulch. Natural insect-repelling properties with a rich cedar scent.', unit: 'cu yd', costLow: 55, costHigh: 55, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-mulch.jpg' },
+  { id: 'm2', category: 'Mulch', name: 'Black Mulch', description: 'Rich black dyed hardwood mulch. Most popular color choice.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-mulch.jpg' },
+  { id: 'm3', category: 'Mulch', name: 'Brown Mulch', description: 'Natural brown hardwood mulch. Classic, warm tone.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/brown-mulch.jpg' },
+  { id: 'm4', category: 'Mulch', name: 'Coffee Mulch', description: 'Rich coffee-colored hardwood mulch. Deep, warm aesthetic.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/coffee-mulch.jpg' },
+  { id: 'm5', category: 'Mulch', name: 'Dark Hardwood', description: 'Natural dark hardwood mulch. Economical and long-lasting.', unit: 'cu yd', costLow: 37, costHigh: 37, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/hardwood-mulch.jpg' },
+  { id: 'm6', category: 'Mulch', name: 'Nursery Mulch', description: 'Budget-friendly nursery grade mulch. Great for large coverage areas.', unit: 'cu yd', costLow: 28, costHigh: 28, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/nursery-mulch.jpg' },
+
+  // ========== LANDSCAPE ROCK (Outdoor Solutions) ==========
+  { id: 'r1', category: 'Landscape Rock', name: 'Black Granite Chips', description: 'Sleek black granite chips. Modern, high-contrast look.', unit: 'ton', costLow: 0.102, costHigh: 204, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-granite-chips.jpg', unitAlt: 'lb' },
+  { id: 'r2', category: 'Landscape Rock', name: 'Black Lava Rock', description: 'Lightweight volcanic lava rock. Excellent drainage and insulation. Also available in $10 bags.', unit: 'ton', costLow: 0.15, costHigh: 300, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-lava-rock.jpg', unitAlt: 'lb' },
+  { id: 'r3', category: 'Landscape Rock', name: 'Black Obsidian', description: 'Dark glossy obsidian-style decorative rock.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-obsidian.jpg', unitAlt: 'lb' },
+  { id: 'r4', category: 'Landscape Rock', name: 'Cedar Creek 2"', description: 'Natural earth-toned creek rock, 2 inch size.', unit: 'ton', costLow: 0.06, costHigh: 120, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-creek.jpg', unitAlt: 'lb' },
+  { id: 'r5', category: 'Landscape Rock', name: 'Cherokee Red Large', description: 'Bold red decorative rock, large size.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-large.jpg', unitAlt: 'lb' },
+  { id: 'r6', category: 'Landscape Rock', name: 'Cherokee Red Small', description: 'Bold red decorative rock, small size.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-small.jpg', unitAlt: 'lb' },
+  { id: 'r7', category: 'Landscape Rock', name: 'Dakota Cobble 1½"x3"', description: 'Natural cobblestone, 1.5 to 3 inch size. Great for borders and beds.', unit: 'ton', costLow: 0.0875, costHigh: 175, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/dakota-cobble.jpg', unitAlt: 'lb' },
+  { id: 'r8', category: 'Landscape Rock', name: 'Indian Sunset', description: 'Warm sunset-toned decorative rock. Beautiful color blend.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/indian-sunset.jpg', unitAlt: 'lb' },
+  { id: 'r9', category: 'Landscape Rock', name: 'Mesa Grey 1-2"', description: 'Neutral grey decorative rock, 1-2 inch size. Clean, modern look.', unit: 'ton', costLow: 0.1075, costHigh: 215, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mesa-grey.jpg', unitAlt: 'lb' },
+  { id: 'r10', category: 'Landscape Rock', name: 'Mexican Beach Pebbles', description: 'Premium smooth black beach pebbles. High-end accent rock.', unit: 'ton', costLow: 0.33, costHigh: 660, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mexican-beach-pebbles.jpg', unitAlt: 'lb' },
+  { id: 'r11', category: 'Landscape Rock', name: 'Midnight Chips', description: 'Dark midnight-toned decorative chips.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/midnight-chips.jpg', unitAlt: 'lb' },
+  { id: 'r12', category: 'Landscape Rock', name: 'Mountain Granite', description: 'Natural mountain granite. Durable and versatile.', unit: 'ton', costLow: 0.09, costHigh: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mountain-granite.jpg', unitAlt: 'lb' },
+  { id: 'r13', category: 'Landscape Rock', name: 'Oak Creek 1"x2"', description: 'Warm-toned creek rock, 1-2 inch size.', unit: 'ton', costLow: 0.084, costHigh: 168, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/oak-creek.jpg', unitAlt: 'lb' },
+  { id: 'r14', category: 'Landscape Rock', name: 'Osage Buff', description: 'Warm buff-colored decorative rock. Natural, earthy feel.', unit: 'ton', costLow: 0.08, costHigh: 160, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/osage-buff.jpg', unitAlt: 'lb' },
+  { id: 'r15', category: 'Landscape Rock', name: 'Ozark Brown 1"', description: 'Rich brown Ozark rock, 1 inch size.', unit: 'ton', costLow: 0.081, costHigh: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown1.jpg', unitAlt: 'lb' },
+  { id: 'r16', category: 'Landscape Rock', name: 'Ozark Brown 2"', description: 'Rich brown Ozark rock, 2 inch size.', unit: 'ton', costLow: 0.09, costHigh: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown2.jpg', unitAlt: 'lb' },
+  { id: 'r17', category: 'Landscape Rock', name: 'Ozark River Chips', description: 'Natural river chip rock from the Ozarks.', unit: 'ton', costLow: 0.074, costHigh: 148, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-river-chips.jpg', unitAlt: 'lb' },
+  { id: 'r18', category: 'Landscape Rock', name: 'Pawnee Red', description: 'Red decorative landscape rock.', unit: 'ton', costLow: 0.09, costHigh: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/pawnee-red.jpg', unitAlt: 'lb', soldOut: true },
+  { id: 'r19', category: 'Landscape Rock', name: 'Rainbow Rock', description: 'Multi-colored decorative landscape rock.', unit: 'ton', costLow: 0.09, costHigh: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/rainbow-rock.jpg', unitAlt: 'lb', soldOut: true },
+  { id: 'r20', category: 'Landscape Rock', name: 'River Cobbles', description: 'Smooth rounded river cobbles. Classic natural look.', unit: 'ton', costLow: 0.059, costHigh: 118, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-cobbles.jpg', unitAlt: 'lb' },
+  { id: 'r21', category: 'Landscape Rock', name: 'River Pebbles', description: 'Small smooth river pebbles. Great for ground cover and accents.', unit: 'ton', costLow: 0.042, costHigh: 84, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-pebbles.jpg', unitAlt: 'lb' },
+  { id: 'r22', category: 'Landscape Rock', name: 'River Rock', description: 'Smooth, rounded river rock. Great for beds and drainage.', unit: 'ton', costLow: 0.055, costHigh: 110, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-rock.jpg', unitAlt: 'lb' },
+  { id: 'r23', category: 'Landscape Rock', name: 'Shawnee Creek 1"', description: 'Natural Shawnee creek rock, 1 inch size.', unit: 'ton', costLow: 0.081, costHigh: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/shawnee-creek.jpg', unitAlt: 'lb' },
+  { id: 'r24', category: 'Landscape Rock', name: 'Slate Chips', description: 'Flat slate chip rock. Premium decorative look.', unit: 'ton', costLow: 0.20, costHigh: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/slate-chips.jpg', unitAlt: 'lb' },
+  { id: 'r25', category: 'Landscape Rock', name: 'Western Sunset', description: 'Warm sunset-toned decorative rock with orange and red hues.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/western-sunset.jpg', unitAlt: 'lb' },
+  { id: 'r26', category: 'Landscape Rock', name: 'White Marble', description: 'Bright white marble decorative rock. Clean, bright look.', unit: 'ton', costLow: 0.20, costHigh: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/white-marble.jpg', unitAlt: 'lb' },
+
+  // ========== EDGING (Outdoor Solutions) ==========
+  { id: 'e1', category: 'Edging', name: 'Big Sky Saw Cut Edging', description: 'Premium saw-cut natural stone edging.', unit: 'ton', costLow: 0.26, costHigh: 520, supplier: 'Outdoor Solutions', image: '🪨', unitAlt: 'lb' },
+  { id: 'e2', category: 'Edging', name: 'Black Hills Natural Edging', description: 'Natural Black Hills stone edging. Rustic, organic look.', unit: 'ton', costLow: 0.1975, costHigh: 395, supplier: 'Outdoor Solutions', image: '⬛', unitAlt: 'lb' },
+  { id: 'e3', category: 'Edging', name: 'Colorado Red Edging', description: 'Bold Colorado red stone edging.', unit: 'ton', costLow: 0.1875, costHigh: 375, supplier: 'Outdoor Solutions', image: '🔴', unitAlt: 'lb' },
+  { id: 'e4', category: 'Edging', name: 'Cottonwood Tumbled Edging', description: 'Tumbled Cottonwood stone edging. Soft, natural finish.', unit: 'ton', costLow: 0.2975, costHigh: 595, supplier: 'Outdoor Solutions', image: '🟤', unitAlt: 'lb' },
+  { id: 'e5', category: 'Edging', name: 'EdgePro Prolip', description: 'Professional EdgePro Prolip landscape edging.', unit: 'each', costLow: 20, costHigh: 20, supplier: 'Outdoor Solutions', image: '➖' },
+  { id: 'e6', category: 'Edging', name: 'EdgePro ProLip 90° Corner', description: 'EdgePro ProLip 90-degree corner piece.', unit: 'each', costLow: 4, costHigh: 4, supplier: 'Outdoor Solutions', image: '📐' },
+  { id: 'e7', category: 'Edging', name: 'Foxglove Edging', description: 'Foxglove natural stone edging.', unit: 'ton', costLow: 0.1975, costHigh: 395, supplier: 'Outdoor Solutions', image: '🌸', unitAlt: 'lb' },
+  { id: 'e8', category: 'Edging', name: 'Steel Edging', description: 'Professional-grade steel edging. Clean lines, very durable.', unit: 'each', costLow: 30, costHigh: 30, supplier: 'Outdoor Solutions', image: '➖' },
+  { id: 'e9', category: 'Edging', name: 'White Marble Edging', description: 'Bright white marble stone edging. Premium, clean look.', unit: 'ton', costLow: 0.2725, costHigh: 545, supplier: 'Outdoor Solutions', image: '⬜', unitAlt: 'lb' },
+  { id: 'e10', category: 'Edging', name: 'Windsor Saw Cut Edging', description: 'Windsor saw-cut stone edging. Refined, uniform profile.', unit: 'ton', costLow: 0.235, costHigh: 470, supplier: 'Outdoor Solutions', image: '🪨', unitAlt: 'lb' },
+
+  // ========== PAVERS ==========
+  { id: 'p1', category: 'Pavers', name: 'Concrete Pavers', description: 'Standard interlocking concrete pavers. Available in multiple colors.', unit: 'sqft', costLow: 3, costHigh: 8, supplier: 'Outdoor Solutions', image: '🧱' },
+  { id: 'p2', category: 'Pavers', name: 'Brick Pavers', description: 'Classic clay brick pavers. Timeless look and extreme durability.', unit: 'sqft', costLow: 6, costHigh: 15, supplier: 'Outdoor Solutions', image: '🔴' },
+  { id: 'p3', category: 'Pavers', name: 'Natural Stone Pavers', description: 'Premium bluestone or travertine pavers. High-end finish.', unit: 'sqft', costLow: 10, costHigh: 25, supplier: 'Outdoor Solutions', image: '💎' },
+
+  // ========== RETAINING WALL ==========
+  { id: 'w1', category: 'Retaining Wall', name: 'Versa-Lok Block', description: 'Engineered retaining wall block. Standard for structural walls.', unit: 'face ft', costLow: 18, costHigh: 35, supplier: 'Outdoor Solutions', image: '🧊' },
+  { id: 'w2', category: 'Retaining Wall', name: 'Natural Boulder', description: 'Large natural boulders for rustic retaining walls.', unit: 'ton', costLow: 200, costHigh: 500, supplier: 'Outdoor Solutions', image: '🪨' },
 ];
 
 const SEED_SERVICES = [

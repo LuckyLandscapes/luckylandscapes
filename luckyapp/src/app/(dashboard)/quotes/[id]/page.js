@@ -3,6 +3,7 @@
 import { useData } from '@/lib/data';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Printer, Edit3, Trash2,
 } from 'lucide-react';
@@ -71,7 +72,7 @@ export default function QuoteDetailPage() {
               </button>
             </>
           )}
-          <button className="btn btn-secondary">
+          <button className="btn btn-secondary" onClick={async () => await generateQuotePdf(quote, customer)}>
             <Printer size={16} /> PDF
           </button>
         </div>

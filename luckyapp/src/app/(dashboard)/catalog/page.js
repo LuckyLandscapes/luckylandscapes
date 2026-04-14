@@ -76,8 +76,13 @@ export default function CatalogPage() {
               justifyContent: 'center',
               fontSize: '3rem',
               background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
+              overflow: 'hidden',
             }}>
-              {material.image}
+              {material.image?.startsWith('http') ? (
+                <img src={material.image} alt={material.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : (
+                material.image
+              )}
             </div>
             <div className="material-card-body">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
@@ -90,7 +95,15 @@ export default function CatalogPage() {
                 )}
               </div>
               <div className="material-card-price">
-                ${material.costLow}–${material.costHigh} / {material.unit}
+                {material.soldOut ? (
+                  <span style={{ color: '#ef4444', fontWeight: 700 }}>Sold Out</span>
+                ) : material.unitAlt ? (
+                  <>${material.costLow}/{material.unitAlt} — ${material.costHigh}/{material.unit}</>
+                ) : material.costLow === material.costHigh ? (
+                  <>${material.costLow} / {material.unit}</>
+                ) : (
+                  <>${material.costLow}–${material.costHigh} / {material.unit}</>
+                )}
               </div>
             </div>
           </div>
@@ -142,7 +155,15 @@ export default function CatalogPage() {
           {/* Material Display */}
           <div style={{ textAlign: 'center', maxWidth: '600px' }}>
             <div style={{ fontSize: '6rem', marginBottom: 'var(--space-xl)' }}>
-              {filtered[presentationIndex].image}
+              {filtered[presentationIndex].image?.startsWith('http') ? (
+                <img
+                  src={filtered[presentationIndex].image}
+                  alt={filtered[presentationIndex].name}
+                  style={{ width: '300px', height: '300px', objectFit: 'cover', borderRadius: 'var(--radius-lg)' }}
+                />
+              ) : (
+                filtered[presentationIndex].image
+              )}
             </div>
             <h2 style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>
               {filtered[presentationIndex].name}
@@ -159,9 +180,17 @@ export default function CatalogPage() {
               padding: 'var(--space-md) var(--space-xl)',
             }}>
               <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Price Range</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--lucky-green-light)' }}>
-                  ${filtered[presentationIndex].costLow}–${filtered[presentationIndex].costHigh}
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Price</div>
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: filtered[presentationIndex].soldOut ? '#ef4444' : 'var(--lucky-green-light)' }}>
+                  {filtered[presentationIndex].soldOut ? (
+                    'Sold Out'
+                  ) : filtered[presentationIndex].unitAlt ? (
+                    <>${filtered[presentationIndex].costLow}/{filtered[presentationIndex].unitAlt} — ${filtered[presentationIndex].costHigh}/{filtered[presentationIndex].unit}</>
+                  ) : filtered[presentationIndex].costLow === filtered[presentationIndex].costHigh ? (
+                    <>${filtered[presentationIndex].costLow}</>
+                  ) : (
+                    <>${filtered[presentationIndex].costLow}–${filtered[presentationIndex].costHigh}</>
+                  )}
                 </div>
               </div>
               <div>
