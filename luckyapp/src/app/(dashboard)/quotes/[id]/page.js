@@ -7,8 +7,9 @@ import Link from 'next/link';
 import { generateQuotePdf, generateQuotePdfBlob } from '@/lib/generateQuotePdf';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Printer, Edit3, Trash2, X, AlertTriangle,
-  Mail, Loader2, CheckCircle, AlertCircle, MessageSquare, Phone,
+  Mail, Loader2, CheckCircle, AlertCircle, MessageSquare, Phone, CalendarDays,
 } from 'lucide-react';
+import ScheduleJobModal from '@/components/ScheduleJobModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -26,6 +27,7 @@ export default function QuoteDetailPage() {
   const [sendPhone, setSendPhone] = useState('');
   const [sendMessage, setSendMessage] = useState('');
   const [toast, setToast] = useState(null);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
 
   const quote = getQuote(id);
   const customer = quote ? getCustomer(quote.customerId) : null;
@@ -225,6 +227,11 @@ export default function QuoteDetailPage() {
                 <XCircle size={16} /> Declined
               </button>
             </>
+          )}
+          {quote.status === 'accepted' && (
+            <button className="btn btn-primary" onClick={() => setShowScheduleModal(true)}>
+              <CalendarDays size={16} /> Schedule Job
+            </button>
           )}
           <button className="btn btn-secondary" onClick={async () => await generateQuotePdf(quote, customer)}>
             <Printer size={16} /> PDF
@@ -655,6 +662,15 @@ export default function QuoteDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Schedule Job Modal */}
+      {showScheduleModal && (
+        <ScheduleJobModal
+          quoteId={id}
+          onClose={() => setShowScheduleModal(false)}
+          onScheduled={() => {}}
+        />
       )}
 
       {/* Toast Notification */}

@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  CalendarDays,
   Palette,
   Ruler,
   Settings,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/quotes', label: 'Quotes', icon: FileText, badgeKey: 'draftQuotes' },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays, badgeKey: 'todayEvents' },
   { href: '/catalog', label: 'Material Catalog', icon: Palette },
   { href: '/measure', label: 'Measure', icon: Ruler },
   { label: 'System', type: 'section' },
@@ -31,11 +33,14 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
-  const { quotes } = useData();
+  const { quotes, calendarEvents, jobs } = useData();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
-  const badges = { draftQuotes: draftQuotes || null };
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayEvents = calendarEvents.filter(e => e.date === todayStr).length
+    + jobs.filter(j => j.scheduledDate === todayStr).length;
+  const badges = { draftQuotes: draftQuotes || null, todayEvents: todayEvents || null };
 
   const initials = user?.fullName
     ?.split(' ')

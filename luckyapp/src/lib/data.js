@@ -167,6 +167,44 @@ function mapServiceFromDb(row) {
   };
 }
 
+function mapJobFromDb(row) {
+  return {
+    id: row.id,
+    quoteId: row.quote_id,
+    customerId: row.customer_id,
+    title: row.title,
+    status: row.status,
+    description: row.description,
+    address: row.address,
+    scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time,
+    estimatedDuration: row.estimated_duration,
+    assignedTo: row.assigned_to || [],
+    crewNotes: row.crew_notes,
+    total: parseFloat(row.total) || 0,
+    createdAt: row.created_at?.split('T')[0] || '',
+  };
+}
+
+function mapCalendarEventFromDb(row) {
+  return {
+    id: row.id,
+    jobId: row.job_id,
+    quoteId: row.quote_id,
+    customerId: row.customer_id,
+    title: row.title,
+    type: row.type,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    allDay: row.all_day,
+    color: row.color,
+    notes: row.notes,
+    googleEventId: row.google_event_id,
+    createdAt: row.created_at?.split('T')[0] || '',
+  };
+}
+
 // ---------- Provider ----------
 export function DataProvider({ children }) {
   const { user } = useAuth();
@@ -178,6 +216,8 @@ export function DataProvider({ children }) {
   const [services, setServices] = useState([]);
   const [activity, setActivity] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+  const [jobs, setJobs] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   // ---------- Load data from Supabase ----------
@@ -191,13 +231,15 @@ export function DataProvider({ children }) {
 
     async function loadAll() {
       try {
-        const [custRes, quoteRes, actRes, matRes, svcRes, teamRes] = await Promise.all([
+        const [custRes, quoteRes, actRes, matRes, svcRes, teamRes, jobsRes, eventsRes] = await Promise.all([
           supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
           supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
           supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
           supabase.from('materials').select('*').eq('org_id', orgId).order('category').order('name'),
           supabase.from('services').select('*').eq('org_id', orgId).order('category').order('name'),
           supabase.from('team_members').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
+          supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
+          supabase.from('calendar_events').select('*').eq('org_id', orgId).order('date', { ascending: true }),
         ]);
 
         if (cancelled) return;
@@ -208,6 +250,8 @@ export function DataProvider({ children }) {
         setMaterials((matRes.data || []).map(mapMaterialFromDb));
         setServices((svcRes.data || []).map(mapServiceFromDb));
         setTeamMembers((teamRes.data || []).map(mapTeamMemberFromDb));
+        setJobs((jobsRes.data || []).map(mapJobFromDb));
+        setCalendarEvents((eventsRes.data || []).map(mapCalendarEventFromDb));
 
         // Seed default catalogs if empty (first-time setup)
         if ((matRes.data || []).length === 0) {
@@ -226,6 +270,94 @@ export function DataProvider({ children }) {
 
     loadAll();
     return () => { cancelled = true; };
+  }, [orgId]);
+
+  // ---------- Supabase Realtime Subscriptions ----------
+  useEffect(() => {
+    if (!orgId || !isSupabaseConnected()) return;
+
+    // Helper: only process changes for our org
+    const isOurs = (payload) => payload.new?.org_id === orgId || payload.old?.org_id === orgId;
+
+    const channel = supabase
+      .channel(`org-${orgId}-realtime`)
+      // --- Calendar Events ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'calendar_events' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCalendarEvents(prev => {
+          if (prev.some(e => e.id === payload.new.id)) return prev;
+          return [...prev, mapCalendarEventFromDb(payload.new)];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'calendar_events' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCalendarEvents(prev => prev.map(e => e.id === payload.new.id ? mapCalendarEventFromDb(payload.new) : e));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'calendar_events' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCalendarEvents(prev => prev.filter(e => e.id !== payload.old.id));
+      })
+      // --- Jobs ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'jobs' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setJobs(prev => {
+          if (prev.some(j => j.id === payload.new.id)) return prev;
+          return [...prev, mapJobFromDb(payload.new)];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'jobs' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setJobs(prev => prev.map(j => j.id === payload.new.id ? mapJobFromDb(payload.new) : j));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'jobs' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setJobs(prev => prev.filter(j => j.id !== payload.old.id));
+      })
+      // --- Customers ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'customers' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCustomers(prev => {
+          if (prev.some(c => c.id === payload.new.id)) return prev;
+          return [mapCustomerFromDb(payload.new), ...prev];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'customers' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCustomers(prev => prev.map(c => c.id === payload.new.id ? mapCustomerFromDb(payload.new) : c));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'customers' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setCustomers(prev => prev.filter(c => c.id !== payload.old.id));
+      })
+      // --- Quotes ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'quotes' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setQuotes(prev => {
+          if (prev.some(q => q.id === payload.new.id)) return prev;
+          return [mapQuoteFromDb(payload.new), ...prev];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'quotes' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setQuotes(prev => prev.map(q => q.id === payload.new.id ? mapQuoteFromDb(payload.new) : q));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'quotes' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setQuotes(prev => prev.filter(q => q.id !== payload.old.id));
+      })
+      // --- Activity ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setActivity(prev => {
+          if (prev.some(a => a.id === payload.new.id)) return prev;
+          return [mapActivityFromDb(payload.new), ...prev];
+        });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [orgId]);
 
   // ---------- Seed helpers ----------
@@ -390,18 +522,174 @@ export function DataProvider({ children }) {
     setActivity(prev => [mapped, ...prev]);
   }, [orgId]);
 
+  // ---------- Job CRUD ----------
+  const addJob = useCallback(async (job) => {
+    if (!orgId) return null;
+    const row = {
+      org_id: orgId,
+      quote_id: job.quoteId || null,
+      customer_id: job.customerId || null,
+      title: job.title,
+      status: job.status || 'scheduled',
+      description: job.description || '',
+      address: job.address || '',
+      scheduled_date: job.scheduledDate || null,
+      scheduled_time: job.scheduledTime || null,
+      estimated_duration: job.estimatedDuration || '4 hours',
+      assigned_to: job.assignedTo || [],
+      crew_notes: job.crewNotes || '',
+      total: job.total || 0,
+    };
+
+    const { data, error } = await supabase.from('jobs').insert(row).select().single();
+    if (error) { console.error('Error adding job:', error); return null; }
+
+    const mapped = mapJobFromDb(data);
+    setJobs(prev => [mapped, ...prev]);
+
+    await addActivity({
+      customerId: mapped.customerId,
+      type: 'job_scheduled',
+      title: `Job scheduled: ${mapped.title}`,
+      description: `Scheduled for ${mapped.scheduledDate}`,
+    });
+
+    return mapped;
+  }, [orgId]);
+
+  const updateJob = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.address !== undefined) dbUpdates.address = updates.address;
+    if (updates.scheduledDate !== undefined) dbUpdates.scheduled_date = updates.scheduledDate;
+    if (updates.scheduledTime !== undefined) dbUpdates.scheduled_time = updates.scheduledTime;
+    if (updates.estimatedDuration !== undefined) dbUpdates.estimated_duration = updates.estimatedDuration;
+    if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo;
+    if (updates.crewNotes !== undefined) dbUpdates.crew_notes = updates.crewNotes;
+    if (updates.total !== undefined) dbUpdates.total = updates.total;
+
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, ...updates } : j));
+    const { error } = await supabase.from('jobs').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating job:', error);
+  }, []);
+
+  const deleteJob = useCallback(async (id) => {
+    setJobs(prev => prev.filter(j => j.id !== id));
+    const { error } = await supabase.from('jobs').delete().eq('id', id);
+    if (error) console.error('Error deleting job:', error);
+  }, []);
+
+  // ---------- Calendar Event CRUD ----------
+  const addCalendarEvent = useCallback(async (event) => {
+    if (!orgId) return null;
+    const row = {
+      org_id: orgId,
+      job_id: event.jobId || null,
+      quote_id: event.quoteId || null,
+      customer_id: event.customerId || null,
+      title: event.title,
+      type: event.type || 'other',
+      date: event.date,
+      start_time: event.startTime || null,
+      end_time: event.endTime || null,
+      all_day: event.allDay || false,
+      color: event.color || '#3a9c4a',
+      notes: event.notes || '',
+    };
+
+    const { data, error } = await supabase.from('calendar_events').insert(row).select().single();
+    if (error) { console.error('Error adding calendar event:', error); return null; }
+
+    const mapped = mapCalendarEventFromDb(data);
+    setCalendarEvents(prev => [...prev, mapped]);
+    return mapped;
+  }, [orgId]);
+
+  const updateCalendarEvent = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.startTime !== undefined) dbUpdates.start_time = updates.startTime;
+    if (updates.endTime !== undefined) dbUpdates.end_time = updates.endTime;
+    if (updates.allDay !== undefined) dbUpdates.all_day = updates.allDay;
+    if (updates.color !== undefined) dbUpdates.color = updates.color;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.googleEventId !== undefined) dbUpdates.google_event_id = updates.googleEventId;
+
+    setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
+    const { error } = await supabase.from('calendar_events').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating calendar event:', error);
+  }, []);
+
+  const deleteCalendarEvent = useCallback(async (id) => {
+    setCalendarEvents(prev => prev.filter(e => e.id !== id));
+    const { error } = await supabase.from('calendar_events').delete().eq('id', id);
+    if (error) console.error('Error deleting calendar event:', error);
+  }, []);
+
+  // ---------- Quote → Job Conversion ----------
+  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledTime, crewNotes, assignedTo }) => {
+    const quote = quotes.find(q => q.id === quoteId);
+    if (!quote) return null;
+    const customer = customers.find(c => c.id === quote.customerId);
+
+    const jobTitle = `${quote.category || 'Job'} — ${customer ? `${customer.firstName} ${customer.lastName || ''}`.trim() : 'Unknown Customer'}`;
+
+    const job = await addJob({
+      quoteId,
+      customerId: quote.customerId,
+      title: jobTitle,
+      description: (quote.items || []).map(i => `${i.name} (${i.quantity} ${i.unit})`).join('\n'),
+      address: customer?.address ? `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim() : '',
+      scheduledDate,
+      scheduledTime: scheduledTime || '08:00',
+      estimatedDuration: '4 hours',
+      assignedTo: assignedTo || [],
+      crewNotes: crewNotes || '',
+      total: quote.total,
+    });
+
+    if (!job) return null;
+
+    // Create corresponding calendar event
+    await addCalendarEvent({
+      jobId: job.id,
+      quoteId,
+      customerId: quote.customerId,
+      title: jobTitle,
+      type: 'job',
+      date: scheduledDate,
+      startTime: scheduledTime || '08:00',
+      endTime: null,
+      color: '#3a9c4a',
+      notes: crewNotes || '',
+    });
+
+    return job;
+  }, [quotes, customers, addJob, addCalendarEvent]);
+
   // ---------- Helpers ----------
   const getCustomer = useCallback((id) => customers.find(c => c.id === id), [customers]);
   const getQuote = useCallback((id) => quotes.find(q => q.id === id), [quotes]);
+  const getJob = useCallback((id) => jobs.find(j => j.id === id), [jobs]);
   const getCustomerQuotes = useCallback((customerId) => quotes.filter(q => q.customerId === customerId), [quotes]);
   const getCustomerActivity = useCallback((customerId) => activity.filter(a => a.customerId === customerId), [activity]);
+  const getEventsByDate = useCallback((date) => calendarEvents.filter(e => e.date === date), [calendarEvents]);
+  const getJobsByDate = useCallback((date) => jobs.filter(j => j.scheduledDate === date), [jobs]);
 
   const value = {
-    customers, quotes, materials, services, activity, teamMembers, loaded,
+    customers, quotes, materials, services, activity, teamMembers, jobs, calendarEvents, loaded,
     addCustomer, updateCustomer, deleteCustomer,
     addQuote, updateQuote, deleteQuote,
+    addJob, updateJob, deleteJob,
+    addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
+    convertQuoteToJob,
     addActivity,
-    getCustomer, getQuote, getCustomerQuotes, getCustomerActivity,
+    getCustomer, getQuote, getJob, getCustomerQuotes, getCustomerActivity,
+    getEventsByDate, getJobsByDate,
     loadTeamMembers,
   };
 
