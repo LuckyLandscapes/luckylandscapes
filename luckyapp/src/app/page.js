@@ -2,19 +2,20 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 
 export default function Home() {
+  const { user, loading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user is logged in
-    const saved = localStorage.getItem('lucky_app_user');
-    if (saved) {
+    if (loading) return;
+    if (user) {
       router.replace('/dashboard');
     } else {
       router.replace('/login');
     }
-  }, [router]);
+  }, [user, loading, router]);
 
   return (
     <div style={{

@@ -1,11 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useData } from '@/lib/data';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Phone, Mail, MapPin, FileText, DollarSign,
-  Clock, CheckCircle2, Send, Plus,
+  Clock, CheckCircle2, Send, Plus, Edit3, Trash2, X, AlertTriangle, Save,
 } from 'lucide-react';
 
 function formatCurrency(amount) {
@@ -25,11 +26,55 @@ const activityIcons = {
 
 export default function CustomerDetailPage() {
   const { id } = useParams();
-  const { getCustomer, getCustomerQuotes, getCustomerActivity } = useData();
+  const router = useRouter();
+  const { getCustomer, getCustomerQuotes, getCustomerActivity, updateCustomer, deleteCustomer, deleteQuote } = useData();
 
   const customer = getCustomer(id);
   const customerQuotes = getCustomerQuotes(id);
   const customerActivity = getCustomerActivity(id);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [editForm, setEditForm] = useState({});
+
+  const openEditModal = () => {
+    setEditForm({
+      firstName: customer.firstName || '',
+      lastName: customer.lastName || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      zip: customer.zip || '',
+      notes: customer.notes || '',
+      tags: customer.tags || [],
+    });
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editForm.firstName) return;
+    await updateCustomer(id, editForm);
+    setShowEditModal(false);
+  };
+
+  const handleDelete = async () => {
+    // Also delete orphaned quotes for this customer
+    await Promise.all(customerQuotes.map(q => deleteQuote(q.id)));
+    await deleteCustomer(id);
+    router.push('/customers');
+  };
+
+  const handleTagToggle = (tag) => {
+    const tags = editForm.tags || [];
+    if (tags.includes(tag)) {
+      setEditForm({ ...editForm, tags: tags.filter(t => t !== tag) });
+    } else {
+      setEditForm({ ...editForm, tags: [...tags, tag] });
+    }
+  };
 
   if (!customer) {
     return (
@@ -78,6 +123,12 @@ export default function CustomerDetailPage() {
           </div>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={openEditModal}>
+            <Edit3 size={16} /> Edit
+          </button>
+          <button className="btn btn-danger" onClick={() => setShowDeleteModal(true)}>
+            <Trash2 size={16} /> Delete
+          </button>
           <Link href={`/quotes/new?customer=${id}`} className="btn btn-primary">
             <Plus size={18} /> New Quote
           </Link>
@@ -212,6 +263,125 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Customer Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Edit Customer</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowEditModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit}>
+              <div className="modal-body">
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">First Name <span className="required">*</span></label>
+                    <input className="form-input" placeholder="John" value={editForm.firstName} onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Last Name</label>
+                    <input className="form-input" placeholder="Doe" value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" type="email" placeholder="john@example.com" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone</label>
+                  <input className="form-input" type="tel" placeholder="(402) 555-1234" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address</label>
+                  <input className="form-input" placeholder="1234 Main St" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">City</label>
+                    <input className="form-input" value={editForm.city} onChange={(e) => setEditForm({ ...editForm, city: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">State</label>
+                    <input className="form-input" value={editForm.state} onChange={(e) => setEditForm({ ...editForm, state: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">ZIP</label>
+                    <input className="form-input" value={editForm.zip} onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })} />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Tags</label>
+                  <div style={{ display: 'flex', gap: 'var(--space-sm)', flexWrap: 'wrap' }}>
+                    {['lead', 'active', 'vip'].map(tag => (
+                      <button
+                        key={tag}
+                        type="button"
+                        className={`tag ${editForm.tags?.includes(tag) ? (tag === 'vip' ? 'tag-gold' : tag === 'active' ? 'tag-green' : 'tag-blue') : ''}`}
+                        style={{
+                          cursor: 'pointer',
+                          opacity: editForm.tags?.includes(tag) ? 1 : 0.4,
+                          border: '1px solid var(--border-primary)',
+                          padding: '4px 12px',
+                        }}
+                        onClick={() => handleTagToggle(tag)}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Notes</label>
+                  <textarea className="form-textarea" rows={3} placeholder="Any notes about this customer..." value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary">
+                  <Save size={16} /> Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Delete Customer</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowDeleteModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>This action cannot be undone</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <strong>{customer.firstName} {customer.lastName}</strong> and {customerQuotes.length > 0 ? (
+                      <span>their <strong>{customerQuotes.length} quote{customerQuotes.length !== 1 ? 's' : ''}</strong></span>
+                    ) : 'all associated data'} will be permanently deleted.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete}>
+                <Trash2 size={16} /> Delete Customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

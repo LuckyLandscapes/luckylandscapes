@@ -1,245 +1,394 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase, isSupabaseConnected } from './supabase';
+import { useAuth } from './auth';
 
 const DataContext = createContext(null);
 
-// ---------- Seed Data ----------
-const SEED_CUSTOMERS = [
-  { id: 'c1', firstName: 'Burdette', lastName: 'Schoen', email: 'burdette@email.com', phone: '(402) 555-0101', address: '1420 S 27th St', city: 'Lincoln', state: 'NE', zip: '68502', tags: ['active', 'vip'], notes: 'Repeat customer, great relationship. Overseeded fall 2025.', source: 'website', createdAt: '2025-09-15' },
-  { id: 'c2', firstName: 'Trent', lastName: 'Jenkins', email: 'trent.j@email.com', phone: '(402) 555-0202', address: '3305 Pioneers Blvd', city: 'Lincoln', state: 'NE', zip: '68506', tags: ['active'], notes: 'Hardscaping project completed.', source: 'referral', createdAt: '2025-11-03' },
-  { id: 'c3', firstName: 'Than', lastName: 'Aye', email: 'than.aye@email.com', phone: '(402) 555-0303', address: '840 N 56th St', city: 'Lincoln', state: 'NE', zip: '68504', tags: ['active'], notes: 'Mulch job completed, very satisfied.', source: 'website', createdAt: '2026-01-12' },
-  { id: 'c4', firstName: 'Sarah', lastName: 'Mitchell', email: 'sarah.m@email.com', phone: '(402) 555-0404', address: '2750 Old Cheney Rd', city: 'Lincoln', state: 'NE', zip: '68516', tags: ['lead'], notes: 'Interested in full landscape design for new build.', source: 'website', createdAt: '2026-03-28' },
-  { id: 'c5', firstName: 'James', lastName: 'Ortega', email: 'jortega@email.com', phone: '(402) 555-0505', address: '920 S Cotner Blvd', city: 'Lincoln', state: 'NE', zip: '68510', tags: ['lead'], notes: 'Needs retaining wall quote for backyard slope.', source: 'website', createdAt: '2026-04-05' },
+// ---------- Default catalogs (used when seeding a new org) ----------
+const DEFAULT_MATERIALS = [
+  // MULCH
+  { category: 'Mulch', name: 'Aromatic Cedar', description: 'Premium aromatic cedar mulch. Natural insect-repelling properties with a rich cedar scent.', unit: 'cu yd', cost_low: 55, cost_high: 55, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-mulch.jpg' },
+  { category: 'Mulch', name: 'Black Mulch', description: 'Rich black dyed hardwood mulch. Most popular color choice.', unit: 'cu yd', cost_low: 45, cost_high: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-mulch.jpg' },
+  { category: 'Mulch', name: 'Brown Mulch', description: 'Natural brown hardwood mulch. Classic, warm tone.', unit: 'cu yd', cost_low: 45, cost_high: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/brown-mulch.jpg' },
+  { category: 'Mulch', name: 'Coffee Mulch', description: 'Rich coffee-colored hardwood mulch. Deep, warm aesthetic.', unit: 'cu yd', cost_low: 45, cost_high: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/coffee-mulch.jpg' },
+  { category: 'Mulch', name: 'Dark Hardwood', description: 'Natural dark hardwood mulch. Economical and long-lasting.', unit: 'cu yd', cost_low: 37, cost_high: 37, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/hardwood-mulch.jpg' },
+  { category: 'Mulch', name: 'Nursery Mulch', description: 'Budget-friendly nursery grade mulch. Great for large coverage areas.', unit: 'cu yd', cost_low: 28, cost_high: 28, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/nursery-mulch.jpg' },
+  // LANDSCAPE ROCK
+  { category: 'Landscape Rock', name: 'Black Granite Chips', description: 'Sleek black granite chips. Modern, high-contrast look.', unit: 'ton', unit_alt: 'lb', cost_low: 0.102, cost_high: 204, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-granite-chips.jpg' },
+  { category: 'Landscape Rock', name: 'Black Lava Rock', description: 'Lightweight volcanic lava rock. Excellent drainage and insulation.', unit: 'ton', unit_alt: 'lb', cost_low: 0.15, cost_high: 300, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-lava-rock.jpg' },
+  { category: 'Landscape Rock', name: 'Black Obsidian', description: 'Dark glossy obsidian-style decorative rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-obsidian.jpg' },
+  { category: 'Landscape Rock', name: 'Cedar Creek 2"', description: 'Natural earth-toned creek rock, 2 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.06, cost_high: 120, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-creek.jpg' },
+  { category: 'Landscape Rock', name: 'Cherokee Red Large', description: 'Bold red decorative rock, large size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-large.jpg' },
+  { category: 'Landscape Rock', name: 'Cherokee Red Small', description: 'Bold red decorative rock, small size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-small.jpg' },
+  { category: 'Landscape Rock', name: 'Dakota Cobble 1½"x3"', description: 'Natural cobblestone, 1.5 to 3 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.0875, cost_high: 175, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/dakota-cobble.jpg' },
+  { category: 'Landscape Rock', name: 'Indian Sunset', description: 'Warm sunset-toned decorative rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/indian-sunset.jpg' },
+  { category: 'Landscape Rock', name: 'Mesa Grey 1-2"', description: 'Neutral grey decorative rock, 1-2 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.1075, cost_high: 215, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mesa-grey.jpg' },
+  { category: 'Landscape Rock', name: 'Mexican Beach Pebbles', description: 'Premium smooth black beach pebbles.', unit: 'ton', unit_alt: 'lb', cost_low: 0.33, cost_high: 660, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mexican-beach-pebbles.jpg' },
+  { category: 'Landscape Rock', name: 'Midnight Chips', description: 'Dark midnight-toned decorative chips.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/midnight-chips.jpg' },
+  { category: 'Landscape Rock', name: 'Mountain Granite', description: 'Natural mountain granite. Durable and versatile.', unit: 'ton', unit_alt: 'lb', cost_low: 0.09, cost_high: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mountain-granite.jpg' },
+  { category: 'Landscape Rock', name: 'Oak Creek 1"x2"', description: 'Warm-toned creek rock, 1-2 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.084, cost_high: 168, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/oak-creek.jpg' },
+  { category: 'Landscape Rock', name: 'Osage Buff', description: 'Warm buff-colored decorative rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.08, cost_high: 160, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/osage-buff.jpg' },
+  { category: 'Landscape Rock', name: 'Ozark Brown 1"', description: 'Rich brown Ozark rock, 1 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.081, cost_high: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown1.jpg' },
+  { category: 'Landscape Rock', name: 'Ozark Brown 2"', description: 'Rich brown Ozark rock, 2 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.09, cost_high: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown2.jpg' },
+  { category: 'Landscape Rock', name: 'Ozark River Chips', description: 'Natural river chip rock from the Ozarks.', unit: 'ton', unit_alt: 'lb', cost_low: 0.074, cost_high: 148, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-river-chips.jpg' },
+  { category: 'Landscape Rock', name: 'Pawnee Red', description: 'Red decorative landscape rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.09, cost_high: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/pawnee-red.jpg', sold_out: true },
+  { category: 'Landscape Rock', name: 'Rainbow Rock', description: 'Multi-colored decorative landscape rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.09, cost_high: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/rainbow-rock.jpg', sold_out: true },
+  { category: 'Landscape Rock', name: 'River Cobbles', description: 'Smooth rounded river cobbles.', unit: 'ton', unit_alt: 'lb', cost_low: 0.059, cost_high: 118, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-cobbles.jpg' },
+  { category: 'Landscape Rock', name: 'River Pebbles', description: 'Small smooth river pebbles.', unit: 'ton', unit_alt: 'lb', cost_low: 0.042, cost_high: 84, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-pebbles.jpg' },
+  { category: 'Landscape Rock', name: 'River Rock', description: 'Smooth, rounded river rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.055, cost_high: 110, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-rock.jpg' },
+  { category: 'Landscape Rock', name: 'Shawnee Creek 1"', description: 'Natural Shawnee creek rock, 1 inch size.', unit: 'ton', unit_alt: 'lb', cost_low: 0.081, cost_high: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/shawnee-creek.jpg' },
+  { category: 'Landscape Rock', name: 'Slate Chips', description: 'Flat slate chip rock. Premium decorative look.', unit: 'ton', unit_alt: 'lb', cost_low: 0.20, cost_high: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/slate-chips.jpg' },
+  { category: 'Landscape Rock', name: 'Western Sunset', description: 'Warm sunset-toned decorative rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.099, cost_high: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/western-sunset.jpg' },
+  { category: 'Landscape Rock', name: 'White Marble', description: 'Bright white marble decorative rock.', unit: 'ton', unit_alt: 'lb', cost_low: 0.20, cost_high: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/white-marble.jpg' },
+  // EDGING
+  { category: 'Edging', name: 'Big Sky Saw Cut Edging', description: 'Premium saw-cut natural stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.26, cost_high: 520, supplier: 'Outdoor Solutions', image: '🪨' },
+  { category: 'Edging', name: 'Black Hills Natural Edging', description: 'Natural Black Hills stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.1975, cost_high: 395, supplier: 'Outdoor Solutions', image: '⬛' },
+  { category: 'Edging', name: 'Colorado Red Edging', description: 'Bold Colorado red stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.1875, cost_high: 375, supplier: 'Outdoor Solutions', image: '🔴' },
+  { category: 'Edging', name: 'Cottonwood Tumbled Edging', description: 'Tumbled Cottonwood stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.2975, cost_high: 595, supplier: 'Outdoor Solutions', image: '🟤' },
+  { category: 'Edging', name: 'EdgePro Prolip', description: 'Professional EdgePro Prolip landscape edging.', unit: 'each', cost_low: 20, cost_high: 20, supplier: 'Outdoor Solutions', image: '➖' },
+  { category: 'Edging', name: 'EdgePro ProLip 90° Corner', description: 'EdgePro ProLip 90-degree corner piece.', unit: 'each', cost_low: 4, cost_high: 4, supplier: 'Outdoor Solutions', image: '📐' },
+  { category: 'Edging', name: 'Foxglove Edging', description: 'Foxglove natural stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.1975, cost_high: 395, supplier: 'Outdoor Solutions', image: '🌸' },
+  { category: 'Edging', name: 'Steel Edging', description: 'Professional-grade steel edging.', unit: 'each', cost_low: 30, cost_high: 30, supplier: 'Outdoor Solutions', image: '➖' },
+  { category: 'Edging', name: 'White Marble Edging', description: 'Bright white marble stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.2725, cost_high: 545, supplier: 'Outdoor Solutions', image: '⬜' },
+  { category: 'Edging', name: 'Windsor Saw Cut Edging', description: 'Windsor saw-cut stone edging.', unit: 'ton', unit_alt: 'lb', cost_low: 0.235, cost_high: 470, supplier: 'Outdoor Solutions', image: '🪨' },
+  // PAVERS
+  { category: 'Pavers', name: 'Concrete Pavers', description: 'Standard interlocking concrete pavers.', unit: 'sqft', cost_low: 3, cost_high: 8, supplier: 'Outdoor Solutions', image: '🧱' },
+  { category: 'Pavers', name: 'Brick Pavers', description: 'Classic clay brick pavers.', unit: 'sqft', cost_low: 6, cost_high: 15, supplier: 'Outdoor Solutions', image: '🔴' },
+  { category: 'Pavers', name: 'Natural Stone Pavers', description: 'Premium bluestone or travertine pavers.', unit: 'sqft', cost_low: 10, cost_high: 25, supplier: 'Outdoor Solutions', image: '💎' },
+  // RETAINING WALL
+  { category: 'Retaining Wall', name: 'Versa-Lok Block', description: 'Engineered retaining wall block.', unit: 'face ft', cost_low: 18, cost_high: 35, supplier: 'Outdoor Solutions', image: '🧊' },
+  { category: 'Retaining Wall', name: 'Natural Boulder', description: 'Large natural boulders for rustic retaining walls.', unit: 'ton', cost_low: 200, cost_high: 500, supplier: 'Outdoor Solutions', image: '🪨' },
 ];
 
-const SEED_QUOTES = [
-  {
-    id: 'q1', quoteNumber: 1001, customerId: 'c1', status: 'accepted', category: 'Lawn Care', total: 1850, createdAt: '2025-10-01', items: [
-      { name: 'Weekly Mowing (Season)', quantity: 1, unit: 'season', unitPrice: 1200, total: 1200 },
-      { name: 'Seasonal Cleanup ×2', quantity: 2, unit: 'visit', unitPrice: 225, total: 450 },
-      { name: 'Hedge Trimming', quantity: 1, unit: 'visit', unitPrice: 200, total: 200 },
-    ]
-  },
-  {
-    id: 'q2', quoteNumber: 1002, customerId: 'c2', status: 'accepted', category: 'Hardscaping', total: 4200, createdAt: '2025-11-10', items: [
-      { name: 'Paver Patio (280 sqft)', quantity: 280, unit: 'sqft', unitPrice: 12, total: 3360 },
-      { name: 'Polymeric Sand', quantity: 1, unit: 'bag', unitPrice: 40, total: 40 },
-      { name: 'Base Material & Prep', quantity: 1, unit: 'lot', unitPrice: 800, total: 800 },
-    ]
-  },
-  {
-    id: 'q3', quoteNumber: 1003, customerId: 'c3', status: 'accepted', category: 'Garden & Beds', total: 780, createdAt: '2026-01-20', items: [
-      { name: 'Premium Black Mulch', quantity: 6, unit: 'cu yd', unitPrice: 85, total: 510 },
-      { name: 'Bed Edging', quantity: 45, unit: 'ft', unitPrice: 4, total: 180 },
-      { name: 'Weed Barrier Fabric', quantity: 1, unit: 'roll', unitPrice: 90, total: 90 },
-    ]
-  },
-  {
-    id: 'q4', quoteNumber: 1004, customerId: 'c4', status: 'sent', category: 'Landscape Design', total: 8500, createdAt: '2026-04-01', items: [
-      { name: 'Design Consultation & Plan', quantity: 1, unit: 'project', unitPrice: 500, total: 500 },
-      { name: 'Front Yard Landscaping', quantity: 1, unit: 'project', unitPrice: 3500, total: 3500 },
-      { name: 'Backyard Patio + Fire Pit', quantity: 1, unit: 'project', unitPrice: 4500, total: 4500 },
-    ]
-  },
-  {
-    id: 'q5', quoteNumber: 1005, customerId: 'c5', status: 'draft', category: 'Hardscaping', total: 3200, createdAt: '2026-04-10', items: [
-      { name: 'Retaining Wall (30 ft, 3 ft high)', quantity: 90, unit: 'face ft', unitPrice: 30, total: 2700 },
-      { name: 'Drainage System', quantity: 1, unit: 'lot', unitPrice: 500, total: 500 },
-    ]
-  },
+const DEFAULT_SERVICES = [
+  { category: 'Lawn Care', name: 'Weekly Mowing', unit: 'visit', default_price: 45 },
+  { category: 'Lawn Care', name: 'Bi-Weekly Mowing', unit: 'visit', default_price: 55 },
+  { category: 'Lawn Care', name: 'Seasonal Cleanup', unit: 'visit', default_price: 225 },
+  { category: 'Lawn Care', name: 'One-Time Leaf Removal', unit: 'visit', default_price: 175 },
+  { category: 'Lawn Care', name: 'Hedge/Shrub Trimming', unit: 'visit', default_price: 200 },
+  { category: 'Garden & Beds', name: 'Mulch (installed)', unit: 'cu yd', default_price: 85 },
+  { category: 'Garden & Beds', name: 'Rock/Stone (installed)', unit: 'ton', default_price: 280 },
+  { category: 'Garden & Beds', name: 'Bed Edging', unit: 'ft', default_price: 4 },
+  { category: 'Garden & Beds', name: 'Plant Installation', unit: 'each', default_price: 45 },
+  { category: 'Hardscaping', name: 'Concrete Pavers', unit: 'sqft', default_price: 12 },
+  { category: 'Hardscaping', name: 'Natural Stone Pavers', unit: 'sqft', default_price: 22 },
+  { category: 'Hardscaping', name: 'Retaining Wall', unit: 'face ft', default_price: 30 },
+  { category: 'Hardscaping', name: 'Fire Pit', unit: 'project', default_price: 2500 },
+  { category: 'Cleanup', name: 'Full Yard Cleanup', unit: 'project', default_price: 350 },
+  { category: 'Cleanup', name: 'Junk Removal', unit: 'load', default_price: 250 },
+  { category: 'Design', name: 'Design Consultation', unit: 'project', default_price: 500 },
+  { category: 'Design', name: 'Full Landscape Design & Build', unit: 'project', default_price: 5000 },
 ];
 
-const SEED_MATERIALS = [
-  // ========== MULCH (Outdoor Solutions) ==========
-  { id: 'm1', category: 'Mulch', name: 'Aromatic Cedar', description: 'Premium aromatic cedar mulch. Natural insect-repelling properties with a rich cedar scent.', unit: 'cu yd', costLow: 55, costHigh: 55, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-mulch.jpg' },
-  { id: 'm2', category: 'Mulch', name: 'Black Mulch', description: 'Rich black dyed hardwood mulch. Most popular color choice.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-mulch.jpg' },
-  { id: 'm3', category: 'Mulch', name: 'Brown Mulch', description: 'Natural brown hardwood mulch. Classic, warm tone.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/brown-mulch.jpg' },
-  { id: 'm4', category: 'Mulch', name: 'Coffee Mulch', description: 'Rich coffee-colored hardwood mulch. Deep, warm aesthetic.', unit: 'cu yd', costLow: 45, costHigh: 45, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/coffee-mulch.jpg' },
-  { id: 'm5', category: 'Mulch', name: 'Dark Hardwood', description: 'Natural dark hardwood mulch. Economical and long-lasting.', unit: 'cu yd', costLow: 37, costHigh: 37, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/hardwood-mulch.jpg' },
-  { id: 'm6', category: 'Mulch', name: 'Nursery Mulch', description: 'Budget-friendly nursery grade mulch. Great for large coverage areas.', unit: 'cu yd', costLow: 28, costHigh: 28, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/nursery-mulch.jpg' },
-
-  // ========== LANDSCAPE ROCK (Outdoor Solutions) ==========
-  { id: 'r1', category: 'Landscape Rock', name: 'Black Granite Chips', description: 'Sleek black granite chips. Modern, high-contrast look.', unit: 'ton', costLow: 0.102, costHigh: 204, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-granite-chips.jpg', unitAlt: 'lb' },
-  { id: 'r2', category: 'Landscape Rock', name: 'Black Lava Rock', description: 'Lightweight volcanic lava rock. Excellent drainage and insulation. Also available in $10 bags.', unit: 'ton', costLow: 0.15, costHigh: 300, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-lava-rock.jpg', unitAlt: 'lb' },
-  { id: 'r3', category: 'Landscape Rock', name: 'Black Obsidian', description: 'Dark glossy obsidian-style decorative rock.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/black-obsidian.jpg', unitAlt: 'lb' },
-  { id: 'r4', category: 'Landscape Rock', name: 'Cedar Creek 2"', description: 'Natural earth-toned creek rock, 2 inch size.', unit: 'ton', costLow: 0.06, costHigh: 120, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cedar-creek.jpg', unitAlt: 'lb' },
-  { id: 'r5', category: 'Landscape Rock', name: 'Cherokee Red Large', description: 'Bold red decorative rock, large size.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-large.jpg', unitAlt: 'lb' },
-  { id: 'r6', category: 'Landscape Rock', name: 'Cherokee Red Small', description: 'Bold red decorative rock, small size.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/cherokee-red-small.jpg', unitAlt: 'lb' },
-  { id: 'r7', category: 'Landscape Rock', name: 'Dakota Cobble 1½"x3"', description: 'Natural cobblestone, 1.5 to 3 inch size. Great for borders and beds.', unit: 'ton', costLow: 0.0875, costHigh: 175, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/dakota-cobble.jpg', unitAlt: 'lb' },
-  { id: 'r8', category: 'Landscape Rock', name: 'Indian Sunset', description: 'Warm sunset-toned decorative rock. Beautiful color blend.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/indian-sunset.jpg', unitAlt: 'lb' },
-  { id: 'r9', category: 'Landscape Rock', name: 'Mesa Grey 1-2"', description: 'Neutral grey decorative rock, 1-2 inch size. Clean, modern look.', unit: 'ton', costLow: 0.1075, costHigh: 215, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mesa-grey.jpg', unitAlt: 'lb' },
-  { id: 'r10', category: 'Landscape Rock', name: 'Mexican Beach Pebbles', description: 'Premium smooth black beach pebbles. High-end accent rock.', unit: 'ton', costLow: 0.33, costHigh: 660, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mexican-beach-pebbles.jpg', unitAlt: 'lb' },
-  { id: 'r11', category: 'Landscape Rock', name: 'Midnight Chips', description: 'Dark midnight-toned decorative chips.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/midnight-chips.jpg', unitAlt: 'lb' },
-  { id: 'r12', category: 'Landscape Rock', name: 'Mountain Granite', description: 'Natural mountain granite. Durable and versatile.', unit: 'ton', costLow: 0.09, costHigh: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/mountain-granite.jpg', unitAlt: 'lb' },
-  { id: 'r13', category: 'Landscape Rock', name: 'Oak Creek 1"x2"', description: 'Warm-toned creek rock, 1-2 inch size.', unit: 'ton', costLow: 0.084, costHigh: 168, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/oak-creek.jpg', unitAlt: 'lb' },
-  { id: 'r14', category: 'Landscape Rock', name: 'Osage Buff', description: 'Warm buff-colored decorative rock. Natural, earthy feel.', unit: 'ton', costLow: 0.08, costHigh: 160, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/osage-buff.jpg', unitAlt: 'lb' },
-  { id: 'r15', category: 'Landscape Rock', name: 'Ozark Brown 1"', description: 'Rich brown Ozark rock, 1 inch size.', unit: 'ton', costLow: 0.081, costHigh: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown1.jpg', unitAlt: 'lb' },
-  { id: 'r16', category: 'Landscape Rock', name: 'Ozark Brown 2"', description: 'Rich brown Ozark rock, 2 inch size.', unit: 'ton', costLow: 0.09, costHigh: 180, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-brown2.jpg', unitAlt: 'lb' },
-  { id: 'r17', category: 'Landscape Rock', name: 'Ozark River Chips', description: 'Natural river chip rock from the Ozarks.', unit: 'ton', costLow: 0.074, costHigh: 148, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/ozark-river-chips.jpg', unitAlt: 'lb' },
-  { id: 'r18', category: 'Landscape Rock', name: 'Pawnee Red', description: 'Red decorative landscape rock.', unit: 'ton', costLow: 0.09, costHigh: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/pawnee-red.jpg', unitAlt: 'lb', soldOut: true },
-  { id: 'r19', category: 'Landscape Rock', name: 'Rainbow Rock', description: 'Multi-colored decorative landscape rock.', unit: 'ton', costLow: 0.09, costHigh: 0, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/rainbow-rock.jpg', unitAlt: 'lb', soldOut: true },
-  { id: 'r20', category: 'Landscape Rock', name: 'River Cobbles', description: 'Smooth rounded river cobbles. Classic natural look.', unit: 'ton', costLow: 0.059, costHigh: 118, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-cobbles.jpg', unitAlt: 'lb' },
-  { id: 'r21', category: 'Landscape Rock', name: 'River Pebbles', description: 'Small smooth river pebbles. Great for ground cover and accents.', unit: 'ton', costLow: 0.042, costHigh: 84, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-pebbles.jpg', unitAlt: 'lb' },
-  { id: 'r22', category: 'Landscape Rock', name: 'River Rock', description: 'Smooth, rounded river rock. Great for beds and drainage.', unit: 'ton', costLow: 0.055, costHigh: 110, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/river-rock.jpg', unitAlt: 'lb' },
-  { id: 'r23', category: 'Landscape Rock', name: 'Shawnee Creek 1"', description: 'Natural Shawnee creek rock, 1 inch size.', unit: 'ton', costLow: 0.081, costHigh: 162, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/shawnee-creek.jpg', unitAlt: 'lb' },
-  { id: 'r24', category: 'Landscape Rock', name: 'Slate Chips', description: 'Flat slate chip rock. Premium decorative look.', unit: 'ton', costLow: 0.20, costHigh: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/slate-chips.jpg', unitAlt: 'lb' },
-  { id: 'r25', category: 'Landscape Rock', name: 'Western Sunset', description: 'Warm sunset-toned decorative rock with orange and red hues.', unit: 'ton', costLow: 0.099, costHigh: 198, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/western-sunset.jpg', unitAlt: 'lb' },
-  { id: 'r26', category: 'Landscape Rock', name: 'White Marble', description: 'Bright white marble decorative rock. Clean, bright look.', unit: 'ton', costLow: 0.20, costHigh: 400, supplier: 'Outdoor Solutions', image: 'https://sedomwhfewxnngpzmkay.supabase.co/storage/v1/object/public/Materials/white-marble.jpg', unitAlt: 'lb' },
-
-  // ========== EDGING (Outdoor Solutions) ==========
-  { id: 'e1', category: 'Edging', name: 'Big Sky Saw Cut Edging', description: 'Premium saw-cut natural stone edging.', unit: 'ton', costLow: 0.26, costHigh: 520, supplier: 'Outdoor Solutions', image: '🪨', unitAlt: 'lb' },
-  { id: 'e2', category: 'Edging', name: 'Black Hills Natural Edging', description: 'Natural Black Hills stone edging. Rustic, organic look.', unit: 'ton', costLow: 0.1975, costHigh: 395, supplier: 'Outdoor Solutions', image: '⬛', unitAlt: 'lb' },
-  { id: 'e3', category: 'Edging', name: 'Colorado Red Edging', description: 'Bold Colorado red stone edging.', unit: 'ton', costLow: 0.1875, costHigh: 375, supplier: 'Outdoor Solutions', image: '🔴', unitAlt: 'lb' },
-  { id: 'e4', category: 'Edging', name: 'Cottonwood Tumbled Edging', description: 'Tumbled Cottonwood stone edging. Soft, natural finish.', unit: 'ton', costLow: 0.2975, costHigh: 595, supplier: 'Outdoor Solutions', image: '🟤', unitAlt: 'lb' },
-  { id: 'e5', category: 'Edging', name: 'EdgePro Prolip', description: 'Professional EdgePro Prolip landscape edging.', unit: 'each', costLow: 20, costHigh: 20, supplier: 'Outdoor Solutions', image: '➖' },
-  { id: 'e6', category: 'Edging', name: 'EdgePro ProLip 90° Corner', description: 'EdgePro ProLip 90-degree corner piece.', unit: 'each', costLow: 4, costHigh: 4, supplier: 'Outdoor Solutions', image: '📐' },
-  { id: 'e7', category: 'Edging', name: 'Foxglove Edging', description: 'Foxglove natural stone edging.', unit: 'ton', costLow: 0.1975, costHigh: 395, supplier: 'Outdoor Solutions', image: '🌸', unitAlt: 'lb' },
-  { id: 'e8', category: 'Edging', name: 'Steel Edging', description: 'Professional-grade steel edging. Clean lines, very durable.', unit: 'each', costLow: 30, costHigh: 30, supplier: 'Outdoor Solutions', image: '➖' },
-  { id: 'e9', category: 'Edging', name: 'White Marble Edging', description: 'Bright white marble stone edging. Premium, clean look.', unit: 'ton', costLow: 0.2725, costHigh: 545, supplier: 'Outdoor Solutions', image: '⬜', unitAlt: 'lb' },
-  { id: 'e10', category: 'Edging', name: 'Windsor Saw Cut Edging', description: 'Windsor saw-cut stone edging. Refined, uniform profile.', unit: 'ton', costLow: 0.235, costHigh: 470, supplier: 'Outdoor Solutions', image: '🪨', unitAlt: 'lb' },
-
-  // ========== PAVERS ==========
-  { id: 'p1', category: 'Pavers', name: 'Concrete Pavers', description: 'Standard interlocking concrete pavers. Available in multiple colors.', unit: 'sqft', costLow: 3, costHigh: 8, supplier: 'Outdoor Solutions', image: '🧱' },
-  { id: 'p2', category: 'Pavers', name: 'Brick Pavers', description: 'Classic clay brick pavers. Timeless look and extreme durability.', unit: 'sqft', costLow: 6, costHigh: 15, supplier: 'Outdoor Solutions', image: '🔴' },
-  { id: 'p3', category: 'Pavers', name: 'Natural Stone Pavers', description: 'Premium bluestone or travertine pavers. High-end finish.', unit: 'sqft', costLow: 10, costHigh: 25, supplier: 'Outdoor Solutions', image: '💎' },
-
-  // ========== RETAINING WALL ==========
-  { id: 'w1', category: 'Retaining Wall', name: 'Versa-Lok Block', description: 'Engineered retaining wall block. Standard for structural walls.', unit: 'face ft', costLow: 18, costHigh: 35, supplier: 'Outdoor Solutions', image: '🧊' },
-  { id: 'w2', category: 'Retaining Wall', name: 'Natural Boulder', description: 'Large natural boulders for rustic retaining walls.', unit: 'ton', costLow: 200, costHigh: 500, supplier: 'Outdoor Solutions', image: '🪨' },
-];
-
-const SEED_SERVICES = [
-  { id: 's1', category: 'Lawn Care', name: 'Weekly Mowing', unit: 'visit', defaultPrice: 45 },
-  { id: 's2', category: 'Lawn Care', name: 'Bi-Weekly Mowing', unit: 'visit', defaultPrice: 55 },
-  { id: 's3', category: 'Lawn Care', name: 'Seasonal Cleanup', unit: 'visit', defaultPrice: 225 },
-  { id: 's4', category: 'Lawn Care', name: 'One-Time Leaf Removal', unit: 'visit', defaultPrice: 175 },
-  { id: 's5', category: 'Lawn Care', name: 'Hedge/Shrub Trimming', unit: 'visit', defaultPrice: 200 },
-  { id: 's6', category: 'Garden & Beds', name: 'Mulch (installed)', unit: 'cu yd', defaultPrice: 85 },
-  { id: 's7', category: 'Garden & Beds', name: 'Rock/Stone (installed)', unit: 'ton', defaultPrice: 280 },
-  { id: 's8', category: 'Garden & Beds', name: 'Bed Edging', unit: 'ft', defaultPrice: 4 },
-  { id: 's9', category: 'Garden & Beds', name: 'Plant Installation', unit: 'each', defaultPrice: 45 },
-  { id: 's10', category: 'Hardscaping', name: 'Concrete Pavers', unit: 'sqft', defaultPrice: 12 },
-  { id: 's11', category: 'Hardscaping', name: 'Natural Stone Pavers', unit: 'sqft', defaultPrice: 22 },
-  { id: 's12', category: 'Hardscaping', name: 'Retaining Wall', unit: 'face ft', defaultPrice: 30 },
-  { id: 's13', category: 'Hardscaping', name: 'Fire Pit', unit: 'project', defaultPrice: 2500 },
-  { id: 's14', category: 'Cleanup', name: 'Full Yard Cleanup', unit: 'project', defaultPrice: 350 },
-  { id: 's15', category: 'Cleanup', name: 'Junk Removal', unit: 'load', defaultPrice: 250 },
-  { id: 's16', category: 'Design', name: 'Design Consultation', unit: 'project', defaultPrice: 500 },
-  { id: 's17', category: 'Design', name: 'Full Landscape Design & Build', unit: 'project', defaultPrice: 5000 },
-];
-
-const SEED_ACTIVITY = [
-  { id: 'a1', customerId: 'c5', quoteId: 'q5', type: 'quote_created', title: 'Quote #1005 created', description: 'Retaining wall — $3,200 draft', createdAt: '2026-04-10T14:30:00' },
-  { id: 'a2', customerId: 'c4', quoteId: 'q4', type: 'quote_sent', title: 'Quote #1004 sent to Sarah Mitchell', description: 'Landscape Design — $8,500', createdAt: '2026-04-02T09:15:00' },
-  { id: 'a3', customerId: 'c3', quoteId: 'q3', type: 'quote_accepted', title: 'Quote #1003 accepted', description: 'Than Aye — Garden & Beds — $780', createdAt: '2026-01-22T16:45:00' },
-  { id: 'a4', customerId: 'c2', quoteId: 'q2', type: 'quote_accepted', title: 'Quote #1002 accepted', description: 'Trent Jenkins — Hardscaping — $4,200', createdAt: '2025-11-15T11:00:00' },
-  { id: 'a5', customerId: 'c1', quoteId: 'q1', type: 'quote_accepted', title: 'Quote #1001 accepted', description: 'Burdette Schoen — Lawn Care — $1,850', createdAt: '2025-10-05T08:30:00' },
-];
-
-// ---------- Helper ----------
-function loadData(key, fallback) {
-  if (typeof window === 'undefined') return fallback;
-  const saved = localStorage.getItem(`lucky_app_${key}`);
-  if (saved) {
-    try { return JSON.parse(saved); }
-    catch { return fallback; }
-  }
-  return fallback;
+// ---------- Supabase → camelCase mappers ----------
+function mapCustomerFromDb(row) {
+  return {
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    email: row.email,
+    phone: row.phone,
+    address: row.address,
+    city: row.city,
+    state: row.state,
+    zip: row.zip,
+    tags: row.tags || [],
+    notes: row.notes,
+    source: row.source,
+    createdAt: row.created_at?.split('T')[0] || '',
+  };
 }
 
-function saveData(key, data) {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(`lucky_app_${key}`, JSON.stringify(data));
+function mapQuoteFromDb(row) {
+  return {
+    id: row.id,
+    quoteNumber: row.quote_number,
+    customerId: row.customer_id,
+    status: row.status,
+    category: row.category,
+    items: row.items || [],
+    total: parseFloat(row.total) || 0,
+    notes: row.notes,
+    createdAt: row.created_at?.split('T')[0] || '',
+  };
+}
+
+function mapActivityFromDb(row) {
+  return {
+    id: row.id,
+    customerId: row.customer_id,
+    quoteId: row.quote_id,
+    type: row.type,
+    title: row.title,
+    description: row.description,
+    createdAt: row.created_at || '',
+  };
+}
+
+function mapTeamMemberFromDb(row) {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    fullName: row.full_name,
+    email: row.email,
+    phone: row.phone,
+    role: row.role,
+    avatarUrl: row.avatar_url,
+    isActive: row.is_active,
+    createdAt: row.created_at?.split('T')[0] || '',
+  };
+}
+
+function mapMaterialFromDb(row) {
+  return {
+    id: row.id,
+    category: row.category,
+    name: row.name,
+    description: row.description,
+    unit: row.unit,
+    unitAlt: row.unit_alt,
+    costLow: parseFloat(row.cost_low) || 0,
+    costHigh: parseFloat(row.cost_high) || 0,
+    supplier: row.supplier,
+    image: row.image,
+    soldOut: row.sold_out || false,
+  };
+}
+
+function mapServiceFromDb(row) {
+  return {
+    id: row.id,
+    category: row.category,
+    name: row.name,
+    unit: row.unit,
+    defaultPrice: parseFloat(row.default_price) || 0,
+  };
 }
 
 // ---------- Provider ----------
 export function DataProvider({ children }) {
+  const { user } = useAuth();
+  const orgId = user?.orgId;
+
   const [customers, setCustomers] = useState([]);
   const [quotes, setQuotes] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [services, setServices] = useState([]);
   const [activity, setActivity] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
-  // Load from localStorage on mount
+  // ---------- Load data from Supabase ----------
   useEffect(() => {
-    setCustomers(loadData('customers', SEED_CUSTOMERS));
-    setQuotes(loadData('quotes', SEED_QUOTES));
-    setMaterials(loadData('materials', SEED_MATERIALS));
-    setServices(loadData('services', SEED_SERVICES));
-    setActivity(loadData('activity', SEED_ACTIVITY));
-    setLoaded(true);
-  }, []);
+    if (!orgId || !isSupabaseConnected()) {
+      setLoaded(true);
+      return;
+    }
 
-  // Persist on change
-  useEffect(() => { if (loaded) saveData('customers', customers); }, [customers, loaded]);
-  useEffect(() => { if (loaded) saveData('quotes', quotes); }, [quotes, loaded]);
-  useEffect(() => { if (loaded) saveData('materials', materials); }, [materials, loaded]);
-  useEffect(() => { if (loaded) saveData('services', services); }, [services, loaded]);
-  useEffect(() => { if (loaded) saveData('activity', activity); }, [activity, loaded]);
+    let cancelled = false;
+
+    async function loadAll() {
+      try {
+        const [custRes, quoteRes, actRes, matRes, svcRes, teamRes] = await Promise.all([
+          supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+          supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+          supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+          supabase.from('materials').select('*').eq('org_id', orgId).order('category').order('name'),
+          supabase.from('services').select('*').eq('org_id', orgId).order('category').order('name'),
+          supabase.from('team_members').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
+        ]);
+
+        if (cancelled) return;
+
+        setCustomers((custRes.data || []).map(mapCustomerFromDb));
+        setQuotes((quoteRes.data || []).map(mapQuoteFromDb));
+        setActivity((actRes.data || []).map(mapActivityFromDb));
+        setMaterials((matRes.data || []).map(mapMaterialFromDb));
+        setServices((svcRes.data || []).map(mapServiceFromDb));
+        setTeamMembers((teamRes.data || []).map(mapTeamMemberFromDb));
+
+        // Seed default catalogs if empty (first-time setup)
+        if ((matRes.data || []).length === 0) {
+          await seedMaterials(orgId);
+        }
+        if ((svcRes.data || []).length === 0) {
+          await seedServices(orgId);
+        }
+
+        setLoaded(true);
+      } catch (err) {
+        console.error('Error loading data from Supabase:', err);
+        setLoaded(true);
+      }
+    }
+
+    loadAll();
+    return () => { cancelled = true; };
+  }, [orgId]);
+
+  // ---------- Seed helpers ----------
+  async function seedMaterials(oid) {
+    const rows = DEFAULT_MATERIALS.map(m => ({ ...m, org_id: oid }));
+    const { data, error } = await supabase.from('materials').insert(rows).select();
+    if (!error && data) setMaterials(data.map(mapMaterialFromDb));
+  }
+
+  async function seedServices(oid) {
+    const rows = DEFAULT_SERVICES.map(s => ({ ...s, org_id: oid }));
+    const { data, error } = await supabase.from('services').insert(rows).select();
+    if (!error && data) setServices(data.map(mapServiceFromDb));
+  }
 
   // ---------- Customer CRUD ----------
-  const addCustomer = useCallback((customer) => {
-    const newCustomer = {
-      ...customer,
-      id: `c${Date.now()}`,
+  const addCustomer = useCallback(async (customer) => {
+    if (!orgId) return null;
+    const row = {
+      org_id: orgId,
+      first_name: customer.firstName,
+      last_name: customer.lastName || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      address: customer.address || '',
+      city: customer.city || '',
+      state: customer.state || '',
+      zip: customer.zip || '',
       tags: customer.tags || ['lead'],
-      createdAt: new Date().toISOString().split('T')[0],
+      notes: customer.notes || '',
       source: 'manual',
     };
-    setCustomers(prev => [newCustomer, ...prev]);
-    addActivity({
-      customerId: newCustomer.id,
+
+    const { data, error } = await supabase.from('customers').insert(row).select().single();
+    if (error) { console.error('Error adding customer:', error); return null; }
+
+    const mapped = mapCustomerFromDb(data);
+    setCustomers(prev => [mapped, ...prev]);
+
+    // Log activity
+    await addActivity({
+      customerId: mapped.id,
       type: 'customer_added',
-      title: `${newCustomer.firstName} ${newCustomer.lastName || ''} added`,
+      title: `${mapped.firstName} ${mapped.lastName || ''} added`,
       description: 'New customer created',
     });
-    return newCustomer;
-  }, []);
 
-  const updateCustomer = useCallback((id, updates) => {
+    return mapped;
+  }, [orgId]);
+
+  const updateCustomer = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.firstName !== undefined) dbUpdates.first_name = updates.firstName;
+    if (updates.lastName !== undefined) dbUpdates.last_name = updates.lastName;
+    if (updates.email !== undefined) dbUpdates.email = updates.email;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.address !== undefined) dbUpdates.address = updates.address;
+    if (updates.city !== undefined) dbUpdates.city = updates.city;
+    if (updates.state !== undefined) dbUpdates.state = updates.state;
+    if (updates.zip !== undefined) dbUpdates.zip = updates.zip;
+    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    // Optimistic update
     setCustomers(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+
+    const { error } = await supabase.from('customers').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating customer:', error);
   }, []);
 
-  const deleteCustomer = useCallback((id) => {
+  const deleteCustomer = useCallback(async (id) => {
     setCustomers(prev => prev.filter(c => c.id !== id));
+    const { error } = await supabase.from('customers').delete().eq('id', id);
+    if (error) console.error('Error deleting customer:', error);
   }, []);
 
   // ---------- Quote CRUD ----------
-  const addQuote = useCallback((quote) => {
-    const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
-    const newQuote = {
-      ...quote,
-      id: `q${Date.now()}`,
-      quoteNumber: maxNum + 1,
-      status: 'draft',
-      createdAt: new Date().toISOString().split('T')[0],
-    };
-    setQuotes(prev => [newQuote, ...prev]);
-    addActivity({
-      customerId: newQuote.customerId,
-      quoteId: newQuote.id,
-      type: 'quote_created',
-      title: `Quote #${newQuote.quoteNumber} created`,
-      description: `${newQuote.category} — $${newQuote.total?.toLocaleString()}`,
-    });
-    return newQuote;
-  }, [quotes]);
+  const addQuote = useCallback(async (quote) => {
+    if (!orgId) return null;
 
-  const updateQuote = useCallback((id, updates) => {
+    // Get next quote number
+    const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
+    const quoteNumber = maxNum + 1;
+
+    const row = {
+      org_id: orgId,
+      customer_id: quote.customerId || null,
+      quote_number: quoteNumber,
+      status: 'draft',
+      category: quote.category || '',
+      items: quote.items || [],
+      total: quote.total || 0,
+      notes: quote.notes || '',
+    };
+
+    const { data, error } = await supabase.from('quotes').insert(row).select().single();
+    if (error) { console.error('Error adding quote:', error); return null; }
+
+    const mapped = mapQuoteFromDb(data);
+    setQuotes(prev => [mapped, ...prev]);
+
+    await addActivity({
+      customerId: mapped.customerId,
+      quoteId: mapped.id,
+      type: 'quote_created',
+      title: `Quote #${mapped.quoteNumber} created`,
+      description: `${mapped.category} — $${mapped.total?.toLocaleString()}`,
+    });
+
+    return mapped;
+  }, [orgId, quotes]);
+
+  const updateQuote = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.customerId !== undefined) dbUpdates.customer_id = updates.customerId;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.items !== undefined) dbUpdates.items = updates.items;
+    if (updates.total !== undefined) dbUpdates.total = updates.total;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    // Optimistic update
     setQuotes(prev => prev.map(q => q.id === id ? { ...q, ...updates } : q));
+
+    const { error } = await supabase.from('quotes').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating quote:', error);
+  }, []);
+
+  const deleteQuote = useCallback(async (id) => {
+    setQuotes(prev => prev.filter(q => q.id !== id));
+    const { error } = await supabase.from('quotes').delete().eq('id', id);
+    if (error) console.error('Error deleting quote:', error);
   }, []);
 
   // ---------- Activity ----------
-  const addActivity = useCallback((entry) => {
-    const newEntry = {
-      ...entry,
-      id: `a${Date.now()}`,
-      createdAt: new Date().toISOString(),
+  // ---------- Team Members ----------
+  const loadTeamMembers = useCallback(async () => {
+    if (!orgId || !isSupabaseConnected()) return;
+    const { data } = await supabase
+      .from('team_members')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('created_at', { ascending: true });
+    if (data) setTeamMembers(data.map(mapTeamMemberFromDb));
+  }, [orgId]);
+
+  const addActivity = useCallback(async (entry) => {
+    if (!orgId) return;
+    const row = {
+      org_id: orgId,
+      customer_id: entry.customerId || null,
+      quote_id: entry.quoteId || null,
+      type: entry.type,
+      title: entry.title,
+      description: entry.description || '',
     };
-    setActivity(prev => [newEntry, ...prev]);
-  }, []);
+
+    const { data, error } = await supabase.from('activity').insert(row).select().single();
+    if (error) { console.error('Error adding activity:', error); return; }
+
+    const mapped = mapActivityFromDb(data);
+    setActivity(prev => [mapped, ...prev]);
+  }, [orgId]);
 
   // ---------- Helpers ----------
   const getCustomer = useCallback((id) => customers.find(c => c.id === id), [customers]);
@@ -248,11 +397,12 @@ export function DataProvider({ children }) {
   const getCustomerActivity = useCallback((customerId) => activity.filter(a => a.customerId === customerId), [activity]);
 
   const value = {
-    customers, quotes, materials, services, activity, loaded,
+    customers, quotes, materials, services, activity, teamMembers, loaded,
     addCustomer, updateCustomer, deleteCustomer,
-    addQuote, updateQuote,
+    addQuote, updateQuote, deleteQuote,
     addActivity,
     getCustomer, getQuote, getCustomerQuotes, getCustomerActivity,
+    loadTeamMembers,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

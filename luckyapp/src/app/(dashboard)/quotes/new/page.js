@@ -76,15 +76,19 @@ function NewQuoteContent() {
 
   const subtotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
 
-  const handleSubmit = () => {
-    const newQuote = addQuote({
+  const handleSubmit = async () => {
+    const newQuote = await addQuote({
       customerId,
       category,
       items,
       notes,
       total: subtotal,
     });
-    router.push(`/quotes/${newQuote.id}`);
+    if (newQuote?.id) {
+      router.push(`/quotes/${newQuote.id}`);
+    } else {
+      router.push('/quotes');
+    }
   };
 
   return (

@@ -9,6 +9,7 @@ import {
   Users,
   FileText,
   Palette,
+  Ruler,
   Settings,
   LogOut,
   Menu,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/quotes', label: 'Quotes', icon: FileText, badgeKey: 'draftQuotes' },
   { href: '/catalog', label: 'Material Catalog', icon: Palette },
+  { href: '/measure', label: 'Measure', icon: Ruler },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];

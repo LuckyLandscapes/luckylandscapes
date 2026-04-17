@@ -1,4 +1,5 @@
 import './globals.css';
+import RootProviders from './root-providers';
 
 export const metadata = {
   title: 'Lucky App — Business Management Platform',
@@ -9,7 +10,9 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <RootProviders>{children}</RootProviders>
+      </body>
     </html>
   );
 }

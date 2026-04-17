@@ -23,10 +23,10 @@ export default function CustomersPage() {
     return matchSearch && matchTag;
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.firstName) return;
-    addCustomer(form);
+    await addCustomer(form);
     setForm({ firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '' });
     setShowModal(false);
   };

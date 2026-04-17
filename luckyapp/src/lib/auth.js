@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   // Load the team member profile + org info from Supabase
+  // If no profile exists, auto-create org + member (first-time setup)
   const loadUserProfile = useCallback(async (authUser) => {
     try {
       const { data: member, error } = await supabase
@@ -71,21 +72,9 @@ export function AuthProvider({ children }) {
         `)
         .eq('user_id', authUser.id)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (error || !member) {
-        // New user — they need an org. We'll create one for them.
-        console.log('No team profile found. User may need onboarding.');
-        setUser({
-          id: authUser.id,
-          email: authUser.email,
-          fullName: authUser.email.split('@')[0],
-          role: 'owner',
-          orgId: null,
-          orgName: null,
-          needsOnboarding: true,
-        });
-      } else {
+      if (member) {
         setUser({
           id: member.id,
           authId: authUser.id,
@@ -99,11 +88,66 @@ export function AuthProvider({ children }) {
           orgSlug: member.organizations?.slug,
           orgIndustry: member.organizations?.industry,
         });
+      } else {
+        // No profile found — auto-create org + team member
+        console.log('No team profile found. Auto-creating org...');
+        const created = await autoCreateOrg(authUser);
+        if (created) {
+          setUser(created);
+        } else {
+          // Fallback if auto-create fails — user can still see the UI
+          setUser({
+            id: authUser.id,
+            email: authUser.email,
+            fullName: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+            role: 'owner',
+            orgId: null,
+            orgName: null,
+          });
+        }
       }
     } catch (err) {
       console.error('Error loading profile:', err);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // Auto-create an organization and team member for first-time users
+  // Uses an RPC function with SECURITY DEFINER to bypass RLS
+  const autoCreateOrg = useCallback(async (authUser) => {
+    try {
+      const fullName = authUser.user_metadata?.full_name || authUser.email.split('@')[0];
+      const uniqueSlug = 'lucky-' + Math.random().toString(36).slice(2, 10);
+
+      const { data, error } = await supabase.rpc('create_org_and_member', {
+        p_org_name: 'Lucky Landscapes',
+        p_org_slug: uniqueSlug,
+        p_org_email: authUser.email,
+        p_user_id: authUser.id,
+        p_full_name: fullName,
+        p_member_email: authUser.email,
+      });
+
+      if (error) {
+        console.error('Error in create_org_and_member RPC:', error.message, error.code, error.details, error.hint);
+        return null;
+      }
+
+      return {
+        id: data.member_id,
+        authId: authUser.id,
+        email: authUser.email,
+        fullName: data.full_name,
+        role: data.role,
+        orgId: data.org_id,
+        orgName: data.org_name,
+        orgSlug: data.org_slug,
+        orgIndustry: data.org_industry,
+      };
+    } catch (err) {
+      console.error('Error in autoCreateOrg:', err);
+      return null;
     }
   }, []);
 
@@ -122,47 +166,23 @@ export function AuthProvider({ children }) {
     }
   }, [mode]);
 
-  // --- Sign Up (creates auth account + org + team member) ---
-  const signup = useCallback(async (email, password, fullName, companyName) => {
+  // --- Sign Up ---
+  const signup = useCallback(async (email, password, fullName) => {
     if (mode !== 'supabase') {
-      // Demo mode — just login
       return login(email, password);
     }
 
     // 1. Create auth account
-    const { data: authData, error: authError } = await supabase.auth.signUp({ email, password });
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
     if (authError) throw authError;
 
-    const userId = authData.user.id;
-
-    // 2. Create organization
-    const slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-    const { data: org, error: orgError } = await supabase
-      .from('organizations')
-      .insert({
-        name: companyName,
-        slug: slug,
-        email: email,
-        industry: 'landscaping',
-      })
-      .select()
-      .single();
-
-    if (orgError) throw orgError;
-
-    // 3. Create team member (owner)
-    const { error: memberError } = await supabase
-      .from('team_members')
-      .insert({
-        org_id: org.id,
-        user_id: userId,
-        full_name: fullName,
-        email: email,
-        role: 'owner',
-      });
-
-    if (memberError) throw memberError;
-
+    // The auth state change listener will handle creating the org + profile
     return authData.user;
   }, [mode, login]);
 

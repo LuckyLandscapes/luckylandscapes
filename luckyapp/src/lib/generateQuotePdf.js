@@ -6,6 +6,8 @@ import fullLogoSrc from '@/assets/Fulllogopdf.png';
  * Load an image from a URL/import and return a base64 data URL.
  */
 function loadImageAsBase64(src) {
+  // Handle Next.js static asset objects or plain strings
+  const imagePath = src?.src || src;
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -17,8 +19,8 @@ function loadImageAsBase64(src) {
       ctx.drawImage(img, 0, 0);
       resolve(canvas.toDataURL('image/png'));
     };
-    img.onerror = reject;
-    img.src = src;
+    img.onerror = () => reject(new Error(`Failed to load image: ${imagePath}`));
+    img.src = imagePath;
   });
 }
 
@@ -28,7 +30,7 @@ function loadImageAsBase64(src) {
  * @param {Object} customer - The customer object
  * @param {Object} [company] - Optional company info override
  */
-export async function generateQuotePdf(quote, customer, company = {}) {
+async function buildQuotePdf(quote, customer, company = {}) {
   const doc = new jsPDF('p', 'pt', 'letter');
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
@@ -64,19 +66,24 @@ export async function generateQuotePdf(quote, customer, company = {}) {
   // Full branded logo (includes clover + company name)
   try {
     const logoBase64 = await loadImageAsBase64(fullLogoSrc);
-    // Original image is wide (~1558x644), scale to fit header height with padding
-    const logoDisplayHeight = headerHeight - 20; // 70pt tall
-    const logoAspectRatio = 1558 / 644;
+    
+    // Determine dimensions (use imported values if available for accuracy)
+    const originalWidth = fullLogoSrc?.width || 1558;
+    const originalHeight = fullLogoSrc?.height || 644;
+    const logoAspectRatio = originalWidth / originalHeight;
+
+    // Increase size for "full banner" feel
+    const logoDisplayHeight = headerHeight - 14; // Larger — 76pt tall
     const logoDisplayWidth = logoDisplayHeight * logoAspectRatio;
-    const logoX = margin;
+    
+    const logoX = margin - 10; // Slight bleed into margin for more "banner" feel
     const logoY = (headerHeight - logoDisplayHeight) / 2;
+    
     doc.addImage(logoBase64, 'PNG', logoX, logoY, logoDisplayWidth, logoDisplayHeight);
-  } catch {
-    // Fallback — render text if logo fails to load
-    doc.setTextColor(...WHITE);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text(co.name, margin, headerHeight / 2 + 6);
+  } catch (err) {
+    console.error('PDF Logo Load Error:', err);
+    // Silent fallback if logo fails (or render co.name if absolutely required)
+    // The user specifically asked to remove the text because it's in the logo.
   }
 
   // Contact info (right side, stacked)
@@ -296,10 +303,38 @@ export async function generateQuotePdf(quote, customer, company = {}) {
   // =============== FOOTER ===============
   drawFooter(doc, co, pageWidth, margin);
 
-  // =============== OPEN IN NEW TAB ===============
+  // =============== RETURN AS BASE64 OR OPEN IN TAB ===============
+  return doc;
+}
+
+/**
+ * Generate and open the PDF in a new browser tab.
+ * (Original behavior — kept for the "PDF" button.)
+ */
+export async function generateQuotePdf(quote, customer, company = {}) {
+  const doc = await buildQuotePdf(quote, customer, company);
   const pdfBlob = doc.output('blob');
   const blobUrl = URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' }));
   window.open(blobUrl, '_blank');
+}
+
+/**
+ * Generate the PDF and return it as a base64 string (for email attachments).
+ */
+export async function generateQuotePdfBase64(quote, customer, company = {}) {
+  const doc = await buildQuotePdf(quote, customer, company);
+  // doc.output('datauristring') returns "data:application/pdf;base64,XXXX"
+  // We only need the base64 part after the comma
+  const dataUri = doc.output('datauristring');
+  return dataUri.split(',')[1];
+}
+
+/**
+ * Generate the PDF and return it as a Blob (for uploading to storage).
+ */
+export async function generateQuotePdfBlob(quote, customer, company = {}) {
+  const doc = await buildQuotePdf(quote, customer, company);
+  return doc.output('blob');
 }
 
 // =============== HELPERS ===============
