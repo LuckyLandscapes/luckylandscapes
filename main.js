@@ -672,7 +672,7 @@ const projectData = [
     {
         title: 'Front Yard Beds',
         tag: 'Landscaping',
-        cover: 0,
+        cover: 1,
         desc: 'Complete front yard garden bed installation featuring fresh mulch, clean edging, and carefully selected plantings that bring year-round curb appeal.',
         images: [
             '/images/gardenbed/1.webp',
