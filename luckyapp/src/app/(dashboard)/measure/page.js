@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useData } from '@/lib/data';
 import {
-  Ruler, Search, Trash2, Copy, MapPin, Plus, Minus, CheckCircle, Layers, X, SquareIcon,
+  Ruler, Search, Trash2, Copy, MapPin, Plus, Minus, CheckCircle, Layers, X, SquareIcon, Loader2,
 } from 'lucide-react';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -28,7 +28,8 @@ export default function MeasurePage() {
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [areas, setAreas] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [hasSearchText, setHasSearchText] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [copied, setCopied] = useState(null);
   const [toast, setToast] = useState(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -130,6 +131,7 @@ export default function MeasurePage() {
       const autocomplete = new window.google.maps.places.Autocomplete(searchInputRef.current, {
         types: ['address'],
         componentRestrictions: { country: 'us' },
+        fields: ['geometry', 'formatted_address', 'address_components'],
       });
       autocomplete.bindTo('bounds', map);
       autocompleteRef.current = autocomplete;
@@ -139,7 +141,7 @@ export default function MeasurePage() {
         if (place.geometry?.location) {
           map.setCenter(place.geometry.location);
           map.setZoom(20);
-          setSearchQuery(place.formatted_address || '');
+          setHasSearchText(true);
         }
       });
     }
@@ -199,16 +201,55 @@ export default function MeasurePage() {
   // Navigate to customer address
   const goToAddress = useCallback((address) => {
     if (!mapInstanceRef.current) return;
+    setIsSearching(true);
 
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ address }, (results, status) => {
+      setIsSearching(false);
       if (status === 'OK' && results[0]) {
         mapInstanceRef.current.setCenter(results[0].geometry.location);
         mapInstanceRef.current.setZoom(20);
-        setSearchQuery(address);
+        if (searchInputRef.current) {
+          searchInputRef.current.value = address;
+        }
+        setHasSearchText(true);
         setShowCustomerAddresses(false);
       }
     });
+  }, []);
+
+  // Handle Enter key for manual geocoding search
+  const handleSearchKeyDown = useCallback((e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const query = searchInputRef.current?.value?.trim();
+      if (!query || !mapInstanceRef.current) return;
+
+      // Dismiss any open autocomplete dropdown
+      const pacContainers = document.querySelectorAll('.pac-container');
+      pacContainers.forEach(c => c.style.display = 'none');
+
+      setIsSearching(true);
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: query }, (results, status) => {
+        setIsSearching(false);
+        if (status === 'OK' && results[0]) {
+          mapInstanceRef.current.setCenter(results[0].geometry.location);
+          mapInstanceRef.current.setZoom(20);
+          searchInputRef.current.value = results[0].formatted_address || query;
+          setHasSearchText(true);
+        }
+      });
+    }
+  }, []);
+
+  // Clear search
+  const clearSearch = useCallback(() => {
+    if (searchInputRef.current) {
+      searchInputRef.current.value = '';
+      searchInputRef.current.focus();
+    }
+    setHasSearchText(false);
   }, []);
 
   // Total sqft
@@ -262,15 +303,29 @@ export default function MeasurePage() {
         <div style={{ flex: 1, position: 'relative', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-primary)' }}>
           {/* Search bar overlay */}
           <div className="measure-search-bar">
-            <Search size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+            {isSearching ? (
+              <Loader2 size={16} className="spin" style={{ color: 'var(--lucky-green-light)', flexShrink: 0 }} />
+            ) : (
+              <Search size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+            )}
             <input
               ref={searchInputRef}
               type="text"
               placeholder="Search address..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => setHasSearchText(!!e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               className="measure-search-input"
+              autoComplete="off"
             />
+            {hasSearchText && (
+              <button
+                className="measure-search-clear"
+                onClick={clearSearch}
+                title="Clear search"
+              >
+                <X size={14} />
+              </button>
+            )}
             {customers.length > 0 && (
               <button
                 className="btn btn-ghost btn-sm"

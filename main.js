@@ -591,14 +591,16 @@ const projectData = [
         inProgress: true,
     },
     {
-        title: 'Brick Garden Walls',
+        title: 'Retaining Walls',
         tag: 'Hardscaping',
-        cover: 2,
-        desc: 'This brick garden wall solved a significant grading challenge while adding striking visual appeal.',
+        cover: 4,
+        desc: 'We specialize in building strong, long-lasting retaining walls that solve drainage and erosion problems while looking great. Using high-quality materials and proven construction methods, we create retaining walls that protect your property and enhance its curb appeal.',
         images: [
-            '/images/bricklaying/1.webp',
-            '/images/bricklaying/2.webp',
-            '/images/bricklaying/3.webp',
+            '/images/retainingwall/1-1.webp',
+            '/images/retainingwall/1-2.webp',
+            '/images/retainingwall/1-3.webp',
+            '/images/retainingwall/1-4.webp',
+            '/images/retainingwall/1-5.webp',
         ],
     },
     {
@@ -616,25 +618,22 @@ const projectData = [
         ],
     },
     {
-        title: 'Lawn Cleanup',
-        tag: 'Seasonal Cleanup',
+        title: 'Fire Places',
+        tag: 'Hardscaping',
         cover: 0,
-        desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting.',
+        desc: 'A custom built fire place designed to extend this family\'s outdoor living space. We selected premium materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
         images: [
-            '/images/LawnRestore/after.webp',
-            '/images/LawnRestore/before.webp',
+            '/images/fireplace/1.jpg',
         ],
     },
     {
         title: 'Garden Beds',
         tag: 'Landscaping',
         cover: 1,
-        desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the front yard.',
+        desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the backyard.',
         images: [
-            '/images/gardenbed/1.webp',
-            '/images/gardenbed/2.webp',
-            '/images/gardenbed/3.webp',
-            '/images/gardenbed/4.webp',
+            '/images/mulchgardenbeds/1.webp',
+            '/images/mulchgardenbeds/2.jpg',
         ],
     },
     {
@@ -646,6 +645,40 @@ const projectData = [
             '/images/landscapedesign/3.webp',
             '/images/landscapedesign/1.webp',
             '/images/landscapedesign/2.webp',
+        ],
+    },
+    {
+        title: 'Lawn Restoration',
+        tag: 'Seasonal Cleanup',
+        cover: 0,
+        desc: 'A thorough lawn cleanup that removed weeds, debris, and overgrowth from the yard, leaving it looking fresh and inviting. See the dramatic before-and-after transformation.',
+        beforeAfter: true,
+        images: [
+            '/images/LawnRestore/before.webp',
+            '/images/LawnRestore/after.webp',
+        ],
+    },
+    {
+        title: 'Brick Garden Walls',
+        tag: 'Hardscaping',
+        cover: 2,
+        desc: 'This brick garden wall solved a significant grading challenge while adding striking visual appeal. Built with precision to withstand the elements and elevate the landscape.',
+        images: [
+            '/images/bricklaying/1.webp',
+            '/images/bricklaying/2.webp',
+            '/images/bricklaying/3.webp',
+        ],
+    },
+    {
+        title: 'Front Yard Beds',
+        tag: 'Landscaping',
+        cover: 0,
+        desc: 'Complete front yard garden bed installation featuring fresh mulch, clean edging, and carefully selected plantings that bring year-round curb appeal.',
+        images: [
+            '/images/gardenbed/1.webp',
+            '/images/gardenbed/2.webp',
+            '/images/gardenbed/3.webp',
+            '/images/gardenbed/4.webp',
         ],
     },
 ];
@@ -662,257 +695,351 @@ function getImageSrc(img) {
     return (isMobile && img.mobile) ? img.mobile : img.desktop;
 }
 
+// Curated projects for the homepage (indices into projectData)
+// Covers hardscaping, landscaping, before/after, outdoor living, maintenance, curb appeal
+const homepageFeatured = [1, 5, 6, 3, 2, 4];
+
 function buildGalleryGrid() {
     if (!galleryGrid) return;
     galleryGrid.innerHTML = '';
 
-    projectData.forEach((project, index) => {
+    // Homepage shows curated subset; gallery page shows all via buildCollectionGrid
+    const featured = homepageFeatured;
+
+    featured.forEach((index) => {
+        const project = projectData[index];
+        if (!project) return;
         const coverIdx = project.cover ?? 0;
         const coverImg = project.images[coverIdx] ?? project.images[0];
         const src = getImageSrc(coverImg);
 
-        const item = document.createElement('div');
-        item.className = 'gallery-item';
-        item.dataset.project = index;
+        const card = document.createElement('div');
+        card.className = 'collection-card';
+        card.dataset.project = index;
 
-        // In Progress chip
-        if (project.inProgress) {
-            const chip = document.createElement('div');
-            chip.className = 'gallery-progress-chip';
-            chip.innerHTML = '<span class="gallery-progress-dot"></span> In Progress';
-            item.appendChild(chip);
+        // Determine badge text
+        let badgeText = '';
+        if (project.beforeAfter) {
+            badgeText = 'Before & After';
+        } else if (project.images.length > 1) {
+            badgeText = `${project.images.length} Photos`;
+        } else {
+            badgeText = '1 Photo';
         }
 
-        // Image element — starts empty, real src set via lazy loader
-        const img = document.createElement('img');
-        img.dataset.src = src; // store real src for lazy loading
-        img.alt = `${project.title} — ${project.tag}`;
-        img.loading = 'lazy';
-        img.className = 'gallery-img-lazy'; // mark as not-yet-loaded for CSS skeleton
+        // In Progress chip
+        let chipHtml = '';
+        if (project.inProgress) {
+            chipHtml = '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>';
+        }
 
-        // Overlay
-        const overlay = document.createElement('div');
-        overlay.className = 'gallery-overlay';
-        overlay.innerHTML = `
-            <span class="gallery-label">${project.title}</span>
-            <span class="gallery-tag">${project.tag}</span>
+        card.innerHTML = `
+            ${chipHtml}
+            <img src="${src}" alt="${project.title}" loading="lazy" class="collection-card-img" />
+            <div class="collection-card-overlay">
+                <div class="collection-card-bottom">
+                    <span class="collection-card-title">${project.title}</span>
+                    <span class="collection-card-tag">${project.tag}</span>
+                </div>
+                <span class="collection-card-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    ${badgeText}
+                </span>
+            </div>
         `;
 
-        item.appendChild(img);
-        item.appendChild(overlay);
-        galleryGrid.appendChild(item);
+        galleryGrid.appendChild(card);
     });
 }
 
 buildGalleryGrid();
 
 // ============================================
-// GALLERY PAGE — Flat photo gallery (easy to add new photos!)
+// GALLERY PAGE — Project Collections
 // ============================================
-// ► TO ADD A NEW PHOTO: just add one line to the galleryPhotos array below.
-// ► Categories: 'Hardscaping', 'Landscaping', 'Lawn Care', 'Construction', 'Cleanup'
-const galleryPhotos = [
-    // === Construction ===
-    { src: '/images/megandeck/1.webp', category: 'Construction', caption: 'Custom composite deck build' },
-    { src: '/images/megandeck/2.webp', category: 'Construction', caption: 'Deck framing & border detail' },
+// Uses projectData (defined above) to render collection cards on the gallery page.
+// Clicking a collection opens either:
+//   • Before/After Slider — for projects with beforeAfter: true (2 images)
+//   • Image Carousel — for projects with 2+ images (series viewer)
 
-    // === Hardscaping ===
-    { src: '/images/bricklaying/1.webp', category: 'Hardscaping', caption: 'Brick garden wall foundation' },
-    { src: '/images/bricklaying/2.webp', category: 'Hardscaping', caption: 'Brick wall construction' },
-    { src: '/images/bricklaying/3.webp', category: 'Hardscaping', caption: 'Finished brick retaining wall' },
+const collectionGrid = document.getElementById('collection-grid');
 
-    // === Lawn Care ===
-    { src: '/images/lawncare/1.webp', category: 'Lawn Care', caption: 'Fresh-cut residential lawn' },
-    { src: '/images/lawncare/2.webp', category: 'Lawn Care', caption: 'Crisp edging & trim work' },
-    { src: '/images/lawncare/3.webp', category: 'Lawn Care', caption: 'Backyard mow & detail' },
-    { src: '/images/lawncare/4.webp', category: 'Lawn Care', caption: 'Full property mow service' },
-    { src: '/images/lawncare/5.webp', category: 'Lawn Care', caption: 'Manicured front yard' },
-    { src: '/images/lawncare/6.webp', category: 'Lawn Care', caption: 'Weekly maintenance service' },
+function buildCollectionGrid() {
+    if (!collectionGrid) return;
+    collectionGrid.innerHTML = '';
 
-    // === Cleanup ===
-    { src: '/images/LawnRestore/after.webp', category: 'Cleanup', caption: 'Yard restoration — after' },
-    { src: '/images/LawnRestore/before.webp', category: 'Cleanup', caption: 'Yard restoration — before' },
+    projectData.forEach((project, index) => {
+        const coverIdx = project.cover ?? 0;
+        const coverImg = project.images[coverIdx] ?? project.images[0];
+        const src = getImageSrc(coverImg);
 
-    // === Landscaping ===
-    { src: '/images/gardenbed/1.webp', category: 'Landscaping', caption: 'Garden bed installation' },
-    { src: '/images/gardenbed/2.webp', category: 'Landscaping', caption: 'Mulch & edging detail' },
-    { src: '/images/gardenbed/3.webp', category: 'Landscaping', caption: 'Front yard bed design' },
-    { src: '/images/gardenbed/4.webp', category: 'Landscaping', caption: 'Finished garden beds' },
-    { src: '/images/landscapedesign/3.webp', category: 'Landscaping', caption: 'Full landscape transformation' },
-    { src: '/images/landscapedesign/1.webp', category: 'Landscaping', caption: 'Landscape design in progress' },
-    { src: '/images/landscapedesign/2.webp', category: 'Landscaping', caption: 'Design & build result' },
+        const card = document.createElement('div');
+        card.className = 'collection-card';
+        card.dataset.project = index;
 
-    // === Retaining Walls ===
-    { src: '/images/retainingwall/1.webp', category: 'Hardscaping', caption: 'Retaining wall build' },
-    { src: '/images/retainingwall/2.webp', category: 'Hardscaping', caption: 'Retaining wall in progress' },
-    { src: '/images/retainingwall/3.webp', category: 'Hardscaping', caption: 'Retaining wall foundation' },
-    { src: '/images/retainingwall/4.webp', category: 'Hardscaping', caption: 'Finished retaining wall' },
-    { src: '/images/retainingwall/5.webp', category: 'Hardscaping', caption: 'Retaining wall landscaping' },
-];
+        // Determine badge text
+        let badgeText = '';
+        if (project.beforeAfter) {
+            badgeText = 'Before & After';
+        } else if (project.images.length > 1) {
+            badgeText = `${project.images.length} Photos`;
+        } else {
+            badgeText = '1 Photo';
+        }
 
-const galleryPageGrid = document.getElementById('gallery-page-grid');
-const galleryPagination = document.getElementById('gallery-pagination');
+        // In Progress chip
+        let chipHtml = '';
+        if (project.inProgress) {
+            chipHtml = '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>';
+        }
 
-let filteredGalleryPhotos = [...galleryPhotos];
-const PHOTOS_PER_PAGE = 8;
-let currentGalleryPage = 0;
-
-function getTotalPages() {
-    return Math.ceil(filteredGalleryPhotos.length / PHOTOS_PER_PAGE);
-}
-
-function getPagePhotos(page) {
-    const start = page * PHOTOS_PER_PAGE;
-    return filteredGalleryPhotos.slice(start, start + PHOTOS_PER_PAGE);
-}
-
-function buildGalleryPageGrid() {
-    if (!galleryPageGrid) return;
-    galleryPageGrid.innerHTML = '';
-
-    const pagePhotos = getPagePhotos(currentGalleryPage);
-
-    pagePhotos.forEach((photo, idx) => {
-        const globalIdx = currentGalleryPage * PHOTOS_PER_PAGE + idx;
-        const item = document.createElement('div');
-        item.className = 'gallery-photo-item';
-        item.dataset.idx = globalIdx;
-
-        item.innerHTML = `
-            <img src="${photo.src}" alt="${photo.caption}" loading="lazy" />
-            <span class="gallery-photo-tag gallery-photo-tag--visible">${photo.category}</span>
-            <div class="gallery-photo-overlay">
-                <span class="gallery-photo-caption">${photo.caption}</span>
+        card.innerHTML = `
+            ${chipHtml}
+            <img src="${src}" alt="${project.title}" loading="lazy" class="collection-card-img" />
+            <div class="collection-card-overlay">
+                <div class="collection-card-bottom">
+                    <span class="collection-card-title">${project.title}</span>
+                    <span class="collection-card-tag">${project.tag}</span>
+                </div>
+                <span class="collection-card-badge">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                    ${badgeText}
+                </span>
             </div>
         `;
 
-        galleryPageGrid.appendChild(item);
+        collectionGrid.appendChild(card);
     });
-
-    buildPagination();
 }
 
-function buildPagination() {
-    if (!galleryPagination) return;
-    const totalPages = getTotalPages();
-    if (totalPages <= 1) {
-        galleryPagination.innerHTML = '';
-        return;
-    }
+buildCollectionGrid();
 
-    let html = '';
+// ============================================
+// COLLECTION LIGHTBOX — Before/After & Carousel
+// ============================================
+const clLightbox = document.getElementById('collection-lightbox');
+const clBackdrop = document.getElementById('cl-backdrop');
+const clClose = document.getElementById('cl-close');
+const clContent = document.getElementById('cl-content');
+const clBaView = document.getElementById('cl-ba-view');
+const clCarouselView = document.getElementById('cl-carousel-view');
+const clCarouselImg = document.getElementById('cl-carousel-img');
+const clDots = document.getElementById('cl-dots');
+const clCounter = document.getElementById('cl-counter');
+const clPrev = document.getElementById('cl-prev');
+const clNext = document.getElementById('cl-next');
+const clTitle = document.getElementById('cl-title');
+const clTag = document.getElementById('cl-tag');
+const clDesc = document.getElementById('cl-desc');
 
-    // Prev button
-    html += `<button class="gp-btn gp-prev" ${currentGalleryPage === 0 ? 'disabled' : ''} data-page="${currentGalleryPage - 1}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-    </button>`;
+// Before/After elements
+const baSlider = document.getElementById('ba-slider');
+const baBeforeImg = document.getElementById('ba-before-img');
+const baAfterImg = document.getElementById('ba-after-img');
+const baAfter = document.getElementById('ba-after');
+const baHandle = document.getElementById('ba-handle');
 
-    // Page numbers
-    for (let i = 0; i < totalPages; i++) {
-        html += `<button class="gp-btn gp-num ${i === currentGalleryPage ? 'active' : ''}" data-page="${i}">${i + 1}</button>`;
-    }
+let clCurrentProject = null;
+let clCurrentImgIdx = 0;
+let clIsTransitioning = false;
 
-    // Next button
-    html += `<button class="gp-btn gp-next" ${currentGalleryPage === totalPages - 1 ? 'disabled' : ''} data-page="${currentGalleryPage + 1}">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-    </button>`;
+function closeCollectionLightbox() {
+    if (!clLightbox) return;
+    clLightbox.classList.remove('active');
+    lenis.start();
+    clCurrentProject = null;
+    clIsTransitioning = false;
+}
 
-    // Page info
-    html += `<div class="gp-info">Page ${currentGalleryPage + 1} of ${totalPages}</div>`;
+function openCollectionLightbox(projectIndex) {
+    clCurrentProject = projectData[projectIndex];
+    clCurrentImgIdx = 0;
+    clIsTransitioning = false;
 
-    galleryPagination.innerHTML = html;
+    if (!clCurrentProject || !clLightbox) return;
 
-    // Add click listeners
-    galleryPagination.querySelectorAll('.gp-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const page = parseInt(btn.dataset.page, 10);
-            if (isNaN(page) || page < 0 || page >= totalPages) return;
-            currentGalleryPage = page;
-            buildGalleryPageGrid();
-            // Scroll to top of gallery grid
-            const gridSection = document.querySelector('.gallery-page-grid-section');
-            if (gridSection) {
-                const navH = navbar ? navbar.offsetHeight : 80;
-                window.scrollTo({ top: gridSection.offsetTop - navH - 20, behavior: 'smooth' });
-            }
+    // Populate info
+    clTitle.textContent = clCurrentProject.title;
+    clTag.textContent = clCurrentProject.tag;
+    clDesc.textContent = clCurrentProject.desc;
+
+    // Preload all images
+    clCurrentProject.images.forEach(img => preloadImage(getImageSrc(img)));
+
+    if (clCurrentProject.beforeAfter && clCurrentProject.images.length === 2) {
+        // Show Before/After Slider
+        clBaView.style.display = '';
+        clCarouselView.style.display = 'none';
+
+        baBeforeImg.src = getImageSrc(clCurrentProject.images[0]);
+        baAfterImg.src = getImageSrc(clCurrentProject.images[1]);
+
+        // Reset slider to 50%
+        requestAnimationFrame(() => {
+            if (baAfter) baAfter.style.clipPath = 'inset(0 0 0 50%)';
+            if (baHandle) baHandle.style.left = '50%';
         });
+    } else {
+        // Show Image Carousel
+        clBaView.style.display = 'none';
+        clCarouselView.style.display = '';
+
+        showCarouselImage(0);
+        buildCarouselDots();
+    }
+
+    clLightbox.classList.add('active');
+    lenis.stop();
+}
+
+// --- Image Carousel ---
+function showCarouselImage(idx) {
+    if (!clCurrentProject) return;
+    clCurrentImgIdx = idx;
+    const src = getImageSrc(clCurrentProject.images[idx]);
+
+    clIsTransitioning = true;
+    clCarouselImg.classList.add('cl-img-fade-out');
+
+    setTimeout(() => {
+        clCarouselImg.src = src;
+        clCarouselImg.alt = `${clCurrentProject.title} — photo ${idx + 1}`;
+
+        const tempImg = new Image();
+        tempImg.onload = () => {
+            clCarouselImg.classList.remove('cl-img-fade-out');
+            clIsTransitioning = false;
+        };
+        tempImg.onerror = () => {
+            clCarouselImg.classList.remove('cl-img-fade-out');
+            clIsTransitioning = false;
+        };
+        tempImg.src = src;
+
+        clCounter.textContent = `${idx + 1} / ${clCurrentProject.images.length}`;
+        updateCarouselDots();
+    }, 200);
+}
+
+function buildCarouselDots() {
+    if (!clDots || !clCurrentProject) return;
+    clDots.innerHTML = '';
+    clCurrentProject.images.forEach((_, i) => {
+        const dot = document.createElement('button');
+        dot.className = 'cl-dot' + (i === 0 ? ' active' : '');
+        dot.setAttribute('aria-label', `View image ${i + 1}`);
+        dot.addEventListener('click', () => {
+            if (i === clCurrentImgIdx || clIsTransitioning) return;
+            showCarouselImage(i);
+        });
+        clDots.appendChild(dot);
     });
 }
 
-if (galleryPageGrid) {
-    buildGalleryPageGrid();
+function updateCarouselDots() {
+    if (!clDots) return;
+    clDots.querySelectorAll('.cl-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === clCurrentImgIdx);
+    });
+}
 
-    // Gallery page photo lightbox
-    const gplLightbox = document.getElementById('gallery-photo-lightbox');
-    const gplImg = document.getElementById('gpl-img');
-    const gplCaption = document.getElementById('gpl-caption');
-    const gplCounter = document.getElementById('gpl-counter');
-    const gplClose = document.getElementById('gpl-close');
-    const gplPrev = document.getElementById('gpl-prev');
-    const gplNext = document.getElementById('gpl-next');
-    let gplIndex = 0;
+function carouselPrev() {
+    if (!clCurrentProject || clIsTransitioning) return;
+    const len = clCurrentProject.images.length;
+    showCarouselImage((clCurrentImgIdx - 1 + len) % len);
+}
 
-    function showGplPhoto(idx) {
-        gplIndex = idx;
-        const photo = filteredGalleryPhotos[idx];
-        if (!photo) return;
-        gplImg.src = photo.src;
-        gplImg.alt = photo.caption;
-        gplCaption.textContent = photo.caption;
-        gplCounter.textContent = `${idx + 1} / ${filteredGalleryPhotos.length}`;
+function carouselNext() {
+    if (!clCurrentProject || clIsTransitioning) return;
+    const len = clCurrentProject.images.length;
+    showCarouselImage((clCurrentImgIdx + 1) % len);
+}
+
+// --- Before/After Slider ---
+let baIsDragging = false;
+
+function updateSliderPosition(x) {
+    if (!baSlider) return;
+    const rect = baSlider.getBoundingClientRect();
+    let pct = ((x - rect.left) / rect.width) * 100;
+    pct = Math.max(0, Math.min(100, pct));
+
+    if (baAfter) baAfter.style.clipPath = `inset(0 0 0 ${pct}%)`;
+    if (baHandle) baHandle.style.left = `${pct}%`;
+}
+
+if (baSlider) {
+    baSlider.addEventListener('mousedown', (e) => {
+        baIsDragging = true;
+        updateSliderPosition(e.clientX);
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (baIsDragging) {
+            updateSliderPosition(e.clientX);
+            e.preventDefault();
+        }
+    });
+
+    document.addEventListener('mouseup', () => { baIsDragging = false; });
+
+    // Touch support for before/after slider
+    baSlider.addEventListener('touchstart', (e) => {
+        baIsDragging = true;
+        updateSliderPosition(e.touches[0].clientX);
+    }, { passive: true });
+
+    baSlider.addEventListener('touchmove', (e) => {
+        if (baIsDragging) {
+            updateSliderPosition(e.touches[0].clientX);
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    baSlider.addEventListener('touchend', () => { baIsDragging = false; }, { passive: true });
+}
+
+// --- Event Listeners ---
+if (collectionGrid) {
+    collectionGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.collection-card[data-project]');
+        if (!card) return;
+        openCollectionLightbox(parseInt(card.dataset.project, 10));
+    });
+}
+
+if (clClose) clClose.addEventListener('click', closeCollectionLightbox);
+if (clBackdrop) clBackdrop.addEventListener('click', closeCollectionLightbox);
+if (clPrev) clPrev.addEventListener('click', carouselPrev);
+if (clNext) clNext.addEventListener('click', carouselNext);
+
+// Keyboard navigation for collection lightbox
+document.addEventListener('keydown', (e) => {
+    if (!clLightbox || !clLightbox.classList.contains('active')) return;
+    if (e.key === 'Escape') closeCollectionLightbox();
+    if (clCurrentProject && !clCurrentProject.beforeAfter) {
+        if (e.key === 'ArrowLeft') carouselPrev();
+        if (e.key === 'ArrowRight') carouselNext();
     }
+});
 
-    function openGpl(idx) {
-        showGplPhoto(idx);
-        gplLightbox.classList.add('active');
-        lenis.stop();
-    }
+// Touch swipe for carousel in collection lightbox
+if (clCarouselView) {
+    let clTouchStartX = 0;
+    clCarouselView.addEventListener('touchstart', (e) => {
+        clTouchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
 
-    function closeGpl() {
-        gplLightbox.classList.remove('active');
-        lenis.start();
-    }
-
-    galleryPageGrid.addEventListener('click', (e) => {
-        const item = e.target.closest('.gallery-photo-item');
-        if (!item) return;
-        openGpl(parseInt(item.dataset.idx, 10));
-    });
-
-    if (gplClose) gplClose.addEventListener('click', closeGpl);
-    if (gplLightbox) gplLightbox.addEventListener('click', (e) => {
-        if (e.target === gplLightbox) closeGpl();
-    });
-
-    if (gplPrev) gplPrev.addEventListener('click', () => {
-        gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length;
-        showGplPhoto(gplIndex);
-    });
-
-    if (gplNext) gplNext.addEventListener('click', () => {
-        gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length;
-        showGplPhoto(gplIndex);
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (!gplLightbox || !gplLightbox.classList.contains('active')) return;
-        if (e.key === 'Escape') closeGpl();
-        if (e.key === 'ArrowLeft') { gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length; showGplPhoto(gplIndex); }
-        if (e.key === 'ArrowRight') { gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length; showGplPhoto(gplIndex); }
-    });
-
-    // Touch swipe on gallery lightbox
-    let gplTouchStartX = 0;
-    gplLightbox.addEventListener('touchstart', (e) => { gplTouchStartX = e.changedTouches[0].screenX; }, { passive: true });
-    gplLightbox.addEventListener('touchend', (e) => {
-        const diff = gplTouchStartX - e.changedTouches[0].screenX;
+    clCarouselView.addEventListener('touchend', (e) => {
+        const diff = clTouchStartX - e.changedTouches[0].screenX;
         if (Math.abs(diff) > 50) {
-            if (diff > 0) { gplIndex = (gplIndex + 1) % filteredGalleryPhotos.length; }
-            else { gplIndex = (gplIndex - 1 + filteredGalleryPhotos.length) % filteredGalleryPhotos.length; }
-            showGplPhoto(gplIndex);
+            if (diff > 0) carouselNext();
+            else carouselPrev();
         }
     }, { passive: true });
 }
+
 
 // ============================================
 // GSAP — GALLERY ITEMS (after dynamic generation)
@@ -983,264 +1110,24 @@ const lazyImageObserver = new IntersectionObserver(
     { rootMargin: '300px 0px', threshold: 0.01 }
 );
 
-// Observe all gallery images for lazy loading
+// Homepage gallery grid → open collection lightbox on card click
 if (galleryGrid) {
-    galleryGrid.querySelectorAll('img[data-src]').forEach((img) => {
-        lazyImageObserver.observe(img);
-    });
-}
-
-// ============================================
-// LIGHTBOX
-// ============================================
-const lightbox = document.getElementById('project-lightbox');
-const lightboxBackdrop = document.getElementById('lightbox-backdrop');
-const lightboxClose = document.getElementById('lightbox-close');
-const lightboxMainImg = document.getElementById('lightbox-main-img');
-const lightboxTitle = document.getElementById('lightbox-title');
-const lightboxTag = document.getElementById('lightbox-tag');
-const lightboxDesc = document.getElementById('lightbox-desc');
-const lightboxDots = document.getElementById('lightbox-dots');
-const lightboxPrev = document.getElementById('lightbox-prev');
-const lightboxNext = document.getElementById('lightbox-next');
-const lightboxCta = document.getElementById('lightbox-cta');
-const lightboxImgWrap = lightboxMainImg ? lightboxMainImg.parentElement : null;
-
-let currentProject = null;
-let currentImageIndex = 0;
-let isTransitioning = false; // prevent rapid clicks from stacking transitions
-
-function showLightboxLoading() {
-    if (lightboxImgWrap) lightboxImgWrap.classList.add('is-loading');
-}
-
-function hideLightboxLoading() {
-    if (lightboxImgWrap) lightboxImgWrap.classList.remove('is-loading');
-}
-
-function updateLightboxImage(direction) {
-    if (!currentProject || isTransitioning) return;
-    const images = currentProject.images;
-    const src = getImageSrc(images[currentImageIndex]);
-
-    isTransitioning = true;
-
-    // Phase 1: Fade out current image
-    lightboxMainImg.classList.remove('lb-visible');
-    lightboxMainImg.classList.add('lb-hidden');
-
-    // Phase 2: After fade-out completes, swap src and fade in
-    setTimeout(() => {
-        // Clear old src immediately so stale image never shows
-        lightboxMainImg.removeAttribute('src');
-        showLightboxLoading();
-
-        const tempImg = new Image();
-        tempImg.onload = () => {
-            lightboxMainImg.src = src;
-            lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
-            hideLightboxLoading();
-
-            // Use rAF to ensure the browser has the new image painted
-            requestAnimationFrame(() => {
-                requestAnimationFrame(() => {
-                    lightboxMainImg.classList.remove('lb-hidden');
-                    lightboxMainImg.classList.add('lb-visible');
-                    isTransitioning = false;
-                });
-            });
-        };
-        tempImg.onerror = () => {
-            // Fallback: show image even if preload fails
-            lightboxMainImg.src = src;
-            lightboxMainImg.alt = `${currentProject.title} — photo ${currentImageIndex + 1}`;
-            hideLightboxLoading();
-            lightboxMainImg.classList.remove('lb-hidden');
-            lightboxMainImg.classList.add('lb-visible');
-            isTransitioning = false;
-        };
-        tempImg.src = src;
-    }, 250); // match the CSS fade-out duration
-
-    // Update dots immediately (they should reflect the new selection)
-    const dots = lightboxDots.querySelectorAll('.lightbox-dot');
-    dots.forEach((dot, i) => {
-        dot.classList.toggle('active', i === currentImageIndex);
-    });
-}
-
-function preloadProjectImages(project) {
-    if (!project) return;
-    project.images.forEach((img) => {
-        preloadImage(getImageSrc(img));
-    });
-}
-
-function openLightbox(projectIndex) {
-    currentProject = projectData[projectIndex];
-    currentImageIndex = 0;
-    isTransitioning = false;
-
-    if (!currentProject || !lightbox) return;
-
-    // ► IMMEDIATELY clear old image so stale gallery photos never show
-    lightboxMainImg.removeAttribute('src');
-    lightboxMainImg.alt = '';
-    lightboxMainImg.classList.remove('lb-visible');
-    lightboxMainImg.classList.add('lb-hidden');
-    showLightboxLoading();
-
-    // Preload all images for this project
-    preloadProjectImages(currentProject);
-
-    // Populate info (text updates instantly)
-    lightboxTitle.textContent = currentProject.title;
-    lightboxTag.textContent = currentProject.tag;
-    lightboxDesc.textContent = currentProject.desc;
-
-    // Create dots
-    lightboxDots.innerHTML = '';
-    currentProject.images.forEach((_, i) => {
-        const dot = document.createElement('button');
-        dot.className = 'lightbox-dot' + (i === 0 ? ' active' : '');
-        dot.setAttribute('aria-label', `View image ${i + 1}`);
-        dot.addEventListener('click', () => {
-            if (i === currentImageIndex) return;
-            currentImageIndex = i;
-            updateLightboxImage();
-        });
-        lightboxDots.appendChild(dot);
-    });
-
-    // Load first image — preload then fade in
-    const firstSrc = getImageSrc(currentProject.images[0]);
-    const tempImg = new Image();
-    tempImg.onload = () => {
-        lightboxMainImg.src = firstSrc;
-        lightboxMainImg.alt = `${currentProject.title} — photo 1`;
-        hideLightboxLoading();
-        requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                lightboxMainImg.classList.remove('lb-hidden');
-                lightboxMainImg.classList.add('lb-visible');
-            });
-        });
-    };
-    tempImg.onerror = () => {
-        lightboxMainImg.src = firstSrc;
-        lightboxMainImg.alt = `${currentProject.title} — photo 1`;
-        hideLightboxLoading();
-        lightboxMainImg.classList.remove('lb-hidden');
-        lightboxMainImg.classList.add('lb-visible');
-    };
-    tempImg.src = firstSrc;
-
-    // Show lightbox
-    lightbox.classList.add('active');
-    lenis.stop();
-}
-
-function closeLightbox() {
-    if (!lightbox) return;
-    lightbox.classList.remove('active');
-    lenis.start();
-    currentProject = null;
-    isTransitioning = false;
-
-    // Clear image so next open doesn't flash old content
-    if (lightboxMainImg) {
-        lightboxMainImg.removeAttribute('src');
-        lightboxMainImg.classList.remove('lb-visible');
-        lightboxMainImg.classList.add('lb-hidden');
-    }
-}
-
-// Gallery item click handlers (event delegation on the homepage grid)
-if (lightbox && galleryGrid) {
     galleryGrid.addEventListener('click', (e) => {
-        const item = e.target.closest('.gallery-item[data-project]');
-        if (!item) return;
-        const idx = parseInt(item.dataset.project, 10);
-        openLightbox(idx);
+        const card = e.target.closest('.collection-card[data-project]');
+        if (!card) return;
+        openCollectionLightbox(parseInt(card.dataset.project, 10));
     });
 }
 
-// Lightbox controls — bind whenever lightbox exists (works on both homepage & gallery page)
-if (lightbox) {
-    // Navigation
-    if (lightboxPrev) {
-        lightboxPrev.addEventListener('click', () => {
-            if (!currentProject) return;
-            currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
-            updateLightboxImage('left');
-        });
-    }
 
-    if (lightboxNext) {
-        lightboxNext.addEventListener('click', () => {
-            if (!currentProject) return;
-            currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
-            updateLightboxImage('right');
-        });
-    }
 
-    // Close handlers
-    if (lightboxClose) lightboxClose.addEventListener('click', closeLightbox);
-    if (lightboxBackdrop) lightboxBackdrop.addEventListener('click', closeLightbox);
 
-    document.addEventListener('keydown', (e) => {
-        if (!lightbox.classList.contains('active')) return;
-        if (e.key === 'Escape') closeLightbox();
-        if (e.key === 'ArrowLeft' && lightboxPrev) {
-            if (!currentProject) return;
-            currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
-            updateLightboxImage('left');
-        }
-        if (e.key === 'ArrowRight' && lightboxNext) {
-            if (!currentProject) return;
-            currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
-            updateLightboxImage('right');
-        }
-    });
 
-    // Touch swipe support for lightbox
-    let touchStartX = 0;
-    let touchEndX = 0;
-    const lightboxImages = document.querySelector('.lightbox-images');
-    if (lightboxImages) {
-        lightboxImages.addEventListener('touchstart', (e) => {
-            touchStartX = e.changedTouches[0].screenX;
-        }, { passive: true });
 
-        lightboxImages.addEventListener('touchend', (e) => {
-            touchEndX = e.changedTouches[0].screenX;
-            const swipeDistance = touchStartX - touchEndX;
-            if (Math.abs(swipeDistance) > 50 && currentProject) {
-                if (swipeDistance > 0) {
-                    // Swipe left → next image
-                    currentImageIndex = (currentImageIndex + 1) % currentProject.images.length;
-                    updateLightboxImage('right');
-                } else {
-                    // Swipe right → prev image
-                    currentImageIndex = (currentImageIndex - 1 + currentProject.images.length) % currentProject.images.length;
-                    updateLightboxImage('left');
-                }
-            }
-        }, { passive: true });
-    }
 
-    // CTA button closes lightbox and navigates to quote
-    if (lightboxCta) {
-        lightboxCta.addEventListener('click', (e) => {
-            e.preventDefault();
-            closeLightbox();
-            const href = lightboxCta.getAttribute('href') || '/quote.html';
-            setTimeout(() => {
-                window.location.href = href;
-            }, 300);
-        });
-    }
-}
+
+
+
 
 
 // ============================================
