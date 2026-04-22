@@ -3,16 +3,14 @@
 import { useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { LogIn, UserPlus, Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { LogIn, Mail, ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
-  const { login, signup, resetPassword } = useAuth();
+  const { login, resetPassword } = useAuth();
   const router = useRouter();
-  const [mode, setMode] = useState('login'); // 'login', 'signup', 'forgot'
+  const [mode, setMode] = useState('login'); // 'login' or 'forgot'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
@@ -21,7 +19,6 @@ export default function LoginPage() {
     setMode(newMode);
     setError('');
     setResetSent(false);
-    setConfirmPassword('');
   };
 
   const handleLogin = async (e) => {
@@ -30,31 +27,10 @@ export default function LoginPage() {
     setError('');
     try {
       await login(email, password);
+      // Route based on role happens in layout.js
       router.push('/dashboard');
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignup = async (e) => {
-    e.preventDefault();
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-    setLoading(true);
-    setError('');
-    try {
-      await signup(email, password, fullName);
-      router.push('/dashboard');
-    } catch (err) {
-      setError(err.message || 'Sign up failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -106,60 +82,13 @@ export default function LoginPage() {
               </button>
             </form>
             <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
-              <span>Don&apos;t have an account?{' '}</span>
-              <button onClick={() => switchMode('signup')}
-                style={{ color: 'var(--lucky-green-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
-                Sign Up
-              </button>
-              <span style={{ margin: '0 8px', opacity: 0.4 }}>•</span>
               <button onClick={() => switchMode('forgot')}
                 style={{ color: 'var(--lucky-green-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
-                Forgot password?
+                Forgot your password?
               </button>
             </div>
-          </>
-        )}
-
-        {/* ──────── SIGN UP ──────── */}
-        {mode === 'signup' && (
-          <>
-            <p className="login-subtitle">Create your account</p>
-            {error && <ErrorBox message={error} />}
-            <form onSubmit={handleSignup}>
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <input id="signup-name" type="text" className="form-input" placeholder="Your name"
-                  value={fullName} onChange={e => setFullName(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input id="signup-email" type="email" className="form-input" placeholder="you@luckylandscapes.com"
-                  value={email} onChange={e => setEmail(e.target.value)} required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <input id="signup-password" type="password" className="form-input" placeholder="••••••••"
-                  value={password} onChange={e => setPassword(e.target.value)} required minLength={6} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Confirm Password</label>
-                <input id="signup-confirm" type="password" className="form-input" placeholder="••••••••"
-                  value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} required minLength={6}
-                  style={confirmPassword && password !== confirmPassword ? { borderColor: '#ef4444' } : {}} />
-                {confirmPassword && password !== confirmPassword && (
-                  <div style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '4px' }}>Passwords do not match</div>
-                )}
-              </div>
-              <button id="signup-submit" type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={loading}>
-                {loading ? <><Loader2 size={18} className="spin" /> Creating account...</> : <>Create Account <UserPlus size={18} /></>}
-              </button>
-            </form>
-            <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
-              Already have an account?{' '}
-              <button onClick={() => switchMode('login')}
-                style={{ color: 'var(--lucky-green-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
-                Sign In
-              </button>
+            <div style={{ textAlign: 'center', marginTop: 'var(--space-sm)', fontSize: '0.78rem', color: 'var(--text-tertiary)', opacity: 0.6 }}>
+              Need an account? Ask your team admin to add you.
             </div>
           </>
         )}

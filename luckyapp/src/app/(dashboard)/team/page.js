@@ -26,6 +26,8 @@ export default function TeamPage() {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
+  const [invitePassword, setInvitePassword] = useState('');
+  const [inviteConfirmPw, setInviteConfirmPw] = useState('');
   const [inviteRole, setInviteRole] = useState('worker');
   const [inviteRate, setInviteRate] = useState('15');
   const [inviteState, setInviteState] = useState({ loading:false, success:false, error:null });
@@ -78,25 +80,35 @@ export default function TeamPage() {
   const roleColors = { owner:'tag-gold', admin:'tag-blue', worker:'tag-green', member:'tag-green', viewer:'tag-gray' };
 
   const handleInvite = async () => {
-    if (!inviteEmail) return;
+    if (!inviteEmail || !invitePassword) return;
+    if (invitePassword !== inviteConfirmPw) {
+      setInviteState({ loading:false, success:false, error:'Passwords do not match.' });
+      return;
+    }
+    if (invitePassword.length < 6) {
+      setInviteState({ loading:false, success:false, error:'Password must be at least 6 characters.' });
+      return;
+    }
     setInviteState({ loading:true, success:false, error:null });
     try {
       const res = await fetch('/api/invite-member', {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({
           email: inviteEmail,
+          password: invitePassword,
           fullName: inviteName || inviteEmail.split('@')[0],
           role: inviteRole,
+          hourlyRate: parseFloat(inviteRate) || 15,
           orgId: user?.orgId,
           orgName: user?.orgName,
           invitedBy: user?.fullName,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send invitation');
+      if (!res.ok) throw new Error(data.error || 'Failed to create member');
       setInviteState({ loading:false, success:true, error:null });
       if (loadTeamMembers) await loadTeamMembers();
-      setTimeout(() => { setShowInviteModal(false); }, 1500);
+      setTimeout(() => { setShowInviteModal(false); }, 2000);
     } catch (err) {
       setInviteState({ loading:false, success:false, error:err.message });
     }
@@ -111,10 +123,11 @@ export default function TeamPage() {
         </div>
         <div className="page-header-actions">
           <button className="btn btn-primary" onClick={() => {
-            setInviteEmail(''); setInviteName(''); setInviteRole('worker'); setInviteRate('15');
+            setInviteEmail(''); setInviteName(''); setInvitePassword(''); setInviteConfirmPw('');
+            setInviteRole('worker'); setInviteRate('15');
             setInviteState({loading:false,success:false,error:null}); setShowInviteModal(true);
           }}>
-            <UserPlus size={18} /> Invite Member
+            <UserPlus size={18} /> Add Member
           </button>
         </div>
       </div>
@@ -254,25 +267,39 @@ export default function TeamPage() {
         <div className="modal-overlay" onClick={() => !inviteState.loading && setShowInviteModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:'480px' }}>
             <div className="modal-header">
-              <h2><UserPlus size={20} style={{ marginRight:'8px', verticalAlign:'middle' }} /> Invite Team Member</h2>
+              <h2><UserPlus size={20} style={{ marginRight:'8px', verticalAlign:'middle' }} /> Add Team Member</h2>
               <button className="btn btn-icon btn-ghost" onClick={() => !inviteState.loading && setShowInviteModal(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
               {inviteState.success ? (
                 <div className="send-success-state">
                   <div className="send-success-icon"><CheckCircle size={48} /></div>
-                  <h3>Invitation Sent!</h3>
-                  <p>An invitation email has been sent to {inviteEmail}</p>
+                  <h3>Member Added!</h3>
+                  <p><strong>{inviteName || inviteEmail}</strong> can now log in at the login page with their email and the password you set.</p>
                 </div>
               ) : (
                 <>
                   <div className="form-group">
+                    <label className="form-label">Full Name <span className="required">*</span></label>
+                    <input className="form-input" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="John Smith" disabled={inviteState.loading} />
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">Email Address <span className="required">*</span></label>
                     <input className="form-input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="worker@email.com" disabled={inviteState.loading} />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">Full Name</label>
-                    <input className="form-input" value={inviteName} onChange={e => setInviteName(e.target.value)} placeholder="John Smith" disabled={inviteState.loading} />
+                  <div className="form-row">
+                    <div className="form-group">
+                      <label className="form-label">Password <span className="required">*</span></label>
+                      <input className="form-input" type="password" value={invitePassword} onChange={e => setInvitePassword(e.target.value)} placeholder="••••••••" disabled={inviteState.loading} minLength={6} />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Confirm Password <span className="required">*</span></label>
+                      <input className="form-input" type="password" value={inviteConfirmPw} onChange={e => setInviteConfirmPw(e.target.value)} placeholder="••••••••" disabled={inviteState.loading} minLength={6}
+                        style={inviteConfirmPw && invitePassword !== inviteConfirmPw ? {borderColor:'#ef4444'} : {}} />
+                      {inviteConfirmPw && invitePassword !== inviteConfirmPw && (
+                        <div style={{ color:'#ef4444', fontSize:'0.72rem', marginTop:'3px' }}>Passwords don&apos;t match</div>
+                      )}
+                    </div>
                   </div>
                   <div className="form-row">
                     <div className="form-group">
@@ -298,8 +325,8 @@ export default function TeamPage() {
                     {inviteRole === 'viewer' && 'Viewers can see all data but cannot edit anything.'}
                   </div>
                   <div style={{ background:'var(--status-info-bg)', borderRadius:'var(--radius-md)', padding:'var(--space-md)', display:'flex', alignItems:'flex-start', gap:'var(--space-sm)', fontSize:'0.82rem', color:'var(--status-info)' }}>
-                    <Mail size={16} style={{ flexShrink:0, marginTop:'2px' }} />
-                    <span>They&apos;ll receive an invite email to set their password and join {user?.orgName || 'your organization'}.</span>
+                    <UserPlus size={16} style={{ flexShrink:0, marginTop:'2px' }} />
+                    <span>This will create an account. Give them their email and the password you set — they can log in immediately.</span>
                   </div>
                   {inviteState.error && (
                     <div style={{ background:'var(--status-danger-bg)', borderRadius:'var(--radius-md)', padding:'var(--space-md)', marginTop:'var(--space-md)', display:'flex', alignItems:'flex-start', gap:'var(--space-sm)', fontSize:'0.82rem', color:'var(--status-danger)' }}>
@@ -313,8 +340,8 @@ export default function TeamPage() {
             {!inviteState.success && (
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setShowInviteModal(false)} disabled={inviteState.loading}>Cancel</button>
-                <button className="btn btn-primary" onClick={handleInvite} disabled={!inviteEmail || inviteState.loading}>
-                  {inviteState.loading ? <><Loader2 size={16} className="spin" /> Sending...</> : <><Send size={16} /> Send Invitation</>}
+                <button className="btn btn-primary" onClick={handleInvite} disabled={!inviteEmail || !invitePassword || inviteState.loading}>
+                  {inviteState.loading ? <><Loader2 size={16} className="spin" /> Creating...</> : <><UserPlus size={16} /> Create Account</>}
                 </button>
               </div>
             )}
