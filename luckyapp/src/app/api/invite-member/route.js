@@ -70,8 +70,9 @@ export async function POST(request) {
     if (authError) {
       // If user already exists in auth, try to get their ID
       if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
-        // Look up existing auth user by email (direct lookup, not paginated)
-        const { data: { user: existingUser }, error: lookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+        // Look up existing auth user by email
+        const { data: { users: matchedUsers } } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1, filter: email });
+        const existingUser = matchedUsers?.[0];
 
         if (existingUser) {
           // Update their password and metadata
