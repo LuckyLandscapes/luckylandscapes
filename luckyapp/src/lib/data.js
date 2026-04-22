@@ -215,6 +215,7 @@ function mapCalendarEventFromDb(row) {
     allDay: row.all_day,
     color: row.color,
     notes: row.notes,
+    assignedTo: row.assigned_to || [],
     googleEventId: row.google_event_id,
     createdAt: row.created_at?.split('T')[0] || '',
   };
@@ -730,6 +731,7 @@ export function DataProvider({ children }) {
       all_day: event.allDay || false,
       color: event.color || '#3a9c4a',
       notes: event.notes || '',
+      assigned_to: event.assignedTo || [],
     };
 
     const { data, error } = await supabase.from('calendar_events').insert(row).select().single();
@@ -750,6 +752,7 @@ export function DataProvider({ children }) {
     if (updates.allDay !== undefined) dbUpdates.all_day = updates.allDay;
     if (updates.color !== undefined) dbUpdates.color = updates.color;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.assignedTo !== undefined) dbUpdates.assigned_to = updates.assignedTo;
     if (updates.googleEventId !== undefined) dbUpdates.google_event_id = updates.googleEventId;
 
     setCalendarEvents(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
@@ -799,6 +802,7 @@ export function DataProvider({ children }) {
       endTime: null,
       color: '#3a9c4a',
       notes: crewNotes || '',
+      assignedTo: assignedTo || [],
     });
 
     return job;

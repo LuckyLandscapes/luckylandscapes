@@ -21,24 +21,47 @@ function getWeekDates(date) {
 
 export default function CrewSchedulePage() {
   const { user } = useAuth();
-  const { jobs, getCustomer } = useData();
+  const { jobs, calendarEvents, getCustomer } = useData();
   const [currentDate, setCurrentDate] = useState(new Date());
   const memberId = user?.id;
   const todayStr = fmtDate(new Date());
 
   const weekDates = getWeekDates(currentDate);
 
-  // My jobs grouped by date
+  // My jobs + calendar events grouped by date (deduplicated)
   const myJobsByDate = useMemo(() => {
     const map = {};
+
+    // Add jobs assigned to me
     jobs.forEach(j => {
       if (!j.scheduledDate || !(j.assignedTo || []).includes(memberId)) return;
       if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
       map[j.scheduledDate].push(j);
     });
+
+    // Add calendar events assigned to me (deduplicate by jobId)
+    calendarEvents.forEach(e => {
+      if (!e.date || !(e.assignedTo || []).includes(memberId)) return;
+      const dateJobs = map[e.date] || [];
+      // Skip if we already have the linked job
+      if (e.jobId && dateJobs.some(j => j.id === e.jobId)) return;
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push({
+        id: e.jobId || `evt-${e.id}`,
+        title: e.title,
+        scheduledDate: e.date,
+        scheduledTime: e.startTime,
+        status: 'scheduled',
+        customerId: e.customerId,
+        assignedTo: e.assignedTo || [],
+        crewNotes: e.notes,
+        address: '',
+      });
+    });
+
     Object.values(map).forEach(arr => arr.sort((a,b) => (a.scheduledTime||'').localeCompare(b.scheduledTime||'')));
     return map;
-  }, [jobs, memberId]);
+  }, [jobs, calendarEvents, memberId]);
 
   const navigate = (dir) => {
     const d = new Date(currentDate);

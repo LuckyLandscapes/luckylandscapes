@@ -29,7 +29,7 @@ function formatDateShort(d) {
 
 export default function CrewDashboardPage() {
   const { user } = useAuth();
-  const { jobs, getCustomer, getActiveTimeEntry, getMemberTimeEntries, clockIn, clockOut, timeEntries } = useData();
+  const { jobs, calendarEvents, getCustomer, getActiveTimeEntry, getMemberTimeEntries, clockIn, clockOut, timeEntries } = useData();
   const [clockOutNotes, setClockOutNotes] = useState('');
   const [showClockOutModal, setShowClockOutModal] = useState(false);
   const [clockLoading, setClockLoading] = useState(false);
@@ -37,17 +37,61 @@ export default function CrewDashboardPage() {
   const memberId = user?.id;
   const todayStr = new Date().toISOString().split('T')[0];
 
-  const myTodayJobs = useMemo(() =>
-    jobs.filter(j => j.scheduledDate === todayStr && (j.assignedTo || []).includes(memberId))
-      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '')),
-    [jobs, todayStr, memberId]);
+  // Merge jobs assigned to me + calendar events assigned to me (deduplicate by jobId)
+  const myTodayJobs = useMemo(() => {
+    // Start with jobs directly assigned to me
+    const directJobs = jobs.filter(j => j.scheduledDate === todayStr && (j.assignedTo || []).includes(memberId));
+    const jobIds = new Set(directJobs.map(j => j.id));
+
+    // Add calendar events assigned to me that don't have a matching job already included
+    calendarEvents.forEach(e => {
+      if (e.date !== todayStr) return;
+      if (!(e.assignedTo || []).includes(memberId)) return;
+      if (e.jobId && jobIds.has(e.jobId)) return; // already have the job
+      // Convert calendar event to job-like shape for display
+      directJobs.push({
+        id: e.jobId || `evt-${e.id}`,
+        title: e.title,
+        scheduledDate: e.date,
+        scheduledTime: e.startTime,
+        status: 'scheduled',
+        customerId: e.customerId,
+        assignedTo: e.assignedTo || [],
+        crewNotes: e.notes,
+        description: e.notes,
+        address: '',
+      });
+    });
+
+    return directJobs.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
+  }, [jobs, calendarEvents, todayStr, memberId]);
 
   const myWeekJobs = useMemo(() => {
     const end = new Date(); end.setDate(end.getDate() + (6 - end.getDay()));
     const endStr = end.toISOString().split('T')[0];
-    return jobs.filter(j => j.scheduledDate > todayStr && j.scheduledDate <= endStr && (j.assignedTo || []).includes(memberId))
-      .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
-  }, [jobs, todayStr, memberId]);
+    const directJobs = jobs.filter(j => j.scheduledDate > todayStr && j.scheduledDate <= endStr && (j.assignedTo || []).includes(memberId));
+    const jobIds = new Set(directJobs.map(j => j.id));
+
+    calendarEvents.forEach(e => {
+      if (!e.date || e.date <= todayStr || e.date > endStr) return;
+      if (!(e.assignedTo || []).includes(memberId)) return;
+      if (e.jobId && jobIds.has(e.jobId)) return;
+      directJobs.push({
+        id: e.jobId || `evt-${e.id}`,
+        title: e.title,
+        scheduledDate: e.date,
+        scheduledTime: e.startTime,
+        status: 'scheduled',
+        customerId: e.customerId,
+        assignedTo: e.assignedTo || [],
+        crewNotes: e.notes,
+        description: e.notes,
+        address: '',
+      });
+    });
+
+    return directJobs.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  }, [jobs, calendarEvents, todayStr, memberId]);
 
   const activeEntry = getActiveTimeEntry(memberId);
   const recentEntries = getMemberTimeEntries(memberId, 7).filter(t => t.clockOut);

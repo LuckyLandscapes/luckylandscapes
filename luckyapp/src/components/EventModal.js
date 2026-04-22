@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Clock,
   User,
+  Users,
   FileText,
   Tag,
 } from 'lucide-react';
@@ -19,7 +20,10 @@ const EVENT_TYPES = [
 ];
 
 export default function EventModal({ event, defaultDate, onClose }) {
-  const { addCalendarEvent, updateCalendarEvent, deleteCalendarEvent, customers } = useData();
+  const {
+    addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
+    addJob, customers, teamMembers,
+  } = useData();
 
   const [form, setForm] = useState({
     title: event?.title || '',
@@ -31,6 +35,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
     customerId: event?.customerId || '',
     notes: event?.notes || '',
     color: event?.color || '#3a9c4a',
+    assignedTo: event?.assignedTo || [],
   });
 
   const [customerSearch, setCustomerSearch] = useState('');
@@ -60,6 +65,15 @@ export default function EventModal({ event, defaultDate, onClose }) {
     }));
   };
 
+  const handleToggleMember = (id) => {
+    setForm(prev => ({
+      ...prev,
+      assignedTo: prev.assignedTo.includes(id)
+        ? prev.assignedTo.filter(m => m !== id)
+        : [...prev.assignedTo, id],
+    }));
+  };
+
   const handleSave = async () => {
     if (!form.title || !form.date) return;
     setSaving(true);
@@ -75,6 +89,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
         customerId: form.customerId || null,
         notes: form.notes,
         color: form.color,
+        assignedTo: form.assignedTo,
       };
 
       if (event?.id) {
@@ -85,7 +100,31 @@ export default function EventModal({ event, defaultDate, onClose }) {
           syncToGoogleCalendar('PUT', { ...eventData, googleEventId: event.googleEventId });
         }
       } else {
-        const created = await addCalendarEvent(eventData);
+        // For job-type events, also create a backing job record so workers see it
+        let jobId = null;
+        if (form.type === 'job') {
+          const customer = form.customerId ? customers.find(c => c.id === form.customerId) : null;
+          const job = await addJob({
+            customerId: form.customerId || null,
+            title: form.title,
+            description: form.notes || '',
+            address: customer?.address
+              ? `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim()
+              : '',
+            scheduledDate: form.date,
+            scheduledTime: form.allDay ? null : form.startTime,
+            estimatedDuration: '4 hours',
+            assignedTo: form.assignedTo,
+            crewNotes: form.notes || '',
+            total: 0,
+          });
+          if (job) jobId = job.id;
+        }
+
+        const created = await addCalendarEvent({
+          ...eventData,
+          jobId,
+        });
 
         // Sync new event to Google Calendar
         if (created?.id) {
@@ -137,6 +176,8 @@ export default function EventModal({ event, defaultDate, onClose }) {
     await deleteCalendarEvent(event.id);
     onClose();
   };
+
+  const activeMembers = teamMembers.filter(m => m.isActive);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -284,6 +325,42 @@ export default function EventModal({ event, defaultDate, onClose }) {
               </>
             )}
           </div>
+
+          {/* Crew Assignment — only for job-type events */}
+          {form.type === 'job' && activeMembers.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">
+                <Users size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Assign Crew
+              </label>
+              <div className="cal-crew-grid">
+                {activeMembers.map(m => {
+                  const isSelected = form.assignedTo.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      className={`cal-crew-chip ${isSelected ? 'active' : ''}`}
+                      onClick={() => handleToggleMember(m.id)}
+                    >
+                      <div className="table-avatar" style={{
+                        width: 26, height: 26, fontSize: '0.6rem',
+                        background: isSelected ? 'var(--lucky-green)' : 'var(--bg-elevated)',
+                        color: isSelected ? 'white' : 'var(--text-secondary)',
+                      }}>
+                        {m.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || '??'}
+                      </div>
+                      <span>{m.fullName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              {form.assignedTo.length === 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                  💡 Assign crew members so they can see this job on their schedule
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Notes */}
           <div className="form-group">
