@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   X,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -24,10 +25,18 @@ const navItems = [
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/quotes', label: 'Quotes', icon: FileText, badgeKey: 'draftQuotes' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, badgeKey: 'todayEvents' },
-  { href: '/catalog', label: 'Material Catalog', icon: Palette },
+  { href: '/catalog', label: 'Catalog', icon: Palette },
   { href: '/measure', label: 'Measure', icon: Ruler },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings },
+];
+
+// Bottom nav items — the 4 most used + a "More" trigger
+const bottomNavItems = [
+  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
+  { href: '/customers', label: 'Customers', icon: Users },
+  { href: '/quotes', label: 'Quotes', icon: FileText },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
 
 export default function Sidebar() {
@@ -50,22 +59,9 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Mobile Toggle */}
-      <button
-        className="sidebar-toggle"
-        onClick={() => setMobileOpen(!mobileOpen)}
-        style={{ display: undefined }}
-      >
-        {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-      </button>
-
       {/* Overlay */}
       {mobileOpen && (
         <div
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            zIndex: 99, display: 'none',
-          }}
           className="sidebar-mobile-overlay"
           onClick={() => setMobileOpen(false)}
         />
@@ -79,6 +75,14 @@ export default function Sidebar() {
             <span className="sidebar-brand-name">Lucky App</span>
             <span className="sidebar-brand-sub">{user?.orgName || 'Business Platform'}</span>
           </div>
+          {/* Mobile close button inside sidebar */}
+          <button
+            className="sidebar-close-btn"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close navigation"
+          >
+            <X size={20} />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -123,6 +127,31 @@ export default function Sidebar() {
           </div>
         </div>
       </aside>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        {bottomNavItems.map(item => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`mobile-bottom-nav-item ${isActive ? 'active' : ''}`}
+            >
+              <Icon size={20} />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+        <button
+          className={`mobile-bottom-nav-item ${mobileOpen ? 'active' : ''}`}
+          onClick={() => setMobileOpen(!mobileOpen)}
+        >
+          <MoreHorizontal size={20} />
+          <span>More</span>
+        </button>
+      </nav>
     </>
   );
 }

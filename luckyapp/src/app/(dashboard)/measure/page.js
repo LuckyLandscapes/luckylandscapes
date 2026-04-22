@@ -276,10 +276,12 @@ export default function MeasurePage() {
     );
   }
 
+  const [mobileShowPanel, setMobileShowPanel] = useState(false);
+
   return (
-    <div className="page animate-fade-in" style={{ height: 'calc(100vh - 0px)', display: 'flex', flexDirection: 'column', padding: 'var(--space-md) var(--space-xl)' }}>
+    <div className="measure-page page animate-fade-in">
       {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)', flexShrink: 0, flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
+      <div className="measure-header">
         <div>
           <h1 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Ruler size={22} /> Measure
@@ -297,10 +299,26 @@ export default function MeasurePage() {
         </div>
       </div>
 
+      {/* Mobile toggle between map and panel */}
+      <div className="measure-mobile-toggle">
+        <button
+          className={`tab ${!mobileShowPanel ? 'active' : ''}`}
+          onClick={() => setMobileShowPanel(false)}
+        >
+          🗺️ Map
+        </button>
+        <button
+          className={`tab ${mobileShowPanel ? 'active' : ''}`}
+          onClick={() => setMobileShowPanel(true)}
+        >
+          📐 Areas {areas.length > 0 && `(${areas.length})`}
+        </button>
+      </div>
+
       {/* Main content: Map + Panel */}
-      <div style={{ display: 'flex', flex: 1, gap: 'var(--space-md)', minHeight: 0 }}>
+      <div className="measure-layout">
         {/* Map */}
-        <div style={{ flex: 1, position: 'relative', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border-primary)' }}>
+        <div className={`measure-map-container ${mobileShowPanel ? 'mobile-hidden' : ''}`}>
           {/* Search bar overlay */}
           <div className="measure-search-bar">
             {isSearching ? (
@@ -381,19 +399,19 @@ export default function MeasurePage() {
           </div>
 
           {/* Map container */}
-          <div ref={mapRef} style={{ width: '100%', height: '100%', minHeight: '500px' }} />
+          <div ref={mapRef} className="measure-map-canvas" />
 
           {/* Drawing hint overlay */}
           {isDrawing && (
             <div className="measure-drawing-hint">
               <SquareIcon size={16} />
-              Click on the map to draw polygon points. Click the first point to close the shape.
+              <span>Tap to draw polygon points. Tap the first point to close.</span>
             </div>
           )}
         </div>
 
         {/* Right panel — Area calculations */}
-        <div className="measure-panel">
+        <div className={`measure-panel ${mobileShowPanel ? 'mobile-visible' : ''}`}>
           <div className="measure-panel-header">
             <h3 style={{ fontSize: '0.95rem' }}>
               <Layers size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />

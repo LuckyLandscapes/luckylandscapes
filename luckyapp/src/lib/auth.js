@@ -18,28 +18,46 @@ const DEMO_USER = {
 };
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Try to restore cached profile instantly so returning users aren't bounced to login
+  const [user, setUser] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const cached = localStorage.getItem('lucky_app_profile');
+      return cached ? JSON.parse(cached) : null;
+    } catch {
+      return null;
+    }
+  });
+  // If we have a cached profile, don't show the loading spinner
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    return !localStorage.getItem('lucky_app_profile');
+  });
   const [mode, setMode] = useState('demo'); // 'demo' or 'supabase'
+
+  // Helper to update user + persist to localStorage
+  const setAndCacheUser = useCallback((userData) => {
+    setUser(userData);
+    if (userData) {
+      localStorage.setItem('lucky_app_profile', JSON.stringify(userData));
+    } else {
+      localStorage.removeItem('lucky_app_profile');
+    }
+  }, []);
 
   useEffect(() => {
     if (isSupabaseConnected()) {
       setMode('supabase');
-      // Check for existing Supabase session
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session?.user) {
-          loadUserProfile(session.user);
-        } else {
-          setLoading(false);
-        }
-      });
 
-      // Listen for auth changes
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Use ONLY onAuthStateChange — it fires INITIAL_SESSION on mount,
+      // which covers the getSession() case without a race condition.
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
         if (session?.user) {
+          // For INITIAL_SESSION, TOKEN_REFRESHED, and SIGNED_IN — load/refresh profile
           loadUserProfile(session.user);
         } else {
-          setUser(null);
+          // SIGNED_OUT or no session
+          setAndCacheUser(null);
           setLoading(false);
         }
       });
@@ -75,7 +93,7 @@ export function AuthProvider({ children }) {
         .maybeSingle();
 
       if (member) {
-        setUser({
+        setAndCacheUser({
           id: member.id,
           authId: authUser.id,
           email: authUser.email,
@@ -93,10 +111,10 @@ export function AuthProvider({ children }) {
         console.log('No team profile found. Auto-creating org...');
         const created = await autoCreateOrg(authUser);
         if (created) {
-          setUser(created);
+          setAndCacheUser(created);
         } else {
           // Fallback if auto-create fails — user can still see the UI
-          setUser({
+          setAndCacheUser({
             id: authUser.id,
             email: authUser.email,
             fullName: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
@@ -191,9 +209,9 @@ export function AuthProvider({ children }) {
     if (mode === 'supabase') {
       await supabase.auth.signOut();
     }
-    setUser(null);
+    setAndCacheUser(null);
     localStorage.removeItem('lucky_app_user');
-  }, [mode]);
+  }, [mode, setAndCacheUser]);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, signup, logout, mode }}>

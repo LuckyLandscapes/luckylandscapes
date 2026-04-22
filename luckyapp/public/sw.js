@@ -1,9 +1,12 @@
 // ============================================
 // 🍀 Lucky App — Service Worker
-// Network-first with offline fallback
+// Network-first with automatic updates
 // ============================================
 
-const CACHE_NAME = 'lucky-app-v1';
+// IMPORTANT: Bump this version string on every deploy.
+// Vercel rebuilds this file each deploy, so the browser
+// sees a byte-changed SW and triggers an update cycle.
+const CACHE_VERSION = 'lucky-app-v' + Date.now();
 const OFFLINE_URL = '/offline';
 
 // Assets to pre-cache on install
@@ -14,26 +17,33 @@ const PRECACHE_ASSETS = [
   '/icon-512x512.png',
 ];
 
-// Install: pre-cache critical assets
+// Install: pre-cache critical assets, skip waiting immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
+    caches.open(CACHE_VERSION).then((cache) => {
       return cache.addAll(PRECACHE_ASSETS);
     })
   );
-  // Activate immediately
+  // Don't wait for old SW to finish — activate immediately
   self.skipWaiting();
 });
 
-// Activate: clean up old caches
+// Activate: purge ALL old caches, take control of all clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
-          .filter((name) => name !== CACHE_NAME)
+          .filter((name) => name !== CACHE_VERSION)
           .map((name) => caches.delete(name))
       );
+    }).then(() => {
+      // Notify all open tabs that the SW has been updated
+      self.clients.matchAll({ type: 'window' }).then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: 'SW_UPDATED' });
+        });
+      });
     })
   );
   // Take control of all pages immediately
@@ -41,20 +51,18 @@ self.addEventListener('activate', (event) => {
 });
 
 // Fetch: network-first strategy
-// For navigation requests, fall back to offline page
-// For other requests, fall back to cache
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Skip chrome-extension and other non-http requests
+  // Skip non-http requests
   if (!event.request.url.startsWith('http')) return;
 
   // Skip API routes — always go to network
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api/')) return;
 
-  // Navigation requests (page loads)
+  // Navigation requests (page loads) — ALWAYS network first
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => {
@@ -64,7 +72,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // All other requests: network first, cache fallback
+  // Static assets: network first, cache fallback
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -75,7 +83,7 @@ self.addEventListener('fetch', (event) => {
             url.pathname.startsWith('/_next/static/'))
         ) {
           const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
+          caches.open(CACHE_VERSION).then((cache) => {
             cache.put(event.request, responseClone);
           });
         }
