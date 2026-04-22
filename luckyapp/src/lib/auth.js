@@ -260,6 +260,25 @@ export function AuthProvider({ children }) {
     }
   }, [mode]);
 
+  // --- Sign Up ---
+  const signup = useCallback(async (email, password, fullName) => {
+    if (mode !== 'supabase') {
+      return login(email, password);
+    }
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
+    if (authError) throw authError;
+
+    // The auth state change listener will handle creating the org + profile
+    return authData.user;
+  }, [mode, login]);
+
   // --- Password Reset ---
   const resetPassword = useCallback(async (email) => {
     if (mode !== 'supabase') {
@@ -289,6 +308,7 @@ export function AuthProvider({ children }) {
       user,
       loading,
       login,
+      signup,
       resetPassword,
       logout,
       mode,
