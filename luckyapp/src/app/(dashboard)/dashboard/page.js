@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Send,
   AlertCircle,
+  HardHat,
 } from 'lucide-react';
 
 function formatCurrency(amount) {
@@ -50,7 +51,7 @@ const activityColors = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { customers, quotes, activity } = useData();
+  const { customers, quotes, activity, teamMembers, timeEntries } = useData();
 
   // Calculate metrics
   const totalRevenue = quotes
@@ -65,6 +66,10 @@ export default function DashboardPage() {
   const firstName = user?.fullName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // Crew stats
+  const clockedInWorkers = timeEntries.filter(t => !t.clockOut).length;
+  const activeWorkers = teamMembers.filter(m => m.role === 'worker' && m.isActive).length;
 
   return (
     <div className="page animate-fade-in">
@@ -129,6 +134,16 @@ export default function DashboardPage() {
           </div>
           <div className="stat-card-value">{closeRate}%</div>
           <div className="stat-card-label">Quote Close Rate</div>
+        </div>
+
+        <div className="stat-card" style={{ '--accent': 'var(--status-success)', '--accent-bg': 'rgba(58,156,74,0.08)' }}>
+          <div className="stat-card-header">
+            <div className="stat-card-icon">
+              <HardHat />
+            </div>
+          </div>
+          <div className="stat-card-value">{clockedInWorkers}<span style={{ fontSize: '0.6em', fontWeight: 400, color: 'var(--text-tertiary)' }}> / {activeWorkers}</span></div>
+          <div className="stat-card-label">Crew On Clock</div>
         </div>
       </div>
 

@@ -16,32 +16,51 @@ import {
   Menu,
   X,
   MoreHorizontal,
+  HardHat,
+  Clock,
+  UserCog,
 } from 'lucide-react';
 import { useState } from 'react';
 
-const navItems = [
+// Owner/Admin navigation
+const ownerNavItems = [
   { label: 'Navigation', type: 'section' },
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/customers', label: 'Customers', icon: Users },
-  { href: '/quotes', label: 'Quotes', icon: FileText, badgeKey: 'draftQuotes' },
-  { href: '/calendar', label: 'Calendar', icon: CalendarDays, badgeKey: 'todayEvents' },
-  { href: '/catalog', label: 'Catalog', icon: Palette },
-  { href: '/measure', label: 'Measure', icon: Ruler },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'admin'] },
+  { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'admin'] },
+  { href: '/quotes', label: 'Quotes', icon: FileText, roles: ['owner', 'admin'], badgeKey: 'draftQuotes' },
+  { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
+  { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
+  { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
+  { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
+  { href: '/team', label: 'Team & Payroll', icon: UserCog, roles: ['owner'] },
   { label: 'System', type: 'section' },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },
 ];
 
-// Bottom nav items — the 4 most used + a "More" trigger
-const bottomNavItems = [
+// Worker navigation
+const workerNavItems = [
+  { label: 'My Work', type: 'section' },
+  { href: '/crew-dashboard', label: 'My Dashboard', icon: HardHat, roles: ['worker'] },
+  { href: '/crew-schedule', label: 'My Schedule', icon: CalendarDays, roles: ['worker'] },
+];
+
+// Bottom nav for owners/admins
+const ownerBottomNavItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/customers', label: 'Customers', icon: Users },
   { href: '/quotes', label: 'Quotes', icon: FileText },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays },
 ];
 
+// Bottom nav for workers
+const workerBottomNavItems = [
+  { href: '/crew-dashboard', label: 'Home', icon: HardHat },
+  { href: '/crew-schedule', label: 'Schedule', icon: CalendarDays },
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, logout, isWorker } = useAuth();
   const { quotes, calendarEvents, jobs } = useData();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -56,6 +75,13 @@ export default function Sidebar() {
     .map((n) => n[0])
     .join('')
     .toUpperCase() || '??';
+
+  // Choose nav items based on role
+  const navItems = isWorker ? workerNavItems : ownerNavItems;
+  const bottomNavItems = isWorker ? workerBottomNavItems : ownerBottomNavItems;
+
+  // Role display label
+  const roleLabel = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '';
 
   return (
     <>
@@ -121,7 +147,7 @@ export default function Sidebar() {
             <div className="sidebar-user-avatar">{initials}</div>
             <div className="sidebar-user-info">
               <div className="sidebar-user-name">{user?.fullName}</div>
-              <div className="sidebar-user-role">{user?.role}</div>
+              <div className="sidebar-user-role">{roleLabel}</div>
             </div>
             <LogOut size={16} style={{ color: 'var(--text-tertiary)' }} />
           </div>

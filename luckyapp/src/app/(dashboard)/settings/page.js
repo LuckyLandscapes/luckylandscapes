@@ -376,11 +376,13 @@ export default function SettingsPage() {
                       onChange={(e) => setInviteRole(e.target.value)}
                       disabled={inviteState.loading}
                     >
+                      <option value="worker">Worker — Crew member</option>
                       <option value="admin">Admin — Full access</option>
                       <option value="member">Member — Can create & edit</option>
                       <option value="viewer">Viewer — Read-only access</option>
                     </select>
                     <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                      {inviteRole === 'worker' && 'Sees assigned jobs, clock in/out, customer info for their jobs. Mobile-optimized.'}
                       {inviteRole === 'admin' && 'Can manage customers, quotes, catalog, and team settings.'}
                       {inviteRole === 'member' && 'Can create and edit customers and quotes. Cannot manage team.'}
                       {inviteRole === 'viewer' && 'Can view all data but cannot create or edit anything.'}

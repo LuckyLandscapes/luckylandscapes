@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
       const { data: member, error } = await supabase
         .from('team_members')
         .select(`
-          id, full_name, role, phone, avatar_url,
+          id, full_name, role, phone, avatar_url, hourly_rate,
           organizations (id, name, slug, industry)
         `)
         .eq('user_id', authUser.id)
@@ -101,27 +101,103 @@ export function AuthProvider({ children }) {
           role: member.role,
           phone: member.phone,
           avatarUrl: member.avatar_url,
+          hourlyRate: member.hourly_rate,
           orgId: member.organizations?.id,
           orgName: member.organizations?.name,
           orgSlug: member.organizations?.slug,
           orgIndustry: member.organizations?.industry,
         });
       } else {
-        // No profile found — auto-create org + team member
-        console.log('No team profile found. Auto-creating org...');
-        const created = await autoCreateOrg(authUser);
-        if (created) {
-          setAndCacheUser(created);
-        } else {
-          // Fallback if auto-create fails — user can still see the UI
+        // Check if there's a pending (invited but not yet active) member record
+        const { data: pendingMember } = await supabase
+          .from('team_members')
+          .select(`
+            id, full_name, role, phone, avatar_url, hourly_rate,
+            organizations (id, name, slug, industry)
+          `)
+          .eq('user_id', authUser.id)
+          .eq('is_active', false)
+          .maybeSingle();
+
+        if (pendingMember) {
+          // Activate the pending member (they just accepted their invite)
+          await supabase
+            .from('team_members')
+            .update({ is_active: true })
+            .eq('id', pendingMember.id);
+
           setAndCacheUser({
-            id: authUser.id,
+            id: pendingMember.id,
+            authId: authUser.id,
             email: authUser.email,
-            fullName: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
-            role: 'owner',
-            orgId: null,
-            orgName: null,
+            fullName: pendingMember.full_name,
+            role: pendingMember.role,
+            phone: pendingMember.phone,
+            avatarUrl: pendingMember.avatar_url,
+            hourlyRate: pendingMember.hourly_rate,
+            orgId: pendingMember.organizations?.id,
+            orgName: pendingMember.organizations?.name,
+            orgSlug: pendingMember.organizations?.slug,
+            orgIndustry: pendingMember.organizations?.industry,
           });
+        } else {
+          // Check if user was invited via metadata (edge case: team_member record
+          // wasn't created yet, but user_metadata has the org info)
+          const invitedOrgId = authUser.user_metadata?.invited_org_id;
+          const invitedRole = authUser.user_metadata?.invited_role;
+
+          if (invitedOrgId) {
+            // Create team_member record for the invited user
+            const { data: newMember } = await supabase
+              .from('team_members')
+              .insert({
+                org_id: invitedOrgId,
+                user_id: authUser.id,
+                full_name: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+                email: authUser.email,
+                role: invitedRole || 'worker',
+                is_active: true,
+              })
+              .select(`
+                id, full_name, role, phone, avatar_url, hourly_rate,
+                organizations (id, name, slug, industry)
+              `)
+              .single();
+
+            if (newMember) {
+              setAndCacheUser({
+                id: newMember.id,
+                authId: authUser.id,
+                email: authUser.email,
+                fullName: newMember.full_name,
+                role: newMember.role,
+                phone: newMember.phone,
+                avatarUrl: newMember.avatar_url,
+                hourlyRate: newMember.hourly_rate,
+                orgId: newMember.organizations?.id,
+                orgName: newMember.organizations?.name,
+                orgSlug: newMember.organizations?.slug,
+                orgIndustry: newMember.organizations?.industry,
+              });
+            }
+          } else {
+            // No profile, no invite — auto-create org (first-time owner setup)
+            console.log('No team profile found. Auto-creating org...');
+            const created = await autoCreateOrg(authUser);
+            if (created) {
+              setAndCacheUser(created);
+            } else {
+              // Fallback if auto-create fails — user can still see the UI
+              setAndCacheUser({
+                id: authUser.id,
+                email: authUser.email,
+                fullName: authUser.user_metadata?.full_name || authUser.email.split('@')[0],
+                role: 'owner',
+                orgId: null,
+                orgName: null,
+              });
+            }
+          }
         }
       }
     } catch (err) {
@@ -184,25 +260,16 @@ export function AuthProvider({ children }) {
     }
   }, [mode]);
 
-  // --- Sign Up ---
-  const signup = useCallback(async (email, password, fullName) => {
+  // --- Password Reset ---
+  const resetPassword = useCallback(async (email) => {
     if (mode !== 'supabase') {
-      return login(email, password);
+      throw new Error('Password reset is not available in demo mode.');
     }
-
-    // 1. Create auth account
-    const { data: authData, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-      },
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
     });
-    if (authError) throw authError;
-
-    // The auth state change listener will handle creating the org + profile
-    return authData.user;
-  }, [mode, login]);
+    if (error) throw error;
+  }, [mode]);
 
   // --- Logout ---
   const logout = useCallback(async () => {
@@ -213,8 +280,21 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('lucky_app_user');
   }, [mode, setAndCacheUser]);
 
+  // Helper to check role permissions
+  const isOwnerOrAdmin = user?.role === 'owner' || user?.role === 'admin';
+  const isWorker = user?.role === 'worker';
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, mode }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      login,
+      resetPassword,
+      logout,
+      mode,
+      isOwnerOrAdmin,
+      isWorker,
+    }}>
       {children}
     </AuthContext.Provider>
   );

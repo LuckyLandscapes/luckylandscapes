@@ -136,8 +136,23 @@ function mapTeamMemberFromDb(row) {
     phone: row.phone,
     role: row.role,
     avatarUrl: row.avatar_url,
+    hourlyRate: parseFloat(row.hourly_rate) || 15,
     isActive: row.is_active,
     createdAt: row.created_at?.split('T')[0] || '',
+  };
+}
+
+function mapTimeEntryFromDb(row) {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    memberId: row.member_id,
+    jobId: row.job_id,
+    clockIn: row.clock_in,
+    clockOut: row.clock_out,
+    durationMinutes: row.duration_minutes,
+    notes: row.notes || '',
+    createdAt: row.created_at || '',
   };
 }
 
@@ -218,6 +233,7 @@ export function DataProvider({ children }) {
   const [teamMembers, setTeamMembers] = useState([]);
   const [jobs, setJobs] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [timeEntries, setTimeEntries] = useState([]);
   const [loaded, setLoaded] = useState(false);
 
   // ---------- Load data from Supabase ----------
@@ -231,7 +247,7 @@ export function DataProvider({ children }) {
 
     async function loadAll() {
       try {
-        const [custRes, quoteRes, actRes, matRes, svcRes, teamRes, jobsRes, eventsRes] = await Promise.all([
+        const [custRes, quoteRes, actRes, matRes, svcRes, teamRes, jobsRes, eventsRes, timeRes] = await Promise.all([
           supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
           supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
           supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
@@ -240,6 +256,7 @@ export function DataProvider({ children }) {
           supabase.from('team_members').select('*').eq('org_id', orgId).order('created_at', { ascending: true }),
           supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
           supabase.from('calendar_events').select('*').eq('org_id', orgId).order('date', { ascending: true }),
+          supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(500),
         ]);
 
         if (cancelled) return;
@@ -252,6 +269,7 @@ export function DataProvider({ children }) {
         setTeamMembers((teamRes.data || []).map(mapTeamMemberFromDb));
         setJobs((jobsRes.data || []).map(mapJobFromDb));
         setCalendarEvents((eventsRes.data || []).map(mapCalendarEventFromDb));
+        setTimeEntries((timeRes.data || []).map(mapTimeEntryFromDb));
 
         // Seed default catalogs if empty (first-time setup)
         if ((matRes.data || []).length === 0) {
@@ -352,6 +370,22 @@ export function DataProvider({ children }) {
           if (prev.some(a => a.id === payload.new.id)) return prev;
           return [mapActivityFromDb(payload.new), ...prev];
         });
+      })
+      // --- Time Entries ---
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'time_entries' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setTimeEntries(prev => {
+          if (prev.some(t => t.id === payload.new.id)) return prev;
+          return [mapTimeEntryFromDb(payload.new), ...prev];
+        });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'time_entries' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setTimeEntries(prev => prev.map(t => t.id === payload.new.id ? mapTimeEntryFromDb(payload.new) : t));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'time_entries' }, (payload) => {
+        if (!isOurs(payload)) return;
+        setTimeEntries(prev => prev.filter(t => t.id !== payload.old.id));
       })
       .subscribe();
 
@@ -504,6 +538,19 @@ export function DataProvider({ children }) {
     if (data) setTeamMembers(data.map(mapTeamMemberFromDb));
   }, [orgId]);
 
+  const updateTeamMember = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+    if (updates.role !== undefined) dbUpdates.role = updates.role;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.hourlyRate !== undefined) dbUpdates.hourly_rate = updates.hourlyRate;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+
+    setTeamMembers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    const { error } = await supabase.from('team_members').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating team member:', error);
+  }, []);
+
   const addActivity = useCallback(async (entry) => {
     if (!orgId) return;
     const row = {
@@ -521,6 +568,78 @@ export function DataProvider({ children }) {
     const mapped = mapActivityFromDb(data);
     setActivity(prev => [mapped, ...prev]);
   }, [orgId]);
+
+  // ---------- Time Entry CRUD (Clock In/Out) ----------
+  const clockIn = useCallback(async (memberId, jobId = null) => {
+    if (!orgId) return null;
+    const row = {
+      org_id: orgId,
+      member_id: memberId,
+      job_id: jobId,
+      clock_in: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase.from('time_entries').insert(row).select().single();
+    if (error) { console.error('Error clocking in:', error); return null; }
+
+    const mapped = mapTimeEntryFromDb(data);
+    setTimeEntries(prev => [mapped, ...prev]);
+    return mapped;
+  }, [orgId]);
+
+  const clockOut = useCallback(async (entryId, notes = '') => {
+    const now = new Date();
+    const entry = timeEntries.find(t => t.id === entryId);
+    const durationMinutes = entry
+      ? Math.round((now - new Date(entry.clockIn)) / 60000)
+      : null;
+
+    const dbUpdates = {
+      clock_out: now.toISOString(),
+      duration_minutes: durationMinutes,
+      notes: notes || '',
+    };
+
+    setTimeEntries(prev => prev.map(t =>
+      t.id === entryId ? { ...t, clockOut: now.toISOString(), durationMinutes, notes } : t
+    ));
+
+    const { error } = await supabase.from('time_entries').update(dbUpdates).eq('id', entryId);
+    if (error) console.error('Error clocking out:', error);
+  }, [timeEntries]);
+
+  const updateTimeEntry = useCallback(async (id, updates) => {
+    const dbUpdates = {};
+    if (updates.clockIn !== undefined) dbUpdates.clock_in = updates.clockIn;
+    if (updates.clockOut !== undefined) dbUpdates.clock_out = updates.clockOut;
+    if (updates.durationMinutes !== undefined) dbUpdates.duration_minutes = updates.durationMinutes;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.jobId !== undefined) dbUpdates.job_id = updates.jobId;
+
+    setTimeEntries(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    const { error } = await supabase.from('time_entries').update(dbUpdates).eq('id', id);
+    if (error) console.error('Error updating time entry:', error);
+  }, []);
+
+  const deleteTimeEntry = useCallback(async (id) => {
+    setTimeEntries(prev => prev.filter(t => t.id !== id));
+    const { error } = await supabase.from('time_entries').delete().eq('id', id);
+    if (error) console.error('Error deleting time entry:', error);
+  }, []);
+
+  // Get the currently active (open) time entry for a member
+  const getActiveTimeEntry = useCallback((memberId) => {
+    return timeEntries.find(t => t.memberId === memberId && !t.clockOut);
+  }, [timeEntries]);
+
+  // Get time entries for a specific member
+  const getMemberTimeEntries = useCallback((memberId, days = 30) => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    return timeEntries.filter(t =>
+      t.memberId === memberId && new Date(t.clockIn) >= cutoff
+    );
+  }, [timeEntries]);
 
   // ---------- Job CRUD ----------
   const addJob = useCallback(async (job) => {
@@ -680,8 +799,13 @@ export function DataProvider({ children }) {
   const getEventsByDate = useCallback((date) => calendarEvents.filter(e => e.date === date), [calendarEvents]);
   const getJobsByDate = useCallback((date) => jobs.filter(j => j.scheduledDate === date), [jobs]);
 
+  // Get jobs assigned to a specific team member
+  const getMyJobs = useCallback((memberId) => {
+    return jobs.filter(j => (j.assignedTo || []).includes(memberId));
+  }, [jobs]);
+
   const value = {
-    customers, quotes, materials, services, activity, teamMembers, jobs, calendarEvents, loaded,
+    customers, quotes, materials, services, activity, teamMembers, jobs, calendarEvents, timeEntries, loaded,
     addCustomer, updateCustomer, deleteCustomer,
     addQuote, updateQuote, deleteQuote,
     addJob, updateJob, deleteJob,
@@ -690,7 +814,9 @@ export function DataProvider({ children }) {
     addActivity,
     getCustomer, getQuote, getJob, getCustomerQuotes, getCustomerActivity,
     getEventsByDate, getJobsByDate,
-    loadTeamMembers,
+    loadTeamMembers, updateTeamMember,
+    clockIn, clockOut, updateTimeEntry, deleteTimeEntry,
+    getActiveTimeEntry, getMemberTimeEntries, getMyJobs,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
