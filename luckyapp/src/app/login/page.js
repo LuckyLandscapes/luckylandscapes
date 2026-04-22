@@ -67,7 +67,7 @@ export default function LoginPage() {
               <input
                 type="text"
                 className="form-input"
-                placeholder="Riley Kopf"
+                placeholder="Your name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 required
