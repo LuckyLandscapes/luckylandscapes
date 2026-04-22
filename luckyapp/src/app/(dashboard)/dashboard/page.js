@@ -133,7 +133,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Two Column */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+      <div className="dashboard-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
         {/* Recent Quotes */}
         <div className="table-wrapper">
           <div className="table-header">
