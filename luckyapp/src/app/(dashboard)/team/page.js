@@ -18,7 +18,7 @@ function fmtCurrency(n) {
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const { teamMembers, timeEntries, updateTeamMember, loadTeamMembers, deleteTimeEntry } = useData();
+  const { teamMembers, timeEntries, updateTeamMember, loadTeamMembers, deleteTimeEntry, addTeamMemberFromApi } = useData();
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
@@ -107,7 +107,16 @@ export default function TeamPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to create member');
       setInviteState({ loading:false, success:true, error:null });
+
+      // Reload team list from Supabase
       if (loadTeamMembers) await loadTeamMembers();
+
+      // Fallback: if RLS blocked the reload from seeing the new member,
+      // inject the API-returned record directly into state
+      if (data.member) {
+        addTeamMemberFromApi(data.member);
+      }
+
       setTimeout(() => { setShowInviteModal(false); }, 2000);
     } catch (err) {
       setInviteState({ loading:false, success:false, error:err.message });

@@ -530,13 +530,27 @@ export function DataProvider({ children }) {
   // ---------- Team Members ----------
   const loadTeamMembers = useCallback(async () => {
     if (!orgId || !isSupabaseConnected()) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('team_members')
       .select('*')
       .eq('org_id', orgId)
       .order('created_at', { ascending: true });
+    if (error) {
+      console.error('Error loading team members:', error);
+      return;
+    }
     if (data) setTeamMembers(data.map(mapTeamMemberFromDb));
   }, [orgId]);
+
+  // Inject a member record returned by the invite API directly into state.
+  // Used as a fallback when RLS prevents the client-side reload from seeing it.
+  const addTeamMemberFromApi = useCallback((rawMember) => {
+    if (!rawMember?.id) return;
+    setTeamMembers(prev => {
+      if (prev.some(m => m.id === rawMember.id)) return prev;
+      return [...prev, mapTeamMemberFromDb(rawMember)];
+    });
+  }, []);
 
   const updateTeamMember = useCallback(async (id, updates) => {
     const dbUpdates = {};
@@ -814,7 +828,7 @@ export function DataProvider({ children }) {
     addActivity,
     getCustomer, getQuote, getJob, getCustomerQuotes, getCustomerActivity,
     getEventsByDate, getJobsByDate,
-    loadTeamMembers, updateTeamMember,
+    loadTeamMembers, updateTeamMember, addTeamMemberFromApi,
     clockIn, clockOut, updateTimeEntry, deleteTimeEntry,
     getActiveTimeEntry, getMemberTimeEntries, getMyJobs,
   };

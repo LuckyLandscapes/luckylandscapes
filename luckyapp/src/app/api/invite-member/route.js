@@ -39,26 +39,29 @@ export async function POST(request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Check if user already exists in the org
-    const { data: existing } = await supabaseAdmin
+    // Check if user already exists as a team member in this org
+    const { data: existingMember } = await supabaseAdmin
       .from('team_members')
-      .select('id, is_active')
+      .select('id, is_active, user_id')
       .eq('org_id', orgId)
       .eq('email', email)
       .maybeSingle();
 
-    if (existing?.is_active) {
+    if (existingMember?.is_active) {
       return NextResponse.json(
         { error: 'This email is already an active team member' },
         { status: 409 }
       );
     }
 
-    // Create the auth user with a password (no email confirmation needed)
+    // ── Step 1: Get or create the auth user ──
+    let authUserId = null;
+
+    // Try creating a new auth user first
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm so they can log in immediately
+      email_confirm: true,
       user_metadata: {
         full_name: fullName || email.split('@')[0],
         invited_org_id: orgId,
@@ -68,15 +71,43 @@ export async function POST(request) {
     });
 
     if (authError) {
-      // If user already exists in auth, try to get their ID
+      // User already exists in auth — find them by listing all users and matching
       if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
-        // Look up existing auth user by email
-        const { data: { users: matchedUsers } } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1, filter: email });
-        const existingUser = matchedUsers?.[0];
+        // Use the GoTrue admin REST API directly to find user by email
+        const gotrueLookup = await fetch(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=50`,
+          {
+            headers: {
+              'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
+              'apikey': process.env.SUPABASE_SERVICE_ROLE_KEY,
+            },
+          }
+        );
 
-        if (existingUser) {
-          // Update their password and metadata
-          await supabaseAdmin.auth.admin.updateUserById(existingUser.id, {
+        if (gotrueLookup.ok) {
+          const gotrueData = await gotrueLookup.json();
+          const users = gotrueData.users || gotrueData;
+          const matchedUser = (Array.isArray(users) ? users : []).find(u => u.email === email);
+          if (matchedUser) {
+            authUserId = matchedUser.id;
+
+            // Update their password and metadata
+            await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+              password,
+              user_metadata: {
+                full_name: fullName || email.split('@')[0],
+                invited_org_id: orgId,
+                invited_org_name: orgName,
+                invited_role: memberRole,
+              },
+            });
+          }
+        }
+
+        // If we still couldn't find the user, try using the existing team member's user_id
+        if (!authUserId && existingMember?.user_id) {
+          authUserId = existingMember.user_id;
+          await supabaseAdmin.auth.admin.updateUserById(authUserId, {
             password,
             user_metadata: {
               full_name: fullName || email.split('@')[0],
@@ -85,98 +116,71 @@ export async function POST(request) {
               invited_role: memberRole,
             },
           });
-
-          // Create or update team member record
-          if (existing) {
-            await supabaseAdmin
-              .from('team_members')
-              .update({
-                is_active: true,
-                role: memberRole,
-                full_name: fullName || email.split('@')[0],
-                user_id: existingUser.id,
-                hourly_rate: hourlyRate || 15,
-              })
-              .eq('id', existing.id);
-          } else {
-            await supabaseAdmin
-              .from('team_members')
-              .insert({
-                org_id: orgId,
-                user_id: existingUser.id,
-                full_name: fullName || email.split('@')[0],
-                email: email,
-                role: memberRole,
-                hourly_rate: hourlyRate || 15,
-                is_active: true,
-              });
-          }
-
-          return NextResponse.json({
-            success: true,
-            message: 'User updated and added to team',
-          });
         }
 
+        if (!authUserId) {
+          console.error('Could not find existing auth user for email:', email);
+          return NextResponse.json(
+            { error: 'This email is already registered but could not be found. Please contact support.' },
+            { status: 500 }
+          );
+        }
+      } else {
+        console.error('Auth create error:', authError);
         return NextResponse.json({ error: authError.message }, { status: 500 });
       }
-
-      console.error('Auth create error:', authError);
-      return NextResponse.json({ error: authError.message }, { status: 500 });
+    } else {
+      authUserId = authData?.user?.id;
     }
 
-    const userId = authData?.user?.id;
+    if (!authUserId) {
+      return NextResponse.json({ error: 'Failed to create or find user account' }, { status: 500 });
+    }
 
-    // If there was an existing deactivated record, reactivate it
-    if (existing && !existing.is_active) {
-      await supabaseAdmin
+    // ── Step 2: Create or update the team_member record ──
+    let memberRecord;
+
+    if (existingMember) {
+      // Reactivate or update existing record
+      const { data, error: updateErr } = await supabaseAdmin
         .from('team_members')
         .update({
           is_active: true,
           role: memberRole,
           full_name: fullName || email.split('@')[0],
-          user_id: userId,
+          user_id: authUserId,
           hourly_rate: hourlyRate || 15,
         })
-        .eq('id', existing.id);
+        .eq('id', existingMember.id)
+        .select()
+        .single();
 
-      return NextResponse.json({
-        success: true,
-        message: 'Member reactivated',
-        memberId: existing.id,
-      });
-    }
-
-    // Create a new team member record linked to the owner's org
-    if (userId) {
-      const { data: member, error: memberError } = await supabaseAdmin
+      if (updateErr) console.error('Team member update error:', updateErr);
+      memberRecord = data;
+    } else {
+      // Create new team member record
+      const { data, error: insertErr } = await supabaseAdmin
         .from('team_members')
         .insert({
           org_id: orgId,
-          user_id: userId,
+          user_id: authUserId,
           full_name: fullName || email.split('@')[0],
           email: email,
           role: memberRole,
           hourly_rate: hourlyRate || 15,
-          is_active: true, // Active immediately — they can log in right away
+          is_active: true,
         })
         .select()
         .single();
 
-      if (memberError) {
-        console.error('Team member insert error:', memberError);
-      }
-
-      return NextResponse.json({
-        success: true,
-        message: 'Team member created — they can log in now',
-        memberId: member?.id,
-      });
+      if (insertErr) console.error('Team member insert error:', insertErr);
+      memberRecord = data;
     }
 
     return NextResponse.json({
       success: true,
-      message: 'User created',
+      message: 'Team member created — they can log in now',
+      member: memberRecord,
     });
   } catch (err) {
     console.error('Invite member error:', err);
