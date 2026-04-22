@@ -155,7 +155,13 @@ export async function POST(request) {
         .select()
         .single();
 
-      if (updateErr) console.error('Team member update error:', updateErr);
+      if (updateErr) {
+        console.error('Team member update error:', updateErr);
+        return NextResponse.json(
+          { error: `Account created but team record failed: ${updateErr.message}` },
+          { status: 500 }
+        );
+      }
       memberRecord = data;
     } else {
       // Create new team member record
@@ -173,7 +179,13 @@ export async function POST(request) {
         .select()
         .single();
 
-      if (insertErr) console.error('Team member insert error:', insertErr);
+      if (insertErr) {
+        console.error('Team member insert error:', insertErr);
+        return NextResponse.json(
+          { error: `Account created but team record failed: ${insertErr.message}. You may need to run the role constraint migration in Supabase SQL Editor.` },
+          { status: 500 }
+        );
+      }
       memberRecord = data;
     }
 
