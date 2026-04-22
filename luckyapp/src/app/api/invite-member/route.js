@@ -23,6 +23,15 @@ export async function POST(request) {
     const validRoles = ['admin', 'worker', 'member', 'viewer'];
     const memberRole = validRoles.includes(role) ? role : 'worker';
 
+    // Validate the service role key is configured
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('SUPABASE_SERVICE_ROLE_KEY is not set in environment variables');
+      return NextResponse.json(
+        { error: 'Server configuration error: service role key is missing. Add SUPABASE_SERVICE_ROLE_KEY to .env.local (find it in Supabase Dashboard → Settings → API).' },
+        { status: 500 }
+      );
+    }
+
     // Create a service-role client (admin privileges, bypasses RLS)
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -61,9 +70,8 @@ export async function POST(request) {
     if (authError) {
       // If user already exists in auth, try to get their ID
       if (authError.message?.includes('already been registered') || authError.message?.includes('already exists')) {
-        // Look up existing auth user
-        const { data: { users } } = await supabaseAdmin.auth.admin.listUsers();
-        const existingUser = users?.find(u => u.email === email);
+        // Look up existing auth user by email (direct lookup, not paginated)
+        const { data: { user: existingUser }, error: lookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
 
         if (existingUser) {
           // Update their password and metadata

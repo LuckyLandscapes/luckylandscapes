@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConnected } from './supabase';
 
 const AuthContext = createContext(null);
@@ -34,6 +34,9 @@ export function AuthProvider({ children }) {
     return !localStorage.getItem('lucky_app_profile');
   });
   const [mode, setMode] = useState('demo'); // 'demo' or 'supabase'
+
+  // Promise-based mechanism: login() resolves only after the profile is loaded
+  const profileReadyResolveRef = useRef(null);
 
   // Helper to update user + persist to localStorage
   const setAndCacheUser = useCallback((userData) => {
@@ -81,6 +84,12 @@ export function AuthProvider({ children }) {
   // Load the team member profile + org info from Supabase
   // If no profile exists, auto-create org + member (first-time setup)
   const loadUserProfile = useCallback(async (authUser) => {
+    const resolveProfileReady = () => {
+      if (profileReadyResolveRef.current) {
+        profileReadyResolveRef.current();
+        profileReadyResolveRef.current = null;
+      }
+    };
     try {
       const { data: member, error } = await supabase
         .from('team_members')
@@ -204,6 +213,7 @@ export function AuthProvider({ children }) {
       console.error('Error loading profile:', err);
     } finally {
       setLoading(false);
+      resolveProfileReady();
     }
   }, []);
 
@@ -248,8 +258,19 @@ export function AuthProvider({ children }) {
   // --- Login ---
   const login = useCallback(async (email, password) => {
     if (mode === 'supabase') {
+      // Create a promise that resolves when the profile is fully loaded.
+      // signInWithPassword triggers onAuthStateChange → loadUserProfile.
+      // We wait for loadUserProfile to finish so the caller can navigate
+      // only after user/org/role data is ready (prevents the "two login" flash).
+      const profileReady = new Promise((resolve) => {
+        profileReadyResolveRef.current = resolve;
+      });
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) {
+        profileReadyResolveRef.current = null;
+        throw error;
+      }
+      await profileReady;
       return data.user;
     } else {
       // Demo mode
