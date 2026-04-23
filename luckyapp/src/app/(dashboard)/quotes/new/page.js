@@ -21,6 +21,8 @@ function NewQuoteContent() {
   const [category, setCategory] = useState('');
   const [items, setItems] = useState([]);
   const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   const categories = [
     { value: 'Lawn Care', icon: '🌿', description: 'Mowing, cleanups, maintenance' },
@@ -77,17 +79,26 @@ function NewQuoteContent() {
   const subtotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
 
   const handleSubmit = async () => {
-    const newQuote = await addQuote({
-      customerId,
-      category,
-      items,
-      notes,
-      total: subtotal,
-    });
-    if (newQuote?.id) {
-      router.push(`/quotes/${newQuote.id}`);
-    } else {
-      router.push('/quotes');
+    setSaving(true);
+    setError('');
+    try {
+      const newQuote = await addQuote({
+        customerId,
+        category,
+        items,
+        notes,
+        total: subtotal,
+        status: 'draft',
+      });
+      if (newQuote?.id) {
+        router.push(`/quotes/${newQuote.id}`);
+      } else {
+        router.push('/quotes');
+      }
+    } catch (err) {
+      console.error('Failed to create quote:', err);
+      setError(err?.message || 'Failed to create quote. Please try again.');
+      setSaving(false);
     }
   };
 
@@ -384,12 +395,30 @@ function NewQuoteContent() {
             </div>
           )}
 
+          {error && (
+            <div style={{
+              background: 'rgba(220, 38, 38, 0.1)',
+              border: '1px solid rgba(220, 38, 38, 0.3)',
+              borderRadius: '10px',
+              padding: 'var(--space-md)',
+              marginBottom: 'var(--space-md)',
+              color: '#dc2626',
+              fontSize: '0.85rem',
+            }}>
+              ⚠️ {error}
+            </div>
+          )}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-xl)' }}>
-            <button className="btn btn-secondary" onClick={() => setStep(3)}>
+            <button className="btn btn-secondary" onClick={() => setStep(3)} disabled={saving}>
               <ArrowLeft size={16} /> Back
             </button>
-            <button className="btn btn-primary btn-lg" onClick={handleSubmit}>
-              <CheckCircle2 size={18} /> Create Quote
+            <button className="btn btn-primary btn-lg" onClick={handleSubmit} disabled={saving}>
+              {saving ? (
+                <><span className="spinner" style={{ width: 18, height: 18, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.6s linear infinite' }} /> Creating...</>
+              ) : (
+                <><CheckCircle2 size={18} /> Create Quote</>
+              )}
             </button>
           </div>
         </div>

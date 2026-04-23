@@ -233,19 +233,26 @@ export function DataProvider({ children }) {
   // ─── Quote CRUD ─────────────────────────────────────────
   const addQuote = useCallback(async (data) => {
     if (connected) {
+      const payload = { ...camelToSnake(data), org_id: orgId };
+      // Remove 'id' if it's undefined/null (let Supabase generate it)
+      if (!payload.id) delete payload.id;
       const { data: row, error } = await supabase.from('quotes')
-        .insert({ ...camelToSnake(data), org_id: orgId })
+        .insert(payload)
         .select().single();
-      if (error) throw error;
+      if (error) {
+        console.error('[addQuote] Supabase error:', JSON.stringify(error, null, 2));
+        throw error;
+      }
       const q = snakeToCamel(row);
       setQuotes(prev => [q, ...prev]);
       return q;
     } else {
-      const q = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
+      const q = { ...data, id: crypto.randomUUID(), orgId, quoteNumber: maxNum + 1, createdAt: new Date().toISOString() };
       setQuotes(prev => { const next = [q, ...prev]; saveLocal('quotes', next); return next; });
       return q;
     }
-  }, [connected, orgId]);
+  }, [connected, orgId, quotes]);
 
   const updateQuote = useCallback(async (id, data) => {
     if (connected) {
