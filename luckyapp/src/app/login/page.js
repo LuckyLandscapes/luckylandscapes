@@ -26,9 +26,14 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
     try {
-      await login(email, password);
-      // Route based on role happens in layout.js
-      router.push('/dashboard');
+      const loggedInUser = await login(email, password);
+      // Route based on role — workers go to crew dashboard
+      const cachedProfile = JSON.parse(localStorage.getItem('lucky_app_profile') || '{}');
+      if (cachedProfile.role === 'worker') {
+        router.push('/crew-dashboard');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {

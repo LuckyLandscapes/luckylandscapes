@@ -6,8 +6,11 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
 import Sidebar from '@/components/Sidebar';
 
+// Pages that workers are allowed to access
+const WORKER_ALLOWED = ['/crew-dashboard', '/crew-schedule', '/calendar/job'];
+
 function DashboardGuard({ children }) {
-  const { user, loading } = useAuth();
+  const { user, loading, isWorker } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
@@ -16,6 +19,18 @@ function DashboardGuard({ children }) {
       router.replace('/login');
     }
   }, [user, loading, router]);
+
+  // Redirect workers away from admin-only pages
+  useEffect(() => {
+    if (!loading && user && isWorker) {
+      const isAllowed = WORKER_ALLOWED.some(
+        path => pathname === path || pathname.startsWith(path + '/')
+      );
+      if (!isAllowed) {
+        router.replace('/crew-dashboard');
+      }
+    }
+  }, [user, loading, isWorker, pathname, router]);
 
   if (loading) {
     return (
@@ -29,6 +44,18 @@ function DashboardGuard({ children }) {
   }
 
   if (!user) return null;
+
+  // While redirecting a worker away from an admin page, show spinner
+  if (isWorker && !WORKER_ALLOWED.some(p => pathname === p || pathname.startsWith(p + '/'))) {
+    return (
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        height: '100vh', background: 'var(--bg-primary)',
+      }}>
+        <div className="loading-spinner" />
+      </div>
+    );
+  }
 
   return (
     <DataProvider>
