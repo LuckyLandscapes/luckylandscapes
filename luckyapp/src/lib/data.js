@@ -232,8 +232,12 @@ export function DataProvider({ children }) {
 
   // ─── Quote CRUD ─────────────────────────────────────────
   const addQuote = useCallback(async (data) => {
+    // Generate quote_number from existing quotes (DB has NOT NULL constraint)
+    const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
+    const nextQuoteNumber = maxNum + 1;
+
     if (connected) {
-      const payload = { ...camelToSnake(data), org_id: orgId };
+      const payload = { ...camelToSnake(data), org_id: orgId, quote_number: nextQuoteNumber };
       // Remove 'id' if it's undefined/null (let Supabase generate it)
       if (!payload.id) delete payload.id;
       const { data: row, error } = await supabase.from('quotes')
@@ -247,8 +251,7 @@ export function DataProvider({ children }) {
       setQuotes(prev => [q, ...prev]);
       return q;
     } else {
-      const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
-      const q = { ...data, id: crypto.randomUUID(), orgId, quoteNumber: maxNum + 1, createdAt: new Date().toISOString() };
+      const q = { ...data, id: crypto.randomUUID(), orgId, quoteNumber: nextQuoteNumber, createdAt: new Date().toISOString() };
       setQuotes(prev => { const next = [q, ...prev]; saveLocal('quotes', next); return next; });
       return q;
     }
