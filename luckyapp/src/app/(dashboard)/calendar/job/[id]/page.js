@@ -1,40 +1,35 @@
 'use client';
 
-import { useState } from 'react';
+import { use, useState } from 'react';
 import { useData } from '@/lib/data';
-import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  CalendarDays,
   Clock,
   MapPin,
   User,
   Phone,
   Mail,
   FileText,
-  CalendarDays,
-  CheckCircle2,
-  Play,
-  XCircle,
-  Briefcase,
-  DollarSign,
-  Navigation,
-  Edit3,
-  Save,
+  Flag,
+  Timer,
   Users,
-  Clipboard,
+  DollarSign,
+  Briefcase,
+  Navigation,
+  Play,
+  CheckCircle2,
+  XCircle,
+  ChevronRight,
 } from 'lucide-react';
-
-function formatCurrency(n) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n);
-}
 
 function formatTime12(time) {
   if (!time) return '';
-  const [h, m] = time.split(':').map(Number);
+  const [h, m] = String(time).split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
 function formatDateLong(dateStr) {
@@ -44,308 +39,354 @@ function formatDateLong(dateStr) {
 }
 
 const STATUS_CONFIG = {
-  scheduled: { label: 'Scheduled', color: 'var(--status-info)', bg: 'var(--status-info-bg)', icon: CalendarDays },
-  in_progress: { label: 'In Progress', color: 'var(--status-warning)', bg: 'var(--status-warning-bg)', icon: Play },
-  completed: { label: 'Completed', color: 'var(--status-success)', bg: 'var(--status-success-bg)', icon: CheckCircle2 },
-  cancelled: { label: 'Cancelled', color: 'var(--status-danger)', bg: 'var(--status-danger-bg)', icon: XCircle },
+  scheduled: { label: 'Scheduled', icon: CalendarDays, color: 'var(--status-info)' },
+  in_progress: { label: 'In Progress', icon: Play, color: 'var(--status-warning)' },
+  completed: { label: 'Completed', icon: CheckCircle2, color: 'var(--status-success)' },
+  cancelled: { label: 'Cancelled', icon: XCircle, color: 'var(--status-danger)' },
 };
 
-export default function JobDetailPage() {
-  const { id } = useParams();
-  const router = useRouter();
-  const { getJob, getCustomer, getQuote, updateJob, teamMembers } = useData();
-  const [editingNotes, setEditingNotes] = useState(false);
-  const [crewNotes, setCrewNotes] = useState('');
+export default function JobDetailPage({ params }) {
+  const resolvedParams = use(params);
+  const jobId = resolvedParams.id;
+  const { getJob, getCustomer, getQuote, getTeamMember, updateJob, teamMembers } = useData();
+  const { isOwnerOrAdmin } = useAuth();
 
-  const job = getJob(id);
-  const customer = job ? getCustomer(job.customerId) : null;
+  const job = getJob(jobId);
+  const customer = job?.customerId ? getCustomer(job.customerId) : null;
   const quote = job?.quoteId ? getQuote(job.quoteId) : null;
+  const [updating, setUpdating] = useState(false);
 
   if (!job) {
     return (
-      <div className="page">
-        <div className="empty-state">
-          <h3>Job not found</h3>
-          <Link href="/calendar" className="btn btn-primary btn-sm" style={{ marginTop: 'var(--space-md)' }}>
-            <ArrowLeft size={16} /> Back to Calendar
-          </Link>
-        </div>
+      <div className="page animate-fade-in" style={{ textAlign: 'center', paddingTop: 'var(--space-2xl)' }}>
+        <Briefcase size={48} style={{ color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }} />
+        <h2>Job Not Found</h2>
+        <p style={{ color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+          This job may have been deleted or you don&apos;t have access.
+        </p>
+        <Link href="/calendar" className="btn btn-primary" style={{ marginTop: 'var(--space-lg)' }}>
+          Back to Calendar
+        </Link>
       </div>
     );
   }
 
-  const status = STATUS_CONFIG[job.status] || STATUS_CONFIG.scheduled;
-  const StatusIcon = status.icon;
-  const assignedMembers = teamMembers.filter(t => (job.assignedTo || []).includes(t.id));
+  const statusConf = STATUS_CONFIG[job.status] || STATUS_CONFIG.scheduled;
+  const assignedMembers = (job.assignedTo || [])
+    .map(id => getTeamMember(id) || teamMembers.find(m => m.id === id))
+    .filter(Boolean);
+
+  const fullAddress = job.address || (customer?.address
+    ? `${customer.address}${customer.city ? `, ${customer.city}` : ''}${customer.state ? ` ${customer.state}` : ''} ${customer.zip || ''}`.trim()
+    : '');
+
+  const mapsUrl = fullAddress
+    ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`
+    : '';
+
+  const quoteItems = quote?.items || [];
 
   const handleStatusChange = async (newStatus) => {
-    await updateJob(id, { status: newStatus });
-  };
-
-  const handleSaveNotes = async () => {
-    await updateJob(id, { crewNotes });
-    setEditingNotes(false);
-  };
-
-  const startEditNotes = () => {
-    setCrewNotes(job.crewNotes || '');
-    setEditingNotes(true);
-  };
-
-  const openInMaps = () => {
-    if (!job.address) return;
-    const encoded = encodeURIComponent(job.address);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
+    setUpdating(true);
+    try {
+      await updateJob(job.id, { status: newStatus });
+    } catch (err) {
+      console.error('Error updating status:', err);
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (
-    <div className="page animate-fade-in">
-      <div style={{ marginBottom: 'var(--space-lg)' }}>
-        <Link href="/calendar" className="btn btn-ghost btn-sm" style={{ marginLeft: '-8px' }}>
-          <ArrowLeft size={16} /> Calendar
-        </Link>
-      </div>
+    <div className="page job-detail-page animate-fade-in">
+      {/* Back nav */}
+      <Link href="/calendar" className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-md)' }}>
+        <ArrowLeft size={16} /> Back to Calendar
+      </Link>
 
       {/* Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
-            <h1>{job.title}</h1>
-            <span className="badge" style={{ background: status.bg, color: status.color, fontSize: '0.82rem', padding: '4px 14px' }}>
-              <StatusIcon size={14} style={{ marginRight: '4px' }} />
-              {status.label}
+      <div className="job-detail-header">
+        <div className="job-detail-title-group">
+          <h1 className="job-detail-title">{job.title}</h1>
+          <div className="job-detail-meta">
+            <span className={`job-detail-status ${job.status}`}>
+              <statusConf.icon size={14} />
+              {statusConf.label}
             </span>
+            {job.priority && job.priority !== 'normal' && (
+              <span className={`crew-job-card-priority ${job.priority}`}>
+                {job.priority}
+              </span>
+            )}
           </div>
-          <p>
-            <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-            {formatDateLong(job.scheduledDate)}
-            {job.scheduledTime && <> at {formatTime12(job.scheduledTime)}</>}
-          </p>
         </div>
-        <div className="page-header-actions">
-          {job.status === 'scheduled' && (
-            <button className="btn btn-primary" onClick={() => handleStatusChange('in_progress')} style={{ background: 'var(--status-warning)', borderColor: 'var(--status-warning)', color: '#000' }}>
-              <Play size={16} /> Start Job
-            </button>
-          )}
-          {job.status === 'in_progress' && (
-            <button className="btn btn-primary" onClick={() => handleStatusChange('completed')} style={{ background: 'var(--status-success)', borderColor: 'var(--status-success)' }}>
-              <CheckCircle2 size={16} /> Mark Complete
-            </button>
-          )}
-          {(job.status === 'scheduled' || job.status === 'in_progress') && (
-            <button className="btn btn-danger" onClick={() => handleStatusChange('cancelled')}>
-              <XCircle size={16} /> Cancel
-            </button>
-          )}
-        </div>
+
+        {/* Status Actions */}
+        {isOwnerOrAdmin && (
+          <div className="job-detail-actions">
+            {job.status === 'scheduled' && (
+              <button className="btn btn-primary btn-sm" onClick={() => handleStatusChange('in_progress')} disabled={updating}>
+                <Play size={14} /> Start Job
+              </button>
+            )}
+            {job.status === 'in_progress' && (
+              <button className="btn btn-primary btn-sm" onClick={() => handleStatusChange('completed')} disabled={updating}>
+                <CheckCircle2 size={14} /> Complete
+              </button>
+            )}
+            {job.status !== 'cancelled' && job.status !== 'completed' && (
+              <button className="btn btn-danger btn-sm" onClick={() => handleStatusChange('cancelled')} disabled={updating}>
+                <XCircle size={14} /> Cancel
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      <div className="job-layout">
-        {/* Main Content */}
-        <div className="job-main">
-          {/* Job Scope */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-lg)' }}>
-              <Clipboard size={18} style={{ color: 'var(--lucky-green-light)' }} />
-              <h3>Job Scope</h3>
-            </div>
-            {job.description ? (
-              <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
-                {job.description}
-              </div>
-            ) : (
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>No description provided</p>
-            )}
+      <div className="job-detail-grid">
+        {/* ─── Customer Info ──────────────────────────────── */}
+        <div className="job-detail-section">
+          <div className="job-detail-section-title">
+            <User size={16} /> Customer Information
           </div>
+          {customer ? (
+            <>
+              <div className="job-detail-row">
+                <User size={16} />
+                <div className="job-detail-row-content">
+                  <div className="job-detail-row-label">Name</div>
+                  <div className="job-detail-row-value" style={{ fontWeight: 700, fontSize: '1rem' }}>
+                    {customer.firstName} {customer.lastName || ''}
+                  </div>
+                </div>
+              </div>
 
-          {/* Quote Line Items */}
-          {quote && quote.items && quote.items.length > 0 && (
-            <div className="table-wrapper" style={{ marginTop: 'var(--space-md)' }}>
-              <div className="table-header">
-                <h3>Quote #{quote.quoteNumber} — Line Items</h3>
-                <Link href={`/quotes/${quote.id}`} className="btn btn-ghost btn-sm">
-                  View Quote →
-                </Link>
-              </div>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Service / Item</th>
-                    <th>Qty</th>
-                    <th>Unit</th>
-                    <th style={{ textAlign: 'right' }}>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quote.items.map((item, i) => (
-                    <tr key={i}>
-                      <td>
-                        <div style={{ fontWeight: 600 }}>{item.name}</div>
-                        {item.description && <div className="table-sub">{item.description}</div>}
-                      </td>
-                      <td>{item.quantity}</td>
-                      <td style={{ color: 'var(--text-tertiary)' }}>{item.unit}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total || item.quantity * item.unitPrice)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{
-                padding: 'var(--space-md) var(--space-lg)',
-                borderTop: '1px solid var(--border-primary)',
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 'var(--space-lg)',
-              }}>
-                <span style={{ color: 'var(--text-tertiary)' }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: '1.125rem', color: 'var(--lucky-green-light)' }}>{formatCurrency(job.total)}</span>
-              </div>
+              {customer.phone && (
+                <div className="job-detail-row">
+                  <Phone size={16} />
+                  <div className="job-detail-row-content">
+                    <div className="job-detail-row-label">Phone</div>
+                    <div className="job-detail-row-value">
+                      <a href={`tel:${customer.phone}`}>{customer.phone}</a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {customer.email && (
+                <div className="job-detail-row">
+                  <Mail size={16} />
+                  <div className="job-detail-row-content">
+                    <div className="job-detail-row-label">Email</div>
+                    <div className="job-detail-row-value">
+                      <a href={`mailto:${customer.email}`}>{customer.email}</a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {fullAddress && (
+                <div className="job-detail-row">
+                  <MapPin size={16} />
+                  <div className="job-detail-row-content">
+                    <div className="job-detail-row-label">Address</div>
+                    <div className="job-detail-row-value">
+                      {mapsUrl ? (
+                        <a href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                          {fullAddress}
+                        </a>
+                      ) : fullAddress}
+                    </div>
+                    {mapsUrl && (
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginTop: '6px', padding: '4px 10px', fontSize: '0.75rem', color: 'var(--lucky-green-light)' }}
+                      >
+                        <Navigation size={12} /> Open in Maps
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {customer.notes && (
+                <div className="job-detail-row">
+                  <FileText size={16} />
+                  <div className="job-detail-row-content">
+                    <div className="job-detail-row-label">Customer Notes</div>
+                    <div className="job-detail-notes">{customer.notes}</div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ padding: 'var(--space-md)', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
+              No customer linked to this job
             </div>
           )}
-
-          {/* Crew Notes */}
-          <div className="card" style={{ marginTop: 'var(--space-md)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                <FileText size={18} style={{ color: 'var(--lucky-gold)' }} />
-                <h3>Crew Notes</h3>
-              </div>
-              {!editingNotes ? (
-                <button className="btn btn-ghost btn-sm" onClick={startEditNotes}>
-                  <Edit3 size={14} /> Edit
-                </button>
-              ) : (
-                <button className="btn btn-primary btn-sm" onClick={handleSaveNotes}>
-                  <Save size={14} /> Save
-                </button>
-              )}
-            </div>
-            {editingNotes ? (
-              <textarea
-                className="form-textarea"
-                rows={4}
-                value={crewNotes}
-                onChange={e => setCrewNotes(e.target.value)}
-                placeholder="Add notes for the crew (access instructions, special requirements, etc.)"
-                autoFocus
-              />
-            ) : (
-              <div style={{ fontSize: '0.85rem', whiteSpace: 'pre-wrap', color: job.crewNotes ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>
-                {job.crewNotes || 'No crew notes yet. Click Edit to add instructions for the crew.'}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="job-sidebar">
-          {/* Customer Card */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-              <User size={18} style={{ color: 'var(--status-info)' }} />
-              <h4 style={{ color: 'var(--text-secondary)' }}>Customer</h4>
-            </div>
-            {customer ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-                  <div className="table-avatar" style={{ width: 42, height: 42, background: 'var(--lucky-green)', color: 'white', fontSize: '0.85rem' }}>
-                    {(customer.firstName?.[0] || '') + (customer.lastName?.[0] || '')}
-                  </div>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem' }}>{customer.firstName} {customer.lastName || ''}</div>
-                  </div>
-                </div>
-                {customer.phone && (
-                  <a href={`tel:${customer.phone}`} className="job-contact-link">
-                    <Phone size={15} /> {customer.phone}
-                  </a>
-                )}
-                {customer.email && (
-                  <a href={`mailto:${customer.email}`} className="job-contact-link">
-                    <Mail size={15} /> {customer.email}
-                  </a>
-                )}
-              </div>
-            ) : (
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>No customer assigned</p>
-            )}
+        {/* ─── Job Details ────────────────────────────────── */}
+        <div className="job-detail-section">
+          <div className="job-detail-section-title">
+            <Briefcase size={16} /> Job Details
           </div>
 
-          {/* Location Card */}
-          {job.address && (
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-                <MapPin size={18} style={{ color: 'var(--status-danger)' }} />
-                <h4 style={{ color: 'var(--text-secondary)' }}>Job Location</h4>
+          <div className="job-detail-row">
+            <CalendarDays size={16} />
+            <div className="job-detail-row-content">
+              <div className="job-detail-row-label">Scheduled Date</div>
+              <div className="job-detail-row-value">{formatDateLong(job.scheduledDate)}</div>
+            </div>
+          </div>
+
+          {job.scheduledTime && (
+            <div className="job-detail-row">
+              <Clock size={16} />
+              <div className="job-detail-row-content">
+                <div className="job-detail-row-label">Start Time</div>
+                <div className="job-detail-row-value">{formatTime12(job.scheduledTime)}</div>
               </div>
-              <p style={{ fontSize: '0.85rem', marginBottom: 'var(--space-md)' }}>{job.address}</p>
-              <button className="btn btn-primary btn-sm" onClick={openInMaps} style={{ width: '100%' }}>
-                <Navigation size={14} /> Open in Google Maps
-              </button>
             </div>
           )}
 
-          {/* Schedule Card */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-              <Clock size={18} style={{ color: 'var(--lucky-gold)' }} />
-              <h4 style={{ color: 'var(--text-secondary)' }}>Schedule</h4>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
-              <div>
-                <div className="job-detail-label">Date</div>
-                <div className="job-detail-value">{formatDateLong(job.scheduledDate)}</div>
+          {job.estimatedDuration && (
+            <div className="job-detail-row">
+              <Timer size={16} />
+              <div className="job-detail-row-content">
+                <div className="job-detail-row-label">Estimated Duration</div>
+                <div className="job-detail-row-value">{job.estimatedDuration}</div>
               </div>
-              {job.scheduledTime && (
-                <div>
-                  <div className="job-detail-label">Start Time</div>
-                  <div className="job-detail-value">{formatTime12(job.scheduledTime)}</div>
+            </div>
+          )}
+
+          {job.priority && (
+            <div className="job-detail-row">
+              <Flag size={16} />
+              <div className="job-detail-row-content">
+                <div className="job-detail-row-label">Priority</div>
+                <div className="job-detail-row-value">
+                  <span className={`crew-job-card-priority ${job.priority}`} style={{ display: 'inline-flex' }}>
+                    {job.priority}
+                  </span>
                 </div>
-              )}
-              {job.estimatedDuration && (
-                <div>
-                  <div className="job-detail-label">Est. Duration</div>
-                  <div className="job-detail-value">{job.estimatedDuration}</div>
+              </div>
+            </div>
+          )}
+
+          {job.total > 0 && (
+            <div className="job-detail-row">
+              <DollarSign size={16} />
+              <div className="job-detail-row-content">
+                <div className="job-detail-row-label">Job Total</div>
+                <div className="job-detail-row-value" style={{ fontWeight: 800, color: 'var(--lucky-green-light)', fontSize: '1.1rem' }}>
+                  ${Number(job.total).toLocaleString()}
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+
+          {job.description && (
+            <div className="job-detail-row">
+              <FileText size={16} />
+              <div className="job-detail-row-content">
+                <div className="job-detail-row-label">Description</div>
+                <div className="job-detail-notes">{job.description}</div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Crew Notes ─────────────────────────────────── */}
+        {job.crewNotes && (
+          <div className="job-detail-section job-detail-full-width">
+            <div className="job-detail-section-title">
+              <FileText size={16} /> Crew Notes &amp; Instructions
+            </div>
+            <div className="job-detail-notes" style={{ fontSize: '0.9rem' }}>
+              {job.crewNotes}
             </div>
           </div>
+        )}
 
-          {/* Job Value Card */}
-          <div className="card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-              <DollarSign size={18} style={{ color: 'var(--status-success)' }} />
-              <h4 style={{ color: 'var(--text-secondary)' }}>Job Value</h4>
-            </div>
-            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--lucky-green-light)' }}>
-              {formatCurrency(job.total)}
-            </div>
+        {/* ─── Assigned Crew ─────────────────────────────── */}
+        <div className="job-detail-section">
+          <div className="job-detail-section-title">
+            <Users size={16} /> Assigned Crew ({assignedMembers.length})
           </div>
 
-          {/* Assigned Crew */}
-          {assignedMembers.length > 0 && (
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: 'var(--space-md)' }}>
-                <Users size={18} style={{ color: 'var(--status-info)' }} />
-                <h4 style={{ color: 'var(--text-secondary)' }}>Assigned Crew</h4>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-                {assignedMembers.map(m => (
-                  <div key={m.id} className="job-crew-chip">
-                    <div className="table-avatar" style={{ width: 28, height: 28, fontSize: '0.65rem', background: 'var(--lucky-green)', color: 'white' }}>
-                      {m.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || '??'}
-                    </div>
+          {assignedMembers.length > 0 ? (
+            <div className="job-detail-crew-list">
+              {assignedMembers.map(m => {
+                const initials = m.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || '??';
+                return (
+                  <div key={m.id} className="job-detail-crew-item">
+                    <div className="job-detail-crew-avatar">{initials}</div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{m.fullName}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{m.role}</div>
+                      <div className="job-detail-crew-name">{m.fullName}</div>
+                      <div className="job-detail-crew-role">{m.role}</div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ padding: 'var(--space-md)', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
+              No crew members assigned yet
             </div>
           )}
         </div>
+
+        {/* ─── Linked Quote ──────────────────────────────── */}
+        {quote && (
+          <div className="job-detail-section">
+            <div className="job-detail-section-title">
+              <DollarSign size={16} /> Linked Quote
+            </div>
+
+            <div className="linked-quote-preview">
+              <div className="linked-quote-preview-header">
+                <span className="linked-quote-preview-num">Quote #{quote.quoteNumber}</span>
+                <span className="linked-quote-preview-total">${Number(quote.total || 0).toLocaleString()}</span>
+              </div>
+              {quote.category && (
+                <div className="linked-quote-preview-items">
+                  Category: {quote.category}
+                </div>
+              )}
+              {Array.isArray(quoteItems) && quoteItems.length > 0 && (
+                <div style={{ marginTop: 'var(--space-sm)' }}>
+                  {quoteItems.map((item, i) => (
+                    <div key={i} style={{
+                      display: 'flex', justifyContent: 'space-between',
+                      fontSize: '0.78rem', padding: '4px 0',
+                      borderTop: i > 0 ? '1px solid var(--border-primary)' : 'none',
+                    }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {item.name || item.description || `Item ${i + 1}`}
+                        {item.quantity ? ` × ${item.quantity}` : ''}
+                      </span>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        ${Number(item.total || item.price || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Link
+              href={`/quotes/${quote.id}`}
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 'var(--space-sm)' }}
+            >
+              View Full Quote <ChevronRight size={14} />
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );

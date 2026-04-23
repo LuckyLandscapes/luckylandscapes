@@ -1,297 +1,290 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import Link from 'next/link';
 import {
-  Clock, MapPin, Phone, FileText, ChevronRight, Play, Square,
-  Calendar, HardHat, Navigation, User, Timer, CheckCircle2,
+  Clock,
+  MapPin,
+  Phone,
+  Mail,
+  CalendarDays,
+  Briefcase,
+  Timer,
+  Flag,
+  FileText,
+  Navigation,
+  ChevronRight,
+  HardHat,
+  CheckCircle2,
 } from 'lucide-react';
 
-function formatTime12(t) {
-  if (!t) return '';
-  const [h, m] = t.split(':').map(Number);
-  return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
+function formatTime12(time) {
+  if (!time) return '';
+  const [h, m] = String(time).split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
-function formatDuration(min) {
-  if (!min) return '0m';
-  const h = Math.floor(min / 60), m = min % 60;
-  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
-function formatTimeSince(iso) {
-  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
-  const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}h ${mins % 60}m` : `${mins}m`;
-}
-function formatDateShort(d) {
-  return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-}
+
+const PRIORITY_COLORS = {
+  low: 'var(--text-tertiary)',
+  normal: 'var(--status-info)',
+  high: 'var(--status-warning)',
+  urgent: 'var(--status-danger)',
+};
 
 export default function CrewDashboardPage() {
   const { user } = useAuth();
-  const { jobs, calendarEvents, getCustomer, getActiveTimeEntry, getMemberTimeEntries, clockIn, clockOut, timeEntries } = useData();
-  const [clockOutNotes, setClockOutNotes] = useState('');
-  const [showClockOutModal, setShowClockOutModal] = useState(false);
-  const [clockLoading, setClockLoading] = useState(false);
-
-  const memberId = user?.id;
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  // Merge jobs assigned to me + calendar events assigned to me (deduplicate by jobId)
-  const myTodayJobs = useMemo(() => {
-    // Start with jobs directly assigned to me
-    const directJobs = jobs.filter(j => j.scheduledDate === todayStr && (j.assignedTo || []).includes(memberId));
-    const jobIds = new Set(directJobs.map(j => j.id));
-
-    // Add calendar events assigned to me that don't have a matching job already included
-    calendarEvents.forEach(e => {
-      if (e.date !== todayStr) return;
-      if (!(e.assignedTo || []).includes(memberId)) return;
-      if (e.jobId && jobIds.has(e.jobId)) return; // already have the job
-      // Convert calendar event to job-like shape for display
-      directJobs.push({
-        id: e.jobId || `evt-${e.id}`,
-        title: e.title,
-        scheduledDate: e.date,
-        scheduledTime: e.startTime,
-        status: 'scheduled',
-        customerId: e.customerId,
-        assignedTo: e.assignedTo || [],
-        crewNotes: e.notes,
-        description: e.notes,
-        address: '',
-      });
-    });
-
-    return directJobs.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
-  }, [jobs, calendarEvents, todayStr, memberId]);
-
-  const myWeekJobs = useMemo(() => {
-    const end = new Date(); end.setDate(end.getDate() + (6 - end.getDay()));
-    const endStr = end.toISOString().split('T')[0];
-    const directJobs = jobs.filter(j => j.scheduledDate > todayStr && j.scheduledDate <= endStr && (j.assignedTo || []).includes(memberId));
-    const jobIds = new Set(directJobs.map(j => j.id));
-
-    calendarEvents.forEach(e => {
-      if (!e.date || e.date <= todayStr || e.date > endStr) return;
-      if (!(e.assignedTo || []).includes(memberId)) return;
-      if (e.jobId && jobIds.has(e.jobId)) return;
-      directJobs.push({
-        id: e.jobId || `evt-${e.id}`,
-        title: e.title,
-        scheduledDate: e.date,
-        scheduledTime: e.startTime,
-        status: 'scheduled',
-        customerId: e.customerId,
-        assignedTo: e.assignedTo || [],
-        crewNotes: e.notes,
-        description: e.notes,
-        address: '',
-      });
-    });
-
-    return directJobs.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
-  }, [jobs, calendarEvents, todayStr, memberId]);
-
-  const activeEntry = getActiveTimeEntry(memberId);
-  const recentEntries = getMemberTimeEntries(memberId, 7).filter(t => t.clockOut);
-
-  const weekTotalMinutes = useMemo(() => {
-    const sow = new Date(); sow.setDate(sow.getDate() - sow.getDay()); sow.setHours(0, 0, 0, 0);
-    return timeEntries.filter(t => t.memberId === memberId && t.clockOut && new Date(t.clockIn) >= sow)
-      .reduce((s, t) => s + (t.durationMinutes || 0), 0);
-  }, [timeEntries, memberId]);
-
-  const handleClockIn = async () => { setClockLoading(true); await clockIn(memberId); setClockLoading(false); };
-  const handleClockOut = async () => {
-    if (!activeEntry) return;
-    setClockLoading(true); await clockOut(activeEntry.id, clockOutNotes);
-    setClockOutNotes(''); setShowClockOutModal(false); setClockLoading(false);
-  };
+  const { jobs, getCustomer, getQuote, timeEntries, clockIn, clockOut } = useData();
 
   const firstName = user?.fullName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Get active clock entry for this user
+  const activeClockEntry = useMemo(() => {
+    return timeEntries.find(t => t.teamMemberId === user?.id && !t.clockOut);
+  }, [timeEntries, user?.id]);
+
+  // My jobs: filter by assignedTo containing my user ID
+  const myJobs = useMemo(() => {
+    if (!user?.id) return [];
+    return jobs.filter(j => {
+      const assigned = j.assignedTo || [];
+      // assigned can be UUID[] or JSONB array
+      return Array.isArray(assigned) && assigned.includes(user.id);
+    });
+  }, [jobs, user?.id]);
+
+  // Today's jobs
+  const todayJobs = useMemo(() => {
+    return myJobs
+      .filter(j => j.scheduledDate === todayStr && j.status !== 'cancelled')
+      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
+  }, [myJobs, todayStr]);
+
+  // Upcoming jobs (next 7 days, excluding today)
+  const upcomingJobs = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+
+    return myJobs
+      .filter(j => j.scheduledDate >= tomorrowStr && j.scheduledDate <= nextWeekStr && j.status !== 'cancelled')
+      .sort((a, b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || '') || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
+  }, [myJobs]);
+
+  const handleClockToggle = async () => {
+    if (activeClockEntry) {
+      await clockOut(activeClockEntry.id);
+    } else {
+      await clockIn(user.id);
+    }
+  };
 
   return (
-    <div className="page animate-fade-in">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>{greeting}, {firstName} 👋</h1>
-          <p>Here&apos;s your work schedule for today.</p>
+    <div className="crew-dash animate-fade-in">
+      {/* Header */}
+      <div className="crew-dash-header">
+        <div className="crew-dash-greeting">
+          <h1>{greeting}, {firstName} 👷</h1>
+          <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
         </div>
       </div>
 
-      {/* Clock Card */}
-      <div className="card" style={{
-        marginBottom: 'var(--space-lg)',
-        background: activeEntry ? 'linear-gradient(135deg, rgba(58,156,74,0.12), rgba(58,156,74,0.04))' : undefined,
-        border: activeEntry ? '1px solid rgba(58,156,74,0.3)' : undefined,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-md)' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)', marginBottom: '4px' }}>
-              <Timer size={20} style={{ color: activeEntry ? 'var(--lucky-green-light)' : 'var(--text-tertiary)' }} />
-              <h3 style={{ margin: 0 }}>Time Clock</h3>
-            </div>
-            {activeEntry ? (
-              <div style={{ fontSize: '0.85rem', color: 'var(--lucky-green-light)' }}>
-                <span className="badge badge-accepted" style={{ marginRight: '8px' }}><span className="badge-dot" /> Clocked In</span>
-                {formatTimeSince(activeEntry.clockIn)} elapsed
-              </div>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', margin: 0 }}>Not clocked in • This week: {formatDuration(weekTotalMinutes)}</p>
-            )}
+      {/* Clock Widget */}
+      <div className="crew-clock-widget">
+        <div className="crew-clock-status">
+          <div className={`crew-clock-dot ${activeClockEntry ? 'active' : 'inactive'}`} />
+          <span>{activeClockEntry ? 'Clocked In' : 'Clocked Out'}</span>
+        </div>
+        {activeClockEntry && (
+          <div className="crew-clock-time">
+            Since {new Date(activeClockEntry.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
           </div>
-          {activeEntry ? (
-            <button className="btn" onClick={() => setShowClockOutModal(true)} disabled={clockLoading}
-              style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)', minWidth: '140px' }}>
-              <Square size={16} fill="currentColor" /> Clock Out
-            </button>
-          ) : (
-            <button className="btn btn-primary" onClick={handleClockIn} disabled={clockLoading} style={{ minWidth: '140px' }}>
-              <Play size={16} fill="currentColor" /> Clock In
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', marginBottom: 'var(--space-lg)' }}>
-        <div className="stat-card" style={{ '--accent': 'var(--lucky-green-light)', '--accent-bg': 'var(--lucky-green-glow)' }}>
-          <div className="stat-card-header"><div className="stat-card-icon"><HardHat /></div></div>
-          <div className="stat-card-value">{myTodayJobs.length}</div>
-          <div className="stat-card-label">Jobs Today</div>
-        </div>
-        <div className="stat-card" style={{ '--accent': 'var(--status-info)', '--accent-bg': 'var(--status-info-bg)' }}>
-          <div className="stat-card-header"><div className="stat-card-icon"><Calendar /></div></div>
-          <div className="stat-card-value">{myWeekJobs.length}</div>
-          <div className="stat-card-label">More This Week</div>
-        </div>
-        <div className="stat-card" style={{ '--accent': 'var(--lucky-gold)', '--accent-bg': 'rgba(212,169,62,0.12)' }}>
-          <div className="stat-card-header"><div className="stat-card-icon"><Clock /></div></div>
-          <div className="stat-card-value">{formatDuration(weekTotalMinutes)}</div>
-          <div className="stat-card-label">Hours This Week</div>
-        </div>
+        )}
+        <button
+          className={`btn ${activeClockEntry ? 'btn-danger' : 'btn-primary'} btn-sm`}
+          onClick={handleClockToggle}
+          style={{ marginLeft: 'auto' }}
+        >
+          <Clock size={14} />
+          {activeClockEntry ? 'Clock Out' : 'Clock In'}
+        </button>
       </div>
 
       {/* Today's Jobs */}
-      <h3 style={{ marginBottom: 'var(--space-md)' }}><HardHat size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Today&apos;s Jobs</h3>
-      {myTodayJobs.length === 0 ? (
-        <div className="card" style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--text-tertiary)' }}>
-          <CheckCircle2 size={32} style={{ margin: '0 auto var(--space-sm)', display: 'block', opacity: 0.5 }} />
-          <p style={{ margin: 0, fontSize: '0.9rem' }}>No jobs scheduled for today.</p>
+      <div className="crew-section-header">
+        <h2>
+          <Briefcase size={20} />
+          Today&apos;s Jobs
+          <span className="crew-section-count">{todayJobs.length}</span>
+        </h2>
+      </div>
+
+      {todayJobs.length === 0 ? (
+        <div className="crew-no-jobs">
+          <CheckCircle2 size={48} />
+          <p>No jobs scheduled for today</p>
+          <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>Check back later or view your upcoming schedule</p>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)', marginBottom: 'var(--space-xl)' }}>
-          {myTodayJobs.map(job => {
-            const cust = job.customerId ? getCustomer(job.customerId) : null;
-            return (
-              <div key={job.id} className="card" style={{ padding: 'var(--space-md)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-sm)' }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '1rem', marginBottom: '2px' }}>{job.title}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>
-                      <Clock size={13} /> {job.scheduledTime ? formatTime12(job.scheduledTime) : 'TBD'}
-                      {job.estimatedDuration && <span>• {job.estimatedDuration}</span>}
-                    </div>
-                  </div>
-                  <span className={`badge badge-${job.status}`}><span className="badge-dot" />{job.status.charAt(0).toUpperCase() + job.status.slice(1)}</span>
-                </div>
-                {cust && (
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-sm) var(--space-md)', marginBottom: 'var(--space-sm)', fontSize: '0.85rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px', fontWeight: 600 }}><User size={13} /> {cust.firstName} {cust.lastName || ''}</div>
-                    {cust.phone && <a href={`tel:${cust.phone}`} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--lucky-green-light)', textDecoration: 'none', marginBottom: '4px' }}><Phone size={13} /> {cust.phone}</a>}
-                    {job.address && <a href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(job.address)}`} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'var(--status-info)', textDecoration: 'none' }}><Navigation size={13} /> {job.address}</a>}
-                  </div>
-                )}
-                {(job.crewNotes || job.description) && (
-                  <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', padding: 'var(--space-sm) 0', borderTop: '1px solid var(--border-subtle)' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: 600, marginBottom: '4px', color: 'var(--text-primary)' }}><FileText size={13} /> Notes</div>
-                    {job.crewNotes || job.description}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        todayJobs.map(job => (
+          <JobCard key={job.id} job={job} getCustomer={getCustomer} getQuote={getQuote} />
+        ))
       )}
 
-      {/* Rest of Week */}
-      {myWeekJobs.length > 0 && (
-        <div style={{ marginBottom: 'var(--space-xl)' }}>
-          <h3 style={{ marginBottom: 'var(--space-md)' }}><Calendar size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Coming Up This Week</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-xs)' }}>
-            {myWeekJobs.map(job => {
-              const cust = job.customerId ? getCustomer(job.customerId) : null;
-              return (
-                <div key={job.id} className="card" style={{ padding: 'var(--space-sm) var(--space-md)', display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: '6px 10px', textAlign: 'center', minWidth: '54px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-tertiary)' }}>
-                    {formatDateShort(job.scheduledDate)}
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{job.title}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)' }}>
-                      {job.scheduledTime ? formatTime12(job.scheduledTime) : 'TBD'}{cust && ` • ${cust.firstName} ${cust.lastName || ''}`}
-                    </div>
-                  </div>
-                  <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
-                </div>
-              );
-            })}
+      {/* Upcoming Jobs */}
+      {upcomingJobs.length > 0 && (
+        <>
+          <div className="crew-section-header" style={{ marginTop: 'var(--space-xl)' }}>
+            <h2>
+              <CalendarDays size={20} />
+              Upcoming
+              <span className="crew-section-count">{upcomingJobs.length}</span>
+            </h2>
+            <Link href="/crew-schedule" className="btn btn-ghost btn-sm">
+              Full Schedule <ChevronRight size={14} />
+            </Link>
           </div>
-        </div>
-      )}
-
-      {/* Recent Time Entries */}
-      {recentEntries.length > 0 && (
-        <div>
-          <h3 style={{ marginBottom: 'var(--space-md)' }}><Clock size={18} style={{ verticalAlign: 'middle', marginRight: '8px' }} />Recent Hours</h3>
-          <div className="table-wrapper">
-            <table>
-              <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Duration</th></tr></thead>
-              <tbody>
-                {recentEntries.slice(0, 10).map(e => (
-                  <tr key={e.id}>
-                    <td style={{ fontWeight: 600 }}>{new Date(e.clockIn).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</td>
-                    <td>{new Date(e.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</td>
-                    <td>{e.clockOut ? new Date(e.clockOut).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</td>
-                    <td style={{ fontWeight: 600, color: 'var(--lucky-green-light)' }}>{formatDuration(e.durationMinutes)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Clock Out Modal */}
-      {showClockOutModal && (
-        <div className="modal-overlay" onClick={() => !clockLoading && setShowClockOutModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
-            <div className="modal-header">
-              <h2><Square size={18} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Clock Out</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowClockOutModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', textAlign: 'center', marginBottom: 'var(--space-md)' }}>
-                <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--lucky-green-light)' }}>{activeEntry ? formatTimeSince(activeEntry.clockIn) : '—'}</div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>Time worked this session</div>
-              </div>
-              <div className="form-group">
-                <label className="form-label">End of day notes (optional)</label>
-                <textarea className="form-input" rows={3} placeholder="Any notes about today's work..." value={clockOutNotes} onChange={e => setClockOutNotes(e.target.value)} style={{ resize: 'vertical' }} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowClockOutModal(false)} disabled={clockLoading}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleClockOut} disabled={clockLoading} style={{ background: '#ef4444', borderColor: '#ef4444' }}>
-                {clockLoading ? '⏳ Clocking out...' : '⏹ Confirm Clock Out'}
-              </button>
-            </div>
-          </div>
-        </div>
+          {upcomingJobs.map(job => (
+            <JobCard key={job.id} job={job} getCustomer={getCustomer} getQuote={getQuote} showDate />
+          ))}
+        </>
       )}
     </div>
+  );
+}
+
+// ─── Rich Job Card Component ────────────────────────────────
+function JobCard({ job, getCustomer, getQuote, showDate }) {
+  const customer = job.customerId ? getCustomer(job.customerId) : null;
+  const quote = job.quoteId ? getQuote(job.quoteId) : null;
+
+  const customerInitials = customer
+    ? `${customer.firstName?.[0] || ''}${customer.lastName?.[0] || ''}`.toUpperCase()
+    : '??';
+
+  const fullAddress = job.address || (customer?.address
+    ? `${customer.address}${customer.city ? `, ${customer.city}` : ''}${customer.state ? ` ${customer.state}` : ''} ${customer.zip || ''}`.trim()
+    : '');
+
+  const mapsUrl = fullAddress
+    ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`
+    : '';
+
+  const priorityAccent = job.priority === 'urgent' ? 'var(--status-danger)'
+    : job.priority === 'high' ? 'var(--status-warning)'
+    : job.priority === 'normal' ? 'var(--lucky-green)'
+    : 'var(--text-tertiary)';
+
+  return (
+    <Link href={`/calendar/job/${job.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+      <div className="crew-job-card" style={{ '--card-accent': priorityAccent }}>
+        {/* Header — title + priority */}
+        <div className="crew-job-card-header">
+          <div>
+            <div className="crew-job-card-title">{job.title}</div>
+            <div className="crew-job-card-time">
+              <Clock size={13} />
+              {showDate && <span>{formatDate(job.scheduledDate)} • </span>}
+              {job.scheduledTime ? formatTime12(job.scheduledTime) : 'Time TBD'}
+              {job.estimatedDuration && (
+                <span style={{ marginLeft: '8px', color: 'var(--text-tertiary)' }}>
+                  <Timer size={12} style={{ verticalAlign: 'middle', marginRight: '2px' }} />
+                  {job.estimatedDuration}
+                </span>
+              )}
+            </div>
+          </div>
+          {job.priority && (
+            <span className={`crew-job-card-priority ${job.priority}`}>
+              {job.priority}
+            </span>
+          )}
+        </div>
+
+        {/* Customer Info */}
+        {customer && (
+          <div className="crew-job-card-customer">
+            <div className="crew-job-card-customer-avatar">{customerInitials}</div>
+            <div className="crew-job-card-customer-info">
+              <div className="crew-job-card-customer-name">
+                {customer.firstName} {customer.lastName || ''}
+              </div>
+              {customer.phone && (
+                <div className="crew-job-card-customer-detail">
+                  <Phone size={11} />
+                  <a href={`tel:${customer.phone}`} onClick={e => e.stopPropagation()}>
+                    {customer.phone}
+                  </a>
+                </div>
+              )}
+              {customer.email && (
+                <div className="crew-job-card-customer-detail">
+                  <Mail size={11} />
+                  <a href={`mailto:${customer.email}`} onClick={e => e.stopPropagation()}>
+                    {customer.email}
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Address with Map Link */}
+        {fullAddress && (
+          <div className="crew-job-card-address">
+            <MapPin size={14} />
+            {mapsUrl ? (
+              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                {fullAddress}
+              </a>
+            ) : (
+              <span>{fullAddress}</span>
+            )}
+          </div>
+        )}
+
+        {/* Crew Notes */}
+        {job.crewNotes && (
+          <div className="crew-job-card-notes">
+            {job.crewNotes}
+          </div>
+        )}
+
+        {/* Footer — tags */}
+        <div className="crew-job-card-footer">
+          {quote && (
+            <span className="crew-job-card-tag">
+              <FileText size={12} />
+              Quote #{quote.quoteNumber}
+            </span>
+          )}
+          {job.status && (
+            <span className="crew-job-card-tag" style={{ textTransform: 'capitalize' }}>
+              <Flag size={12} />
+              {job.status.replace('_', ' ')}
+            </span>
+          )}
+          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+            Tap for details <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }

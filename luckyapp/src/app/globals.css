@@ -3255,3 +3255,1364 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ============================================
+   Job Media System
+   ============================================ */
+
+/* ---------- Media Dropzone ---------- */
+.media-dropzone {
+  border: 2px dashed var(--border-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-base);
+  background: transparent;
+  margin-bottom: var(--space-md);
+}
+
+.media-dropzone:hover,
+.media-dropzone.drag-over {
+  border-color: var(--lucky-green);
+  background: rgba(58, 156, 74, 0.06);
+}
+
+.media-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.media-dropzone-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.media-dropzone-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+
+/* ---------- Upload Progress ---------- */
+.upload-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--space-md);
+}
+
+.upload-progress-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+}
+
+.upload-progress-name {
+  font-weight: 600;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upload-progress-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.upload-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+.upload-status.compressing {
+  color: var(--status-info);
+}
+
+.upload-status.uploading {
+  color: var(--lucky-green-light);
+}
+
+.upload-status.done {
+  color: var(--status-success);
+}
+
+.upload-status.error {
+  color: var(--status-danger);
+}
+
+.upload-savings {
+  font-size: 0.7rem;
+  color: var(--status-success);
+  font-weight: 500;
+}
+
+/* ---------- Media Grid ---------- */
+.media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.media-card {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--bg-elevated);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.media-card:hover {
+  transform: scale(1.03);
+  box-shadow: var(--shadow-md);
+}
+
+.media-card-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-card-video {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  color: var(--text-tertiary);
+}
+
+.media-card-play {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.media-card-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 4px 8px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.media-card:hover .media-card-overlay {
+  opacity: 1;
+}
+
+.media-card-size {
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+}
+
+.media-pin-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  font-size: 0.75rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  backdrop-filter: blur(4px);
+}
+
+/* ---------- Media Lightbox ---------- */
+.media-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease;
+}
+
+.media-lightbox-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.media-lightbox-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  color: white;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+}
+
+.media-lightbox-close:hover {
+  opacity: 1;
+}
+
+.media-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white;
+  opacity: 0.5;
+  transition: opacity var(--transition-fast);
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.media-lightbox-nav:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.media-lightbox-nav.prev {
+  left: -60px;
+}
+
+.media-lightbox-nav.next {
+  right: -60px;
+}
+
+.media-lightbox-main {
+  max-width: 85vw;
+  max-height: 75vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.media-lightbox-main img {
+  max-width: 100%;
+  max-height: 75vh;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+}
+
+.media-lightbox-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: var(--space-md);
+  padding: 0 var(--space-sm);
+}
+
+@media (max-width: 768px) {
+  .media-lightbox-nav.prev {
+    left: 8px;
+  }
+
+  .media-lightbox-nav.next {
+    right: 8px;
+  }
+
+  .media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  }
+}
+
+/* ============================================
+   Priority System
+   ============================================ */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.priority-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.priority-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  font-size: 0.78rem;
+  font-weight: 500;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.priority-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.priority-option.active {
+  border-color: var(--priority-color, var(--border-secondary));
+  color: var(--priority-color, var(--text-primary));
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ============================================
+   Crew Assignment — Searchable List
+   ============================================ */
+.crew-assignment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+}
+
+.crew-assignment-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.crew-assignment-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.crew-assignment-item.active {
+  background: rgba(58, 156, 74, 0.08);
+}
+
+.crew-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--radius-pill);
+  background: rgba(58, 156, 74, 0.12);
+  border: 1px solid rgba(58, 156, 74, 0.25);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--lucky-green-light);
+}
+
+/* ============================================
+   Customer Preview (EventModal)
+   ============================================ */
+.customer-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customer-preview-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.customer-preview-row svg {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Enhanced Crew Dashboard Cards
+   ============================================ */
+.job-card-enhanced {
+  border: 1px solid var(--border-primary);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.job-card-enhanced:hover {
+  border-color: rgba(58, 156, 74, 0.3);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+}
+
+.crew-quick-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--lucky-green-light);
+  text-decoration: none;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(58, 156, 74, 0.08);
+  transition: all var(--transition-fast);
+}
+
+.crew-quick-action:hover {
+  background: rgba(58, 156, 74, 0.16);
+}
+
+/* Spinning animation for loaders */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--border-secondary);
+  border-top-color: var(--lucky-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* ============================================
+   Crew Assignment List — Scalable Picker
+   ============================================ */
+.crew-assignment-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  background: var(--bg-input);
+}
+
+.crew-assignment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+}
+
+.crew-assignment-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.crew-assignment-item.active {
+  background: rgba(58, 156, 74, 0.12);
+}
+
+/* Crew Selected Chips */
+.crew-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+}
+
+.crew-selected-chip:hover {
+  border-color: var(--text-tertiary);
+}
+
+/* ============================================
+   Priority Selector
+   ============================================ */
+.priority-selector {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.priority-option {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid var(--border-primary);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.priority-option:hover {
+  border-color: var(--border-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.priority-option.active {
+  border-color: var(--priority-color, var(--lucky-green));
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--priority-color, var(--lucky-green-light));
+}
+
+/* ============================================
+   Job Detail Page
+   ============================================ */
+.job-detail-page {
+  max-width: 960px;
+}
+
+.job-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+}
+
+.job-detail-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.job-detail-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.job-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.job-detail-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.job-detail-status.scheduled {
+  background: var(--status-info-bg);
+  color: var(--status-info);
+}
+
+.job-detail-status.in_progress {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.job-detail-status.completed {
+  background: var(--status-success-bg);
+  color: var(--status-success);
+}
+
+.job-detail-status.cancelled {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.job-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 768px) {
+  .job-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.job-detail-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  transition: border-color var(--transition-base);
+}
+
+.job-detail-section:hover {
+  border-color: var(--border-secondary);
+}
+
+.job-detail-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.job-detail-section-title svg {
+  width: 16px;
+  height: 16px;
+}
+
+.job-detail-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.job-detail-row + .job-detail-row {
+  border-top: 1px solid var(--border-primary);
+}
+
+.job-detail-row svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.job-detail-row-content {
+  flex: 1;
+}
+
+.job-detail-row-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+}
+
+.job-detail-row-value {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.job-detail-row-value a {
+  color: var(--lucky-green-light);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+.job-detail-row-value a:hover {
+  color: var(--lucky-green);
+  text-decoration: underline;
+}
+
+.job-detail-notes {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin-top: var(--space-sm);
+}
+
+.job-detail-full-width {
+  grid-column: 1 / -1;
+}
+
+/* Assigned crew in job detail */
+.job-detail-crew-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.job-detail-crew-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.job-detail-crew-item:hover {
+  background: var(--bg-card-hover);
+}
+
+.job-detail-crew-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--lucky-green);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.job-detail-crew-name {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.job-detail-crew-role {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  text-transform: capitalize;
+}
+
+/* Status actions */
+.job-detail-actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-lg);
+}
+
+/* ============================================
+   Crew Dashboard — Worker View
+   ============================================ */
+.crew-dash {
+  padding: var(--space-lg);
+  max-width: 800px;
+}
+
+.crew-dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-xl);
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.crew-dash-greeting h1 {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.crew-dash-greeting p {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Clock widget */
+.crew-clock-widget {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.crew-clock-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.crew-clock-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.crew-clock-dot.active {
+  background: var(--status-success);
+  box-shadow: 0 0 8px rgba(52, 211, 153, 0.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.crew-clock-dot.inactive {
+  background: var(--text-tertiary);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.crew-clock-time {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  margin-left: auto;
+}
+
+/* Section headers */
+.crew-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.crew-section-header h2 {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.crew-section-count {
+  background: var(--bg-elevated);
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+
+/* Job cards for crew */
+.crew-job-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  position: relative;
+  overflow: hidden;
+}
+
+.crew-job-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--card-accent, var(--lucky-green));
+}
+
+.crew-job-card:hover {
+  border-color: rgba(58, 156, 74, 0.3);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.crew-job-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.crew-job-card-title {
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+}
+
+.crew-job-card-time {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.crew-job-card-priority {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+
+.crew-job-card-priority.low {
+  background: rgba(100, 116, 139, 0.15);
+  color: var(--text-tertiary);
+}
+
+.crew-job-card-priority.normal {
+  background: var(--status-info-bg);
+  color: var(--status-info);
+}
+
+.crew-job-card-priority.high {
+  background: var(--status-warning-bg);
+  color: var(--status-warning);
+}
+
+.crew-job-card-priority.urgent {
+  background: var(--status-danger-bg);
+  color: var(--status-danger);
+}
+
+.crew-job-card-customer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.crew-job-card-customer-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--lucky-green);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.crew-job-card-customer-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.crew-job-card-customer-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.crew-job-card-customer-detail {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.crew-job-card-customer-detail a {
+  color: var(--lucky-green-light);
+  text-decoration: none;
+}
+
+.crew-job-card-customer-detail a:hover {
+  text-decoration: underline;
+}
+
+.crew-job-card-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-sm);
+}
+
+.crew-job-card-address a {
+  color: var(--lucky-green-light);
+  text-decoration: none;
+}
+
+.crew-job-card-address a:hover {
+  text-decoration: underline;
+}
+
+.crew-job-card-address svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.crew-job-card-notes {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  background: var(--bg-input);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  border-left: 3px solid var(--lucky-green-glow);
+}
+
+.crew-job-card-footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.crew-job-card-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 3px 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.crew-job-card-tag svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* No jobs message */
+.crew-no-jobs {
+  text-align: center;
+  padding: var(--space-2xl);
+  color: var(--text-tertiary);
+}
+
+.crew-no-jobs svg {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--space-md);
+  opacity: 0.4;
+}
+
+.crew-no-jobs p {
+  font-size: 0.9rem;
+  margin-top: var(--space-sm);
+}
+
+/* ============================================
+   Crew Schedule — Weekly View
+   ============================================ */
+.crew-schedule {
+  padding: var(--space-lg);
+  max-width: 1100px;
+}
+
+.crew-schedule-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.crew-schedule-nav h2 {
+  font-size: 1.1rem;
+  min-width: 200px;
+}
+
+.crew-schedule-week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-sm);
+}
+
+@media (max-width: 768px) {
+  .crew-schedule-week {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crew-schedule-day {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  min-height: 120px;
+  transition: border-color var(--transition-base);
+}
+
+.crew-schedule-day:hover {
+  border-color: var(--border-secondary);
+}
+
+.crew-schedule-day.today {
+  border-color: var(--lucky-green);
+  box-shadow: 0 0 12px var(--lucky-green-glow);
+}
+
+.crew-schedule-day-header {
+  text-align: center;
+  margin-bottom: var(--space-sm);
+  padding-bottom: var(--space-sm);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.crew-schedule-day-name {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.crew-schedule-day-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.crew-schedule-day.today .crew-schedule-day-num {
+  color: var(--lucky-green-light);
+}
+
+.crew-schedule-mini-card {
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+  border-left: 3px solid var(--card-accent, var(--lucky-green));
+  transition: all var(--transition-fast);
+  font-size: 0.78rem;
+}
+
+.crew-schedule-mini-card:hover {
+  background: var(--bg-card-hover);
+  transform: translateX(2px);
+}
+
+.crew-schedule-mini-card-title {
+  font-weight: 600;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.crew-schedule-mini-card-time {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.crew-schedule-mini-card-customer {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.crew-schedule-empty {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: var(--space-md) 0;
+  opacity: 0.6;
+}
+
+/* ============================================
+   Customer Info Card (Rich Detail)
+   ============================================ */
+.customer-info-card {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.customer-info-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.customer-info-card-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--lucky-green);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.customer-info-card-name {
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.customer-info-card-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+.customer-info-card-tag {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(58, 156, 74, 0.12);
+  color: var(--lucky-green-light);
+  text-transform: capitalize;
+}
+
+.customer-info-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.customer-info-card-row svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.customer-info-card-row a {
+  color: var(--lucky-green-light);
+  text-decoration: none;
+}
+
+.customer-info-card-row a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
+   Enhanced Event Modal — Form improvements
+   ============================================ */
+.event-modal-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .event-modal-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Linked quote preview in event modal */
+.linked-quote-preview {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  border-left: 3px solid var(--lucky-gold);
+}
+
+.linked-quote-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.linked-quote-preview-num {
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.linked-quote-preview-total {
+  font-weight: 800;
+  font-size: 1rem;
+  color: var(--lucky-green-light);
+}
+
+.linked-quote-preview-items {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+}
+
+/* Form row in modal for 2-column layouts */
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+}
