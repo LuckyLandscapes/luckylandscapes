@@ -18,7 +18,7 @@ function formatCurrency(n) {
 export default function QuoteDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getQuote, getCustomer, updateQuote, deleteQuote, addActivity } = useData();
+  const { getQuote, getCustomer, updateQuote, deleteQuote, addActivity, jobs } = useData();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendTab, setSendTab] = useState('email'); // 'email' | 'sms'
@@ -31,6 +31,7 @@ export default function QuoteDetailPage() {
 
   const quote = getQuote(id);
   const customer = quote ? getCustomer(quote.customerId) : null;
+  const linkedJob = quote ? jobs.find(j => j.quoteId === id) : null;
 
   if (!quote) {
     return (
@@ -228,10 +229,15 @@ export default function QuoteDetailPage() {
               </button>
             </>
           )}
-          {quote.status === 'accepted' && (
+          {quote.status === 'accepted' && !linkedJob && (
             <button className="btn btn-primary" onClick={() => setShowScheduleModal(true)}>
               <CalendarDays size={16} /> Schedule Job
             </button>
+          )}
+          {linkedJob && (
+            <Link href={`/jobs/${linkedJob.id}`} className="btn btn-primary">
+              <CalendarDays size={16} /> View Job →
+            </Link>
           )}
           <button className="btn btn-secondary" onClick={async () => await generateQuotePdf(quote, customer)}>
             <Printer size={16} /> PDF

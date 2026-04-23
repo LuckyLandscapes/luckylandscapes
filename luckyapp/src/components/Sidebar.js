@@ -19,6 +19,7 @@ import {
   HardHat,
   Clock,
   UserCog,
+  Briefcase,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -28,6 +29,7 @@ const ownerNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'admin'] },
   { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'admin'] },
   { href: '/quotes', label: 'Quotes', icon: FileText, roles: ['owner', 'admin'], badgeKey: 'draftQuotes' },
+  { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
@@ -65,10 +67,11 @@ export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
+  const activeJobs = jobs.filter(j => j.status === 'scheduled' || j.status === 'in_progress').length;
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEvents = calendarEvents.filter(e => e.date === todayStr).length
     + jobs.filter(j => j.scheduledDate === todayStr).length;
-  const badges = { draftQuotes: draftQuotes || null, todayEvents: todayEvents || null };
+  const badges = { draftQuotes: draftQuotes || null, activeJobs: activeJobs || null, todayEvents: todayEvents || null };
 
   const initials = user?.fullName
     ?.split(' ')

@@ -100,7 +100,7 @@ const EVENT_TYPE_LABELS = {
 
 // ─── Main Calendar Page ─────────────────────────────────────
 export default function CalendarPage() {
-  const { calendarEvents, jobs, customers, getCustomer, quotes } = useData();
+  const { calendarEvents, jobs, customers, getCustomer, quotes, updateJob } = useData();
   const [view, setView] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -314,13 +314,28 @@ export default function CalendarPage() {
                         </div>
                       )}
                     </div>
-                    {e.jobId && e.source === 'event' && (
-                      <Link href={`/calendar/job/${e.jobId}`} className="cal-sidebar-event-link" onClick={ev => ev.stopPropagation()}>
-                        <ExternalLink size={14} />
-                      </Link>
+                    {/* Completed ticker for jobs */}
+                    {(e.source === 'job' || (e.source === 'event' && e.type === 'job')) && e.jobId && (
+                      <button
+                        className={`cal-job-ticker ${e.jobStatus === 'completed' ? 'done' : ''}`}
+                        title={e.jobStatus === 'completed' ? 'Completed' : 'Mark completed'}
+                        onClick={async (ev) => {
+                          ev.stopPropagation();
+                          const job = jobs.find(j => j.id === e.jobId);
+                          if (job) {
+                            const newStatus = job.status === 'completed' ? 'scheduled' : 'completed';
+                            await updateJob(job.id, { status: newStatus });
+                          }
+                        }}
+                      >
+                        {(() => {
+                          const job = jobs.find(j => j.id === e.jobId);
+                          return job?.status === 'completed' ? '✅' : '⬜';
+                        })()}
+                      </button>
                     )}
-                    {e.source === 'job' && (
-                      <Link href={`/calendar/job/${e.jobId}`} className="cal-sidebar-event-link" onClick={ev => ev.stopPropagation()}>
+                    {e.jobId && (
+                      <Link href={`/jobs/${e.jobId}`} className="cal-sidebar-event-link" onClick={ev => ev.stopPropagation()}>
                         <ExternalLink size={14} />
                       </Link>
                     )}
@@ -647,7 +662,7 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit }) {
             <button className="btn btn-secondary" onClick={onEdit}>Edit Event</button>
           )}
           {(event.jobId) && (
-            <Link href={`/calendar/job/${event.jobId}`} className="btn btn-primary">
+            <Link href={`/jobs/${event.jobId}`} className="btn btn-primary">
               <Briefcase size={16} /> View Job Details
             </Link>
           )}

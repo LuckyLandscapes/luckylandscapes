@@ -51,7 +51,7 @@ const activityColors = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { customers, quotes, activity, teamMembers, timeEntries } = useData();
+  const { customers, quotes, activity, teamMembers, timeEntries, jobs, getJobFinancials, getCustomer } = useData();
 
   // Calculate metrics
   const totalRevenue = quotes
@@ -70,6 +70,15 @@ export default function DashboardPage() {
   // Crew stats
   const clockedInWorkers = timeEntries.filter(t => !t.clockOut).length;
   const activeWorkers = teamMembers.filter(m => m.role === 'worker' && m.isActive).length;
+
+  // Net profit across all jobs
+  let netProfit = 0;
+  jobs.forEach(j => {
+    const fin = getJobFinancials(j.id);
+    if (fin) netProfit += fin.profit;
+  });
+
+  const recentJobs = jobs.slice(0, 5);
 
   return (
     <div className="page animate-fade-in">
@@ -144,6 +153,16 @@ export default function DashboardPage() {
           </div>
           <div className="stat-card-value">{clockedInWorkers}<span style={{ fontSize: '0.6em', fontWeight: 400, color: 'var(--text-tertiary)' }}> / {activeWorkers}</span></div>
           <div className="stat-card-label">Crew On Clock</div>
+        </div>
+
+        <div className="stat-card" style={{ '--accent': netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)', '--accent-bg': netProfit >= 0 ? 'var(--status-success-bg)' : 'var(--status-danger-bg)' }}>
+          <div className="stat-card-header">
+            <div className="stat-card-icon">
+              <TrendingUp />
+            </div>
+          </div>
+          <div className="stat-card-value" style={{ color: netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{formatCurrency(netProfit)}</div>
+          <div className="stat-card-label">Net Profit (All Jobs)</div>
         </div>
       </div>
 

@@ -58,6 +58,7 @@ export function DataProvider({ children }) {
   const [activity, setActivity] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [jobMedia, setJobMedia] = useState([]);
+  const [jobExpenses, setJobExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -78,6 +79,7 @@ export function DataProvider({ children }) {
       setActivity(loadLocal('activity'));
       setTimeEntries(loadLocal('time_entries'));
       setJobMedia(loadLocal('job_media'));
+      setJobExpenses(loadLocal('job_expenses'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -86,7 +88,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -94,6 +96,7 @@ export function DataProvider({ children }) {
         supabase.from('team_members').select('*').eq('org_id', orgId),
         supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(100),
+        supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -103,6 +106,7 @@ export function DataProvider({ children }) {
       if (team.data) setTeamMembers(snakeToCamel(team.data));
       if (act.data) setActivity(snakeToCamel(act.data));
       if (te.data) setTimeEntries(snakeToCamel(te.data));
+      if (jexp.data) setJobExpenses(snakeToCamel(jexp.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -135,6 +139,10 @@ export function DataProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_media' }, () => {
         supabase.from('job_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setJobMedia(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_expenses' }, () => {
+        supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+          .then(({ data }) => { if (data) setJobExpenses(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -278,6 +286,7 @@ export function DataProvider({ children }) {
       assignedTo: assignedTo || [],
       crewNotes: crewNotes || '',
       total: quote.total || 0,
+      revenue: quote.total || 0,
       priority: 'normal',
     };
 
@@ -350,10 +359,11 @@ export function DataProvider({ children }) {
   }, [connected, orgId]);
 
   // ─── Time Entries ───────────────────────────────────────
-  const clockIn = useCallback(async (memberId) => {
+  const clockIn = useCallback(async (memberId, jobId = null) => {
     const entry = {
       teamMemberId: memberId,
       clockIn: new Date().toISOString(),
+      jobId: jobId || null,
     };
     if (connected) {
       const { data: row, error } = await supabase.from('time_entries')
@@ -382,6 +392,75 @@ export function DataProvider({ children }) {
       return next;
     });
   }, [connected]);
+
+  // ─── Job Expenses ──────────────────────────────────────
+  const addJobExpense = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('job_expenses')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const e = snakeToCamel(row);
+      setJobExpenses(prev => [e, ...prev]);
+      return e;
+    } else {
+      const e = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setJobExpenses(prev => { const next = [e, ...prev]; saveLocal('job_expenses', next); return next; });
+      return e;
+    }
+  }, [connected, orgId]);
+
+  const updateJobExpense = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('job_expenses').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setJobExpenses(prev => {
+      const next = prev.map(e => e.id === id ? { ...e, ...data } : e);
+      if (!connected) saveLocal('job_expenses', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteJobExpense = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('job_expenses').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setJobExpenses(prev => {
+      const next = prev.filter(e => e.id !== id);
+      if (!connected) saveLocal('job_expenses', next);
+      return next;
+    });
+  }, [connected]);
+
+  // ─── Financial Helpers ─────────────────────────────────
+  const getJobFinancials = useCallback((jobId) => {
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return null;
+
+    const expenses = jobExpenses.filter(e => e.jobId === jobId);
+    const entries = timeEntries.filter(t => t.jobId === jobId && t.clockIn && t.clockOut);
+
+    const materialCosts = expenses.filter(e => e.category === 'materials').reduce((s, e) => s + Number(e.amount || 0), 0);
+    const equipmentCosts = expenses.filter(e => e.category === 'equipment').reduce((s, e) => s + Number(e.amount || 0), 0);
+    const otherExpenses = expenses.filter(e => !['materials', 'equipment'].includes(e.category)).reduce((s, e) => s + Number(e.amount || 0), 0);
+
+    // Calculate labor cost from time entries × worker hourly rates
+    let laborCosts = 0;
+    entries.forEach(entry => {
+      const member = teamMembers.find(m => m.id === entry.teamMemberId);
+      const rate = Number(member?.hourlyRate || 0);
+      const hours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
+      laborCosts += rate * hours;
+    });
+
+    const revenue = Number(job.revenue || job.total || 0);
+    const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
+    const profit = revenue - totalExpenses;
+
+    return { revenue, materialCosts, equipmentCosts, laborCosts, otherExpenses, totalExpenses, profit, expenses, entries };
+  }, [jobs, jobExpenses, timeEntries, teamMembers]);
 
   // ─── Team Members ───────────────────────────────────────
   const addTeamMember = useCallback(async (data) => {
@@ -430,7 +509,7 @@ export function DataProvider({ children }) {
   const value = {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
-    activity, timeEntries, jobMedia, loading,
+    activity, timeEntries, jobMedia, jobExpenses, loading,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember,
@@ -452,6 +531,9 @@ export function DataProvider({ children }) {
 
     // Time
     clockIn, clockOut,
+
+    // Expenses & Financials
+    addJobExpense, updateJobExpense, deleteJobExpense, getJobFinancials,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,

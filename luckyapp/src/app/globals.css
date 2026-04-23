@@ -4616,3 +4616,179 @@ body {
     grid-template-columns: 1fr;
   }
 }
+
+/* ============================================
+   Quote Picker (EventModal job scheduling)
+   ============================================ */
+.quote-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.quote-picker-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+
+.quote-picker-item:hover {
+  border-color: var(--lucky-green);
+  background: rgba(45, 122, 58, 0.06);
+}
+
+.quote-picker-item.active {
+  border-color: var(--lucky-green);
+  background: rgba(45, 122, 58, 0.1);
+  box-shadow: 0 0 0 1px var(--lucky-green);
+}
+
+/* ============================================
+   Job Financials Banner
+   ============================================ */
+.job-financials-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-lg);
+  overflow-x: auto;
+  flex-wrap: wrap;
+}
+
+.job-financials-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+}
+
+.job-financials-item.profit {
+  padding: var(--space-xs) var(--space-md);
+  background: rgba(45, 122, 58, 0.06);
+  border-radius: var(--radius-md);
+}
+
+.job-financials-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+}
+
+.job-financials-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.job-financials-divider {
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: var(--text-tertiary);
+  user-select: none;
+}
+
+/* ============================================
+   Expenses List
+   ============================================ */
+.expenses-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.expense-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-primary);
+  transition: background var(--transition-fast);
+}
+
+.expense-row:last-child {
+  border-bottom: none;
+}
+
+.expense-row:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.expense-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.expense-add-form {
+  padding: var(--space-md);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+  border: 1px dashed var(--border-secondary);
+}
+
+/* ============================================
+   Calendar Job Ticker
+   ============================================ */
+.cal-job-ticker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+  opacity: 0.7;
+}
+
+.cal-job-ticker:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cal-job-ticker.done {
+  opacity: 1;
+}
+
+/* Job Financials Tab */
+.job-financials-tab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+@media (max-width: 768px) {
+  .job-financials-banner {
+    flex-direction: column;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+  }
+  .job-financials-divider {
+    display: none;
+  }
+  .job-financials-item {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+  }
+}
