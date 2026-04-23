@@ -46,10 +46,10 @@ export default function EventModal({ event, defaultDate, onClose }) {
 
   const filteredCustomers = customerSearch
     ? customers.filter(c =>
-        `${c.firstName} ${c.lastName || ''} ${c.email || ''} ${c.phone || ''}`
-          .toLowerCase()
-          .includes(customerSearch.toLowerCase())
-      ).slice(0, 6)
+      `${c.firstName} ${c.lastName || ''} ${c.email || ''} ${c.phone || ''}`
+        .toLowerCase()
+        .includes(customerSearch.toLowerCase())
+    ).slice(0, 6)
     : customers.slice(0, 6);
 
   const updateField = (field, value) => {

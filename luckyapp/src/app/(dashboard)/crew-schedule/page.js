@@ -5,18 +5,18 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { ChevronLeft, ChevronRight, Clock, MapPin, User, HardHat, Calendar } from 'lucide-react';
 
-const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-function pad(n) { return String(n).padStart(2,'0'); }
-function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function pad(n) { return String(n).padStart(2, '0'); }
+function fmtDate(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function fmtTime12(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
-  return `${h%12||12}:${pad(m)} ${h>=12?'PM':'AM'}`;
+  return `${h % 12 || 12}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
 function getWeekDates(date) {
   const s = new Date(date); s.setDate(s.getDate() - s.getDay());
-  return Array.from({length:7}, (_,i) => { const d = new Date(s); d.setDate(d.getDate()+i); return d; });
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(s); d.setDate(d.getDate() + i); return d; });
 }
 
 export default function CrewSchedulePage() {
@@ -59,7 +59,7 @@ export default function CrewSchedulePage() {
       });
     });
 
-    Object.values(map).forEach(arr => arr.sort((a,b) => (a.scheduledTime||'').localeCompare(b.scheduledTime||'')));
+    Object.values(map).forEach(arr => arr.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '')));
     return map;
   }, [jobs, calendarEvents, memberId]);
 
@@ -72,8 +72,8 @@ export default function CrewSchedulePage() {
   const startDate = weekDates[0];
   const endDate = weekDates[6];
   const titleText = startDate.getMonth() === endDate.getMonth()
-    ? `${startDate.toLocaleDateString('en-US',{month:'long'})} ${startDate.getDate()} – ${endDate.getDate()}, ${startDate.getFullYear()}`
-    : `${startDate.toLocaleDateString('en-US',{month:'short'})} ${startDate.getDate()} – ${endDate.toLocaleDateString('en-US',{month:'short'})} ${endDate.getDate()}, ${endDate.getFullYear()}`;
+    ? `${startDate.toLocaleDateString('en-US', { month: 'long' })} ${startDate.getDate()} – ${endDate.getDate()}, ${startDate.getFullYear()}`
+    : `${startDate.toLocaleDateString('en-US', { month: 'short' })} ${startDate.getDate()} – ${endDate.toLocaleDateString('en-US', { month: 'short' })} ${endDate.getDate()}, ${endDate.getFullYear()}`;
 
   return (
     <div className="page animate-fade-in">
@@ -97,7 +97,7 @@ export default function CrewSchedulePage() {
       </div>
 
       {/* Week Grid */}
-      <div style={{ display:'flex', flexDirection:'column', gap:'var(--space-sm)' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
         {weekDates.map(date => {
           const dateStr = fmtDate(date);
           const isToday = dateStr === todayStr;
@@ -116,7 +116,7 @@ export default function CrewSchedulePage() {
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 borderBottom: dayJobs.length > 0 ? '1px solid var(--border-subtle)' : 'none',
               }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'var(--space-sm)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
                   <div style={{
                     width: '32px', height: '32px', borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -132,7 +132,7 @@ export default function CrewSchedulePage() {
                     </div>
                   </div>
                 </div>
-                <span style={{ fontSize:'0.75rem', color:'var(--text-tertiary)' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
                   {dayJobs.length} job{dayJobs.length !== 1 ? 's' : ''}
                 </span>
               </div>
@@ -152,10 +152,10 @@ export default function CrewSchedulePage() {
                     }} />
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{job.title}</div>
-                      <div style={{ fontSize:'0.8rem', color:'var(--text-tertiary)', display:'flex', flexWrap:'wrap', gap:'8px' }}>
-                        {job.scheduledTime && <span style={{ display:'flex', alignItems:'center', gap:'3px' }}><Clock size={11} /> {fmtTime12(job.scheduledTime)}</span>}
-                        {cust && <span style={{ display:'flex', alignItems:'center', gap:'3px' }}><User size={11} /> {cust.firstName} {cust.lastName||''}</span>}
-                        {job.address && <span style={{ display:'flex', alignItems:'center', gap:'3px' }}><MapPin size={11} /> {job.address.split(',')[0]}</span>}
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {job.scheduledTime && <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><Clock size={11} /> {fmtTime12(job.scheduledTime)}</span>}
+                        {cust && <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><User size={11} /> {cust.firstName} {cust.lastName || ''}</span>}
+                        {job.address && <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}><MapPin size={11} /> {job.address.split(',')[0]}</span>}
                       </div>
                     </div>
                   </div>
@@ -163,7 +163,7 @@ export default function CrewSchedulePage() {
               })}
 
               {dayJobs.length === 0 && (
-                <div style={{ padding:'var(--space-xs) var(--space-md)', fontSize:'0.8rem', color:'var(--text-tertiary)', opacity:0.5 }}>
+                <div style={{ padding: 'var(--space-xs) var(--space-md)', fontSize: '0.8rem', color: 'var(--text-tertiary)', opacity: 0.5 }}>
                   No jobs
                 </div>
               )}
