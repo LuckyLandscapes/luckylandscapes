@@ -98,7 +98,7 @@ export default function CustomersPage() {
                     </div>
                     <div>
                       <div className="table-name">{c.firstName} {c.lastName}</div>
-                      <div className="table-sub">Since {c.createdAt}</div>
+                      <div className="table-sub">Since {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</div>
                     </div>
                   </div>
                 </td>

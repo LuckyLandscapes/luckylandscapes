@@ -117,7 +117,7 @@ export default function CustomerDetailPage() {
                 </span>
               ))}
               <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                Customer since {customer.createdAt}
+                Customer since {formatDate(customer.createdAt)}
               </span>
             </div>
           </div>

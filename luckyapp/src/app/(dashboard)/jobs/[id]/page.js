@@ -8,6 +8,7 @@ import {
   ArrowLeft, CalendarDays, Clock, MapPin, User, Phone, Mail, FileText,
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
+  Edit3, Save, Search, Check,
 } from 'lucide-react';
 
 function formatTime12(time) {
@@ -59,6 +60,9 @@ export default function JobDetailPage({ params }) {
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ category: 'materials', description: '', amount: '' });
   const [activeTab, setActiveTab] = useState('details');
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [crewSearch, setCrewSearch] = useState('');
 
   if (!job) {
     return (
@@ -104,6 +108,44 @@ export default function JobDetailPage({ params }) {
     setShowAddExpense(false);
   };
 
+  const openEditModal = () => {
+    setEditForm({
+      scheduledDate: job.scheduledDate || '',
+      scheduledTime: job.scheduledTime || '',
+      crewNotes: job.crewNotes || '',
+      priority: job.priority || 'normal',
+      assignedTo: job.assignedTo || [],
+    });
+    setCrSearch('');
+    setShowEditModal(true);
+  };
+
+  const handleEditSave = async () => {
+    setUpdating(true);
+    try {
+      await updateJob(job.id, editForm);
+      setShowEditModal(false);
+    } catch (err) {
+      console.error('Error updating job:', err);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const setCrSearch = (v) => setCrewSearch(v);
+  const toggleEditCrew = (id) => {
+    setEditForm(prev => ({
+      ...prev,
+      assignedTo: prev.assignedTo.includes(id)
+        ? prev.assignedTo.filter(m => m !== id)
+        : [...prev.assignedTo, id],
+    }));
+  };
+  const activeMembers = teamMembers.filter(m => m.isActive);
+  const filteredEditMembers = crewSearch
+    ? activeMembers.filter(m => m.fullName?.toLowerCase().includes(crewSearch.toLowerCase()))
+    : activeMembers;
+
   // Get time entries for this job
   const jobTimeEntries = timeEntries.filter(t => t.jobId === jobId && t.clockIn && t.clockOut);
 
@@ -126,6 +168,9 @@ export default function JobDetailPage({ params }) {
         </div>
         {isOwnerOrAdmin && (
           <div className="job-detail-actions">
+            <button className="btn btn-secondary btn-sm" onClick={openEditModal}>
+              <Edit3 size={14} /> Edit
+            </button>
             {job.status === 'scheduled' && (
               <button className="btn btn-primary btn-sm" onClick={() => handleStatusChange('in_progress')} disabled={updating}>
                 <Play size={14} /> Start Job
@@ -447,6 +492,85 @@ export default function JobDetailPage({ params }) {
                 No time entries linked to this job yet. Workers can clock in to this job from their dashboard.
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Job Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => !updating && setShowEditModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '560px' }}>
+            <div className="modal-header">
+              <h2><Edit3 size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Edit Job</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowEditModal(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              {/* Date & Time */}
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label"><CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Date</label>
+                  <input className="form-input" type="date" value={editForm.scheduledDate} onChange={e => setEditForm(prev => ({ ...prev, scheduledDate: e.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label"><Clock size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Time</label>
+                  <input className="form-input" type="time" value={editForm.scheduledTime} onChange={e => setEditForm(prev => ({ ...prev, scheduledTime: e.target.value }))} />
+                </div>
+              </div>
+
+              {/* Priority */}
+              <div className="form-group">
+                <label className="form-label"><Flag size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Priority</label>
+                <select className="form-select" value={editForm.priority} onChange={e => setEditForm(prev => ({ ...prev, priority: e.target.value }))}>
+                  <option value="low">Low</option>
+                  <option value="normal">Normal</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+
+              {/* Crew Notes */}
+              <div className="form-group">
+                <label className="form-label"><FileText size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Crew Notes</label>
+                <textarea className="form-textarea" rows={3} value={editForm.crewNotes} onChange={e => setEditForm(prev => ({ ...prev, crewNotes: e.target.value }))} placeholder="Access instructions, materials, gate codes..." />
+              </div>
+
+              {/* Crew Assignment */}
+              {activeMembers.length > 0 && (
+                <div className="form-group">
+                  <label className="form-label">
+                    <Users size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                    Assign Crew ({editForm.assignedTo?.length || 0})
+                  </label>
+                  <div style={{ position: 'relative', marginBottom: '8px' }}>
+                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} />
+                    <input className="form-input" placeholder="Search crew..." value={crewSearch} onChange={e => setCrSearch(e.target.value)} style={{ paddingLeft: '32px' }} />
+                  </div>
+                  <div className="crew-assignment-list">
+                    {filteredEditMembers.map(m => {
+                      const isSelected = editForm.assignedTo?.includes(m.id);
+                      return (
+                        <button key={m.id} className={`crew-assignment-item ${isSelected ? 'active' : ''}`} onClick={() => toggleEditCrew(m.id)}>
+                          <div className="table-avatar" style={{ width: 30, height: 30, fontSize: '0.6rem', background: isSelected ? 'var(--lucky-green)' : 'var(--bg-elevated)', color: isSelected ? 'white' : 'var(--text-secondary)' }}>
+                            {m.fullName?.split(' ').map(n => n[0]).join('').toUpperCase() || '??'}
+                          </div>
+                          <div style={{ flex: 1, textAlign: 'left' }}>
+                            <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{m.fullName}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{m.role}</div>
+                          </div>
+                          {isSelected && <Check size={16} style={{ color: 'var(--lucky-green-light)' }} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowEditModal(false)} disabled={updating}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleEditSave} disabled={updating}>
+                {updating ? 'Saving...' : <><Save size={16} /> Save Changes</>}
+              </button>
+            </div>
           </div>
         </div>
       )}

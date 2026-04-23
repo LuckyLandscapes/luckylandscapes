@@ -20,6 +20,8 @@ import {
   Clock,
   UserCog,
   Briefcase,
+  Receipt,
+  BarChart3,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -30,10 +32,13 @@ const ownerNavItems = [
   { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'admin'] },
   { href: '/quotes', label: 'Quotes', icon: FileText, roles: ['owner', 'admin'], badgeKey: 'draftQuotes' },
   { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
+  { href: '/invoices', label: 'Invoices', icon: Receipt, roles: ['owner', 'admin'], badgeKey: 'unpaidInvoices' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
+  { label: 'Tools', type: 'section', roles: ['owner', 'admin'] },
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
   { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
+  { href: '/reports', label: 'Reports', icon: BarChart3, roles: ['owner', 'admin'] },
   { href: '/team', label: 'Team & Payroll', icon: UserCog, roles: ['owner'] },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },
@@ -63,15 +68,16 @@ const workerBottomNavItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout, isWorker } = useAuth();
-  const { quotes, calendarEvents, jobs } = useData();
+  const { quotes, calendarEvents, jobs, invoices } = useData();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
   const activeJobs = jobs.filter(j => j.status === 'scheduled' || j.status === 'in_progress').length;
+  const unpaidInvoices = invoices.filter(i => i.status === 'unpaid' || i.status === 'overdue').length;
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEvents = calendarEvents.filter(e => e.date === todayStr).length
     + jobs.filter(j => j.scheduledDate === todayStr).length;
-  const badges = { draftQuotes: draftQuotes || null, activeJobs: activeJobs || null, todayEvents: todayEvents || null };
+  const badges = { draftQuotes: draftQuotes || null, activeJobs: activeJobs || null, todayEvents: todayEvents || null, unpaidInvoices: unpaidInvoices || null };
 
   const initials = user?.fullName
     ?.split(' ')

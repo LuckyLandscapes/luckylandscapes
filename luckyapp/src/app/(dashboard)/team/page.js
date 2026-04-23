@@ -47,12 +47,12 @@ export default function TeamPage() {
   const payrollData = useMemo(() => {
     return teamMembers.map(member => {
       const entries = timeEntries.filter(t =>
-        t.memberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
+        t.teamMemberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
       );
       const totalMinutes = entries.reduce((s, t) => s + (t.durationMinutes || 0), 0);
       const totalHours = totalMinutes / 60;
       const totalPay = totalHours * (member.hourlyRate || 15);
-      const activeEntry = timeEntries.find(t => t.memberId === member.id && !t.clockOut);
+      const activeEntry = timeEntries.find(t => t.teamMemberId === member.id && !t.clockOut);
       return { member, entries, totalMinutes, totalHours, totalPay, activeEntry };
     });
   }, [teamMembers, timeEntries, cutoffDate]);

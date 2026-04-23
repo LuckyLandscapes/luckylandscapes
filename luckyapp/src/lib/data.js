@@ -60,6 +60,8 @@ export function DataProvider({ children }) {
   const [jobMedia, setJobMedia] = useState([]);
   const [jobExpenses, setJobExpenses] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [services, setServices] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -82,6 +84,8 @@ export function DataProvider({ children }) {
       setJobMedia(loadLocal('job_media'));
       setJobExpenses(loadLocal('job_expenses'));
       setMaterials(loadLocal('materials'));
+      setServices(loadLocal('services'));
+      setInvoices(loadLocal('invoices'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -90,16 +94,18 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
         supabase.from('calendar_events').select('*').eq('org_id', orgId).order('date', { ascending: true }),
         supabase.from('team_members').select('*').eq('org_id', orgId),
         supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(100),
+        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(200),
         supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true }),
+        supabase.from('services').select('*').eq('org_id', orgId).order('category', { ascending: true }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -111,6 +117,8 @@ export function DataProvider({ children }) {
       if (te.data) setTimeEntries(snakeToCamel(te.data));
       if (jexp.data) setJobExpenses(snakeToCamel(jexp.data));
       if (mat.data) setMaterials(snakeToCamel(mat.data));
+      if (svc?.data) setServices(snakeToCamel(svc.data));
+      if (inv?.data) setInvoices(snakeToCamel(inv.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -152,6 +160,18 @@ export function DataProvider({ children }) {
         supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true })
           .then(({ data }) => { if (data) setMaterials(snakeToCamel(data)); });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quotes' }, () => {
+        supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+          .then(({ data }) => { if (data) setQuotes(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, () => {
+        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(200)
+          .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
+        supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+          .then(({ data }) => { if (data) setInvoices(snakeToCamel(data)); });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -162,6 +182,12 @@ export function DataProvider({ children }) {
   const getQuote = useCallback((id) => quotes.find(q => q.id === id) || null, [quotes]);
   const getJob = useCallback((id) => jobs.find(j => j.id === id) || null, [jobs]);
   const getTeamMember = useCallback((id) => teamMembers.find(m => m.id === id) || null, [teamMembers]);
+  const getInvoice = useCallback((id) => invoices.find(i => i.id === id) || null, [invoices]);
+
+  // Customer-scoped getters (used by customer detail page)
+  const getCustomerQuotes = useCallback((custId) => quotes.filter(q => q.customerId === custId), [quotes]);
+  const getCustomerJobs = useCallback((custId) => jobs.filter(j => j.customerId === custId), [jobs]);
+  const getCustomerActivity = useCallback((custId) => activity.filter(a => a.customerId === custId), [activity]);
 
   // ─── Customer CRUD ──────────────────────────────────────
   const addCustomer = useCallback(async (data) => {
@@ -228,6 +254,18 @@ export function DataProvider({ children }) {
     }
     setQuotes(prev => {
       const next = prev.map(q => q.id === id ? { ...q, ...data } : q);
+      if (!connected) saveLocal('quotes', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteQuote = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('quotes').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setQuotes(prev => {
+      const next = prev.filter(q => q.id !== id);
       if (!connected) saveLocal('quotes', next);
       return next;
     });
@@ -401,6 +439,18 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  const deleteTimeEntry = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('time_entries').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setTimeEntries(prev => {
+      const next = prev.filter(t => t.id !== id);
+      if (!connected) saveLocal('time_entries', next);
+      return next;
+    });
+  }, [connected]);
+
   // ─── Job Expenses ──────────────────────────────────────
   const addJobExpense = useCallback(async (data) => {
     if (connected) {
@@ -513,20 +563,63 @@ export function DataProvider({ children }) {
     });
   }, []);
 
+  // ─── Invoice CRUD ───────────────────────────────────────
+  const addInvoice = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('invoices')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const inv = snakeToCamel(row);
+      setInvoices(prev => [inv, ...prev]);
+      return inv;
+    } else {
+      const inv = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setInvoices(prev => { const next = [inv, ...prev]; saveLocal('invoices', next); return next; });
+      return inv;
+    }
+  }, [connected, orgId]);
+
+  const updateInvoice = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('invoices').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setInvoices(prev => {
+      const next = prev.map(i => i.id === id ? { ...i, ...data } : i);
+      if (!connected) saveLocal('invoices', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteInvoice = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('invoices').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setInvoices(prev => {
+      const next = prev.filter(i => i.id !== id);
+      if (!connected) saveLocal('invoices', next);
+      return next;
+    });
+  }, [connected]);
+
   // ─── Context value ──────────────────────────────────────
   const value = {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
-    activity, timeEntries, jobMedia, jobExpenses, materials, loading,
+    activity, timeEntries, jobMedia, jobExpenses, materials,
+    services, invoices, loading,
 
     // Getters
-    getCustomer, getQuote, getJob, getTeamMember,
+    getCustomer, getQuote, getJob, getTeamMember, getInvoice,
+    getCustomerQuotes, getCustomerJobs, getCustomerActivity,
 
     // Customers
     addCustomer, updateCustomer, deleteCustomer,
 
     // Quotes
-    addQuote, updateQuote,
+    addQuote, updateQuote, deleteQuote,
 
     // Jobs
     addJob, updateJob, deleteJob, convertQuoteToJob,
@@ -538,10 +631,13 @@ export function DataProvider({ children }) {
     addActivity,
 
     // Time
-    clockIn, clockOut,
+    clockIn, clockOut, deleteTimeEntry,
 
     // Expenses & Financials
     addJobExpense, updateJobExpense, deleteJobExpense, getJobFinancials,
+
+    // Invoices
+    addInvoice, updateInvoice, deleteInvoice,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
