@@ -408,6 +408,24 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // Reload team members from Supabase (used after invite API)
+  const loadTeamMembers = useCallback(async () => {
+    if (!connected) return;
+    const { data } = await supabase.from('team_members').select('*').eq('org_id', orgId);
+    if (data) setTeamMembers(snakeToCamel(data));
+  }, [connected, orgId]);
+
+  // Inject a team member record from API response into local state
+  // (fallback when RLS blocks the reload from seeing the new member)
+  const addTeamMemberFromApi = useCallback((rawMember) => {
+    const m = snakeToCamel(rawMember);
+    setTeamMembers(prev => {
+      // Avoid duplicates
+      if (prev.some(existing => existing.id === m.id)) return prev;
+      return [...prev, m];
+    });
+  }, []);
+
   // ─── Context value ──────────────────────────────────────
   const value = {
     // State
@@ -436,7 +454,7 @@ export function DataProvider({ children }) {
     clockIn, clockOut,
 
     // Team
-    addTeamMember, updateTeamMember,
+    addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
 
     // Refetch
     refetch: fetchAllFromSupabase,
