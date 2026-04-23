@@ -59,6 +59,7 @@ export function DataProvider({ children }) {
   const [timeEntries, setTimeEntries] = useState([]);
   const [jobMedia, setJobMedia] = useState([]);
   const [jobExpenses, setJobExpenses] = useState([]);
+  const [materials, setMaterials] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -80,6 +81,7 @@ export function DataProvider({ children }) {
       setTimeEntries(loadLocal('time_entries'));
       setJobMedia(loadLocal('job_media'));
       setJobExpenses(loadLocal('job_expenses'));
+      setMaterials(loadLocal('materials'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -88,7 +90,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -97,6 +99,7 @@ export function DataProvider({ children }) {
         supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
         supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(100),
         supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
+        supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true }),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -107,6 +110,7 @@ export function DataProvider({ children }) {
       if (act.data) setActivity(snakeToCamel(act.data));
       if (te.data) setTimeEntries(snakeToCamel(te.data));
       if (jexp.data) setJobExpenses(snakeToCamel(jexp.data));
+      if (mat.data) setMaterials(snakeToCamel(mat.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -143,6 +147,10 @@ export function DataProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'job_expenses' }, () => {
         supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setJobExpenses(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'materials' }, () => {
+        supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true })
+          .then(({ data }) => { if (data) setMaterials(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -509,7 +517,7 @@ export function DataProvider({ children }) {
   const value = {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
-    activity, timeEntries, jobMedia, jobExpenses, loading,
+    activity, timeEntries, jobMedia, jobExpenses, materials, loading,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember,
