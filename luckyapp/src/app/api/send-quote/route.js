@@ -122,8 +122,33 @@ export async function POST(request) {
 </body>
 </html>`;
 
-    // ── Send via Resend (NO attachment — just clean HTML) ─────
+    // ── Send via Resend ────────────────────────────────────────
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'Lucky Landscapes <onboarding@resend.dev>';
+    const replyTo = process.env.RESEND_REPLY_TO || 'rileykopf@luckylandscapes.com';
+
+    // Build a plain-text fallback (spam filters penalize HTML-only emails)
+    const plainItems = (items || [])
+      .map((item) => `  • ${item.name} — Qty: ${item.quantity} ${item.unit || ''} — ${formatUSD(item.total)}`)
+      .join('\n');
+
+    const text = [
+      `Hi ${customerName || 'there'},`,
+      '',
+      message || "Thank you for your interest in our services! We've prepared a detailed estimate for you.",
+      '',
+      `Quote #${quoteNumber}${category ? ` — ${category}` : ''}`,
+      '─────────────────────────────',
+      plainItems || '(see attached details)',
+      '─────────────────────────────',
+      `Total: ${formattedTotal}`,
+      '',
+      'This estimate is valid for 30 days. If you have any questions or would like to move forward, don\'t hesitate to reach out!',
+      '',
+      'Call us: (402) 405-5475',
+      'Email: rileykopf@luckylandscapes.com',
+      '',
+      'Lucky Landscapes • 109 South Canopy ST, Lincoln, NE',
+    ].join('\n');
 
     console.log('[send-quote] Sending email...');
     console.log('[send-quote] From:', fromAddress);
@@ -131,9 +156,14 @@ export async function POST(request) {
 
     const { data, error } = await resend.emails.send({
       from: fromAddress,
+      reply_to: replyTo,
       to: [to],
-      subject: `Estimate #${quoteNumber} from Lucky Landscapes — ${formattedTotal}`,
+      subject: `Estimate #${quoteNumber} from Lucky Landscapes`,
       html,
+      text,
+      headers: {
+        'List-Unsubscribe': `<mailto:rileykopf@luckylandscapes.com?subject=Unsubscribe>`,
+      },
     });
 
     if (error) {
