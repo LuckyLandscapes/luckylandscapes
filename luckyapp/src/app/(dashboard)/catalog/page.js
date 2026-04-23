@@ -78,10 +78,10 @@ export default function CatalogPage() {
               background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
               overflow: 'hidden',
             }}>
-              {material.imageUrl ? (
-                <img src={material.imageUrl} alt={material.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {material.image?.startsWith('http') ? (
+                <img src={material.image} alt={material.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : (
-                material.imageEmoji || '🌿'
+                material.image || '🌿'
               )}
             </div>
             <div className="material-card-body">
@@ -95,7 +95,11 @@ export default function CatalogPage() {
                 )}
               </div>
               <div className="material-card-price">
-                {material.costLow === material.costHigh ? (
+                {material.soldOut ? (
+                  <span style={{ color: '#ef4444', fontWeight: 700 }}>Sold Out</span>
+                ) : material.unitAlt ? (
+                  <>${material.costLow}/{material.unitAlt} — ${material.costHigh}/{material.unit}</>
+                ) : material.costLow === material.costHigh ? (
                   <>${material.costLow} / {material.unit}</>
                 ) : (
                   <>${material.costLow}–${material.costHigh} / {material.unit}</>
@@ -151,14 +155,14 @@ export default function CatalogPage() {
           {/* Material Display */}
           <div style={{ textAlign: 'center', maxWidth: '600px' }}>
             <div style={{ fontSize: '6rem', marginBottom: 'var(--space-xl)' }}>
-              {filtered[presentationIndex].imageUrl ? (
+              {filtered[presentationIndex].image?.startsWith('http') ? (
                 <img
-                  src={filtered[presentationIndex].imageUrl}
+                  src={filtered[presentationIndex].image}
                   alt={filtered[presentationIndex].name}
                   style={{ width: '300px', height: '300px', objectFit: 'cover', borderRadius: 'var(--radius-lg)' }}
                 />
               ) : (
-                filtered[presentationIndex].imageEmoji || '🌿'
+                filtered[presentationIndex].image || '🌿'
               )}
             </div>
             <h2 style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>
@@ -177,8 +181,12 @@ export default function CatalogPage() {
             }}>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Price</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--lucky-green-light)' }}>
-                  {filtered[presentationIndex].costLow === filtered[presentationIndex].costHigh ? (
+                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: filtered[presentationIndex].soldOut ? '#ef4444' : 'var(--lucky-green-light)' }}>
+                  {filtered[presentationIndex].soldOut ? (
+                    'Sold Out'
+                  ) : filtered[presentationIndex].unitAlt ? (
+                    <>${filtered[presentationIndex].costLow}/{filtered[presentationIndex].unitAlt} — ${filtered[presentationIndex].costHigh}/{filtered[presentationIndex].unit}</>
+                  ) : filtered[presentationIndex].costLow === filtered[presentationIndex].costHigh ? (
                     <>${filtered[presentationIndex].costLow}</>
                   ) : (
                     <>${filtered[presentationIndex].costLow}–${filtered[presentationIndex].costHigh}</>
