@@ -10,6 +10,7 @@ import {
   Users,
   Loader2,
   CheckCircle,
+  AlertCircle,
 } from 'lucide-react';
 
 export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
@@ -27,6 +28,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState(null);
   const [createdJobId, setCreatedJobId] = useState(null);
 
   const handleToggleMember = (id) => {
@@ -41,6 +43,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
   const handleSchedule = async () => {
     if (!form.scheduledDate) return;
     setSaving(true);
+    setError(null);
 
     try {
       const job = await convertQuoteToJob({
@@ -72,9 +75,12 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
         } catch (syncErr) {
           console.warn('Google Calendar sync failed (non-blocking):', syncErr.message);
         }
+      } else {
+        setError('Failed to create job. The quote may not exist.');
       }
     } catch (err) {
       console.error('Error scheduling job:', err);
+      setError(err.message || 'Failed to schedule job. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -204,6 +210,23 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                   placeholder="Access instructions, special requirements, materials to bring..."
                 />
               </div>
+
+              {error && (
+                <div style={{
+                  background: 'var(--status-danger-bg, rgba(239,68,68,0.08))',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-md)',
+                  marginTop: 'var(--space-md)',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 'var(--space-sm)',
+                  fontSize: '0.82rem',
+                  color: 'var(--status-danger, #ef4444)',
+                }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>{error}</span>
+                </div>
+              )}
             </>
           )}
         </div>

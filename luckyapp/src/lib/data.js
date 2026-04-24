@@ -345,7 +345,6 @@ export function DataProvider({ children }) {
       crewNotes: crewNotes || '',
       total: quote.total || 0,
       revenue: quote.total || 0,
-      priority: 'normal',
     };
 
     const job = await addJob(jobData);
