@@ -19,6 +19,18 @@ const nextConfig = {
       },
     ];
   },
+
+  // Config-level redirects (replaces page-level redirect components)
+  async redirects() {
+    return [
+      {
+        source: '/calendar/job/:id',
+        destination: '/jobs/:id',
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
+

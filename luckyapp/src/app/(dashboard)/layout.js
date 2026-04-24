@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { useAuth } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
 import Sidebar from '@/components/Sidebar';
 
@@ -71,10 +71,9 @@ function DashboardGuard({ children }) {
 
 export default function DashboardLayout({ children }) {
   return (
-    <AuthProvider>
-      <DashboardGuard>
-        {children}
-      </DashboardGuard>
-    </AuthProvider>
+    <DashboardGuard>
+      {children}
+    </DashboardGuard>
   );
 }
+

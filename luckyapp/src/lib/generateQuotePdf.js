@@ -319,17 +319,6 @@ export async function generateQuotePdf(quote, customer, company = {}) {
 }
 
 /**
- * Generate the PDF and return it as a base64 string (for email attachments).
- */
-export async function generateQuotePdfBase64(quote, customer, company = {}) {
-  const doc = await buildQuotePdf(quote, customer, company);
-  // doc.output('datauristring') returns "data:application/pdf;base64,XXXX"
-  // We only need the base64 part after the comma
-  const dataUri = doc.output('datauristring');
-  return dataUri.split(',')[1];
-}
-
-/**
  * Generate the PDF and return it as a Blob (for uploading to storage).
  */
 export async function generateQuotePdfBlob(quote, customer, company = {}) {
