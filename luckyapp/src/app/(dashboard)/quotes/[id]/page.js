@@ -221,6 +221,9 @@ export default function QuoteDetailPage() {
           )}
           {quote.status === 'sent' && (
             <>
+              <button className="btn btn-secondary" onClick={openSendModal}>
+                <Send size={16} /> Resend Quote
+              </button>
               <button className="btn btn-primary" onClick={() => handleStatusChange('accepted')} style={{ background: 'var(--status-success)', borderColor: 'var(--status-success)' }}>
                 <CheckCircle2 size={16} /> Mark Accepted
               </button>
@@ -229,7 +232,7 @@ export default function QuoteDetailPage() {
               </button>
             </>
           )}
-          {quote.status === 'accepted' && !linkedJob && (
+          {(quote.status === 'accepted' || quote.status === 'sent') && !linkedJob && (
             <button className="btn btn-primary" onClick={() => setShowScheduleModal(true)}>
               <CalendarDays size={16} /> Schedule Job
             </button>
