@@ -115,7 +115,7 @@ export default function QuotesPage() {
                       {q.status.charAt(0).toUpperCase() + q.status.slice(1)}
                     </span>
                   </td>
-                  <td style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>{q.createdAt}</td>
+                  <td style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>{q.createdAt ? new Date(q.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</td>
                   <td>
                     <Link href={`/quotes/${q.id}`} className="btn btn-ghost btn-sm">
                       View <ArrowRight size={14} />

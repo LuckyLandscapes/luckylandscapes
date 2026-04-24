@@ -104,7 +104,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                 {quote?.category} job has been scheduled for{' '}
                 {new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
-              <a href={`/calendar/job/${createdJobId}`} className="btn btn-primary">
+              <a href={`/jobs/${createdJobId}`} className="btn btn-primary">
                 View Job Details
               </a>
             </div>

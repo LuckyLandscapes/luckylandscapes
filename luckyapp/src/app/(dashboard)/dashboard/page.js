@@ -80,7 +80,7 @@ export default function DashboardPage() {
   let netProfit = 0;
   jobs.forEach(j => {
     const fin = getJobFinancials(j.id);
-    if (fin) netProfit += fin.netProfit;
+    if (fin) netProfit += fin.profit;
   });
 
   // Invoice stats

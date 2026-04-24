@@ -49,7 +49,10 @@ export default function TeamPage() {
       const entries = timeEntries.filter(t =>
         t.teamMemberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
       );
-      const totalMinutes = entries.reduce((s, t) => s + (t.durationMinutes || 0), 0);
+      const totalMinutes = entries.reduce((sum, t) => {
+        const mins = t.durationMinutes || (t.clockIn && t.clockOut ? (new Date(t.clockOut) - new Date(t.clockIn)) / 60000 : 0);
+        return sum + (mins || 0);
+      }, 0);
       const totalHours = totalMinutes / 60;
       const totalPay = totalHours * (member.hourlyRate || 15);
       const activeEntry = timeEntries.find(t => t.teamMemberId === member.id && !t.clockOut);
@@ -364,7 +367,7 @@ export default function TeamPage() {
 // Sub-component: Time log for a member
 function TimeLog({ memberId, timeEntries }) {
   const entries = timeEntries
-    .filter(t => t.memberId === memberId && t.clockOut)
+    .filter(t => t.teamMemberId === memberId && t.clockOut)
     .sort((a,b) => new Date(b.clockIn) - new Date(a.clockIn))
     .slice(0, 20);
 

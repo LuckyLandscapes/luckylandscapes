@@ -211,7 +211,7 @@ export default function QuoteDetailPage() {
               {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
             </span>
           </div>
-          <p>{quote.category} • Created {quote.createdAt}</p>
+          <p>{quote.category} • Created {quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</p>
         </div>
         <div className="page-header-actions">
           {quote.status === 'draft' && (
@@ -354,7 +354,7 @@ export default function QuoteDetailPage() {
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Created</div>
-                <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{quote.createdAt}</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Valid For</div>

@@ -94,7 +94,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -106,6 +106,7 @@ export function DataProvider({ children }) {
         supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true }),
         supabase.from('services').select('*').eq('org_id', orgId).order('category', { ascending: true }).then(r => r).catch(() => ({ data: null })),
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('job_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -119,6 +120,7 @@ export function DataProvider({ children }) {
       if (mat.data) setMaterials(snakeToCamel(mat.data));
       if (svc?.data) setServices(snakeToCamel(svc.data));
       if (inv?.data) setInvoices(snakeToCamel(inv.data));
+      if (jmed?.data) setJobMedia(snakeToCamel(jmed.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {

@@ -64,17 +64,18 @@ export default function ReportsPage() {
 
     const jobProfits = completedJobs.map(j => {
       const fin = getJobFinancials(j.id);
+      if (!fin) return { job: j, revenue: 0, materialCosts: 0, equipmentCosts: 0, laborCosts: 0, otherExpenses: 0, totalExpenses: 0, profit: 0 };
       totalRevenue += fin.revenue;
-      totalExpenses += fin.materialCost + fin.equipmentCost;
-      totalLabor += fin.laborCost;
-      return { job: j, ...fin };
+      totalExpenses += fin.materialCosts + fin.equipmentCosts;
+      totalLabor += fin.laborCosts;
+      return { job: j, ...fin, netProfit: fin.profit };
     });
 
     const netProfit = totalRevenue - totalExpenses - totalLabor;
     const margin = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
 
     // Top 5 most profitable jobs
-    const topJobs = [...jobProfits].sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
+    const topJobs = [...jobProfits].filter(j => j.revenue > 0).sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
 
     return { totalRevenue, totalExpenses, totalLabor, netProfit, margin, topJobs, jobProfits };
   }, [jobs, getJobFinancials]);
@@ -84,7 +85,10 @@ export default function ReportsPage() {
     return teamMembers.filter(m => m.isActive).map(member => {
       const entries = timeEntries.filter(t => t.teamMemberId === member.id && t.clockOut);
       const periodEntries = entries.filter(t => new Date(t.clockIn) >= cutoff);
-      const totalMinutes = periodEntries.reduce((s, t) => s + (t.durationMinutes || 0), 0);
+      const totalMinutes = periodEntries.reduce((s, t) => {
+        const mins = t.durationMinutes || ((new Date(t.clockOut) - new Date(t.clockIn)) / 60000);
+        return s + (mins || 0);
+      }, 0);
       const totalHours = totalMinutes / 60;
       const jobsAssigned = jobs.filter(j => j.assignedTo?.includes(member.id) && j.scheduledDate && new Date(j.scheduledDate + 'T12:00:00') >= cutoff).length;
       const pay = totalHours * (member.hourlyRate || 15);
@@ -350,7 +354,7 @@ export default function ReportsPage() {
                     <tr key={j.job.id}>
                       <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>{j.job.title}</td>
                       <td style={{ fontSize: '0.82rem' }}>{fmtCurrency(j.revenue)}</td>
-                      <td style={{ fontSize: '0.82rem', color: 'var(--status-danger)' }}>{fmtCurrency(j.materialCost + j.equipmentCost + j.laborCost)}</td>
+                      <td style={{ fontSize: '0.82rem', color: 'var(--status-danger)' }}>{fmtCurrency((j.materialCosts || 0) + (j.equipmentCosts || 0) + (j.laborCosts || 0))}</td>
                       <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '0.82rem', color: j.netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
                         {fmtCurrency(j.netProfit)}
                       </td>
