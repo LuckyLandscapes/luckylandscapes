@@ -63,6 +63,7 @@ export default function JobDetailPage({ params }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [crewSearch, setCrewSearch] = useState('');
+  const [editError, setEditError] = useState(null);
 
   if (!job) {
     return (
@@ -117,16 +118,19 @@ export default function JobDetailPage({ params }) {
       assignedTo: job.assignedTo || [],
     });
     setCrSearch('');
+    setEditError(null);
     setShowEditModal(true);
   };
 
   const handleEditSave = async () => {
     setUpdating(true);
+    setEditError(null);
     try {
       await updateJob(job.id, editForm);
       setShowEditModal(false);
     } catch (err) {
       console.error('Error updating job:', err);
+      setEditError(err?.message || 'Failed to save changes. Please try again.');
     } finally {
       setUpdating(false);
     }
@@ -578,6 +582,11 @@ export default function JobDetailPage({ params }) {
                 </div>
               )}
             </div>
+            {editError && (
+              <div style={{ padding: '0 var(--space-lg) var(--space-md)', fontSize: '0.82rem', color: 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <XCircle size={14} /> {editError}
+              </div>
+            )}
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowEditModal(false)} disabled={updating}>Cancel</button>
               <button className="btn btn-primary" onClick={handleEditSave} disabled={updating}>
