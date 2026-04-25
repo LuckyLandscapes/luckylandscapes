@@ -62,6 +62,7 @@ export function DataProvider({ children }) {
   const [materials, setMaterials] = useState([]);
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [companyExpenses, setCompanyExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -86,6 +87,7 @@ export function DataProvider({ children }) {
       setMaterials(loadLocal('materials'));
       setServices(loadLocal('services'));
       setInvoices(loadLocal('invoices'));
+      setCompanyExpenses(loadLocal('company_expenses'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -94,19 +96,20 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
         supabase.from('calendar_events').select('*').eq('org_id', orgId).order('date', { ascending: true }),
         supabase.from('team_members').select('*').eq('org_id', orgId),
         supabase.from('activity').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(200),
+        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(1000),
         supabase.from('job_expenses').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('materials').select('*').eq('org_id', orgId).order('category', { ascending: true }),
         supabase.from('services').select('*').eq('org_id', orgId).order('category', { ascending: true }).then(r => r).catch(() => ({ data: null })),
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('job_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -121,6 +124,7 @@ export function DataProvider({ children }) {
       if (svc?.data) setServices(snakeToCamel(svc.data));
       if (inv?.data) setInvoices(snakeToCamel(inv.data));
       if (jmed?.data) setJobMedia(snakeToCamel(jmed.data));
+      if (cexp?.data) setCompanyExpenses(snakeToCamel(cexp.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -167,12 +171,16 @@ export function DataProvider({ children }) {
           .then(({ data }) => { if (data) setQuotes(snakeToCamel(data)); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, () => {
-        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(200)
+        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(1000)
           .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId }))); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setInvoices(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'company_expenses' }, () => {
+        supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false })
+          .then(({ data }) => { if (data) setCompanyExpenses(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -301,12 +309,17 @@ export function DataProvider({ children }) {
   }, [connected, orgId]);
 
   const updateJob = useCallback(async (id, data) => {
+    // Auto-set completedAt when status changes to 'completed' (Phase 1B)
+    const payload = { ...data };
+    if (payload.status === 'completed' && !payload.completedAt) {
+      payload.completedAt = new Date().toISOString();
+    }
     if (connected) {
-      const { error } = await supabase.from('jobs').update(camelToSnake(data)).eq('id', id);
+      const { error } = await supabase.from('jobs').update(camelToSnake(payload)).eq('id', id);
       if (error) throw error;
     }
     setJobs(prev => {
-      const next = prev.map(j => j.id === id ? { ...j, ...data } : j);
+      const next = prev.map(j => j.id === id ? { ...j, ...payload } : j);
       if (!connected) saveLocal('jobs', next);
       return next;
     });
@@ -536,6 +549,7 @@ export function DataProvider({ children }) {
 
     const materialCosts = expenses.filter(e => e.category === 'materials').reduce((s, e) => s + Number(e.amount || 0), 0);
     const equipmentCosts = expenses.filter(e => e.category === 'equipment').reduce((s, e) => s + Number(e.amount || 0), 0);
+    // Phase 1D: include ALL non-material/equipment expenses (fuel, dump fees, subcontractor, permits, etc.)
     const otherExpenses = expenses.filter(e => !['materials', 'equipment'].includes(e.category)).reduce((s, e) => s + Number(e.amount || 0), 0);
 
     // Calculate labor cost from time entries × worker hourly rates
@@ -552,7 +566,9 @@ export function DataProvider({ children }) {
       laborCosts += rate * paidHours;
     });
 
+    // Phase 1C: Use job.revenue (canonical) — not quote lookup
     const revenue = Number(job.revenue || job.total || 0);
+    // Phase 1D: totalExpenses includes ALL categories (materials + equipment + other + labor)
     const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
     const profit = revenue - totalExpenses;
 
@@ -631,6 +647,47 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // ─── Company Expenses CRUD (Phase 2B) ──────────────────
+  const addCompanyExpense = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('company_expenses')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const e = snakeToCamel(row);
+      setCompanyExpenses(prev => [e, ...prev]);
+      return e;
+    } else {
+      const e = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setCompanyExpenses(prev => { const next = [e, ...prev]; saveLocal('company_expenses', next); return next; });
+      return e;
+    }
+  }, [connected, orgId]);
+
+  const updateCompanyExpense = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('company_expenses').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setCompanyExpenses(prev => {
+      const next = prev.map(e => e.id === id ? { ...e, ...data } : e);
+      if (!connected) saveLocal('company_expenses', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteCompanyExpense = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('company_expenses').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setCompanyExpenses(prev => {
+      const next = prev.filter(e => e.id !== id);
+      if (!connected) saveLocal('company_expenses', next);
+      return next;
+    });
+  }, [connected]);
+
   const deleteInvoice = useCallback(async (id) => {
     if (connected) {
       const { error } = await supabase.from('invoices').delete().eq('id', id);
@@ -689,7 +746,7 @@ export function DataProvider({ children }) {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
     activity, timeEntries, jobMedia, jobExpenses, materials,
-    services, invoices, loading,
+    services, invoices, companyExpenses, loading,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
@@ -715,6 +772,9 @@ export function DataProvider({ children }) {
 
     // Expenses & Financials
     addJobExpense, updateJobExpense, deleteJobExpense, getJobFinancials,
+
+    // Company Expenses (overhead)
+    addCompanyExpense, updateCompanyExpense, deleteCompanyExpense,
 
     // Invoices
     addInvoice, updateInvoice, deleteInvoice,

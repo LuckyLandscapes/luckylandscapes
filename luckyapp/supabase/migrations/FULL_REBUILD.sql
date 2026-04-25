@@ -176,6 +176,7 @@ CREATE TABLE IF NOT EXISTS jobs (
   crew_notes          TEXT,
   total               NUMERIC(12,2) DEFAULT 0,
   revenue             NUMERIC(12,2) DEFAULT 0,
+  completed_at        TIMESTAMPTZ,
   created_at          TIMESTAMPTZ DEFAULT now()
 );
 
@@ -214,6 +215,7 @@ CREATE TABLE IF NOT EXISTS time_entries (
   clock_in          TIMESTAMPTZ NOT NULL DEFAULT now(),
   clock_out         TIMESTAMPTZ,
   duration_minutes  INTEGER,
+  break_minutes     INTEGER DEFAULT 0,
   notes             TEXT DEFAULT '',
   created_at        TIMESTAMPTZ DEFAULT now()
 );
@@ -270,6 +272,25 @@ CREATE TABLE IF NOT EXISTS job_media (
   caption         TEXT DEFAULT '',
   pinned          BOOLEAN DEFAULT false,
   created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+-- Company Expenses (overhead / non-job costs)
+CREATE TABLE IF NOT EXISTS company_expenses (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  org_id              UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  category            TEXT NOT NULL CHECK (category IN (
+    'vehicle','insurance','rent','utilities','software','marketing',
+    'office_supplies','fuel','payroll_tax','other'
+  )),
+  description         TEXT NOT NULL DEFAULT '',
+  amount              NUMERIC(12,2) NOT NULL DEFAULT 0,
+  date                DATE NOT NULL DEFAULT CURRENT_DATE,
+  recurring           BOOLEAN DEFAULT false,
+  recurring_interval  TEXT CHECK (recurring_interval IN ('weekly','biweekly','monthly','quarterly','yearly')),
+  receipt_url         TEXT,
+  vendor              TEXT,
+  created_by          UUID REFERENCES team_members(id) ON DELETE SET NULL,
+  created_at          TIMESTAMPTZ DEFAULT now()
 );
 
 
@@ -439,6 +460,7 @@ ALTER TABLE time_entries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE company_expenses ENABLE ROW LEVEL SECURITY;
 
 -- ---- ORGANIZATIONS ----
 CREATE POLICY "org_insert" ON organizations FOR INSERT
@@ -587,6 +609,16 @@ CREATE POLICY "job_media_update" ON job_media FOR UPDATE
 CREATE POLICY "job_media_delete" ON job_media FOR DELETE
   TO authenticated USING (org_id = get_user_org_id());
 
+-- ---- COMPANY EXPENSES ----
+CREATE POLICY "company_expenses_select" ON company_expenses FOR SELECT
+  TO authenticated USING (org_id = get_user_org_id());
+CREATE POLICY "company_expenses_insert" ON company_expenses FOR INSERT
+  TO authenticated WITH CHECK (org_id = get_user_org_id());
+CREATE POLICY "company_expenses_update" ON company_expenses FOR UPDATE
+  TO authenticated USING (org_id = get_user_org_id());
+CREATE POLICY "company_expenses_delete" ON company_expenses FOR DELETE
+  TO authenticated USING (org_id = get_user_org_id());
+
 
 -- =============================================
 -- 7. INDEXES (performance)
@@ -651,6 +683,14 @@ CREATE INDEX IF NOT EXISTS idx_job_media_org ON job_media(org_id);
 CREATE INDEX IF NOT EXISTS idx_job_media_job ON job_media(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_media_created ON job_media(created_at);
 
+-- Company Expenses
+CREATE INDEX IF NOT EXISTS idx_company_expenses_org ON company_expenses(org_id);
+CREATE INDEX IF NOT EXISTS idx_company_expenses_date ON company_expenses(date);
+CREATE INDEX IF NOT EXISTS idx_company_expenses_category ON company_expenses(category);
+
+-- Jobs completed_at
+CREATE INDEX IF NOT EXISTS idx_jobs_completed_at ON jobs(completed_at);
+
 
 -- =============================================
 -- 8. STORAGE BUCKETS
@@ -713,6 +753,7 @@ DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE time_entries; EXCEPTIO
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE job_expenses; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE invoices; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE job_media; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE company_expenses; EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
 -- =============================================

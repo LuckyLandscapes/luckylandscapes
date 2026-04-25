@@ -65,8 +65,8 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Revenue & metrics
-  const totalRevenue = quotes.filter(q => q.status === 'accepted').reduce((sum, q) => sum + (q.total || 0), 0);
+  // Revenue — use completed jobs' revenue, not accepted quote totals (Phase 1C)
+  const totalRevenue = jobs.filter(j => j.status === 'completed').reduce((sum, j) => sum + Number(j.revenue || j.total || 0), 0);
   const pendingQuotes = quotes.filter(q => q.status === 'draft' || q.status === 'sent');
   const pendingValue = pendingQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
   const acceptedCount = quotes.filter(q => q.status === 'accepted').length;
