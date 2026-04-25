@@ -50,7 +50,7 @@ export default function JobDetailPage({ params }) {
   const jobId = resolvedParams.id;
   const { getJob, getCustomer, getQuote, getTeamMember, updateJob, teamMembers,
     getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries } = useData();
-  const { isOwnerOrAdmin } = useAuth();
+  const { isOwnerOrAdmin, isWorker } = useAuth();
 
   const job = getJob(jobId);
   const customer = job?.customerId ? getCustomer(job.customerId) : null;
@@ -72,8 +72,8 @@ export default function JobDetailPage({ params }) {
         <p style={{ color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
           This job may have been deleted or you don&apos;t have access.
         </p>
-        <Link href="/jobs" className="btn btn-primary" style={{ marginTop: 'var(--space-lg)' }}>
-          Back to Jobs
+        <Link href={isWorker ? '/crew-dashboard' : '/jobs'} className="btn btn-primary" style={{ marginTop: 'var(--space-lg)' }}>
+          {isWorker ? 'Back to Dashboard' : 'Back to Jobs'}
         </Link>
       </div>
     );
@@ -151,8 +151,8 @@ export default function JobDetailPage({ params }) {
 
   return (
     <div className="page job-detail-page animate-fade-in">
-      <Link href="/jobs" className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-md)' }}>
-        <ArrowLeft size={16} /> Back to Jobs
+      <Link href={isWorker ? '/crew-dashboard' : '/jobs'} className="btn btn-ghost btn-sm" style={{ marginBottom: 'var(--space-md)' }}>
+        <ArrowLeft size={16} /> {isWorker ? 'Back to Dashboard' : 'Back to Jobs'}
       </Link>
 
       {/* Header */}
@@ -229,12 +229,14 @@ export default function JobDetailPage({ params }) {
         </div>
       )}
 
-      {/* Tab Bar */}
+      {/* Tab Bar — workers see details only */}
       <div className="tabs" style={{ marginBottom: 'var(--space-lg)' }}>
         <button className={`tab ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>Details</button>
-        <button className={`tab ${activeTab === 'financials' ? 'active' : ''}`} onClick={() => setActiveTab('financials')}>
-          Financials {financials?.expenses?.length ? `(${financials.expenses.length})` : ''}
-        </button>
+        {isOwnerOrAdmin && (
+          <button className={`tab ${activeTab === 'financials' ? 'active' : ''}`} onClick={() => setActiveTab('financials')}>
+            Financials {financials?.expenses?.length ? `(${financials.expenses.length})` : ''}
+          </button>
+        )}
       </div>
 
       {activeTab === 'details' && (
@@ -469,15 +471,26 @@ export default function JobDetailPage({ params }) {
                 {jobTimeEntries.map(entry => {
                   const member = teamMembers.find(m => m.id === entry.teamMemberId);
                   const rate = Number(member?.hourlyRate || 0);
-                  const hours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
-                  const cost = rate * hours;
+                  const totalHours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
+                  const breakMins = Number(entry.breakMinutes || 0);
+                  const breakHrs = breakMins / 60;
+                  const paidHours = Math.max(0, totalHours - breakHrs);
+                  const cost = rate * paidHours;
                   return (
                     <div key={entry.id} className="expense-row">
                       <span className="expense-icon">👷</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{member?.fullName || 'Unknown'}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                          {hours.toFixed(1)} hrs × ${rate.toFixed(2)}/hr
+                          {paidHours.toFixed(1)} paid hrs × ${rate.toFixed(2)}/hr
+                          {breakMins > 0 && (
+                            <span style={{ color: 'var(--lucky-gold)', marginLeft: '6px' }}>
+                              ☕ {breakMins} min break deducted
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', opacity: 0.7, marginTop: '1px' }}>
+                          Total shift: {totalHours.toFixed(1)} hrs
                         </div>
                       </div>
                       <div style={{ fontWeight: 700, color: 'var(--lucky-gold)', fontSize: '0.9rem' }}>

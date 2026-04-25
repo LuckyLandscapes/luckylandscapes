@@ -461,6 +461,18 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  const updateTimeEntry = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('time_entries').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setTimeEntries(prev => {
+      const next = prev.map(t => t.id === id ? { ...t, ...data } : t);
+      if (!connected) saveLocal('time_entries', next);
+      return next;
+    });
+  }, [connected]);
+
   const deleteTimeEntry = useCallback(async (id) => {
     if (connected) {
       const { error } = await supabase.from('time_entries').delete().eq('id', id);
@@ -527,19 +539,24 @@ export function DataProvider({ children }) {
     const otherExpenses = expenses.filter(e => !['materials', 'equipment'].includes(e.category)).reduce((s, e) => s + Number(e.amount || 0), 0);
 
     // Calculate labor cost from time entries × worker hourly rates
+    // Break minutes are subtracted from paid hours (breaks are unpaid)
     let laborCosts = 0;
+    let totalBreakMinutes = 0;
     entries.forEach(entry => {
       const member = teamMembers.find(m => m.id === entry.teamMemberId);
       const rate = Number(member?.hourlyRate || 0);
-      const hours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
-      laborCosts += rate * hours;
+      const totalHours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
+      const breakHrs = Number(entry.breakMinutes || 0) / 60;
+      totalBreakMinutes += Number(entry.breakMinutes || 0);
+      const paidHours = Math.max(0, totalHours - breakHrs);
+      laborCosts += rate * paidHours;
     });
 
     const revenue = Number(job.revenue || job.total || 0);
     const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
     const profit = revenue - totalExpenses;
 
-    return { revenue, materialCosts, equipmentCosts, laborCosts, otherExpenses, totalExpenses, profit, expenses, entries };
+    return { revenue, materialCosts, equipmentCosts, laborCosts, otherExpenses, totalExpenses, profit, expenses, entries, totalBreakMinutes };
   }, [jobs, jobExpenses, timeEntries, teamMembers]);
 
   // ─── Team Members ───────────────────────────────────────
@@ -694,7 +711,7 @@ export function DataProvider({ children }) {
     addActivity,
 
     // Time
-    clockIn, clockOut, deleteTimeEntry,
+    clockIn, clockOut, updateTimeEntry, deleteTimeEntry,
 
     // Expenses & Financials
     addJobExpense, updateJobExpense, deleteJobExpense, getJobFinancials,

@@ -7,7 +7,7 @@ import { DataProvider } from '@/lib/data';
 import Sidebar from '@/components/Sidebar';
 
 // Pages that workers are allowed to access
-const WORKER_ALLOWED = ['/crew-dashboard', '/crew-schedule', '/calendar/job'];
+const WORKER_ALLOWED = ['/crew-dashboard', '/crew-schedule', '/jobs'];
 
 function DashboardGuard({ children }) {
   const { user, loading, isWorker } = useAuth();

@@ -86,8 +86,9 @@ export default function ReportsPage() {
       const entries = timeEntries.filter(t => t.teamMemberId === member.id && t.clockOut);
       const periodEntries = entries.filter(t => new Date(t.clockIn) >= cutoff);
       const totalMinutes = periodEntries.reduce((s, t) => {
-        const mins = t.durationMinutes || ((new Date(t.clockOut) - new Date(t.clockIn)) / 60000);
-        return s + (mins || 0);
+        const shiftMins = t.durationMinutes || ((new Date(t.clockOut) - new Date(t.clockIn)) / 60000);
+        const breakMins = Number(t.breakMinutes || 0);
+        return s + Math.max(0, (shiftMins || 0) - breakMins);
       }, 0);
       const totalHours = totalMinutes / 60;
       const jobsAssigned = jobs.filter(j => j.assignedTo?.includes(member.id) && j.scheduledDate && new Date(j.scheduledDate + 'T12:00:00') >= cutoff).length;

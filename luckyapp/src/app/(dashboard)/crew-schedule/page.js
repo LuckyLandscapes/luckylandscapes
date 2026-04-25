@@ -132,7 +132,7 @@ export default function CrewSchedulePage() {
                   return (
                     <Link
                       key={job.id}
-                      href={`/calendar/job/${job.id}`}
+                      href={`/jobs/${job.id}`}
                       style={{ textDecoration: 'none', color: 'inherit' }}
                     >
                       <div

@@ -63,14 +63,16 @@ export default function TeamPage() {
         t.teamMemberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
       );
       const totalMinutes = entries.reduce((sum, t) => {
-        // Always compute from timestamps for accuracy
-        const mins = computeDurationMinutes(t.clockIn, t.clockOut);
-        return sum + (mins || 0);
+        // Compute from timestamps, then subtract break minutes (unpaid)
+        const shiftMins = computeDurationMinutes(t.clockIn, t.clockOut);
+        const breakMins = Number(t.breakMinutes || 0);
+        return sum + Math.max(0, (shiftMins || 0) - breakMins);
       }, 0);
+      const totalBreakMinutes = entries.reduce((sum, t) => sum + Number(t.breakMinutes || 0), 0);
       const totalHours = totalMinutes / 60;
       const totalPay = totalHours * (member.hourlyRate || 15);
       const activeEntry = timeEntries.find(t => t.teamMemberId === member.id && !t.clockOut);
-      return { member, entries, totalMinutes, totalHours, totalPay, activeEntry };
+      return { member, entries, totalMinutes, totalBreakMinutes, totalHours, totalPay, activeEntry };
     });
   }, [teamMembers, timeEntries, cutoffDate]);
 
@@ -460,17 +462,22 @@ function TimeLog({ memberId, timeEntries }) {
 
   return (
     <table style={{ width:'100%', fontSize:'0.82rem' }}>
-      <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Duration</th><th>Notes</th></tr></thead>
+      <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Shift</th><th>Break</th><th>Paid</th><th>Notes</th></tr></thead>
       <tbody>
         {entries.map(e => {
-          // Always compute duration from timestamps for accuracy
-          const mins = computeDurationMinutes(e.clockIn, e.clockOut);
+          const shiftMins = computeDurationMinutes(e.clockIn, e.clockOut);
+          const breakMins = Number(e.breakMinutes || 0);
+          const paidMins = Math.max(0, shiftMins - breakMins);
           return (
             <tr key={e.id}>
               <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
               <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
               <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
-              <td style={{ fontWeight:600 }}>{fmtDur(mins)}</td>
+              <td style={{ color:'var(--text-tertiary)' }}>{fmtDur(shiftMins)}</td>
+              <td style={{ color: breakMins > 0 ? 'var(--lucky-gold)' : 'var(--text-tertiary)' }}>
+                {breakMins > 0 ? `${breakMins}m` : '—'}
+              </td>
+              <td style={{ fontWeight:600 }}>{fmtDur(paidMins)}</td>
               <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
             </tr>
           );
