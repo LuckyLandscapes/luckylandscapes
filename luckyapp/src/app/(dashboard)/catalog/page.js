@@ -1,240 +1,418 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useData } from '@/lib/data';
-import { Search, Maximize2, X, ChevronLeft, ChevronRight, Star } from 'lucide-react';
+import {
+  Search, Maximize2, X, ChevronLeft, ChevronRight, Star, Plus,
+  Grid3x3, List, ExternalLink, Edit3, Trash2, AlertTriangle, Clock,
+} from 'lucide-react';
+import MaterialFormModal from '@/components/MaterialFormModal';
+
+function getSupplierClass(s) {
+  if (!s) return 'supplier-other';
+  const l = s.toLowerCase();
+  if (l.includes('outdoor')) return 'supplier-outdoor-solutions';
+  if (l.includes('menard')) return 'supplier-menards';
+  if (l.includes('home') || l.includes('depot')) return 'supplier-home-depot';
+  return 'supplier-other';
+}
+
+function formatPrice(m) {
+  if (m.soldOut) return <span style={{ color: '#ef4444', fontWeight: 700 }}>Sold Out</span>;
+  if (m.unitAlt) return <>${m.costLow}/{m.unitAlt} — ${m.costHigh}/{m.unit}</>;
+  if (Number(m.costLow) === Number(m.costHigh)) return <>${m.costLow} / {m.unit}</>;
+  return <>${m.costLow}–${m.costHigh} / {m.unit}</>;
+}
+
+function getImageSrc(m) {
+  if (m.imageUrl && m.imageUrl.startsWith('http')) return m.imageUrl;
+  if (m.image && m.image.startsWith('http')) return m.image;
+  return null;
+}
 
 export default function CatalogPage() {
-  const { materials } = useData();
+  const { materials, addMaterial, updateMaterial, deleteMaterial } = useData();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
-  const [presentationMode, setPresentationMode] = useState(false);
-  const [presentationIndex, setPresentationIndex] = useState(0);
+  const [activeSupplier, setActiveSupplier] = useState('all');
+  const [view, setView] = useState('grid');
+  const [selectedMaterial, setSelectedMaterial] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState(null);
+  const [showDelete, setShowDelete] = useState(null);
+  const [presMode, setPresMode] = useState(false);
+  const [presIndex, setPresIndex] = useState(0);
 
-  const categories = ['all', ...new Set(materials.map(m => m.category))];
+  // Filters
+  const categories = ['all', ...new Set(materials.map(m => m.category).filter(Boolean))];
+  const suppliers = ['all', ...new Set(materials.map(m => m.supplier).filter(Boolean))];
 
   const filtered = materials.filter(m => {
-    const matchSearch = `${m.name} ${m.description} ${m.supplier}`.toLowerCase().includes(search.toLowerCase());
+    const s = `${m.name} ${m.description || ''} ${m.supplier || ''} ${m.color || ''} ${(m.tags || []).join(' ')}`.toLowerCase();
+    const matchSearch = s.includes(search.toLowerCase());
     const matchCat = activeCategory === 'all' || m.category === activeCategory;
-    return matchSearch && matchCat;
+    const matchSup = activeSupplier === 'all' || m.supplier === activeSupplier;
+    return matchSearch && matchCat && matchSup;
+  }).sort((a, b) => {
+    if (a.isFavorite && !b.isFavorite) return -1;
+    if (!a.isFavorite && b.isFavorite) return 1;
+    return (a.sortOrder || 0) - (b.sortOrder || 0);
   });
 
-  // Presentation mode navigation
-  const startPresentation = (index) => {
-    setPresentationIndex(index);
-    setPresentationMode(true);
+  // Keyboard nav for presentation
+  useEffect(() => {
+    if (!presMode) return;
+    const handler = (e) => {
+      if (e.key === 'Escape') setPresMode(false);
+      if (e.key === 'ArrowRight') setPresIndex(i => (i + 1) % filtered.length);
+      if (e.key === 'ArrowLeft') setPresIndex(i => (i - 1 + filtered.length) % filtered.length);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [presMode, filtered.length]);
+
+  const handleSave = async (data) => {
+    if (editingMaterial) {
+      await updateMaterial(editingMaterial.id, data);
+    } else {
+      await addMaterial(data);
+    }
   };
 
-  const nextSlide = () => setPresentationIndex((i) => (i + 1) % filtered.length);
-  const prevSlide = () => setPresentationIndex((i) => (i - 1 + filtered.length) % filtered.length);
+  const handleDelete = async () => {
+    if (!showDelete) return;
+    await deleteMaterial(showDelete.id);
+    setShowDelete(null);
+    setSelectedMaterial(null);
+  };
+
+  const toggleFav = async (e, m) => {
+    e.stopPropagation();
+    await updateMaterial(m.id, { isFavorite: !m.isFavorite });
+  };
+
+  const startPresentation = (idx) => { setPresIndex(idx); setPresMode(true); };
 
   return (
     <div className="page animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
           <h1>Material Catalog</h1>
-          <p>Browse materials to show clients and add to quotes. {materials.length} items available.</p>
+          <p>Browse & present materials to customers. {materials.length} items.</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-secondary" onClick={() => startPresentation(0)}>
-            <Maximize2 size={16} /> Presentation Mode
+          <button className="btn btn-secondary" onClick={() => startPresentation(0)} disabled={filtered.length === 0}>
+            <Maximize2 size={16} /> Present
+          </button>
+          <button className="btn btn-primary" onClick={() => { setEditingMaterial(null); setShowForm(true); }}>
+            <Plus size={16} /> Add Material
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)', flexWrap: 'wrap', alignItems: 'center' }}>
-        <div className="search-input-wrap" style={{ flex: 1, maxWidth: '400px' }}>
+      {/* Toolbar */}
+      <div className="catalog-toolbar">
+        <div className="search-input-wrap">
           <Search size={16} />
-          <input
-            className="search-input"
-            placeholder="Search materials..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+          <input className="search-input" placeholder="Search materials..." value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <div className="tabs">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              className={`tab ${activeCategory === cat ? 'active' : ''}`}
-              onClick={() => setActiveCategory(cat)}
-            >
-              {cat === 'all' ? 'All' : cat}
-            </button>
-          ))}
+        <div className="catalog-view-toggle">
+          <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}><Grid3x3 size={16} /></button>
+          <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}><List size={16} /></button>
         </div>
       </div>
 
-      {/* Material Grid */}
-      <div className="material-grid">
-        {filtered.map((material, i) => (
-          <div key={material.id} className="material-card" onClick={() => startPresentation(i)}>
-            <div className="material-card-img" style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '3rem',
-              background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
-              overflow: 'hidden',
-            }}>
-              {material.image?.startsWith('http') ? (
-                <img src={material.image} alt={material.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                material.image || '🌿'
-              )}
-            </div>
-            <div className="material-card-body">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
-                <div>
-                  <div className="material-card-name">{material.name}</div>
-                  <div className="material-card-sub">{material.category}</div>
-                </div>
-                {material.isFavorite && (
-                  <Star size={14} style={{ color: 'var(--lucky-gold)', fill: 'var(--lucky-gold)' }} />
-                )}
-              </div>
-              <div className="material-card-price">
-                {material.soldOut ? (
-                  <span style={{ color: '#ef4444', fontWeight: 700 }}>Sold Out</span>
-                ) : material.unitAlt ? (
-                  <>${material.costLow}/{material.unitAlt} — ${material.costHigh}/{material.unit}</>
-                ) : material.costLow === material.costHigh ? (
-                  <>${material.costLow} / {material.unit}</>
-                ) : (
-                  <>${material.costLow}–${material.costHigh} / {material.unit}</>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Category Chips */}
+      <div className="catalog-filters">
+        {categories.map(cat => {
+          const count = cat === 'all' ? materials.length : materials.filter(m => m.category === cat).length;
+          return (
+            <button key={cat} className={`catalog-filter-chip ${activeCategory === cat ? 'active' : ''}`} onClick={() => setActiveCategory(cat)}>
+              {cat === 'all' ? 'All' : cat}
+              <span className="chip-count">{count}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* Supplier Chips */}
+      {suppliers.length > 1 && (
+        <div className="catalog-filters" style={{ marginTop: '-var(--space-sm)' }}>
+          {suppliers.map(sup => {
+            const count = sup === 'all' ? materials.length : materials.filter(m => m.supplier === sup).length;
+            return (
+              <button key={sup} className={`catalog-filter-chip ${activeSupplier === sup ? 'active' : ''}`} onClick={() => setActiveSupplier(sup)}>
+                {sup === 'all' ? 'All Suppliers' : sup}
+                <span className="chip-count">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Grid View */}
+      {view === 'grid' && (
+        <div className="material-grid">
+          {filtered.map((m, i) => {
+            const imgSrc = getImageSrc(m);
+            return (
+              <div key={m.id} className="material-card" onClick={() => setSelectedMaterial(m)}>
+                <div className="material-card-img">
+                  {imgSrc ? <img src={imgSrc} alt={m.name} /> : <div className="material-emoji">{m.imageEmoji || '🪨'}</div>}
+                  <div className="material-card-badges">
+                    <div>{m.soldOut && <span className="material-sold-out-badge">Sold Out</span>}</div>
+                    <button className={`material-fav-btn ${m.isFavorite ? 'active' : ''}`} onClick={e => toggleFav(e, m)}>
+                      <Star size={14} fill={m.isFavorite ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
+                </div>
+                <div className="material-card-body">
+                  <div className="material-card-name">{m.name}</div>
+                  <div className="material-card-sub">{m.category}{m.subcategory ? ` · ${m.subcategory}` : ''}</div>
+                  <div className="material-card-footer">
+                    <div className="material-card-price">{formatPrice(m)}</div>
+                    {m.supplier && <span className={`material-card-supplier ${getSupplierClass(m.supplier)}`}>{m.supplier}</span>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* List View */}
+      {view === 'list' && (
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th style={{ width: 50 }}></th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Price</th>
+                <th>Supplier</th>
+                <th>Status</th>
+                <th style={{ width: 80 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(m => {
+                const imgSrc = getImageSrc(m);
+                return (
+                  <tr key={m.id} onClick={() => setSelectedMaterial(m)} style={{ cursor: 'pointer' }}>
+                    <td>
+                      <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', overflow: 'hidden', background: 'var(--bg-elevated)' }}>
+                        {imgSrc ? <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', fontSize: '1.2rem' }}>{m.imageEmoji || '🪨'}</div>}
+                      </div>
+                    </td>
+                    <td><div style={{ fontWeight: 600 }}>{m.name}</div></td>
+                    <td style={{ color: 'var(--text-tertiary)' }}>{m.category}</td>
+                    <td><span style={{ fontWeight: 600, color: 'var(--lucky-green-light)' }}>{formatPrice(m)}</span></td>
+                    <td>{m.supplier && <span className={`material-card-supplier ${getSupplierClass(m.supplier)}`}>{m.supplier}</span>}</td>
+                    <td>{m.soldOut ? <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.78rem' }}>Sold Out</span> : m.isFavorite ? <Star size={14} style={{ color: 'var(--lucky-gold)', fill: 'var(--lucky-gold)' }} /> : null}</td>
+                    <td>
+                      <button className="btn btn-icon btn-ghost" onClick={e => { e.stopPropagation(); setEditingMaterial(m); setShowForm(true); }}><Edit3 size={14} /></button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="empty-state">
           <h3>No materials found</h3>
-          <p>Try a different search term or category.</p>
+          <p>Try a different search or add your first material.</p>
+          <button className="btn btn-primary" style={{ marginTop: 'var(--space-md)' }} onClick={() => { setEditingMaterial(null); setShowForm(true); }}>
+            <Plus size={16} /> Add Material
+          </button>
         </div>
       )}
 
-      {/* Presentation Mode Overlay */}
-      {presentationMode && filtered.length > 0 && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.95)',
-          zIndex: 1000,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 'var(--space-xl)',
-          animation: 'fadeIn 200ms ease',
-        }}>
-          {/* Close */}
-          <button
-            onClick={() => setPresentationMode(false)}
-            style={{
-              position: 'absolute', top: 'var(--space-lg)', right: 'var(--space-lg)',
-              width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.1)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-              cursor: 'pointer', border: 'none',
-            }}
-          >
-            <X size={22} />
-          </button>
+      {/* Detail Slideout */}
+      {selectedMaterial && (
+        <>
+          <div className="material-detail-overlay" onClick={() => setSelectedMaterial(null)} />
+          <div className="material-detail-panel">
+            <div className="material-detail-hero">
+              {getImageSrc(selectedMaterial)
+                ? <img src={getImageSrc(selectedMaterial)} alt={selectedMaterial.name} />
+                : <div className="material-emoji">{selectedMaterial.imageEmoji || '🪨'}</div>
+              }
+              <button className="material-detail-close" onClick={() => setSelectedMaterial(null)}><X size={20} /></button>
+            </div>
+            <div className="material-detail-content">
+              <div className="material-detail-header">
+                <div>
+                  <div className="material-detail-name">{selectedMaterial.name}</div>
+                  <div className="material-detail-category">{selectedMaterial.category}{selectedMaterial.subcategory ? ` · ${selectedMaterial.subcategory}` : ''}</div>
+                </div>
+                {selectedMaterial.isFavorite && <Star size={20} style={{ color: 'var(--lucky-gold)', fill: 'var(--lucky-gold)', flexShrink: 0 }} />}
+              </div>
 
-          {/* Counter */}
-          <div style={{
-            position: 'absolute', top: 'var(--space-lg)', left: '50%', transform: 'translateX(-50%)',
-            fontSize: '0.82rem', color: 'var(--text-tertiary)', fontWeight: 600,
-          }}>
-            {presentationIndex + 1} / {filtered.length}
-          </div>
-
-          {/* Material Display */}
-          <div style={{ textAlign: 'center', maxWidth: '600px' }}>
-            <div style={{ fontSize: '6rem', marginBottom: 'var(--space-xl)' }}>
-              {filtered[presentationIndex].image?.startsWith('http') ? (
-                <img
-                  src={filtered[presentationIndex].image}
-                  alt={filtered[presentationIndex].name}
-                  style={{ width: '300px', height: '300px', objectFit: 'cover', borderRadius: 'var(--radius-lg)' }}
-                />
-              ) : (
-                filtered[presentationIndex].image || '🌿'
+              {selectedMaterial.description && (
+                <div className="material-detail-section">
+                  <div className="material-detail-section-title">Description</div>
+                  <p style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', lineHeight: 1.6 }}>{selectedMaterial.description}</p>
+                </div>
               )}
-            </div>
-            <h2 style={{ fontSize: '2rem', marginBottom: 'var(--space-sm)' }}>
-              {filtered[presentationIndex].name}
-            </h2>
-            <div style={{ fontSize: '1rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
-              {filtered[presentationIndex].category}
-            </div>
-            <p style={{ fontSize: '1.1rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)', lineHeight: 1.7 }}>
-              {filtered[presentationIndex].description}
-            </p>
-            <div style={{
-              display: 'inline-flex', gap: 'var(--space-xl)',
-              background: 'rgba(255,255,255,0.05)', borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-md) var(--space-xl)',
-            }}>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Price</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700, color: filtered[presentationIndex].soldOut ? '#ef4444' : 'var(--lucky-green-light)' }}>
-                  {filtered[presentationIndex].soldOut ? (
-                    'Sold Out'
-                  ) : filtered[presentationIndex].unitAlt ? (
-                    <>${filtered[presentationIndex].costLow}/{filtered[presentationIndex].unitAlt} — ${filtered[presentationIndex].costHigh}/{filtered[presentationIndex].unit}</>
-                  ) : filtered[presentationIndex].costLow === filtered[presentationIndex].costHigh ? (
-                    <>${filtered[presentationIndex].costLow}</>
-                  ) : (
-                    <>${filtered[presentationIndex].costLow}–${filtered[presentationIndex].costHigh}</>
+
+              {/* Price */}
+              <div className="material-detail-section">
+                <div className="material-detail-section-title">Pricing</div>
+                <div className="material-detail-price-row">
+                  <div className="material-detail-price-value">{formatPrice(selectedMaterial)}</div>
+                  {selectedMaterial.lastPriceCheck && (
+                    <div className="material-detail-price-verified">
+                      <Clock size={12} /> Verified {new Date(selectedMaterial.lastPriceCheck).toLocaleDateString()}
+                    </div>
                   )}
                 </div>
               </div>
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Unit</div>
-                <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>
-                  per {filtered[presentationIndex].unit}
+
+              {/* Details Grid */}
+              <div className="material-detail-section">
+                <div className="material-detail-section-title">Details</div>
+                <div className="material-detail-info-grid">
+                  {selectedMaterial.color && <div className="material-detail-info-item"><div className="material-detail-info-label">Color</div><div className="material-detail-info-value">{selectedMaterial.color}</div></div>}
+                  {selectedMaterial.texture && <div className="material-detail-info-item"><div className="material-detail-info-label">Texture</div><div className="material-detail-info-value">{selectedMaterial.texture}</div></div>}
+                  {selectedMaterial.supplier && <div className="material-detail-info-item"><div className="material-detail-info-label">Supplier</div><div className="material-detail-info-value">{selectedMaterial.supplier}</div></div>}
+                  {selectedMaterial.coveragePerUnit && <div className="material-detail-info-item"><div className="material-detail-info-label">Coverage</div><div className="material-detail-info-value">{selectedMaterial.coveragePerUnit}</div></div>}
                 </div>
               </div>
-              {filtered[presentationIndex].supplier && (
-                <div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Supplier</div>
-                  <div style={{ fontSize: '1rem', fontWeight: 600 }}>
-                    {filtered[presentationIndex].supplier}
+
+              {/* Supplier Links */}
+              {(selectedMaterial.supplierUrl || selectedMaterial.supplierUrlAlt) && (
+                <div className="material-detail-section">
+                  <div className="material-detail-section-title">Check Live Price & Stock</div>
+                  <div className="material-detail-supplier-links">
+                    {selectedMaterial.supplierUrl && (
+                      <a href={selectedMaterial.supplierUrl} target="_blank" rel="noopener noreferrer" className="supplier-link-btn">
+                        <div className="supplier-link-icon" style={{ background: 'rgba(58, 156, 74, 0.1)' }}>🔗</div>
+                        <div className="supplier-link-text">
+                          <div>{selectedMaterial.supplier || 'Supplier'} Product Page</div>
+                          <div className="supplier-link-sub">Check current price & availability</div>
+                        </div>
+                        <ExternalLink size={16} style={{ color: 'var(--text-tertiary)' }} />
+                      </a>
+                    )}
+                    {selectedMaterial.supplierUrlAlt && (
+                      <a href={selectedMaterial.supplierUrlAlt} target="_blank" rel="noopener noreferrer" className="supplier-link-btn">
+                        <div className="supplier-link-icon" style={{ background: 'rgba(251, 146, 60, 0.1)' }}>🔗</div>
+                        <div className="supplier-link-text">
+                          <div>Alternative Supplier</div>
+                          <div className="supplier-link-sub">Compare prices</div>
+                        </div>
+                        <ExternalLink size={16} style={{ color: 'var(--text-tertiary)' }} />
+                      </a>
+                    )}
                   </div>
                 </div>
               )}
+
+              {selectedMaterial.notes && (
+                <div className="material-detail-section">
+                  <div className="material-detail-section-title">Internal Notes</div>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>{selectedMaterial.notes}</p>
+                </div>
+              )}
+
+              <div className="material-detail-actions">
+                <button className="btn btn-primary" onClick={() => { const idx = filtered.findIndex(m => m.id === selectedMaterial.id); if (idx >= 0) { setSelectedMaterial(null); startPresentation(idx); }}}>
+                  <Maximize2 size={16} /> Present
+                </button>
+                <button className="btn btn-secondary" onClick={() => { setEditingMaterial(selectedMaterial); setShowForm(true); setSelectedMaterial(null); }}>
+                  <Edit3 size={16} /> Edit
+                </button>
+                <button className="btn btn-danger" onClick={() => { setShowDelete(selectedMaterial); setSelectedMaterial(null); }}>
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           </div>
+        </>
+      )}
 
-          {/* Navigation */}
-          <div style={{
-            position: 'absolute', bottom: 'var(--space-xl)',
-            display: 'flex', gap: 'var(--space-md)',
-          }}>
-            <button
-              onClick={prevSlide}
-              style={{
-                width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-                cursor: 'pointer', border: 'none',
-              }}
-            >
-              <ChevronLeft size={24} />
-            </button>
-            <button
-              onClick={nextSlide}
-              style={{
-                width: 48, height: 48, borderRadius: '50%', background: 'rgba(255,255,255,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white',
-                cursor: 'pointer', border: 'none',
-              }}
-            >
-              <ChevronRight size={24} />
-            </button>
+      {/* Presentation Mode */}
+      {presMode && filtered.length > 0 && (() => {
+        const m = filtered[presIndex];
+        const imgSrc = getImageSrc(m);
+        return (
+          <div className="catalog-presentation">
+            <button className="catalog-presentation-close" onClick={() => setPresMode(false)}><X size={24} /></button>
+            <div className="catalog-presentation-counter">{presIndex + 1} / {filtered.length}</div>
+            <div className="catalog-presentation-content">
+              <div className="catalog-presentation-image">
+                {imgSrc ? <img src={imgSrc} alt={m.name} /> : <div className="material-emoji">{m.imageEmoji || '🪨'}</div>}
+              </div>
+              <div className="catalog-presentation-info">
+                <div className="catalog-presentation-name">{m.name}</div>
+                <div className="catalog-presentation-category">{m.category}{m.subcategory ? ` · ${m.subcategory}` : ''}</div>
+                {m.description && <div className="catalog-presentation-description">{m.description}</div>}
+                <div className="catalog-presentation-stats">
+                  <div className="catalog-presentation-stat">
+                    <div className="catalog-presentation-stat-label">Price</div>
+                    <div className="catalog-presentation-stat-value price">{formatPrice(m)}</div>
+                  </div>
+                  <div className="catalog-presentation-stat">
+                    <div className="catalog-presentation-stat-label">Unit</div>
+                    <div className="catalog-presentation-stat-value">per {m.unit}</div>
+                  </div>
+                  {m.supplier && (
+                    <div className="catalog-presentation-stat">
+                      <div className="catalog-presentation-stat-label">Supplier</div>
+                      <div className="catalog-presentation-stat-value">{m.supplier}</div>
+                    </div>
+                  )}
+                  {m.coveragePerUnit && (
+                    <div className="catalog-presentation-stat">
+                      <div className="catalog-presentation-stat-label">Coverage</div>
+                      <div className="catalog-presentation-stat-value" style={{ fontSize: '0.9rem' }}>{m.coveragePerUnit}</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="catalog-presentation-nav">
+              <button onClick={() => setPresIndex(i => (i - 1 + filtered.length) % filtered.length)}><ChevronLeft size={24} /></button>
+              <button onClick={() => setPresIndex(i => (i + 1) % filtered.length)}><ChevronRight size={24} /></button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Form Modal */}
+      {showForm && (
+        <MaterialFormModal
+          material={editingMaterial}
+          onClose={() => { setShowForm(false); setEditingMaterial(null); }}
+          onSave={handleSave}
+        />
+      )}
+
+      {/* Delete Confirm */}
+      {showDelete && (
+        <div className="modal-overlay" onClick={() => setShowDelete(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+            <div className="modal-header">
+              <h2>Delete Material</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowDelete(null)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>This cannot be undone</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>"{showDelete.name}" will be permanently removed from your catalog.</div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowDelete(null)}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete}><Trash2 size={16} /> Delete</button>
+            </div>
           </div>
         </div>
       )}

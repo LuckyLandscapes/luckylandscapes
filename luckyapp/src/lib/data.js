@@ -615,6 +615,47 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // ─── Material CRUD ──────────────────────────────────────
+  const addMaterial = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('materials')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const m = snakeToCamel(row);
+      setMaterials(prev => [m, ...prev]);
+      return m;
+    } else {
+      const m = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setMaterials(prev => { const next = [m, ...prev]; saveLocal('materials', next); return next; });
+      return m;
+    }
+  }, [connected, orgId]);
+
+  const updateMaterial = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('materials').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setMaterials(prev => {
+      const next = prev.map(m => m.id === id ? { ...m, ...data } : m);
+      if (!connected) saveLocal('materials', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteMaterial = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('materials').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setMaterials(prev => {
+      const next = prev.filter(m => m.id !== id);
+      if (!connected) saveLocal('materials', next);
+      return next;
+    });
+  }, [connected]);
+
   // ─── Context value ──────────────────────────────────────
   const value = {
     // State
@@ -649,6 +690,9 @@ export function DataProvider({ children }) {
 
     // Invoices
     addInvoice, updateInvoice, deleteInvoice,
+
+    // Materials
+    addMaterial, updateMaterial, deleteMaterial,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
