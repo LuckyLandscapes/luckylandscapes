@@ -8,6 +8,15 @@ import {
   ArrowLeft, Phone, Mail, MapPin, FileText, DollarSign,
   Clock, CheckCircle2, Send, Plus, Edit3, Trash2, X, AlertTriangle, Save,
 } from 'lucide-react';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
+
+function formatPhoneNumber(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 function formatCurrency(amount) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
@@ -292,11 +301,23 @@ export default function CustomerDetailPage() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Phone</label>
-                  <input className="form-input" type="tel" placeholder="(402) 555-1234" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                  <input className="form-input" type="tel" placeholder="(402) 555-1234" value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: formatPhoneNumber(e.target.value) })} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Address</label>
-                  <input className="form-input" placeholder="1234 Main St" value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
+                  <AddressAutocomplete
+                    value={editForm.address}
+                    onChange={(val) => setEditForm({ ...editForm, address: val })}
+                    onPlaceSelect={({ address, city, state, zip }) => {
+                      setEditForm(prev => ({
+                        ...prev,
+                        address: address || prev.address,
+                        city: city || prev.city,
+                        state: state || prev.state,
+                        zip: zip || prev.zip,
+                      }));
+                    }}
+                  />
                 </div>
                 <div className="form-row">
                   <div className="form-group">

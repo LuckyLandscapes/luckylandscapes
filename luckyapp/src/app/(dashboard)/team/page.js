@@ -5,13 +5,21 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
-  ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail,
+  ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
 } from 'lucide-react';
 
 function fmtDur(min) {
-  if (!min) return '0h 0m';
-  return `${Math.floor(min/60)}h ${min%60}m`;
+  if (!min || min <= 0) return '0h 0m';
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return `${h}h ${m}m`;
 }
+
+function computeDurationMinutes(clockIn, clockOut) {
+  if (!clockIn || !clockOut) return 0;
+  return (new Date(clockOut) - new Date(clockIn)) / 60000;
+}
+
 function fmtCurrency(n) {
   return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',minimumFractionDigits:2}).format(n);
 }
@@ -22,6 +30,11 @@ export default function TeamPage() {
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
   const [dateRange, setDateRange] = useState('week'); // 'week', 'biweek', 'month'
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -50,7 +63,8 @@ export default function TeamPage() {
         t.teamMemberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
       );
       const totalMinutes = entries.reduce((sum, t) => {
-        const mins = t.durationMinutes || (t.clockIn && t.clockOut ? (new Date(t.clockOut) - new Date(t.clockIn)) / 60000 : 0);
+        // Always compute from timestamps for accuracy
+        const mins = computeDurationMinutes(t.clockIn, t.clockOut);
         return sum + (mins || 0);
       }, 0);
       const totalHours = totalMinutes / 60;
@@ -68,14 +82,47 @@ export default function TeamPage() {
     setEditingId(member.id);
     setEditRate(String(member.hourlyRate || 15));
     setEditRole(member.role);
+    setEditName(member.fullName || '');
+    setEditEmail(member.email || '');
+    setEditPassword('');
+    setEditError(null);
   };
 
   const saveEdit = async (id) => {
-    await updateTeamMember(id, {
-      hourlyRate: parseFloat(editRate) || 15,
-      role: editRole,
-    });
-    setEditingId(null);
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      // Update local fields (role, rate)
+      await updateTeamMember(id, {
+        hourlyRate: parseFloat(editRate) || 15,
+        role: editRole,
+        fullName: editName,
+        email: editEmail,
+      });
+
+      // Update auth credentials (name, email, password) via server API
+      const member = teamMembers.find(m => m.id === id);
+      const authPayload = { memberId: id, orgId: user?.orgId };
+      if (editName && editName !== member?.fullName) authPayload.fullName = editName;
+      if (editEmail && editEmail !== member?.email) authPayload.email = editEmail;
+      if (editPassword) authPayload.password = editPassword;
+
+      if (authPayload.fullName || authPayload.email || authPayload.password) {
+        const res = await fetch('/api/update-member', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(authPayload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to update credentials');
+      }
+
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditSaving(false);
+    }
   };
 
   const getInitials = (name) => name ? name.split(' ').map(n=>n[0]).join('').toUpperCase().slice(0,2) : '??';
@@ -206,8 +253,21 @@ export default function TeamPage() {
                         {getInitials(member.fullName)}
                       </div>
                       <div>
-                        <div className="table-name">{member.fullName}</div>
-                        <div className="table-sub">{member.email}</div>
+                        {isEditing ? (
+                          <>
+                            <input className="form-input" value={editName} onChange={e => setEditName(e.target.value)}
+                              style={{ width:'160px', padding:'4px 8px', fontSize:'0.82rem', marginBottom:'2px' }}
+                              onClick={e => e.stopPropagation()} placeholder="Full Name" />
+                            <input className="form-input" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
+                              style={{ width:'160px', padding:'4px 8px', fontSize:'0.78rem' }}
+                              onClick={e => e.stopPropagation()} placeholder="Email" />
+                          </>
+                        ) : (
+                          <>
+                            <div className="table-name">{member.fullName}</div>
+                            <div className="table-sub">{member.email}</div>
+                          </>
+                        )}
                       </div>
                     </div>
                   </td>
@@ -249,16 +309,39 @@ export default function TeamPage() {
                   <td onClick={e => e.stopPropagation()}>
                     {isEditing ? (
                       <div style={{ display:'flex', gap:'4px' }}>
-                        <button className="btn btn-icon btn-ghost" onClick={() => saveEdit(member.id)} title="Save"><Save size={14} /></button>
-                        <button className="btn btn-icon btn-ghost" onClick={() => setEditingId(null)} title="Cancel"><X size={14} /></button>
+                        <button className="btn btn-icon btn-ghost" onClick={() => saveEdit(member.id)} title="Save" disabled={editSaving}>
+                          {editSaving ? <Loader2 size={14} className="spin" /> : <Save size={14} />}
+                        </button>
+                        <button className="btn btn-icon btn-ghost" onClick={() => { setEditingId(null); setEditError(null); }} title="Cancel"><X size={14} /></button>
                       </div>
                     ) : (
                       <button className="btn btn-icon btn-ghost" onClick={() => startEdit(member)} title="Edit"><Edit2 size={14} /></button>
                     )}
                   </td>
                 </tr>,
+                // Password field when editing
+                isEditing && (
+                  <tr key={`${member.id}-edit-extra`}>
+                    <td colSpan={7} style={{ padding:0 }}>
+                      <div style={{ background:'var(--bg-elevated)', padding:'var(--space-sm) var(--space-md)', borderTop:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:'var(--space-md)', flexWrap:'wrap' }}>
+                        <div style={{ display:'flex', alignItems:'center', gap:'var(--space-sm)' }}>
+                          <Key size={14} style={{ color:'var(--text-tertiary)' }} />
+                          <span style={{ fontSize:'0.78rem', color:'var(--text-tertiary)' }}>New Password:</span>
+                          <input className="form-input" type="password" value={editPassword} onChange={e => setEditPassword(e.target.value)}
+                            style={{ width:'180px', padding:'4px 8px', fontSize:'0.82rem' }}
+                            placeholder="Leave blank to keep current" minLength={6} />
+                        </div>
+                        {editError && (
+                          <div style={{ display:'flex', alignItems:'center', gap:'4px', fontSize:'0.78rem', color:'var(--status-danger)' }}>
+                            <AlertCircle size={14} /> {editError}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ),
                 // Expanded time log
-                isExpanded && (
+                isExpanded && !isEditing && (
                   <tr key={`${member.id}-detail`}>
                     <td colSpan={7} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-md)', borderTop:'1px solid var(--border-subtle)' }}>
@@ -379,15 +462,19 @@ function TimeLog({ memberId, timeEntries }) {
     <table style={{ width:'100%', fontSize:'0.82rem' }}>
       <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Duration</th><th>Notes</th></tr></thead>
       <tbody>
-        {entries.map(e => (
-          <tr key={e.id}>
-            <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
-            <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
-            <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
-            <td style={{ fontWeight:600 }}>{fmtDur(e.durationMinutes)}</td>
-            <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
-          </tr>
-        ))}
+        {entries.map(e => {
+          // Always compute duration from timestamps for accuracy
+          const mins = computeDurationMinutes(e.clockIn, e.clockOut);
+          return (
+            <tr key={e.id}>
+              <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
+              <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
+              <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
+              <td style={{ fontWeight:600 }}>{fmtDur(mins)}</td>
+              <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
+            </tr>
+          );
+        })}
       </tbody>
     </table>
   );

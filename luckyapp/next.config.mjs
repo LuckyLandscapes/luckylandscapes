@@ -1,5 +1,14 @@
+import { dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Fix turbopack root so it doesn't resolve to the parent directory
+  turbopack: {
+    root: __dirname,
+  },
   // Ensure the service worker is never cached by the browser
   // so updates are always picked up immediately
   async headers() {

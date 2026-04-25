@@ -6,6 +6,19 @@ import Link from 'next/link';
 import {
   Plus, Search, Phone, Mail, MapPin, X, UserPlus, ArrowRight,
 } from 'lucide-react';
+import AddressAutocomplete from '@/components/AddressAutocomplete';
+
+/**
+ * Format a phone number as (XXX) XXX-XXXX as the user types.
+ * Strips all non-digit characters, then applies formatting.
+ */
+function formatPhoneNumber(value) {
+  const digits = value.replace(/\D/g, '').slice(0, 10);
+  if (digits.length === 0) return '';
+  if (digits.length <= 3) return `(${digits}`;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
 
 export default function CustomersPage() {
   const { customers, quotes, addCustomer } = useData();
@@ -22,6 +35,11 @@ export default function CustomersPage() {
     const matchTag = filterTag === 'all' || (c.tags && c.tags.includes(filterTag));
     return matchSearch && matchTag;
   });
+
+  const handlePhoneChange = (e) => {
+    const formatted = formatPhoneNumber(e.target.value);
+    setForm({ ...form, phone: formatted });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -188,11 +206,23 @@ export default function CustomersPage() {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Phone</label>
-                  <input className="form-input" type="tel" placeholder="(402) 555-1234" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+                  <input className="form-input" type="tel" placeholder="(402) 555-1234" value={form.phone} onChange={handlePhoneChange} />
                 </div>
                 <div className="form-group">
                   <label className="form-label">Address</label>
-                  <input className="form-input" placeholder="1234 Main St" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+                  <AddressAutocomplete
+                    value={form.address}
+                    onChange={(val) => setForm({ ...form, address: val })}
+                    onPlaceSelect={({ address, city, state, zip }) => {
+                      setForm(prev => ({
+                        ...prev,
+                        address: address || prev.address,
+                        city: city || prev.city,
+                        state: state || prev.state,
+                        zip: zip || prev.zip,
+                      }));
+                    }}
+                  />
                 </div>
                 <div className="form-row">
                   <div className="form-group">
@@ -202,6 +232,10 @@ export default function CustomersPage() {
                   <div className="form-group">
                     <label className="form-label">State</label>
                     <input className="form-input" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">ZIP</label>
+                    <input className="form-input" value={form.zip} onChange={(e) => setForm({ ...form, zip: e.target.value })} />
                   </div>
                 </div>
                 <div className="form-group">
