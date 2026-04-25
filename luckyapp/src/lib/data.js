@@ -115,7 +115,7 @@ export function DataProvider({ children }) {
       if (cal.data) setCalendarEvents(snakeToCamel(cal.data));
       if (team.data) setTeamMembers(snakeToCamel(team.data));
       if (act.data) setActivity(snakeToCamel(act.data));
-      if (te.data) setTimeEntries(snakeToCamel(te.data));
+      if (te.data) setTimeEntries(snakeToCamel(te.data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId })));
       if (jexp.data) setJobExpenses(snakeToCamel(jexp.data));
       if (mat.data) setMaterials(snakeToCamel(mat.data));
       if (svc?.data) setServices(snakeToCamel(svc.data));
@@ -168,7 +168,7 @@ export function DataProvider({ children }) {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, () => {
         supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(200)
-          .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data)); });
+          .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId }))); });
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
@@ -417,21 +417,32 @@ export function DataProvider({ children }) {
 
   // ─── Time Entries ───────────────────────────────────────
   const clockIn = useCallback(async (memberId, jobId = null) => {
-    const entry = {
-      teamMemberId: memberId,
-      clockIn: new Date().toISOString(),
-      jobId: jobId || null,
-    };
     if (connected) {
+      // DB column is `member_id`, not `team_member_id`, so build the payload explicitly
+      const payload = {
+        org_id: orgId,
+        member_id: memberId,
+        clock_in: new Date().toISOString(),
+        job_id: jobId || null,
+      };
       const { data: row, error } = await supabase.from('time_entries')
-        .insert({ ...camelToSnake(entry), org_id: orgId })
+        .insert(payload)
         .select().single();
       if (error) throw error;
       const te = snakeToCamel(row);
+      // Normalize: DB returns `memberId` (from `member_id`), frontend expects `teamMemberId`
+      te.teamMemberId = te.memberId;
       setTimeEntries(prev => [te, ...prev]);
       return te;
     } else {
-      const te = { ...entry, id: crypto.randomUUID(), orgId };
+      const te = {
+        id: crypto.randomUUID(),
+        orgId,
+        teamMemberId: memberId,
+        memberId: memberId,
+        clockIn: new Date().toISOString(),
+        jobId: jobId || null,
+      };
       setTimeEntries(prev => { const next = [te, ...prev]; saveLocal('time_entries', next); return next; });
       return te;
     }
