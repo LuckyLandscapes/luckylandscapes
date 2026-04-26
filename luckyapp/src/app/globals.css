@@ -62,14 +62,14 @@
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* Surfaces — deep forest-leaning charcoals */
-  --bg-primary: #0E140F;
-  --bg-secondary: #14201A;
-  --bg-card: #1A2620;
-  --bg-card-hover: #21302A;
-  --bg-elevated: #263A30;
-  --bg-input: #14201A;
-  --bg-sidebar: #0A1310;
+  /* Surfaces — neutral warm charcoal, no color tint */
+  --bg-primary: #0F1115;
+  --bg-secondary: #161922;
+  --bg-card: #1C2029;
+  --bg-card-hover: #232834;
+  --bg-elevated: #2A3140;
+  --bg-input: #161922;
+  --bg-sidebar: #0B0D12;
 
   /* Borders & overlays */
   --border-primary: rgba(255, 255, 255, 0.07);
@@ -78,13 +78,13 @@
   --overlay-hover: rgba(255, 255, 255, 0.05);
   --overlay-active: rgba(255, 255, 255, 0.08);
 
-  /* Text */
-  --text-primary: #F0F2EC;
-  --text-secondary: #9AA89A;
-  --text-tertiary: #6A7A6E;
-  --text-inverse: #14201A;
+  /* Text — neutral cool gray */
+  --text-primary: #ECEEF2;
+  --text-secondary: #98A0AE;
+  --text-tertiary: #5F6776;
+  --text-inverse: #161922;
 
-  /* Brand glow + clover accent for dark UI */
+  /* Brand glow + clover accent — used sparingly */
   --lucky-green-glow: rgba(143, 175, 114, 0.28);
   --clover-soft: rgba(143, 175, 114, 0.14);
 
@@ -121,30 +121,30 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  /* Surfaces — cream + white from the marketing site */
-  --bg-primary: var(--cream);
-  --bg-secondary: var(--off-white);
+  /* Surfaces — neutral off-white / soft gray */
+  --bg-primary: #F5F6F8;
+  --bg-secondary: #FAFAFB;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F4F1EA;
+  --bg-card-hover: #F1F2F5;
   --bg-elevated: #FFFFFF;
   --bg-input: #FFFFFF;
   --bg-sidebar: #FFFFFF;
 
-  /* Borders & overlays */
-  --border-primary: rgba(60, 60, 60, 0.08);
-  --border-secondary: rgba(60, 60, 60, 0.14);
+  /* Borders & overlays — neutral gray, not green */
+  --border-primary: rgba(15, 23, 42, 0.07);
+  --border-secondary: rgba(15, 23, 42, 0.12);
   --border-focus: var(--clover);
-  --overlay-hover: rgba(107, 142, 78, 0.08);
-  --overlay-active: rgba(107, 142, 78, 0.14);
+  --overlay-hover: rgba(15, 23, 42, 0.04);
+  --overlay-active: rgba(15, 23, 42, 0.08);
 
-  /* Text — charcoal-led */
-  --text-primary: #2A2E27;
-  --text-secondary: #5A6A5C;
-  --text-tertiary: #8A998C;
+  /* Text — charcoal */
+  --text-primary: #1F2430;
+  --text-secondary: #4D5566;
+  --text-tertiary: #8A93A4;
   --text-inverse: #FFFFFF;
 
-  /* Brand glow + soft clover */
-  --lucky-green-glow: rgba(107, 142, 78, 0.25);
+  /* Brand glow + soft clover — used sparingly */
+  --lucky-green-glow: rgba(107, 142, 78, 0.22);
   --clover-soft: rgba(107, 142, 78, 0.10);
 
   /* Shadows — softer, ambient */
@@ -324,10 +324,6 @@ h4 {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border-radius: var(--radius-md);
-  background: var(--clover-soft);
-  border: 1px solid var(--border-primary);
-  box-shadow: var(--shadow-sm);
 }
 
 .sidebar-brand-mark img {
@@ -400,9 +396,13 @@ h4 {
 }
 
 .sidebar-link.active {
-  background: var(--clover-soft);
-  color: var(--clover);
+  background: var(--overlay-active);
+  color: var(--text-primary);
   font-weight: 600;
+}
+
+.sidebar-link.active svg {
+  color: var(--clover);
 }
 
 .sidebar-link.active::before {
