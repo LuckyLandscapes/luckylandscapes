@@ -64,6 +64,7 @@ export function DataProvider({ children }) {
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [companyExpenses, setCompanyExpenses] = useState([]);
+  const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -89,6 +90,7 @@ export function DataProvider({ children }) {
       setServices(loadLocal('services'));
       setInvoices(loadLocal('invoices'));
       setCompanyExpenses(loadLocal('company_expenses'));
+      setPayments(loadLocal('payments'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -97,7 +99,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -111,6 +113,7 @@ export function DataProvider({ children }) {
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('job_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('payments').select('*').eq('org_id', orgId).order('paid_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -126,6 +129,7 @@ export function DataProvider({ children }) {
       if (inv?.data) setInvoices(snakeToCamel(inv.data));
       if (jmed?.data) setJobMedia(snakeToCamel(jmed.data));
       if (cexp?.data) setCompanyExpenses(snakeToCamel(cexp.data));
+      if (pay?.data) setPayments(snakeToCamel(pay.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -183,6 +187,10 @@ export function DataProvider({ children }) {
         supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false })
           .then(({ data }) => { if (data) setCompanyExpenses(snakeToCamel(data)); });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
+        supabase.from('payments').select('*').eq('org_id', orgId).order('paid_at', { ascending: false })
+          .then(({ data }) => { if (data) setPayments(snakeToCamel(data)); });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -194,6 +202,7 @@ export function DataProvider({ children }) {
   const getJob = useCallback((id) => jobs.find(j => j.id === id) || null, [jobs]);
   const getTeamMember = useCallback((id) => teamMembers.find(m => m.id === id) || null, [teamMembers]);
   const getInvoice = useCallback((id) => invoices.find(i => i.id === id) || null, [invoices]);
+  const getInvoicePayments = useCallback((invId) => payments.filter(p => p.invoiceId === invId), [payments]);
 
   // Customer-scoped getters (used by customer detail page)
   const getCustomerQuotes = useCallback((custId) => quotes.filter(q => q.customerId === custId), [quotes]);
@@ -665,6 +674,35 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // ─── Payment CRUD ───────────────────────────────────────
+  const addPayment = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('payments')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const p = snakeToCamel(row);
+      setPayments(prev => [p, ...prev]);
+      return p;
+    } else {
+      const p = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setPayments(prev => { const next = [p, ...prev]; saveLocal('payments', next); return next; });
+      return p;
+    }
+  }, [connected, orgId]);
+
+  const deletePayment = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('payments').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setPayments(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (!connected) saveLocal('payments', next);
+      return next;
+    });
+  }, [connected]);
+
   const deleteInvoice = useCallback(async (id) => {
     if (connected) {
       const { error } = await supabase.from('invoices').delete().eq('id', id);
@@ -723,10 +761,11 @@ export function DataProvider({ children }) {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
     activity, timeEntries, jobMedia, jobExpenses, materials,
-    services, invoices, companyExpenses, loading,
+    services, invoices, companyExpenses, payments, loading,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
+    getInvoicePayments,
     getCustomerQuotes, getCustomerJobs, getCustomerActivity,
 
     // Customers
@@ -756,6 +795,9 @@ export function DataProvider({ children }) {
 
     // Invoices
     addInvoice, updateInvoice, deleteInvoice,
+
+    // Payments (online + manual)
+    addPayment, deletePayment,
 
     // Materials
     addMaterial, updateMaterial, deleteMaterial,

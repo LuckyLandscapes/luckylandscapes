@@ -143,11 +143,9 @@ export default function QuoteDetailPage() {
     }
   };
 
-  // ─── Send SMS with PDF link ───────────────────────────────
+  // ─── Send SMS with PDF link via Twilio ────────────────────
   const handleSendSms = async () => {
-    const phoneNumber = sendPhone.replace(/[^\d+]/g, '');
-    if (!phoneNumber) return;
-
+    if (!sendPhone) return;
     setSendState({ loading: true, success: false, error: null });
 
     try {
@@ -165,14 +163,25 @@ export default function QuoteDetailPage() {
       });
 
       const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload PDF');
 
-      if (!uploadRes.ok) {
-        throw new Error(uploadData.error || 'Failed to upload PDF');
-      }
-
-      // 3. Build SMS with the PDF link and open Messages
-      const smsBody = encodeURIComponent(buildSmsBody(uploadData.url));
-      window.open(`sms:${phoneNumber}?&body=${smsBody}`, '_self');
+      // 3. Send SMS via Twilio (server-side — works on any device)
+      const smsRes = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          kind: 'quote',
+          phone: sendPhone,
+          quoteNumber: quote.quoteNumber,
+          customerFirstName: customer?.firstName || null,
+          total: quote.total,
+          category: quote.category,
+          pdfUrl: uploadData.url,
+          customMessage: sendMessage || undefined,
+        }),
+      });
+      const smsData = await smsRes.json();
+      if (!smsRes.ok) throw new Error(smsData.error || 'Failed to send SMS');
 
       // 4. Mark as sent
       await updateQuote(id, { status: 'sent' });
@@ -184,9 +193,11 @@ export default function QuoteDetailPage() {
         description: `Texted to ${sendPhone} with PDF link`,
       });
 
-      setSendState({ loading: false, success: false, error: null });
-      setShowSendModal(false);
-      showToast('success', `Quote #${quote.quoteNumber} — SMS opened for ${sendPhone}`);
+      setSendState({ loading: false, success: true, error: null });
+      setTimeout(() => {
+        setShowSendModal(false);
+        showToast('success', `Quote #${quote.quoteNumber} texted to ${sendPhone}`);
+      }, 1500);
     } catch (err) {
       console.error('[browser] SMS error:', err);
       setSendState({ loading: false, success: false, error: err.message });
@@ -580,7 +591,7 @@ export default function QuoteDetailPage() {
                         color: 'var(--status-info)',
                       }}>
                         <Phone size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>Your PDF estimate will be uploaded and a download link included in the text message.</span>
+                        <span>Your PDF estimate is uploaded and texted via Twilio. Requires TWILIO_* env vars.</span>
                       </div>
                     </>
                   )}
@@ -630,7 +641,7 @@ export default function QuoteDetailPage() {
                     style={{ background: 'var(--clover)', borderColor: 'var(--clover)' }}
                   >
                     {sendState.loading ? (
-                      <><Loader2 size={16} className="spin" /> Preparing PDF...</>
+                      <><Loader2 size={16} className="spin" /> Sending...</>
                     ) : (
                       <><MessageSquare size={16} /> Send Text</>
                     )}

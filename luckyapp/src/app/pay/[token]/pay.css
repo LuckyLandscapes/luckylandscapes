@@ -1,0 +1,9 @@
+/* Public payment page — mobile responsive */
+@media (max-width: 768px) {
+  .pay-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .pay-card-sticky {
+    position: static !important;
+  }
+}
