@@ -8,24 +8,23 @@ export default function OfflinePage() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      background: '#0a0e14',
-      color: '#f0f2f5',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      background: 'var(--bg-primary)',
+      color: 'var(--text-primary)',
+      fontFamily: 'var(--font-body)',
       padding: '2rem',
       textAlign: 'center',
     }}>
-      {/* Offline Icon */}
       <div style={{
         width: 80,
         height: 80,
         borderRadius: 20,
-        background: 'rgba(45, 122, 58, 0.15)',
+        background: 'var(--clover-soft)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: '1.5rem',
       }}>
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#3a9c4a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--clover)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <line x1="1" y1="1" x2="23" y2="23" />
           <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
           <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
@@ -37,8 +36,9 @@ export default function OfflinePage() {
       </div>
 
       <h1 style={{
-        fontSize: '1.5rem',
-        fontWeight: 700,
+        fontFamily: 'var(--font-heading)',
+        fontSize: '1.75rem',
+        fontWeight: 800,
         marginBottom: '0.5rem',
         letterSpacing: '-0.02em',
       }}>
@@ -46,8 +46,8 @@ export default function OfflinePage() {
       </h1>
 
       <p style={{
-        color: '#8b99ad',
-        fontSize: '0.9rem',
+        color: 'var(--text-secondary)',
+        fontSize: '0.95rem',
         maxWidth: 400,
         lineHeight: 1.6,
         marginBottom: '2rem',
@@ -57,20 +57,7 @@ export default function OfflinePage() {
 
       <button
         onClick={() => window.location.reload()}
-        style={{
-          background: '#2d7a3a',
-          color: 'white',
-          border: 'none',
-          padding: '0.75rem 2rem',
-          borderRadius: 10,
-          fontSize: '0.9rem',
-          fontWeight: 600,
-          cursor: 'pointer',
-          fontFamily: 'inherit',
-          transition: 'all 150ms ease',
-        }}
-        onMouseOver={(e) => e.target.style.background = '#3a9c4a'}
-        onMouseOut={(e) => e.target.style.background = '#2d7a3a'}
+        className="btn btn-primary btn-lg"
       >
         Try Again
       </button>

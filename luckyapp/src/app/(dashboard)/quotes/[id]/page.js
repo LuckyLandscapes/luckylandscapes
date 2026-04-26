@@ -627,7 +627,7 @@ export default function QuoteDetailPage() {
                     className="btn btn-primary"
                     onClick={handleSendSms}
                     disabled={!sendPhone || sendState.loading}
-                    style={{ background: '#2d7a3a', borderColor: '#2d7a3a' }}
+                    style={{ background: 'var(--clover)', borderColor: 'var(--clover)' }}
                   >
                     {sendState.loading ? (
                       <><Loader2 size={16} className="spin" /> Preparing PDF...</>

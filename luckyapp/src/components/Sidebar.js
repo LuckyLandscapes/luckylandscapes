@@ -2,8 +2,10 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { useTheme } from '@/lib/theme';
 import {
   LayoutDashboard,
   Users,
@@ -23,6 +25,8 @@ import {
   Receipt,
   BarChart3,
   Wallet,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -71,6 +75,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout, isWorker } = useAuth();
   const { quotes, calendarEvents, jobs, invoices } = useData();
+  const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
@@ -107,7 +112,15 @@ export default function Sidebar() {
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         {/* Brand */}
         <div className="sidebar-header">
-          <div style={{ fontSize: '1.75rem' }}>🍀</div>
+          <div className="sidebar-brand-mark">
+            <Image
+              src="/lucky-leaf.png"
+              alt="Lucky Landscapes"
+              width={36}
+              height={36}
+              priority
+            />
+          </div>
           <div className="sidebar-brand">
             <span className="sidebar-brand-name">Lucky App</span>
             <span className="sidebar-brand-sub">{user?.orgName || 'Business Platform'}</span>
@@ -152,8 +165,18 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* User */}
+        {/* Footer */}
         <div className="sidebar-footer">
+          <button
+            type="button"
+            className="sidebar-theme-toggle"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+          </button>
           <div className="sidebar-user" onClick={logout}>
             <div className="sidebar-user-avatar">{initials}</div>
             <div className="sidebar-user-info">

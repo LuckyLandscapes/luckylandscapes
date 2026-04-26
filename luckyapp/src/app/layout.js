@@ -8,7 +8,7 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#0a0e14',
+  themeColor: '#0E140F',
 };
 
 export const metadata = {
@@ -26,9 +26,21 @@ export const metadata = {
   },
 };
 
+// Inline bootstrap: set the theme attribute before paint to avoid a flash.
+const themeBootstrap = `
+(function(){try{
+  var t=localStorage.getItem('lucky-theme');
+  if(t!=='light'&&t!=='dark'){t='dark';}
+  document.documentElement.setAttribute('data-theme',t);
+}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();
+`;
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootstrap }} />
+      </head>
       <body>
         <RootProviders>{children}</RootProviders>
         <ServiceWorkerRegistration />

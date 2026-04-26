@@ -1,11 +1,14 @@
 'use client';
 
 import { AuthProvider } from '@/lib/auth';
+import { ThemeProvider } from '@/lib/theme';
 
 export default function RootProviders({ children }) {
   return (
-    <AuthProvider>
-      {children}
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        {children}
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

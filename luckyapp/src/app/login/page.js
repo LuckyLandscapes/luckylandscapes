@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { LogIn, Mail, ArrowLeft, Loader2 } from 'lucide-react';
@@ -60,7 +61,7 @@ export default function LoginPage() {
     <div className="login-page">
       <div className="login-card animate-slide-up">
         <div className="login-logo">
-          <div style={{ fontSize: '2.5rem' }}>🍀</div>
+          <Image src="/lucky-leaf.png" alt="Lucky Landscapes" width={48} height={48} priority />
           <div className="login-logo-text">
             Lucky <span>App</span>
           </div>
@@ -88,7 +89,7 @@ export default function LoginPage() {
             </form>
             <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
               <button onClick={() => switchMode('forgot')}
-                style={{ color: 'var(--lucky-green-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
+                style={{ color: 'var(--clover)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem' }}>
                 Forgot your password?
               </button>
             </div>
@@ -104,8 +105,8 @@ export default function LoginPage() {
             <p className="login-subtitle">{resetSent ? 'Check your inbox' : 'Reset your password'}</p>
             {resetSent ? (
               <div style={{
-                background: 'rgba(58,156,74,0.1)', border: '1px solid rgba(58,156,74,0.3)',
-                color: 'var(--lucky-green-light)', padding: '1rem', borderRadius: 'var(--radius-md)',
+                background: 'var(--status-success-bg)', border: '1px solid var(--status-success)',
+                color: 'var(--status-success)', padding: '1rem', borderRadius: 'var(--radius-md)',
                 fontSize: '0.85rem', textAlign: 'center', marginBottom: 'var(--space-md)',
               }}>
                 <Mail size={24} style={{ display: 'block', margin: '0 auto 0.5rem' }} />
@@ -128,7 +129,7 @@ export default function LoginPage() {
             )}
             <div style={{ textAlign: 'center', marginTop: 'var(--space-lg)', fontSize: '0.85rem', color: 'var(--text-tertiary)' }}>
               <button onClick={() => switchMode('login')}
-                style={{ color: 'var(--lucky-green-light)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                style={{ color: 'var(--clover)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.85rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                 <ArrowLeft size={14} /> Back to Sign In
               </button>
             </div>
@@ -144,8 +145,8 @@ export default function LoginPage() {
 function ErrorBox({ message }) {
   return (
     <div style={{
-      background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-      color: '#ef4444', padding: '0.6rem 1rem', borderRadius: 'var(--radius-md)',
+      background: 'var(--status-danger-bg)', border: '1px solid var(--status-danger)',
+      color: 'var(--status-danger)', padding: '0.6rem 1rem', borderRadius: 'var(--radius-md)',
       fontSize: '0.82rem', marginBottom: 'var(--space-md)',
     }}>
       {message}

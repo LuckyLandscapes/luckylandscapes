@@ -23,7 +23,7 @@ import {
 
 const EVENT_TYPES = [
   { value: 'quote_appointment', label: 'Quote Appointment', color: '#3b82f6', icon: '📋' },
-  { value: 'job', label: 'Schedule Job', color: '#3a9c4a', icon: '🔨' },
+  { value: 'job', label: 'Schedule Job', color: '#6B8E4E', icon: '🔨' },
   { value: 'meeting', label: 'Meeting', color: '#d4a93e', icon: '🤝' },
   { value: 'other', label: 'Other', color: '#64748b', icon: '📌' },
 ];
@@ -146,7 +146,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
             allDay: form.allDay,
             customerId: job.customerId || null,
             notes: form.notes,
-            color: '#3a9c4a',
+            color: '#6B8E4E',
             assignedTo: form.assignedTo,
             jobId: job.id,
           });

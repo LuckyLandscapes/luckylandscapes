@@ -137,7 +137,7 @@ export default function CalendarPage() {
           type: 'job',
           date: j.scheduledDate,
           startTime: j.scheduledTime,
-          color: '#3a9c4a',
+          color: '#6B8E4E',
           customerId: j.customerId,
           source: 'job',
         });

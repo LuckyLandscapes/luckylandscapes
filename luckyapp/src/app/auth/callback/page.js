@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { supabase, isSupabaseConnected } from '@/lib/supabase';
 
@@ -107,13 +108,15 @@ export default function AuthCallbackPage() {
       color: 'var(--text-primary, #fff)',
     }}>
       <div style={{ textAlign: 'center', maxWidth: '400px', padding: '2rem' }}>
-        <div style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>🍀</div>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+          <Image src="/lucky-leaf.png" alt="Lucky Landscapes" width={48} height={48} />
+        </div>
         {error ? (
           <>
             <div style={{
-              background: 'rgba(239,68,68,0.1)',
-              border: '1px solid rgba(239,68,68,0.3)',
-              color: '#ef4444',
+              background: 'var(--status-danger-bg)',
+              border: '1px solid var(--status-danger)',
+              color: 'var(--status-danger)',
               padding: '1rem',
               borderRadius: '12px',
               fontSize: '0.9rem',
