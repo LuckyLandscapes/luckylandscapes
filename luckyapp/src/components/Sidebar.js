@@ -22,6 +22,7 @@ import {
   Briefcase,
   Receipt,
   BarChart3,
+  Wallet,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -38,7 +39,8 @@ const ownerNavItems = [
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
   { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
-  { href: '/reports', label: 'Reports', icon: BarChart3, roles: ['owner', 'admin'] },
+  { href: '/finance', label: 'Finance', icon: Wallet, roles: ['owner', 'admin'] },
+  { href: '/reports', label: 'P&L Report', icon: BarChart3, roles: ['owner', 'admin'] },
   { href: '/team', label: 'Team & Payroll', icon: UserCog, roles: ['owner'] },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },

@@ -63,10 +63,20 @@ export default function InvoicesPage() {
     try {
       const job = getJob(selectedJobId);
       const quote = job?.quoteId ? getQuote(job.quoteId) : null;
-      const invoiceNumber = `INV-${String(invoices.length + 1001).padStart(4, '0')}`;
+      // Job revenue is the canonical billable amount; quote total is the fallback.
+      const billable = Number(job?.revenue || job?.total || quote?.total || 0);
 
-      const items = quote?.items || [{ name: job?.title || 'Service', quantity: 1, unitPrice: quote?.total || 0, total: quote?.total || 0 }];
-      const subtotal = items.reduce((s, i) => s + (i.total || 0), 0);
+      // Robust invoice number: parse trailing digits off existing INV-#### numbers.
+      const maxNum = invoices.reduce((max, inv) => {
+        const m = String(inv.invoiceNumber || '').match(/(\d+)$/);
+        return m ? Math.max(max, parseInt(m[1], 10)) : max;
+      }, 1000);
+      const invoiceNumber = `INV-${String(maxNum + 1).padStart(4, '0')}`;
+
+      const items = quote?.items?.length
+        ? quote.items
+        : [{ name: job?.title || 'Service', quantity: 1, unitPrice: billable, total: billable }];
+      const subtotal = items.reduce((s, i) => s + (i.total || 0), 0) || billable;
 
       await addInvoice({
         jobId: selectedJobId,
@@ -244,6 +254,7 @@ export default function InvoicesPage() {
                     {invoiceableJobs.map(job => {
                       const customer = job.customerId ? getCustomer(job.customerId) : null;
                       const quote = job.quoteId ? getQuote(job.quoteId) : null;
+                      const billable = Number(job.revenue || job.total || quote?.total || 0);
                       const isSelected = selectedJobId === job.id;
                       return (
                         <button
@@ -259,7 +270,7 @@ export default function InvoicesPage() {
                             </div>
                           </div>
                           <div style={{ fontWeight: 800, color: 'var(--lucky-green-light)', fontSize: '0.95rem' }}>
-                            {formatCurrency(quote?.total)}
+                            {formatCurrency(billable)}
                           </div>
                         </button>
                       );

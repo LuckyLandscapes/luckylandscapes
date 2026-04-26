@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConnected } from './supabase';
 import { useAuth } from './auth';
+import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging } from './finance';
 
 const DataContext = createContext(null);
 
@@ -542,38 +543,14 @@ export function DataProvider({ children }) {
   // ─── Financial Helpers ─────────────────────────────────
   const getJobFinancials = useCallback((jobId) => {
     const job = jobs.find(j => j.id === jobId);
-    if (!job) return null;
-
-    const expenses = jobExpenses.filter(e => e.jobId === jobId);
-    const entries = timeEntries.filter(t => t.jobId === jobId && t.clockIn && t.clockOut);
-
-    const materialCosts = expenses.filter(e => e.category === 'materials').reduce((s, e) => s + Number(e.amount || 0), 0);
-    const equipmentCosts = expenses.filter(e => e.category === 'equipment').reduce((s, e) => s + Number(e.amount || 0), 0);
-    // Phase 1D: include ALL non-material/equipment expenses (fuel, dump fees, subcontractor, permits, etc.)
-    const otherExpenses = expenses.filter(e => !['materials', 'equipment'].includes(e.category)).reduce((s, e) => s + Number(e.amount || 0), 0);
-
-    // Calculate labor cost from time entries × worker hourly rates
-    // Break minutes are subtracted from paid hours (breaks are unpaid)
-    let laborCosts = 0;
-    let totalBreakMinutes = 0;
-    entries.forEach(entry => {
-      const member = teamMembers.find(m => m.id === entry.teamMemberId);
-      const rate = Number(member?.hourlyRate || 0);
-      const totalHours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
-      const breakHrs = Number(entry.breakMinutes || 0) / 60;
-      totalBreakMinutes += Number(entry.breakMinutes || 0);
-      const paidHours = Math.max(0, totalHours - breakHrs);
-      laborCosts += rate * paidHours;
-    });
-
-    // Phase 1C: Use job.revenue (canonical) — not quote lookup
-    const revenue = Number(job.revenue || job.total || 0);
-    // Phase 1D: totalExpenses includes ALL categories (materials + equipment + other + labor)
-    const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
-    const profit = revenue - totalExpenses;
-
-    return { revenue, materialCosts, equipmentCosts, laborCosts, otherExpenses, totalExpenses, profit, expenses, entries, totalBreakMinutes };
+    return computeJobFinancials(job, jobExpenses, timeEntries, teamMembers);
   }, [jobs, jobExpenses, timeEntries, teamMembers]);
+
+  const getPnL = useCallback((period = 'month', basis = 'completed') =>
+    computeBuildPnL({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis }),
+    [jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses]);
+
+  const getARAging = useCallback(() => computeARAging(invoices), [invoices]);
 
   // ─── Team Members ───────────────────────────────────────
   const addTeamMember = useCallback(async (data) => {
@@ -772,6 +749,7 @@ export function DataProvider({ children }) {
 
     // Expenses & Financials
     addJobExpense, updateJobExpense, deleteJobExpense, getJobFinancials,
+    getPnL, getARAging,
 
     // Company Expenses (overhead)
     addCompanyExpense, updateCompanyExpense, deleteCompanyExpense,

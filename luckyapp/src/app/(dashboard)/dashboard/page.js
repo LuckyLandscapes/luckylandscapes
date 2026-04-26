@@ -9,10 +9,7 @@ import {
   Clock, CheckCircle2, Send, AlertCircle, HardHat, Briefcase,
   CalendarDays, Receipt, MapPin, ChevronRight, BarChart3,
 } from 'lucide-react';
-
-function formatCurrency(amount) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount || 0);
-}
+import { fmtCurrency as formatCurrency } from '@/lib/finance';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -58,15 +55,18 @@ const activityColors = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { customers, quotes, activity, teamMembers, timeEntries, jobs, invoices, getJobFinancials, getCustomer } = useData();
+  const { customers, quotes, activity, teamMembers, timeEntries, jobs, invoices, getPnL, getCustomer } = useData();
 
   const firstName = user?.fullName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Revenue — use completed jobs' revenue, not accepted quote totals (Phase 1C)
-  const totalRevenue = jobs.filter(j => j.status === 'completed').reduce((sum, j) => sum + Number(j.revenue || j.total || 0), 0);
+  // Pull headline numbers from the canonical P&L (last 30 days)
+  const pnl = useMemo(() => getPnL('month', 'completed'), [getPnL]);
+  const totalRevenue = pnl.revenue;
+  const netProfit = pnl.netProfit;
+
   const pendingQuotes = quotes.filter(q => q.status === 'draft' || q.status === 'sent');
   const pendingValue = pendingQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
   const acceptedCount = quotes.filter(q => q.status === 'accepted').length;
@@ -76,14 +76,7 @@ export default function DashboardPage() {
   const clockedInWorkers = timeEntries.filter(t => !t.clockOut).length;
   const activeWorkers = teamMembers.filter(m => m.role === 'worker' && m.isActive).length;
 
-  // Net profit
-  let netProfit = 0;
-  jobs.forEach(j => {
-    const fin = getJobFinancials(j.id);
-    if (fin) netProfit += fin.profit;
-  });
-
-  // Invoice stats
+  // Invoice stats (all-time outstanding A/R)
   const unpaidInvoices = invoices.filter(i => i.status === 'unpaid' || i.status === 'overdue');
   const outstandingAmount = unpaidInvoices.reduce((s, i) => s + ((i.total || 0) - (i.amountPaid || 0)), 0);
 
@@ -131,7 +124,7 @@ export default function DashboardPage() {
         <div className="stat-card" style={{ '--accent': 'var(--status-success)', '--accent-bg': 'var(--status-success-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><DollarSign /></div></div>
           <div className="stat-card-value">{formatCurrency(totalRevenue)}</div>
-          <div className="stat-card-label">Total Revenue</div>
+          <div className="stat-card-label">Revenue (30 days)</div>
         </div>
         <div className="stat-card" style={{ '--accent': 'var(--status-info)', '--accent-bg': 'var(--status-info-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><FileText /></div></div>
@@ -146,7 +139,7 @@ export default function DashboardPage() {
         <div className="stat-card" style={{ '--accent': netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)', '--accent-bg': netProfit >= 0 ? 'var(--status-success-bg)' : 'var(--status-danger-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><TrendingUp /></div></div>
           <div className="stat-card-value" style={{ color: netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{formatCurrency(netProfit)}</div>
-          <div className="stat-card-label">Net Profit</div>
+          <div className="stat-card-label">Net Profit (30 days)</div>
         </div>
         <div className="stat-card" style={{ '--accent': 'var(--lucky-gold)', '--accent-bg': 'rgba(212,169,62,0.12)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><BarChart3 /></div></div>
@@ -250,8 +243,11 @@ export default function DashboardPage() {
               <Link href="/invoices" className="btn btn-secondary btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
                 <Receipt size={14} /> View Invoices
               </Link>
+              <Link href="/finance" className="btn btn-secondary btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
+                <DollarSign size={14} /> Finance
+              </Link>
               <Link href="/reports" className="btn btn-secondary btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
-                <BarChart3 size={14} /> View Reports
+                <BarChart3 size={14} /> P&amp;L Report
               </Link>
               <Link href="/team" className="btn btn-secondary btn-sm" style={{ justifyContent: 'flex-start', width: '100%' }}>
                 <Users size={14} /> Team & Payroll

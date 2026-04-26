@@ -1,182 +1,119 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { useData } from '@/lib/data';
 import {
-  TrendingUp, DollarSign, Users, Briefcase, Clock,
-  BarChart3, PieChart, CalendarDays, ArrowUp, ArrowDown, Minus,
+  buildPnL, buildARAging, jobFinancials, fmtCurrency, pctChange,
+  COGS_LABELS, OPEX_LABELS, AGING_LABELS,
+} from '@/lib/finance';
+import {
+  TrendingUp, DollarSign, Briefcase, Receipt,
+  PieChart, ArrowUp, ArrowDown, Minus,
 } from 'lucide-react';
 
-function fmtCurrency(n) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n || 0);
-}
-function fmtCurrency2(n) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
-}
+const PERIODS = [
+  { key: 'week', label: 'Week' },
+  { key: 'month', label: 'Month' },
+  { key: 'quarter', label: 'Quarter' },
+  { key: 'year', label: 'Year' },
+  { key: 'all', label: 'All Time' },
+];
+
+const BASES = [
+  { key: 'completed', label: 'Accrual (completed jobs)' },
+  { key: 'paid', label: 'Cash (paid invoices)' },
+];
 
 export default function ReportsPage() {
-  const { jobs, quotes, invoices, customers, teamMembers, timeEntries, jobExpenses, getCustomer, getTeamMember, getJobFinancials } = useData();
-  const [period, setPeriod] = useState('month'); // 'week', 'month', 'quarter', 'year'
+  const {
+    jobs, jobExpenses, timeEntries, teamMembers, invoices,
+    companyExpenses, getCustomer,
+  } = useData();
 
-  // Period cutoff date
-  const cutoff = useMemo(() => {
-    const d = new Date();
-    if (period === 'week') d.setDate(d.getDate() - 7);
-    else if (period === 'month') d.setMonth(d.getMonth() - 1);
-    else if (period === 'quarter') d.setMonth(d.getMonth() - 3);
-    else d.setFullYear(d.getFullYear() - 1);
-    return d;
-  }, [period]);
+  const [period, setPeriod] = useState('month');
+  const [basis, setBasis] = useState('completed');
 
-  const cutoffStr = cutoff.toISOString();
+  const pnl = useMemo(
+    () => buildPnL({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis }),
+    [jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis]
+  );
 
-  // Previous period for comparison
-  const prevCutoff = useMemo(() => {
-    const d = new Date(cutoff);
-    if (period === 'week') d.setDate(d.getDate() - 7);
-    else if (period === 'month') d.setMonth(d.getMonth() - 1);
-    else if (period === 'quarter') d.setMonth(d.getMonth() - 3);
-    else d.setFullYear(d.getFullYear() - 1);
-    return d;
-  }, [cutoff, period]);
+  const aging = useMemo(() => buildARAging(invoices), [invoices]);
 
-  // Revenue metrics
-  const revenueData = useMemo(() => {
-    const periodJobs = jobs.filter(j => j.status === 'completed' && j.completedAt && new Date(j.completedAt) >= cutoff);
-    const prevJobs = jobs.filter(j => j.status === 'completed' && j.completedAt && new Date(j.completedAt) >= prevCutoff && new Date(j.completedAt) < cutoff);
+  const range = pnl.range;
 
-    const periodRevenue = periodJobs.reduce((s, j) => {
-      const q = quotes.find(q => q.id === j.quoteId);
-      return s + (q?.total || 0);
-    }, 0);
-    const prevRevenue = prevJobs.reduce((s, j) => {
-      const q = quotes.find(q => q.id === j.quoteId);
-      return s + (q?.total || 0);
-    }, 0);
+  // Per-job financials for the period (top-jobs table & customer rollup)
+  const periodJobFinancials = useMemo(() => {
+    return pnl.periodJobs.map(j => ({
+      job: j,
+      ...jobFinancials(j, jobExpenses, timeEntries, teamMembers),
+    }));
+  }, [pnl.periodJobs, jobExpenses, timeEntries, teamMembers]);
 
-    return { periodJobs, periodRevenue, prevRevenue, jobCount: periodJobs.length, prevJobCount: prevJobs.length };
-  }, [jobs, quotes, cutoff, prevCutoff]);
+  const topJobs = useMemo(
+    () => [...periodJobFinancials].sort((a, b) => b.profit - a.profit).slice(0, 5),
+    [periodJobFinancials]
+  );
 
-  // Profitability
-  const profitData = useMemo(() => {
-    const completedJobs = jobs.filter(j => j.status === 'completed');
-    let totalRevenue = 0, totalExpenses = 0, totalLabor = 0;
+  // Top customers — by revenue from completed jobs in period
+  const topCustomers = useMemo(() => {
+    const map = new Map();
+    for (const jf of periodJobFinancials) {
+      const cid = jf.job.customerId;
+      if (!cid) continue;
+      const cur = map.get(cid) || { revenue: 0, profit: 0, jobCount: 0 };
+      cur.revenue += jf.revenue;
+      cur.profit += jf.profit;
+      cur.jobCount += 1;
+      map.set(cid, cur);
+    }
+    return [...map.entries()]
+      .map(([cid, v]) => ({ customer: getCustomer(cid), ...v }))
+      .filter(x => x.customer)
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 8);
+  }, [periodJobFinancials, getCustomer]);
 
-    const jobProfits = completedJobs.map(j => {
-      const fin = getJobFinancials(j.id);
-      if (!fin) return { job: j, revenue: 0, materialCosts: 0, equipmentCosts: 0, laborCosts: 0, otherExpenses: 0, totalExpenses: 0, profit: 0 };
-      totalRevenue += fin.revenue;
-      totalExpenses += fin.materialCosts + fin.equipmentCosts;
-      totalLabor += fin.laborCosts;
-      return { job: j, ...fin, netProfit: fin.profit };
-    });
-
-    const netProfit = totalRevenue - totalExpenses - totalLabor;
-    const margin = totalRevenue > 0 ? (netProfit / totalRevenue * 100) : 0;
-
-    // Top 5 most profitable jobs
-    const topJobs = [...jobProfits].filter(j => j.revenue > 0).sort((a, b) => b.netProfit - a.netProfit).slice(0, 5);
-
-    return { totalRevenue, totalExpenses, totalLabor, netProfit, margin, topJobs, jobProfits };
-  }, [jobs, getJobFinancials]);
-
-  // Crew performance
+  // Crew performance (period-aware)
   const crewData = useMemo(() => {
+    const { start, end } = range;
     return teamMembers.filter(m => m.isActive).map(member => {
-      const entries = timeEntries.filter(t => t.teamMemberId === member.id && t.clockOut);
-      const periodEntries = entries.filter(t => new Date(t.clockIn) >= cutoff);
-      const totalMinutes = periodEntries.reduce((s, t) => {
-        const shiftMins = t.durationMinutes || ((new Date(t.clockOut) - new Date(t.clockIn)) / 60000);
-        const breakMins = Number(t.breakMinutes || 0);
-        return s + Math.max(0, (shiftMins || 0) - breakMins);
-      }, 0);
-      const totalHours = totalMinutes / 60;
-      const jobsAssigned = jobs.filter(j => j.assignedTo?.includes(member.id) && j.scheduledDate && new Date(j.scheduledDate + 'T12:00:00') >= cutoff).length;
-      const pay = totalHours * (member.hourlyRate || 15);
-      return { member, totalHours, jobsAssigned, pay, entryCount: periodEntries.length };
+      const entries = timeEntries.filter(t =>
+        t.teamMemberId === member.id && t.clockIn && t.clockOut &&
+        new Date(t.clockIn) >= start && new Date(t.clockIn) <= end
+      );
+      let mins = 0, breakMins = 0;
+      for (const t of entries) {
+        const shift = (new Date(t.clockOut) - new Date(t.clockIn)) / 60000;
+        const b = Number(t.breakMinutes || 0);
+        mins += Math.max(0, shift - b);
+        breakMins += b;
+      }
+      const totalHours = mins / 60;
+      const pay = totalHours * Number(member.hourlyRate || 0);
+      const jobsTouched = new Set(entries.map(t => t.jobId).filter(Boolean)).size;
+      return { member, totalHours, pay, jobsTouched, breakMins, entryCount: entries.length };
     }).sort((a, b) => b.totalHours - a.totalHours);
-  }, [teamMembers, timeEntries, jobs, cutoff]);
+  }, [teamMembers, timeEntries, range]);
 
-  // Customer insights
-  const customerData = useMemo(() => {
-    return customers.map(c => {
-      const customerQuotes = quotes.filter(q => q.customerId === c.id);
-      const acceptedQuotes = customerQuotes.filter(q => q.status === 'accepted');
-      const totalRevenue = acceptedQuotes.reduce((s, q) => s + (q.total || 0), 0);
-      const customerJobs = jobs.filter(j => j.customerId === c.id);
-      return { customer: c, quoteCount: customerQuotes.length, acceptedCount: acceptedQuotes.length, totalRevenue, jobCount: customerJobs.length };
-    }).filter(c => c.totalRevenue > 0).sort((a, b) => b.totalRevenue - a.totalRevenue);
-  }, [customers, quotes, jobs]);
-
-  // Invoice insights
-  const invoiceData = useMemo(() => {
-    const outstanding = invoices.filter(i => i.status === 'unpaid' || i.status === 'overdue');
-    const paid = invoices.filter(i => i.status === 'paid');
-    const totalOutstanding = outstanding.reduce((s, i) => s + ((i.total || 0) - (i.amountPaid || 0)), 0);
-    const totalCollected = paid.reduce((s, i) => s + (i.total || 0), 0);
-    return { outstanding: outstanding.length, totalOutstanding, collected: paid.length, totalCollected };
-  }, [invoices]);
-
-  const pctChange = (curr, prev) => {
-    if (!prev) return curr > 0 ? 100 : 0;
-    return ((curr - prev) / prev * 100);
-  };
-
-  const ChangeIndicator = ({ current, previous }) => {
-    const change = pctChange(current, previous);
-    const isUp = change > 0;
-    const isDown = change < 0;
-    return (
-      <div className={`stat-card-change ${isUp ? 'up' : isDown ? 'down' : ''}`}>
-        {isUp ? <ArrowUp size={12} /> : isDown ? <ArrowDown size={12} /> : <Minus size={12} />}
-        {Math.abs(change).toFixed(0)}%
-      </div>
-    );
-  };
-
-  // Simple bar visualization
-  const BarViz = ({ data, maxVal }) => {
-    if (!maxVal) maxVal = Math.max(...data.map(d => d.value), 1);
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {data.map((d, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
-            <div style={{ width: '120px', fontSize: '0.78rem', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0 }}>
-              {d.label}
-            </div>
-            <div style={{ flex: 1, height: '20px', background: 'var(--bg-elevated)', borderRadius: '4px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${Math.max(2, (d.value / maxVal) * 100)}%`,
-                background: d.color || 'var(--lucky-green)',
-                borderRadius: '4px',
-                transition: 'width 0.5s ease',
-              }} />
-            </div>
-            <div style={{ width: '80px', textAlign: 'right', fontSize: '0.82rem', fontWeight: 600, flexShrink: 0 }}>
-              {d.display}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
+  // Revenue change vs prior period
+  const revenueChange = pctChange(pnl.revenue, pnl.previous.revenue);
+  const profitChange = pctChange(pnl.netProfit, pnl.previous.netProfit);
 
   return (
     <div className="page animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
-          <h1>Reports & Analytics</h1>
-          <p>Track performance across your entire operation.</p>
+          <h1>Profit &amp; Loss</h1>
+          <p>{fmtRange(range, period)} · {basis === 'paid' ? 'Cash basis' : 'Accrual basis'}</p>
         </div>
-        <div className="page-header-actions">
+        <div className="page-header-actions" style={{ gap: '8px', flexWrap: 'wrap' }}>
+          <select className="form-select" value={basis} onChange={e => setBasis(e.target.value)} style={{ maxWidth: '220px', padding: '0.45rem 0.6rem', fontSize: '0.82rem' }}>
+            {BASES.map(b => <option key={b.key} value={b.key}>{b.label}</option>)}
+          </select>
           <div className="tabs">
-            {[
-              { key: 'week', label: 'Week' },
-              { key: 'month', label: 'Month' },
-              { key: 'quarter', label: 'Quarter' },
-              { key: 'year', label: 'Year' },
-            ].map(p => (
+            {PERIODS.map(p => (
               <button key={p.key} className={`tab ${period === p.key ? 'active' : ''}`} onClick={() => setPeriod(p.key)}>
                 {p.label}
               </button>
@@ -185,190 +122,361 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Overview Stats */}
-      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <div className="stat-card" style={{ '--accent': 'var(--lucky-green)', '--accent-bg': 'var(--lucky-green-glow)' }}>
-          <div className="stat-card-header">
-            <div className="stat-card-icon"><DollarSign /></div>
-            <ChangeIndicator current={revenueData.periodRevenue} previous={revenueData.prevRevenue} />
-          </div>
-          <div className="stat-card-value">{fmtCurrency(revenueData.periodRevenue)}</div>
-          <div className="stat-card-label">Revenue ({period})</div>
-        </div>
+      {/* Headline P&L stats */}
+      <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+        <StatCard
+          color="var(--status-success)" bg="var(--status-success-bg)"
+          icon={<DollarSign />}
+          label="Revenue" value={fmtCurrency(pnl.revenue)}
+          change={revenueChange}
+        />
+        <StatCard
+          color="var(--status-warning)" bg="var(--status-warning-bg)"
+          icon={<Briefcase />}
+          label="Cost of Goods Sold" value={fmtCurrency(pnl.cogs)}
+        />
+        <StatCard
+          color="var(--lucky-green-light)" bg="var(--lucky-green-glow)"
+          icon={<TrendingUp />}
+          label="Gross Profit"
+          value={fmtCurrency(pnl.grossProfit)}
+          subtitle={`${pnl.grossMargin.toFixed(0)}% margin`}
+        />
+        <StatCard
+          color="var(--status-info)" bg="var(--status-info-bg)"
+          icon={<PieChart />}
+          label="Operating Expenses" value={fmtCurrency(pnl.opex)}
+        />
+        <StatCard
+          color={pnl.netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)'}
+          bg={pnl.netProfit >= 0 ? 'var(--status-success-bg)' : 'var(--status-danger-bg)'}
+          icon={<TrendingUp />}
+          label="Net Profit"
+          value={fmtCurrency(pnl.netProfit)}
+          subtitle={`${pnl.netMargin.toFixed(0)}% margin`}
+          change={profitChange}
+        />
+      </div>
 
-        <div className="stat-card" style={{ '--accent': 'var(--status-success)', '--accent-bg': 'var(--status-success-bg)' }}>
-          <div className="stat-card-header">
-            <div className="stat-card-icon"><TrendingUp /></div>
-          </div>
-          <div className="stat-card-value">{profitData.margin.toFixed(0)}%</div>
-          <div className="stat-card-label">Profit Margin (all time)</div>
-        </div>
+      {/* P&L Statement */}
+      <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
+        <h3 style={{ marginBottom: 'var(--space-lg)' }}>Profit &amp; Loss Statement</h3>
+        <div className="pnl-statement">
+          <PnLSection title="Income">
+            <PnLRow label={basis === 'paid' ? 'Payments collected' : 'Job revenue (completed)'} amount={pnl.revenue} bold />
+          </PnLSection>
+          <PnLTotal label="Total Income" amount={pnl.revenue} />
 
-        <div className="stat-card" style={{ '--accent': 'var(--status-info)', '--accent-bg': 'var(--status-info-bg)' }}>
-          <div className="stat-card-header">
-            <div className="stat-card-icon"><Briefcase /></div>
-            <ChangeIndicator current={revenueData.jobCount} previous={revenueData.prevJobCount} />
-          </div>
-          <div className="stat-card-value">{revenueData.jobCount}</div>
-          <div className="stat-card-label">Jobs Completed ({period})</div>
-        </div>
+          <PnLSection title="Cost of Goods Sold" subtitle="Direct costs to deliver jobs">
+            {Object.entries(pnl.cogsByCat).filter(([, v]) => v > 0).map(([cat, val]) => (
+              <PnLRow key={cat} label={COGS_LABELS[cat] || cat} amount={val} />
+            ))}
+            {pnl.directLabor > 0 && <PnLRow label="Direct Labor (logged to jobs)" amount={pnl.directLabor} />}
+            {pnl.cogs === 0 && <EmptyRow text="No direct costs recorded" />}
+          </PnLSection>
+          <PnLTotal label="Total COGS" amount={pnl.cogs} />
 
-        <div className="stat-card" style={{ '--accent': 'var(--status-warning)', '--accent-bg': 'var(--status-warning-bg)' }}>
-          <div className="stat-card-header">
-            <div className="stat-card-icon"><Clock /></div>
-          </div>
-          <div className="stat-card-value">{fmtCurrency(invoiceData.totalOutstanding)}</div>
-          <div className="stat-card-label">Outstanding Invoices</div>
+          <PnLBigTotal label="Gross Profit" amount={pnl.grossProfit} suffix={`${pnl.grossMargin.toFixed(1)}% margin`} />
+
+          <PnLSection title="Operating Expenses" subtitle="Overhead — not tied to specific jobs">
+            {Object.entries(pnl.opexByCat).filter(([, v]) => v > 0).map(([cat, val]) => (
+              <PnLRow key={cat} label={OPEX_LABELS[cat] || cat} amount={val} />
+            ))}
+            {pnl.indirectLabor > 0 && <PnLRow label="Indirect Labor (overhead time)" amount={pnl.indirectLabor} />}
+            {pnl.opex === 0 && <EmptyRow text={<>No overhead logged. <Link href="/finance" style={{ color: 'var(--lucky-green-light)' }}>Add company expenses →</Link></>} />}
+          </PnLSection>
+          <PnLTotal label="Total Operating Expenses" amount={pnl.opex} />
+
+          <PnLBigTotal
+            label="Net Profit"
+            amount={pnl.netProfit}
+            suffix={`${pnl.netMargin.toFixed(1)}% margin`}
+            negative={pnl.netProfit < 0}
+            highlight
+          />
         </div>
       </div>
 
-      {/* Two Column Grid */}
+      {/* A/R Aging + Cost Distribution */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
-        {/* Profitability Breakdown */}
         <div className="card">
-          <h3 style={{ marginBottom: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PieChart size={18} style={{ color: 'var(--lucky-green-light)' }} /> Profitability Breakdown
+          <h3 style={{ marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Receipt size={18} style={{ color: 'var(--status-warning)' }} /> Accounts Receivable Aging
           </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginBottom: 'var(--space-lg)' }}>
-            <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Revenue</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--status-success)' }}>{fmtCurrency(profitData.totalRevenue)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Net Profit</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: profitData.netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                {fmtCurrency(profitData.netProfit)}
-              </div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Labor Cost</div>
-              <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--status-info)' }}>{fmtCurrency(profitData.totalLabor)}</div>
-            </div>
-            <div>
-              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: '4px' }}>Materials & Equipment</div>
-              <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--status-warning)' }}>{fmtCurrency(profitData.totalExpenses)}</div>
-            </div>
+          <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
+            Total outstanding: <strong style={{ color: 'var(--text-primary)' }}>{fmtCurrency(aging.totalAR)}</strong>
           </div>
-
-          {/* Cost Breakdown Bar */}
-          <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: '8px', fontWeight: 600 }}>Cost Distribution</div>
-          <div style={{ height: '24px', display: 'flex', borderRadius: '6px', overflow: 'hidden', background: 'var(--bg-elevated)' }}>
-            {profitData.totalRevenue > 0 && (
-              <>
-                <div style={{ width: `${(profitData.totalLabor / profitData.totalRevenue) * 100}%`, background: 'var(--status-info)', minWidth: '2px' }} title={`Labor: ${fmtCurrency(profitData.totalLabor)}`} />
-                <div style={{ width: `${(profitData.totalExpenses / profitData.totalRevenue) * 100}%`, background: 'var(--status-warning)', minWidth: '2px' }} title={`Materials: ${fmtCurrency(profitData.totalExpenses)}`} />
-                <div style={{ flex: 1, background: 'var(--status-success)', minWidth: '2px' }} title={`Profit: ${fmtCurrency(profitData.netProfit)}`} />
-              </>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 'var(--space-lg)', marginTop: '8px', fontSize: '0.72rem' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--status-info)' }} /> Labor</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--status-warning)' }} /> Materials</span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><span style={{ width: 8, height: 8, borderRadius: 2, background: 'var(--status-success)' }} /> Profit</span>
-          </div>
+          <table style={{ width: '100%' }}>
+            <thead>
+              <tr>
+                <th>Bucket</th>
+                <th style={{ textAlign: 'right' }}>Invoices</th>
+                <th style={{ textAlign: 'right' }}>Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.keys(aging.totals).map(key => {
+                const amount = aging.totals[key];
+                const count = aging.buckets[key].length;
+                const isOver = key !== 'current';
+                return (
+                  <tr key={key}>
+                    <td style={{ fontWeight: 600, color: isOver && amount > 0 ? 'var(--status-danger)' : 'inherit' }}>
+                      {AGING_LABELS[key]}
+                    </td>
+                    <td style={{ textAlign: 'right', color: 'var(--text-tertiary)' }}>{count}</td>
+                    <td style={{ textAlign: 'right', fontWeight: 600 }}>{fmtCurrency(amount)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {aging.totalAR === 0 && (
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+              No outstanding invoices. 🎉
+            </p>
+          )}
         </div>
 
-        {/* Crew Performance */}
         <div className="card">
-          <h3 style={{ marginBottom: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={18} style={{ color: 'var(--status-info)' }} /> Crew Performance
-          </h3>
-          {crewData.length > 0 ? (
-            <BarViz
-              data={crewData.map(c => ({
-                label: c.member.fullName?.split(' ')[0] || 'Unknown',
-                value: c.totalHours,
-                display: `${c.totalHours.toFixed(1)}h`,
-                color: 'var(--status-info)',
-              }))}
-            />
+          <h3 style={{ marginBottom: 'var(--space-md)' }}>Cost Distribution</h3>
+          {pnl.revenue > 0 ? (
+            <>
+              <div style={{ height: '32px', display: 'flex', borderRadius: '8px', overflow: 'hidden', background: 'var(--bg-elevated)', marginBottom: 'var(--space-md)' }}>
+                <Segment label="COGS" amount={pnl.cogs} total={pnl.revenue} color="var(--status-warning)" />
+                <Segment label="OpEx" amount={pnl.opex} total={pnl.revenue} color="var(--status-info)" />
+                <Segment label="Profit" amount={Math.max(0, pnl.netProfit)} total={pnl.revenue} color="var(--status-success)" />
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-lg)', fontSize: '0.78rem', flexWrap: 'wrap' }}>
+                <Legend color="var(--status-warning)" label="COGS" amount={pnl.cogs} pct={pnl.revenue ? (pnl.cogs / pnl.revenue) * 100 : 0} />
+                <Legend color="var(--status-info)" label="OpEx" amount={pnl.opex} pct={pnl.revenue ? (pnl.opex / pnl.revenue) * 100 : 0} />
+                <Legend color={pnl.netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)'} label="Net Profit" amount={pnl.netProfit} pct={pnl.netMargin} />
+              </div>
+            </>
           ) : (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-xl)' }}>No crew data for this period</p>
-          )}
-
-          {crewData.length > 0 && (
-            <div className="table-wrapper" style={{ marginTop: 'var(--space-lg)', border: 'none' }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Member</th>
-                    <th>Hours</th>
-                    <th>Jobs</th>
-                    <th style={{ textAlign: 'right' }}>Pay</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {crewData.map(c => (
-                    <tr key={c.member.id}>
-                      <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>{c.member.fullName}</td>
-                      <td style={{ fontSize: '0.82rem' }}>{c.totalHours.toFixed(1)}h</td>
-                      <td style={{ fontSize: '0.82rem' }}>{c.jobsAssigned}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 600, fontSize: '0.82rem' }}>{fmtCurrency2(c.pay)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+              No revenue in this period.
+            </p>
           )}
         </div>
       </div>
 
-      {/* Second Row */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-        {/* Top Customers */}
+      {/* Top jobs + crew */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
         <div className="card">
-          <h3 style={{ marginBottom: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Users size={18} style={{ color: 'var(--lucky-gold)' }} /> Top Customers
-          </h3>
-          {customerData.length > 0 ? (
-            <BarViz
-              data={customerData.slice(0, 8).map(c => ({
-                label: `${c.customer.firstName} ${c.customer.lastName?.[0] || ''}`,
-                value: c.totalRevenue,
-                display: fmtCurrency(c.totalRevenue),
-                color: 'var(--lucky-gold)',
-              }))}
-            />
-          ) : (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-xl)' }}>No customer data yet</p>
-          )}
-        </div>
-
-        {/* Top Jobs by Profit */}
-        <div className="card">
-          <h3 style={{ marginBottom: 'var(--space-lg)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BarChart3 size={18} style={{ color: 'var(--status-success)' }} /> Most Profitable Jobs
-          </h3>
-          {profitData.topJobs.length > 0 ? (
+          <h3 style={{ marginBottom: 'var(--space-md)' }}>Most Profitable Jobs</h3>
+          {topJobs.length > 0 ? (
             <div className="table-wrapper" style={{ border: 'none' }}>
               <table>
                 <thead>
                   <tr>
                     <th>Job</th>
-                    <th>Revenue</th>
-                    <th>Cost</th>
+                    <th style={{ textAlign: 'right' }}>Revenue</th>
+                    <th style={{ textAlign: 'right' }}>Costs</th>
                     <th style={{ textAlign: 'right' }}>Profit</th>
+                    <th style={{ textAlign: 'right' }}>Margin</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {profitData.topJobs.map(j => (
+                  {topJobs.map(j => (
                     <tr key={j.job.id}>
-                      <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>{j.job.title}</td>
-                      <td style={{ fontSize: '0.82rem' }}>{fmtCurrency(j.revenue)}</td>
-                      <td style={{ fontSize: '0.82rem', color: 'var(--status-danger)' }}>{fmtCurrency((j.materialCosts || 0) + (j.equipmentCosts || 0) + (j.laborCosts || 0))}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, fontSize: '0.82rem', color: j.netProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-                        {fmtCurrency(j.netProfit)}
+                      <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                        <Link href={`/jobs/${j.job.id}`} style={{ color: 'inherit' }}>{j.job.title}</Link>
                       </td>
+                      <td style={{ textAlign: 'right', fontSize: '0.82rem' }}>{fmtCurrency(j.revenue)}</td>
+                      <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--status-warning)' }}>{fmtCurrency(j.totalExpenses)}</td>
+                      <td style={{ textAlign: 'right', fontSize: '0.82rem', fontWeight: 700, color: j.profit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                        {fmtCurrency(j.profit)}
+                      </td>
+                      <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{j.margin.toFixed(0)}%</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-xl)' }}>Complete jobs to see profit data</p>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+              Complete jobs in this period to see profit data.
+            </p>
+          )}
+        </div>
+
+        <div className="card">
+          <h3 style={{ marginBottom: 'var(--space-md)' }}>Crew Performance</h3>
+          {crewData.some(c => c.totalHours > 0) ? (
+            <table>
+              <thead>
+                <tr>
+                  <th>Member</th>
+                  <th style={{ textAlign: 'right' }}>Hours</th>
+                  <th style={{ textAlign: 'right' }}>Jobs</th>
+                  <th style={{ textAlign: 'right' }}>Pay</th>
+                </tr>
+              </thead>
+              <tbody>
+                {crewData.filter(c => c.totalHours > 0).map(c => (
+                  <tr key={c.member.id}>
+                    <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>{c.member.fullName}</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem' }}>{c.totalHours.toFixed(1)}h</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{c.jobsTouched}</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', fontWeight: 600 }}>{fmtCurrency(c.pay, 2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+              No clocked time in this period.
+            </p>
           )}
         </div>
       </div>
+
+      {/* Top customers */}
+      <div className="card">
+        <h3 style={{ marginBottom: 'var(--space-md)' }}>Top Customers (by revenue)</h3>
+        {topCustomers.length > 0 ? (
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th style={{ textAlign: 'right' }}>Jobs</th>
+                <th style={{ textAlign: 'right' }}>Revenue</th>
+                <th style={{ textAlign: 'right' }}>Profit</th>
+                <th style={{ textAlign: 'right' }}>Margin</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topCustomers.map(c => {
+                const margin = c.revenue > 0 ? (c.profit / c.revenue) * 100 : 0;
+                return (
+                  <tr key={c.customer.id}>
+                    <td style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                      <Link href={`/customers/${c.customer.id}`} style={{ color: 'inherit' }}>
+                        {c.customer.firstName} {c.customer.lastName || ''}
+                      </Link>
+                    </td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{c.jobCount}</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', fontWeight: 600 }}>{fmtCurrency(c.revenue)}</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', color: c.profit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>{fmtCurrency(c.profit)}</td>
+                    <td style={{ textAlign: 'right', fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{margin.toFixed(0)}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center', padding: 'var(--space-lg)' }}>
+            No customer revenue in this period.
+          </p>
+        )}
+      </div>
     </div>
   );
+}
+
+// ─── Subcomponents ────────────────────────────────────────────
+
+function StatCard({ color, bg, icon, label, value, subtitle, change }) {
+  return (
+    <div className="stat-card" style={{ '--accent': color, '--accent-bg': bg }}>
+      <div className="stat-card-header">
+        <div className="stat-card-icon">{icon}</div>
+        {typeof change === 'number' && <ChangeIndicator change={change} />}
+      </div>
+      <div className="stat-card-value">{value}</div>
+      <div className="stat-card-label">{label}</div>
+      {subtitle && (
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>{subtitle}</div>
+      )}
+    </div>
+  );
+}
+
+function ChangeIndicator({ change }) {
+  const up = change > 0, down = change < 0;
+  return (
+    <div className={`stat-card-change ${up ? 'up' : down ? 'down' : ''}`}>
+      {up ? <ArrowUp size={12} /> : down ? <ArrowDown size={12} /> : <Minus size={12} />}
+      {Math.abs(change).toFixed(0)}%
+    </div>
+  );
+}
+
+function PnLSection({ title, subtitle, children }) {
+  return (
+    <div style={{ marginBottom: 'var(--space-md)' }}>
+      <div style={{ fontSize: '0.78rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-tertiary)', marginBottom: '4px' }}>
+        {title}
+      </div>
+      {subtitle && (
+        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', opacity: 0.7, marginBottom: '6px' }}>{subtitle}</div>
+      )}
+      <div>{children}</div>
+    </div>
+  );
+}
+
+function PnLRow({ label, amount, bold }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+      <span style={{ fontSize: '0.85rem', fontWeight: bold ? 600 : 400, color: 'var(--text-secondary)' }}>{label}</span>
+      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{fmtCurrency(amount, 2)}</span>
+    </div>
+  );
+}
+
+function EmptyRow({ text }) {
+  return (
+    <div style={{ padding: '6px 0', fontSize: '0.82rem', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>{text}</div>
+  );
+}
+
+function PnLTotal({ label, amount }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--border-secondary)', borderBottom: '1px solid var(--border-secondary)', marginBottom: 'var(--space-md)' }}>
+      <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>{label}</span>
+      <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>{fmtCurrency(amount, 2)}</span>
+    </div>
+  );
+}
+
+function PnLBigTotal({ label, amount, suffix, negative, highlight }) {
+  const color = negative ? 'var(--status-danger)' : highlight ? 'var(--lucky-green-light)' : 'var(--text-primary)';
+  return (
+    <div style={{
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      padding: '12px 0', borderTop: '2px solid var(--border-secondary)', borderBottom: highlight ? '3px double var(--border-secondary)' : '2px solid var(--border-secondary)',
+      marginBottom: 'var(--space-md)',
+    }}>
+      <span style={{ fontWeight: 800, fontSize: '1rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-md)' }}>
+        {suffix && <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>{suffix}</span>}
+        <span style={{ fontWeight: 800, fontSize: '1.15rem', color }}>{fmtCurrency(amount, 2)}</span>
+      </div>
+    </div>
+  );
+}
+
+function Segment({ amount, total, color, label }) {
+  if (total <= 0) return null;
+  const pct = Math.max(0, (amount / total) * 100);
+  if (pct < 0.5) return null;
+  return <div style={{ width: `${pct}%`, background: color, minWidth: '2px' }} title={`${label}: ${fmtCurrency(amount)}`} />;
+}
+
+function Legend({ color, label, amount, pct }) {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+      <span style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+      <strong>{label}</strong>
+      <span style={{ color: 'var(--text-tertiary)' }}>{fmtCurrency(amount)} ({pct.toFixed(0)}%)</span>
+    </span>
+  );
+}
+
+function fmtRange({ start, end }, period) {
+  if (period === 'all') return 'All time';
+  const f = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  return `${f(start)} – ${f(end)}`;
 }

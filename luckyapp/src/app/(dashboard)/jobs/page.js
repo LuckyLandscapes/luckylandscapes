@@ -45,10 +45,10 @@ export default function JobsPage() {
     statusCounts[s] = s === 'all' ? jobs.length : jobs.filter(j => j.status === s).length;
   });
 
-  // Aggregate financial stats
+  // Aggregate financial stats — only completed jobs (revenue isn't realized until done)
   const allFinancials = useMemo(() => {
     let totalRevenue = 0, totalExpenses = 0, totalLabor = 0, totalProfit = 0;
-    jobs.forEach(j => {
+    jobs.filter(j => j.status === 'completed').forEach(j => {
       const fin = getJobFinancials(j.id);
       if (fin) {
         totalRevenue += fin.revenue;
@@ -81,7 +81,7 @@ export default function JobsPage() {
             <div className="stat-card-icon"><DollarSign /></div>
           </div>
           <div className="stat-card-value">{formatCurrency(allFinancials.totalRevenue)}</div>
-          <div className="stat-card-label">Total Revenue</div>
+          <div className="stat-card-label">Revenue (completed)</div>
         </div>
         <div className="stat-card" style={{ '--accent': 'var(--status-danger)', '--accent-bg': 'var(--status-danger-bg)' }}>
           <div className="stat-card-header">
@@ -104,7 +104,7 @@ export default function JobsPage() {
           <div className="stat-card-value" style={{ color: allFinancials.totalProfit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
             {formatCurrency(allFinancials.totalProfit)}
           </div>
-          <div className="stat-card-label">Net Profit</div>
+          <div className="stat-card-label">Gross Job Profit</div>
         </div>
       </div>
 
