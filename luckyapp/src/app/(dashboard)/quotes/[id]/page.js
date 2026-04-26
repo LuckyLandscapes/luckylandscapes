@@ -72,11 +72,11 @@ export default function QuoteDetailPage() {
   // ─── Build SMS text body ──────────────────────────────────
   const buildSmsBody = (pdfUrl) => {
     const lines = [
-      `Hi ${customer?.firstName || 'there'}! Here's your estimate from Lucky Landscapes:`,
+      `Hi ${customer?.firstName || 'there'}! 🍀 Thanks for considering Lucky Landscapes — we'd love to help bring your project to life!`,
       '',
-      `Quote #${quote.quoteNumber}`,
-      quote.category ? `Category: ${quote.category}` : '',
-      `Total: ${formatCurrency(quote.total)}`,
+      `📄 Quote #${quote.quoteNumber}${quote.category ? ` (${quote.category})` : ''}`,
+      `💰 Estimated Total: ${formatCurrency(quote.total)}`,
+      `📅 Valid for 30 days`,
     ];
 
     if (sendMessage) {
@@ -84,13 +84,16 @@ export default function QuoteDetailPage() {
     }
 
     if (pdfUrl) {
-      lines.push('', `📄 View your full estimate here:`, pdfUrl);
+      lines.push('', `View your full estimate (PDF):`, pdfUrl);
     }
 
     lines.push(
       '',
-      'This estimate is valid for 30 days. Reply or call (402) 405-5475 with any questions!',
-      '— Lucky Landscapes 🍀'
+      `Ready to move forward? Just reply with a "yes" or call us at (402) 405-5475 — we'll get you scheduled!`,
+      '',
+      `Have questions or want to make changes? We're happy to revise.`,
+      '',
+      `— The Lucky Landscapes Team`,
     );
 
     return lines.filter(Boolean).join('\n');

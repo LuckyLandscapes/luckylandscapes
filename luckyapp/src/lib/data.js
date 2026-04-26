@@ -7,6 +7,16 @@ import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, bui
 
 const DataContext = createContext(null);
 
+// URL-safe random token (hex) for public invoice payment links
+function makeUrlSafeToken(bytes = 18) {
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    const arr = new Uint8Array(bytes);
+    window.crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
 // ─── Snake ↔ Camel helpers ───────────────────────────────────
 function snakeToCamel(obj) {
   if (Array.isArray(obj)) return obj.map(snakeToCamel);
@@ -606,16 +616,21 @@ export function DataProvider({ children }) {
 
   // ─── Invoice CRUD ───────────────────────────────────────
   const addInvoice = useCallback(async (data) => {
+    // Generate a URL-safe public token client-side so it never has '/' or '+'
+    // (the DB default may still be base64 from migration 014 — overriding here is safer)
+    const publicToken = data.publicToken || makeUrlSafeToken();
+    const payload = { ...data, publicToken };
+
     if (connected) {
       const { data: row, error } = await supabase.from('invoices')
-        .insert({ ...camelToSnake(data), org_id: orgId })
+        .insert({ ...camelToSnake(payload), org_id: orgId })
         .select().single();
       if (error) throw error;
       const inv = snakeToCamel(row);
       setInvoices(prev => [inv, ...prev]);
       return inv;
     } else {
-      const inv = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      const inv = { ...payload, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
       setInvoices(prev => { const next = [inv, ...prev]; saveLocal('invoices', next); return next; });
       return inv;
     }

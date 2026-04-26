@@ -58,11 +58,12 @@ ALTER TABLE invoices ADD COLUMN IF NOT EXISTS sent_to_phone      TEXT;
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS terms              TEXT;
 
 -- Backfill: every existing invoice gets a public token so it can receive payments
-UPDATE invoices SET public_token = encode(gen_random_bytes(18), 'base64')
+-- (hex encoding for URL safety — base64 contains '/' which breaks /pay/[token])
+UPDATE invoices SET public_token = encode(gen_random_bytes(18), 'hex')
   WHERE public_token IS NULL;
 
 -- Make public_token mandatory going forward
-ALTER TABLE invoices ALTER COLUMN public_token SET DEFAULT encode(gen_random_bytes(18), 'base64');
+ALTER TABLE invoices ALTER COLUMN public_token SET DEFAULT encode(gen_random_bytes(18), 'hex');
 ALTER TABLE invoices ALTER COLUMN public_token SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_invoices_public_token ON invoices(public_token);

@@ -56,63 +56,97 @@ export async function POST(request) {
 <html><head><meta charset="utf-8"></head>
 <body style="margin:0; padding:0; background:#f5f5f0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <div style="max-width:600px; margin:0 auto; background:#fff;">
-    <div style="background:#2D4A22; padding:28px 32px;">
-      <h1 style="color:#fff; margin:0; font-size:22px; font-weight:700;">🍀 Lucky Landscapes</h1>
-      <p style="color:rgba(255,255,255,0.7); margin:4px 0 0; font-size:13px;">Invoice ${invoice.invoice_number}</p>
+    <!-- Header -->
+    <div style="background:#2D4A22; padding:32px;">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:24px;">🍀</span>
+        <h1 style="color:#fff; margin:0; font-size:22px; font-weight:700; display:inline;">Lucky Landscapes</h1>
+      </div>
+      <p style="color:rgba(255,255,255,0.75); margin:6px 0 0 32px; font-size:13px;">Creating outdoor spaces you'll feel lucky to have</p>
     </div>
 
     <div style="padding:32px;">
-      <h2 style="color:#1f2937; margin:0 0 8px; font-size:20px;">Your Invoice is Ready</h2>
-      <p style="color:#6b7280; font-size:14px; line-height:1.6; margin:0 0 24px;">
-        Hi ${customerName},<br><br>
-        ${customMessage || 'Thanks for your business! Your invoice is ready below. You can pay online with credit/debit card or bank transfer using the button below.'}
+      <!-- Greeting -->
+      <h2 style="color:#1f2937; margin:0 0 12px; font-size:22px; font-weight:700;">Hi ${customerName}, your invoice is ready 👋</h2>
+      <p style="color:#4b5563; font-size:15px; line-height:1.65; margin:0 0 20px;">
+        ${customMessage || 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready below, and you can pay online in just a few clicks using the secure button below.'}
       </p>
 
-      <!-- Pay button -->
-      <div style="text-align:center; margin:24px 0 28px;">
-        <a href="${payUrl}" style="display:inline-block; background:#2d7a3a; color:#fff; text-decoration:none; padding:16px 40px; border-radius:10px; font-weight:700; font-size:15px;">
-          💳 Pay ${formatUSD(balance)} Online
+      <!-- Pay button — primary CTA -->
+      <div style="text-align:center; margin:28px 0;">
+        <a href="${payUrl}" style="display:inline-block; background:#2d7a3a; color:#fff; text-decoration:none; padding:16px 44px; border-radius:10px; font-weight:700; font-size:16px; box-shadow:0 2px 8px rgba(45,122,58,0.25);">
+          Pay ${formatUSD(balance)} Online →
         </a>
-        <div style="color:#9ca3af; font-size:12px; margin-top:10px;">Secure payment via Stripe — card or bank transfer</div>
+        <div style="color:#6b7280; font-size:13px; margin-top:12px; line-height:1.5;">
+          💳 Credit/Debit Card &nbsp;•&nbsp; 🏦 Bank Transfer (ACH)<br>
+          <span style="color:#9ca3af; font-size:11px;">Secured by Stripe — your payment info never touches our servers</span>
+        </div>
       </div>
 
-      <!-- Invoice info -->
-      <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:16px 20px; margin-bottom:20px;">
+      <!-- Invoice header bar -->
+      <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; margin-bottom:20px;">
         <table style="width:100%; border-collapse:collapse;">
-          <tr><td style="padding:4px 0; color:#6b7280; font-size:12px;">Invoice #</td>
-              <td style="padding:4px 0; text-align:right; font-weight:600; color:#1f2937; font-size:13px;">${invoice.invoice_number}</td></tr>
-          ${dueDate ? `<tr><td style="padding:4px 0; color:#6b7280; font-size:12px;">Due</td>
-              <td style="padding:4px 0; text-align:right; font-weight:600; color:#1f2937; font-size:13px;">${dueDate}</td></tr>` : ''}
+          <tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Invoice number</td>
+              <td style="padding:5px 0; text-align:right; font-weight:700; color:#1f2937; font-size:14px;">${invoice.invoice_number}</td></tr>
+          <tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Issued</td>
+              <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937; font-size:14px;">${formatDate(invoice.created_at?.split('T')[0]) || 'Today'}</td></tr>
+          ${dueDate ? `<tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Due</td>
+              <td style="padding:5px 0; text-align:right; font-weight:700; color:#1f2937; font-size:14px;">${dueDate}</td></tr>` : ''}
         </table>
       </div>
 
       ${items.length ? `
-      <table style="width:100%; border-collapse:collapse; margin-bottom:8px;">
+      <h3 style="color:#1f2937; margin:24px 0 12px; font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em;">Work performed</h3>
+      <table style="width:100%; border-collapse:collapse; margin-bottom:8px; border-radius:8px; overflow:hidden;">
         <thead><tr style="background:#6B8E4E;">
-          <th style="padding:10px 12px; text-align:left; color:#fff; font-size:12px; font-weight:600;">Description</th>
-          <th style="padding:10px 12px; text-align:center; color:#fff; font-size:12px; font-weight:600;">Qty</th>
-          <th style="padding:10px 12px; text-align:right; color:#fff; font-size:12px; font-weight:600;">Total</th>
+          <th style="padding:11px 14px; text-align:left; color:#fff; font-size:12px; font-weight:600; letter-spacing:0.03em;">Description</th>
+          <th style="padding:11px 14px; text-align:center; color:#fff; font-size:12px; font-weight:600;">Qty</th>
+          <th style="padding:11px 14px; text-align:right; color:#fff; font-size:12px; font-weight:600;">Total</th>
         </tr></thead>
         <tbody>${itemRows}</tbody>
       </table>` : ''}
 
-      <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:16px 20px; margin:16px 0 24px;">
+      <!-- Totals -->
+      <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; margin:16px 0 24px;">
         <table style="width:100%; border-collapse:collapse;">
-          <tr><td style="padding:4px 0; color:#6b7280; font-size:13px;">Subtotal</td>
-              <td style="padding:4px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.subtotal)}</td></tr>
-          ${Number(invoice.tax) ? `<tr><td style="padding:4px 0; color:#6b7280; font-size:13px;">Tax</td>
-              <td style="padding:4px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.tax)}</td></tr>` : ''}
-          ${Number(invoice.amount_paid) ? `<tr><td style="padding:4px 0; color:#6b7280; font-size:13px;">Paid</td>
-              <td style="padding:4px 0; text-align:right; font-weight:600; color:#1f2937;">−${formatUSD(invoice.amount_paid)}</td></tr>` : ''}
-          <tr><td style="padding:8px 0 0; border-top:1px solid #e5e7eb; font-size:16px; font-weight:700; color:#1f2937;">Balance Due</td>
-              <td style="padding:8px 0 0; border-top:1px solid #e5e7eb; text-align:right; font-size:20px; font-weight:800; color:#6B8E4E;">${formatUSD(balance)}</td></tr>
+          <tr><td style="padding:5px 0; color:#6b7280; font-size:14px;">Subtotal</td>
+              <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.subtotal)}</td></tr>
+          ${Number(invoice.tax) ? `<tr><td style="padding:5px 0; color:#6b7280; font-size:14px;">Tax</td>
+              <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.tax)}</td></tr>` : ''}
+          ${Number(invoice.amount_paid) ? `<tr><td style="padding:5px 0; color:#2d7a3a; font-size:14px; font-weight:600;">Already paid</td>
+              <td style="padding:5px 0; text-align:right; font-weight:600; color:#2d7a3a;">−${formatUSD(invoice.amount_paid)}</td></tr>` : ''}
+          <tr><td style="padding:10px 0 0; border-top:2px solid #1f2937; font-size:17px; font-weight:700; color:#1f2937;">Balance due</td>
+              <td style="padding:10px 0 0; border-top:2px solid #1f2937; text-align:right; font-size:22px; font-weight:800; color:#2d7a3a;">${formatUSD(balance)}</td></tr>
         </table>
       </div>
 
-      ${invoice.notes ? `<div style="background:#fafaf8; border-radius:8px; padding:12px 16px; margin-bottom:20px; font-size:13px; color:#6b7280;"><strong>Notes:</strong> ${invoice.notes}</div>` : ''}
+      ${invoice.notes ? `<div style="background:#fafaf8; border-left:3px solid #6B8E4E; padding:14px 18px; margin:0 0 22px; font-size:14px; color:#4b5563; line-height:1.6;"><strong style="color:#1f2937;">A note from us:</strong><br>${invoice.notes}</div>` : ''}
 
-      <div style="border-top:1px solid #e5e7eb; padding-top:20px; margin-top:24px; text-align:center;">
-        <p style="color:#9ca3af; font-size:12px; margin:0;">Lucky Landscapes • (402) 405-5475 • rileykopf@luckylandscapes.com</p>
+      <!-- How to pay -->
+      <div style="background:#f0f7f0; border:1px solid #d4e7d4; border-radius:10px; padding:18px 22px; margin:0 0 24px;">
+        <div style="font-weight:700; color:#1f6f3a; margin-bottom:8px; font-size:14px;">💡 How payment works</div>
+        <p style="color:#4b5563; font-size:13px; line-height:1.6; margin:0;">
+          Click the green "Pay Online" button above to open a secure payment page. You can pay by <strong>credit/debit card</strong> (instant) or <strong>bank transfer / ACH</strong> (lower fees, takes 3-5 business days to clear). You'll get an email receipt the moment your payment is received.
+        </p>
+      </div>
+
+      <!-- Other ways to pay -->
+      <div style="font-size:13px; color:#6b7280; line-height:1.7; margin:0 0 20px; text-align:center;">
+        <strong style="color:#4b5563;">Prefer to pay another way?</strong><br>
+        Cash or check: drop off or mail to <strong>109 South Canopy ST, Lincoln, NE</strong>.<br>
+        Questions about this invoice? Just reply to this email or call <a href="tel:+14024055475" style="color:#2d7a3a; text-decoration:none; font-weight:600;">(402) 405-5475</a>.
+      </div>
+
+      <div style="text-align:center; margin:28px 0 8px;">
+        <p style="color:#1f2937; font-size:14px; margin:0; font-weight:600;">Thanks again for your business!</p>
+        <p style="color:#6b7280; font-size:13px; margin:4px 0 0;">— The Lucky Landscapes Team 🍀</p>
+      </div>
+
+      <!-- Footer -->
+      <div style="border-top:1px solid #e5e7eb; padding-top:20px; margin-top:28px; text-align:center;">
+        <p style="color:#9ca3af; font-size:12px; margin:0;">
+          <strong>Lucky Landscapes</strong> • (402) 405-5475 • rileykopf@luckylandscapes.com
+        </p>
         <p style="color:#9ca3af; font-size:12px; margin:4px 0 0;">109 South Canopy ST, Lincoln, NE</p>
       </div>
     </div>
@@ -122,16 +156,23 @@ export async function POST(request) {
     const text = [
       `Hi ${customerName},`,
       '',
-      customMessage || 'Your invoice is ready.',
+      customMessage || 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready.',
       '',
-      `Invoice ${invoice.invoice_number}`,
+      `─── INVOICE ${invoice.invoice_number} ───`,
       `Balance Due: ${formatUSD(balance)}`,
-      dueDate ? `Due: ${dueDate}` : '',
+      dueDate ? `Due: ${dueDate}` : null,
       '',
-      `Pay online (card or bank transfer): ${payUrl}`,
+      `💳 Pay online (credit/debit card or bank transfer):`,
+      payUrl,
       '',
-      'Lucky Landscapes • (402) 405-5475',
-    ].filter(Boolean).join('\n');
+      `Prefer cash or check? Drop off or mail to:`,
+      `109 South Canopy ST, Lincoln, NE`,
+      '',
+      `Questions? Reply to this email or call (402) 405-5475.`,
+      '',
+      `Thanks again!`,
+      `— The Lucky Landscapes Team 🍀`,
+    ].filter(l => l !== null).join('\n');
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'Lucky Landscapes <onboarding@resend.dev>';
@@ -141,7 +182,7 @@ export async function POST(request) {
       from: fromAddress,
       reply_to: replyTo,
       to: [to],
-      subject: `Invoice ${invoice.invoice_number} from Lucky Landscapes — ${formatUSD(balance)} due`,
+      subject: `Your invoice from Lucky Landscapes — ${formatUSD(balance)} due (${invoice.invoice_number})`,
       html,
       text,
       headers: {

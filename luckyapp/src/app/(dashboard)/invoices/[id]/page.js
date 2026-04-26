@@ -228,18 +228,21 @@ export default function InvoiceDetailPage() {
     if (!invoice) return '';
     const firstName = customer?.firstName || 'there';
     const lines = [
-      `Hi ${firstName}! Your invoice from Lucky Landscapes is ready.`,
+      `Hi ${firstName}! 🍀 Thanks again for your business — your invoice from Lucky Landscapes is ready.`,
       ``,
-      `Invoice ${invoice.invoiceNumber}`,
-      `Balance Due: ${formatCurrency(balance)}`,
+      `📄 Invoice ${invoice.invoiceNumber}`,
+      `💰 Balance Due: ${formatCurrency(balance)}`,
+      invoice.dueDate ? `📅 Due: ${formatDate(invoice.dueDate)}` : null,
       ``,
       sendMessage || null,
       sendMessage ? '' : null,
-      `Pay online (card or bank transfer):`,
+      `Pay securely online (credit/debit card or bank transfer — takes 30 seconds):`,
       payUrl,
       ``,
-      `Questions? (402) 405-5475`,
-      `— Lucky Landscapes 🍀`,
+      `Questions? Just reply or call (402) 405-5475.`,
+      ``,
+      `Thanks!`,
+      `— The Lucky Landscapes Team`,
     ];
     return lines.filter(l => l !== null).join('\n');
   }, [invoice, customer, balance, sendMessage, payUrl]);
