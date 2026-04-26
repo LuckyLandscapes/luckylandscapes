@@ -143,64 +143,66 @@ export default function QuoteDetailPage() {
     }
   };
 
-  // ─── Send SMS with PDF link via Twilio ────────────────────
-  const handleSendSms = async () => {
-    if (!sendPhone) return;
-    setSendState({ loading: true, success: false, error: null });
-
+  // ─── Mark quote as sent + log activity ────────────────────
+  const markQuoteSent = async (descriptionSuffix = 'via copied SMS') => {
     try {
-      // 1. Generate the PDF as a Blob
-      const pdfBlob = await generateQuotePdfBlob(quote, customer);
-
-      // 2. Upload to Supabase Storage via API route
-      const formData = new FormData();
-      formData.append('file', new File([pdfBlob], `quote-${quote.quoteNumber}.pdf`, { type: 'application/pdf' }));
-      formData.append('quoteNumber', quote.quoteNumber);
-
-      const uploadRes = await fetch('/api/upload-quote-pdf', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload PDF');
-
-      // 3. Send SMS via Twilio (server-side — works on any device)
-      const smsRes = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind: 'quote',
-          phone: sendPhone,
-          quoteNumber: quote.quoteNumber,
-          customerFirstName: customer?.firstName || null,
-          total: quote.total,
-          category: quote.category,
-          pdfUrl: uploadData.url,
-          customMessage: sendMessage || undefined,
-        }),
-      });
-      const smsData = await smsRes.json();
-      if (!smsRes.ok) throw new Error(smsData.error || 'Failed to send SMS');
-
-      // 4. Mark as sent
       await updateQuote(id, { status: 'sent' });
       await addActivity({
         customerId: quote.customerId,
         quoteId: quote.id,
         type: 'quote_sent',
         title: `Quote #${quote.quoteNumber} sent`,
-        description: `Texted to ${sendPhone} with PDF link`,
+        description: descriptionSuffix,
       });
+    } catch { /* best effort */ }
+  };
 
+  // ─── Build SMS body, uploading the PDF first ──────────────
+  const prepareSmsMessage = async () => {
+    const pdfBlob = await generateQuotePdfBlob(quote, customer);
+    const formData = new FormData();
+    formData.append('file', new File([pdfBlob], `quote-${quote.quoteNumber}.pdf`, { type: 'application/pdf' }));
+    formData.append('quoteNumber', quote.quoteNumber);
+    const uploadRes = await fetch('/api/upload-quote-pdf', { method: 'POST', body: formData });
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload PDF');
+    return buildSmsBody(uploadData.url);
+  };
+
+  const handleCopySms = async () => {
+    setSendState({ loading: true, success: false, error: null });
+    try {
+      const body = await prepareSmsMessage();
+      await navigator.clipboard.writeText(body);
+      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with PDF link` : 'Sent via copied SMS');
       setSendState({ loading: false, success: true, error: null });
       setTimeout(() => {
         setShowSendModal(false);
-        showToast('success', `Quote #${quote.quoteNumber} texted to ${sendPhone}`);
-      }, 1500);
+        showToast('success', 'Message copied! Paste into Messages, WhatsApp, etc.');
+      }, 1200);
     } catch (err) {
-      console.error('[browser] SMS error:', err);
-      setSendState({ loading: false, success: false, error: err.message });
+      console.error('[copy SMS] error:', err);
+      setSendState({ loading: false, success: false, error: err.message || 'Could not prepare message' });
+    }
+  };
+
+  const handleOpenInMessages = async () => {
+    setSendState({ loading: true, success: false, error: null });
+    try {
+      const body = await prepareSmsMessage();
+      const phoneClean = (sendPhone || '').replace(/[^\d+]/g, '');
+      const href = phoneClean
+        ? `sms:${phoneClean}?&body=${encodeURIComponent(body)}`
+        : `sms:?&body=${encodeURIComponent(body)}`;
+      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with PDF link` : 'Sent via Messages');
+      setSendState({ loading: false, success: false, error: null });
+      window.location.href = href;
+      setTimeout(() => {
+        setShowSendModal(false);
+        showToast('success', 'Opening Messages…');
+      }, 400);
+    } catch (err) {
+      setSendState({ loading: false, success: false, error: err.message || 'Could not prepare message' });
     }
   };
 
@@ -530,9 +532,7 @@ export default function QuoteDetailPage() {
                   {sendTab === 'sms' && (
                     <>
                       <div className="form-group">
-                        <label className="form-label">
-                          Phone Number <span className="required">*</span>
-                        </label>
+                        <label className="form-label">Phone Number (optional)</label>
                         <input
                           className="form-input"
                           type="tel"
@@ -541,11 +541,9 @@ export default function QuoteDetailPage() {
                           placeholder="(402) 555-1234"
                           disabled={sendState.loading}
                         />
-                        {customer?.firstName && (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
-                            Sending to {customer.firstName} {customer.lastName}
-                          </div>
-                        )}
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                          Used for the &quot;Open in Messages&quot; button. Skip to copy only.
+                        </div>
                       </div>
 
                       <div className="form-group">
@@ -591,7 +589,7 @@ export default function QuoteDetailPage() {
                         color: 'var(--status-info)',
                       }}>
                         <Phone size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>Your PDF estimate is uploaded and texted via Twilio. Requires TWILIO_* env vars.</span>
+                        <span>Your PDF is uploaded and a download link is added to the message. Copy it into iMessage, WhatsApp, or any messaging app — free, no SMS service needed.</span>
                       </div>
                     </>
                   )}
@@ -634,18 +632,32 @@ export default function QuoteDetailPage() {
                     )}
                   </button>
                 ) : (
-                  <button
-                    className="btn btn-primary"
-                    onClick={handleSendSms}
-                    disabled={!sendPhone || sendState.loading}
-                    style={{ background: 'var(--clover)', borderColor: 'var(--clover)' }}
-                  >
-                    {sendState.loading ? (
-                      <><Loader2 size={16} className="spin" /> Sending...</>
-                    ) : (
-                      <><MessageSquare size={16} /> Send Text</>
+                  <>
+                    {sendPhone && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={handleOpenInMessages}
+                        disabled={sendState.loading}
+                      >
+                        {sendState.loading ? (
+                          <><Loader2 size={16} className="spin" /> Preparing...</>
+                        ) : (
+                          <><MessageSquare size={16} /> Open in Messages</>
+                        )}
+                      </button>
                     )}
-                  </button>
+                    <button
+                      className="btn btn-primary"
+                      onClick={handleCopySms}
+                      disabled={sendState.loading}
+                    >
+                      {sendState.loading ? (
+                        <><Loader2 size={16} className="spin" /> Preparing PDF...</>
+                      ) : (
+                        <><MessageSquare size={16} /> Copy Message</>
+                      )}
+                    </button>
+                  </>
                 )}
               </div>
             )}

@@ -223,38 +223,69 @@ export default function InvoiceDetailPage() {
     }
   };
 
-  const handleSendSms = async () => {
-    if (!sendPhone) return;
-    setSendState({ loading: true, success: false, error: null });
-    try {
-      const res = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind: 'invoice',
-          invoiceId: id,
-          phone: sendPhone,
-          customMessage: sendMessage || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send SMS');
+  // Pre-formatted SMS body — copy/paste into any messaging app
+  const smsBody = useMemo(() => {
+    if (!invoice) return '';
+    const firstName = customer?.firstName || 'there';
+    const lines = [
+      `Hi ${firstName}! Your invoice from Lucky Landscapes is ready.`,
+      ``,
+      `Invoice ${invoice.invoiceNumber}`,
+      `Balance Due: ${formatCurrency(balance)}`,
+      ``,
+      sendMessage || null,
+      sendMessage ? '' : null,
+      `Pay online (card or bank transfer):`,
+      payUrl,
+      ``,
+      `Questions? (402) 405-5475`,
+      `— Lucky Landscapes 🍀`,
+    ];
+    return lines.filter(l => l !== null).join('\n');
+  }, [invoice, customer, balance, sendMessage, payUrl]);
 
+  const markInvoiceSent = async () => {
+    try {
+      await updateInvoice(id, {
+        sentAt: new Date().toISOString(),
+        sentVia: invoice.sentVia === 'email' ? 'both' : 'sms',
+        ...(sendPhone ? { sentToPhone: sendPhone } : {}),
+      });
       await addActivity({
         customerId: invoice.customerId,
         type: 'invoice_sent',
         title: `Invoice ${invoice.invoiceNumber} sent`,
-        description: `Texted to ${sendPhone}`,
+        description: sendPhone ? `Texted to ${sendPhone}` : 'Sent via copied SMS',
       });
+    } catch (e) { /* best effort */ }
+  };
 
+  const handleCopySms = async () => {
+    if (!smsBody) return;
+    try {
+      await navigator.clipboard.writeText(smsBody);
+      await markInvoiceSent();
       setSendState({ loading: false, success: true, error: null });
       setTimeout(() => {
         setShowSendModal(false);
-        showToast('success', `Invoice texted to ${sendPhone}`);
-      }, 1500);
+        showToast('success', 'Message copied! Paste into Messages, WhatsApp, etc.');
+      }, 1200);
     } catch (err) {
-      setSendState({ loading: false, success: false, error: err.message });
+      setSendState({ loading: false, success: false, error: 'Could not copy. Select the text and copy manually.' });
     }
+  };
+
+  const handleOpenInMessages = async () => {
+    const phoneClean = (sendPhone || '').replace(/[^\d+]/g, '');
+    const body = encodeURIComponent(smsBody);
+    // iOS uses ?&body=, Android uses ?body=  — ?&body= works on both
+    const href = phoneClean ? `sms:${phoneClean}?&body=${body}` : `sms:?&body=${body}`;
+    await markInvoiceSent();
+    window.location.href = href;
+    setTimeout(() => {
+      setShowSendModal(false);
+      showToast('success', 'Opening Messages…');
+    }, 400);
   };
 
   return (
@@ -540,8 +571,8 @@ export default function InvoiceDetailPage() {
               {sendState.success ? (
                 <div className="send-success-state">
                   <div className="send-success-icon"><CheckCircle size={48} /></div>
-                  <h3>Invoice Sent!</h3>
-                  <p>{invoice.invoiceNumber} has been sent successfully</p>
+                  <h3>{sendTab === 'email' ? 'Invoice Sent!' : 'Message Copied!'}</h3>
+                  <p>{sendTab === 'email' ? `${invoice.invoiceNumber} has been emailed` : 'Paste it into your favorite messaging app'}</p>
                 </div>
               ) : (
                 <>
@@ -598,16 +629,37 @@ export default function InvoiceDetailPage() {
                   {sendTab === 'sms' && (
                     <>
                       <div className="form-group">
-                        <label className="form-label">Phone Number <span className="required">*</span></label>
+                        <label className="form-label">Phone Number (optional)</label>
                         <input className="form-input" type="tel" value={sendPhone} onChange={e => setSendPhone(e.target.value)} placeholder="(402) 555-1234" disabled={sendState.loading} />
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                          Used for the &quot;Open in Messages&quot; option. Skip to copy only.
+                        </div>
                       </div>
                       <div className="form-group">
                         <label className="form-label">Additional Note (optional)</label>
                         <textarea className="form-textarea" rows={2} value={sendMessage} onChange={e => setSendMessage(e.target.value)} disabled={sendState.loading} />
                       </div>
+
+                      <div className="form-group">
+                        <label className="form-label">Message Preview</label>
+                        <div style={{
+                          background: 'var(--bg-elevated)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: 'var(--space-md)',
+                          fontSize: '0.82rem',
+                          color: 'var(--text-secondary)',
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.5,
+                          maxHeight: '220px',
+                          overflowY: 'auto',
+                          border: '1px solid var(--border-primary)',
+                          fontFamily: 'inherit',
+                        }}>{smsBody}</div>
+                      </div>
+
                       <div style={infoBoxStyle}>
                         <MessageSquare size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>SMS with secure payment link will be sent via Twilio. Requires TWILIO_* env vars.</span>
+                        <span>Copy the message and paste into iMessage, WhatsApp, or any messaging app — free, no SMS service required.</span>
                       </div>
                     </>
                   )}
@@ -636,9 +688,16 @@ export default function InvoiceDetailPage() {
                     {sendState.loading ? <><Loader2 size={16} className="spin" /> Sending...</> : <><Mail size={16} /> Send Email</>}
                   </button>
                 ) : (
-                  <button className="btn btn-primary" onClick={handleSendSms} disabled={!sendPhone || sendState.loading}>
-                    {sendState.loading ? <><Loader2 size={16} className="spin" /> Sending...</> : <><MessageSquare size={16} /> Send Text</>}
-                  </button>
+                  <>
+                    {sendPhone && (
+                      <button className="btn btn-secondary" onClick={handleOpenInMessages}>
+                        <MessageSquare size={16} /> Open in Messages
+                      </button>
+                    )}
+                    <button className="btn btn-primary" onClick={handleCopySms}>
+                      <Copy size={16} /> Copy Message
+                    </button>
+                  </>
                 )}
               </div>
             )}
