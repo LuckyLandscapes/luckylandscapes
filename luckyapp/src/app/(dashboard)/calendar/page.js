@@ -16,6 +16,7 @@ import {
   FileText,
   Users as UsersIcon,
   ExternalLink,
+  Trash2,
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -100,7 +101,7 @@ const EVENT_TYPE_LABELS = {
 
 // ─── Main Calendar Page ─────────────────────────────────────
 export default function CalendarPage() {
-  const { calendarEvents, jobs, customers, getCustomer, quotes, updateJob } = useData();
+  const { calendarEvents, jobs, customers, getCustomer, quotes, updateJob, deleteCalendarEvent } = useData();
   const [view, setView] = useState('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -185,6 +186,41 @@ export default function CalendarPage() {
     if (event.source === 'job') return;
     setEditingEvent(event);
     setShowEventModal(true);
+  };
+
+  const handleDeleteEvent = async (event) => {
+    if (!event) return;
+    const ok = typeof window !== 'undefined'
+      ? window.confirm('Remove this event from the calendar? This will not delete any related job records.')
+      : true;
+    if (!ok) return;
+
+    try {
+      // Try to remove from Google Calendar (non-blocking)
+      if (event.googleEventId) {
+        try {
+          await fetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
+        } catch (err) {
+          console.warn('Google Calendar delete failed (non-blocking):', err.message);
+        }
+      }
+
+      if (event.source === 'event' && event.id) {
+        await deleteCalendarEvent(event.id);
+      }
+
+      // Unschedule the linked job (so it doesn't reappear synthetically)
+      if (event.jobId) {
+        await updateJob(event.jobId, { scheduledDate: null, scheduledTime: null });
+      }
+
+      setSelectedEvent(null);
+    } catch (err) {
+      console.error('Error deleting event:', err);
+      if (typeof window !== 'undefined') {
+        window.alert('Could not remove event. Please try again.');
+      }
+    }
   };
 
   // Title for current view
@@ -365,6 +401,7 @@ export default function CalendarPage() {
           getCustomer={getCustomer}
           onClose={() => setSelectedEvent(null)}
           onEdit={() => { handleEditEvent(selectedEvent); setSelectedEvent(null); }}
+          onDelete={() => handleDeleteEvent(selectedEvent)}
         />
       )}
 
@@ -543,7 +580,7 @@ function DayView({ currentDate, todayStr, eventsByDate, onEventClick, getCustome
 }
 
 // ─── Event Detail Overlay ───────────────────────────────────
-function EventDetailOverlay({ event, getCustomer, onClose, onEdit }) {
+function EventDetailOverlay({ event, getCustomer, onClose, onEdit, onDelete }) {
   const customer = event.customerId ? getCustomer(event.customerId) : null;
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState(event.googleEventId ? 'synced' : null);
@@ -643,30 +680,40 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit }) {
             )}
           </div>
         </div>
-        <div className="modal-footer">
+        <div className="modal-footer cal-detail-footer">
           {syncStatus === 'synced' ? (
-            <span className="btn btn-ghost btn-sm" style={{ marginRight: 'auto', color: 'var(--status-success)', cursor: 'default' }}>
-              ✅ Synced to Google Calendar
+            <span className="btn btn-ghost btn-sm cal-detail-sync-status" style={{ color: 'var(--status-success)', cursor: 'default' }}>
+              ✅ Synced
             </span>
           ) : (
             <button
-              className="btn btn-secondary btn-sm"
+              className="btn btn-secondary btn-sm cal-detail-sync"
               onClick={syncToGoogleCalendar}
               disabled={syncing}
-              style={{ marginRight: 'auto' }}
             >
-              {syncing ? '⏳ Syncing...' : '📅 Sync to Google Calendar'}
+              {syncing ? '⏳ Syncing...' : '📅 Sync to Google'}
             </button>
           )}
-          {event.source !== 'job' && (
-            <button className="btn btn-secondary" onClick={onEdit}>Edit Event</button>
-          )}
-          {(event.jobId) && (
-            <Link href={`/jobs/${event.jobId}`} className="btn btn-primary">
-              <Briefcase size={16} /> View Job Details
-            </Link>
-          )}
-          <button className="btn btn-ghost" onClick={onClose}>Close</button>
+          <div className="cal-detail-actions">
+            {onDelete && (
+              <button
+                className="btn btn-danger btn-sm cal-detail-delete"
+                onClick={onDelete}
+                title="Remove from calendar"
+              >
+                <Trash2 size={14} /> Delete
+              </button>
+            )}
+            {event.source !== 'job' && (
+              <button className="btn btn-secondary" onClick={onEdit}>Edit</button>
+            )}
+            {(event.jobId) && (
+              <Link href={`/jobs/${event.jobId}`} className="btn btn-primary">
+                <Briefcase size={16} /> Job Details
+              </Link>
+            )}
+            <button className="btn btn-ghost cal-detail-close" onClick={onClose}>Close</button>
+          </div>
         </div>
       </div>
     </div>

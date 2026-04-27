@@ -6157,3 +6157,353 @@ body {
     margin-left: 26px;
   }
 }
+
+/* ============================================
+   Calendar Detail Overlay — Responsive Footer
+   ============================================ */
+.cal-detail-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.cal-detail-sync,
+.cal-detail-sync-status {
+  margin-right: auto;
+}
+
+.cal-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .cal-detail-footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .cal-detail-sync,
+  .cal-detail-sync-status {
+    margin-right: 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cal-detail-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  .cal-detail-actions .btn {
+    width: 100%;
+    justify-content: center;
+    min-width: 0;
+  }
+
+  .cal-detail-close {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ============================================
+   Calendar — Mobile Layout Polish
+   ============================================ */
+@media (max-width: 768px) {
+  .cal-toolbar {
+    padding: var(--space-sm);
+    gap: var(--space-sm);
+  }
+
+  .cal-toolbar-left {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .cal-title {
+    font-size: 1.05rem;
+    flex: 1 1 100%;
+    min-width: 0;
+    order: 3;
+  }
+
+  .cal-month-cell {
+    min-height: 56px;
+    padding: 3px 2px;
+  }
+
+  .cal-day-number {
+    font-size: 0.72rem;
+    padding: 1px 5px;
+  }
+
+  .cal-day-events {
+    gap: 1px;
+  }
+
+  .cal-day-more {
+    font-size: 0.6rem;
+    padding: 0 3px;
+  }
+
+  .cal-month-header-cell {
+    padding: 6px 2px;
+    font-size: 0.62rem;
+    letter-spacing: 0.04em;
+  }
+
+  /* Week view — make scrollable horizontally instead of cramming 7 days */
+  .cal-week {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .cal-week-header,
+  .cal-week-row {
+    min-width: 640px;
+  }
+
+  /* Day view — tighter time gutter */
+  .cal-day-row {
+    grid-template-columns: 56px 1fr;
+    min-height: 56px;
+  }
+
+  .cal-day-time {
+    font-size: 0.7rem;
+    padding: 6px 8px 0 0;
+  }
+
+  .cal-day-event {
+    padding: 8px 10px;
+  }
+
+  .cal-day-event-title {
+    font-size: 0.82rem;
+  }
+
+  /* Sidebar panel: full-width, comfortable spacing */
+  .cal-sidebar-panel {
+    margin-top: var(--space-sm);
+  }
+
+  .cal-sidebar-header {
+    padding: 10px 12px;
+  }
+
+  .cal-sidebar-events {
+    padding: 6px;
+    max-height: none;
+  }
+
+  .cal-sidebar-event {
+    padding: 8px 10px;
+  }
+
+  .cal-legend {
+    padding: 10px 12px;
+  }
+
+  .cal-legend-items {
+    gap: 8px 14px;
+    flex-wrap: wrap;
+    display: flex;
+  }
+
+  /* Tabs (month/week/day) — full width on mobile */
+  .cal-toolbar .tabs {
+    width: 100%;
+  }
+
+  .cal-toolbar .tab {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .cal-month-cell {
+    min-height: 48px;
+  }
+
+  .cal-day-number {
+    font-size: 0.68rem;
+  }
+
+  .cal-event-pill {
+    padding: 2px;
+  }
+}
+
+/* ============================================
+   Crew Dashboard — Mobile Polish
+   ============================================ */
+@media (max-width: 768px) {
+  .crew-dash {
+    padding: var(--space-md);
+  }
+
+  .crew-dash-header {
+    margin-bottom: var(--space-md);
+  }
+
+  .crew-dash-greeting h1 {
+    font-size: 1.25rem;
+  }
+
+  .crew-clock-widget {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    padding: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+
+  .crew-clock-status {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .crew-clock-time {
+    margin-left: 0;
+    flex: 1 1 100%;
+    order: 3;
+    text-align: left;
+  }
+
+  .crew-clock-widget .btn {
+    margin-left: auto !important;
+    order: 2;
+    flex-shrink: 0;
+  }
+
+  .crew-section-header {
+    margin-bottom: var(--space-sm);
+  }
+
+  .crew-section-header h2 {
+    font-size: 1rem;
+    gap: 6px;
+  }
+
+  /* Job cards — tighter padding */
+  .crew-job-card {
+    padding: var(--space-md);
+    margin-bottom: var(--space-sm);
+    /* Hover transform feels weird on touch — disable */
+  }
+
+  .crew-job-card:hover {
+    transform: none;
+  }
+
+  .crew-job-card-header {
+    margin-bottom: var(--space-sm);
+  }
+
+  .crew-job-card-title {
+    font-size: 0.95rem;
+  }
+
+  .crew-job-card-customer {
+    padding: 8px 10px;
+  }
+
+  .crew-job-card-customer-avatar {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .crew-clock-widget {
+    padding: 10px 12px;
+  }
+
+  .crew-clock-status {
+    font-size: 0.8rem;
+  }
+
+  .crew-job-card {
+    padding: 12px;
+  }
+
+  .crew-job-card-priority {
+    font-size: 0.6rem;
+    padding: 2px 8px;
+  }
+
+  .crew-job-card-footer {
+    gap: 6px;
+  }
+}
+
+/* ============================================
+   Crew Schedule — Mobile Polish
+   ============================================ */
+@media (max-width: 768px) {
+  .crew-schedule {
+    padding: var(--space-md);
+  }
+
+  .crew-schedule-nav {
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+  }
+
+  .crew-schedule-nav h2 {
+    font-size: 1rem;
+    min-width: 0;
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .crew-schedule-day {
+    padding: 12px;
+    min-height: auto;
+  }
+
+  .crew-schedule-day-header {
+    text-align: left;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+  }
+
+  .crew-schedule-day-num {
+    font-size: 1.1rem;
+  }
+
+  .crew-schedule-mini-card {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+
+  .crew-schedule-mini-card:hover {
+    transform: none;
+  }
+}
+
+/* ============================================
+   Modal Footer — Better wrapping for many buttons
+   ============================================ */
+@media (max-width: 600px) {
+  .modal-footer {
+    gap: 8px;
+  }
+
+  .modal-footer > .btn {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 0;
+    justify-content: center;
+  }
+}
