@@ -1,141 +1,205 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import {
-  Ruler, Search, Trash2, Copy, MapPin, Plus, Minus, CheckCircle, Layers, X, SquareIcon, Loader2,
+  Ruler, Search, Trash2, Copy, MapPin, CheckCircle, Layers, X, SquareIcon,
+  Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp, Eye, EyeOff,
 } from 'lucide-react';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
+const SQM_TO_SQFT = 10.7639;
+const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
-// Area polygon colors
-const POLYGON_COLORS = [
-  { fill: '#2d7a3a', stroke: '#1e5a28', label: 'Green' },
-  { fill: '#3b82f6', stroke: '#1d4ed8', label: 'Blue' },
-  { fill: '#f59e0b', stroke: '#d97706', label: 'Amber' },
-  { fill: '#ef4444', stroke: '#dc2626', label: 'Red' },
-  { fill: '#8b5cf6', stroke: '#7c3aed', label: 'Purple' },
-  { fill: '#ec4899', stroke: '#db2777', label: 'Pink' },
+const AREA_FILL = '#2d7a3a';
+const AREA_STROKE = '#7dd87d';
+const EXCLUSION_FILL = '#dc2626';
+const EXCLUSION_STROKE = '#fca5a5';
+const CANDIDATE_FILL = '#f59e0b';
+const CANDIDATE_STROKE = '#fbbf24';
+
+// Tools the user can pick from the toolbar.
+const TOOLS = [
+  { id: 'polygon-area',     kind: 'area',      shape: 'polygon',   label: 'Polygon',   Icon: Hexagon },
+  { id: 'rectangle-area',   kind: 'area',      shape: 'rectangle', label: 'Rectangle', Icon: SquareIcon },
+  { id: 'circle-area',      kind: 'area',      shape: 'circle',    label: 'Circle',    Icon: CircleIcon },
+  { id: 'polygon-exclude',  kind: 'exclusion', shape: 'polygon',   label: 'Subtract',  Icon: Minus },
 ];
 
 export default function MeasurePage() {
   const { customers } = useData();
+
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const drawingManagerRef = useRef(null);
   const searchInputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  const shapesRef = useRef(new Map()); // id -> google maps overlay
+  const candidateOverlaysRef = useRef(new Map()); // candidate id -> overlay
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [areas, setAreas] = useState([]);
+  const [shapes, setShapes] = useState([]); // [{id, kind, shape, sqft, label, hidden}]
+  const [activeTool, setActiveTool] = useState(null); // tool id or null
   const [hasSearchText, setHasSearchText] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [copied, setCopied] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [showCustomerAddresses, setShowCustomerAddresses] = useState(false);
+  const [candidates, setCandidates] = useState([]); // detected building candidates
+  const [detecting, setDetecting] = useState(false);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const [toast, setToast] = useState(null);
 
-  // Load Google Maps script
+  // Show transient toast
+  const showToast = useCallback((message, type = 'info') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 2400);
+  }, []);
+
+  // ---- Load Google Maps script ----
   useEffect(() => {
     if (!GOOGLE_MAPS_KEY) return;
     if (window.google?.maps?.Map) {
       setMapsLoaded(true);
       return;
     }
-
-    const existingScript = document.getElementById('google-maps-script');
-    if (existingScript) {
-      existingScript.addEventListener('load', () => setMapsLoaded(true));
+    const existing = document.getElementById('google-maps-script');
+    if (existing) {
+      existing.addEventListener('load', () => setMapsLoaded(true));
       return;
     }
-
-    const script = document.createElement('script');
-    script.id = 'google-maps-script';
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=drawing,geometry,places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setMapsLoaded(true);
-    script.onerror = () => console.error('Failed to load Google Maps');
-    document.head.appendChild(script);
+    const s = document.createElement('script');
+    s.id = 'google-maps-script';
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=drawing,geometry,places`;
+    s.async = true;
+    s.defer = true;
+    s.onload = () => setMapsLoaded(true);
+    s.onerror = () => console.error('Failed to load Google Maps');
+    document.head.appendChild(s);
   }, []);
 
-  // Initialize map
+  // Helper: compute sqft for a google maps overlay (polygon/rectangle/circle).
+  const computeSqft = useCallback((overlay) => {
+    const g = window.google.maps;
+    if (!overlay) return 0;
+    if (typeof overlay.getRadius === 'function') {
+      const r = overlay.getRadius();
+      return Math.round(Math.PI * r * r * SQM_TO_SQFT);
+    }
+    if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
+      const b = overlay.getBounds();
+      const ne = b.getNorthEast();
+      const sw = b.getSouthWest();
+      const path = [
+        new g.LatLng(ne.lat(), sw.lng()),
+        new g.LatLng(ne.lat(), ne.lng()),
+        new g.LatLng(sw.lat(), ne.lng()),
+        new g.LatLng(sw.lat(), sw.lng()),
+      ];
+      return Math.round(g.geometry.spherical.computeArea(path) * SQM_TO_SQFT);
+    }
+    if (typeof overlay.getPath === 'function') {
+      return Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
+    }
+    return 0;
+  }, []);
+
+  // Helper: attach edit listeners that recalc sqft on change.
+  const attachEditListeners = useCallback((id, overlay) => {
+    const g = window.google.maps;
+    const recalc = () => {
+      const sqft = computeSqft(overlay);
+      setShapes(prev => prev.map(s => s.id === id ? { ...s, sqft } : s));
+    };
+    if (typeof overlay.getPath === 'function') {
+      const path = overlay.getPath();
+      ['set_at', 'insert_at', 'remove_at'].forEach(ev => g.event.addListener(path, ev, recalc));
+    }
+    if (typeof overlay.getRadius === 'function') {
+      g.event.addListener(overlay, 'radius_changed', recalc);
+      g.event.addListener(overlay, 'center_changed', recalc);
+    }
+    if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
+      g.event.addListener(overlay, 'bounds_changed', recalc);
+    }
+  }, [computeSqft]);
+
+  // Add a completed shape to state.
+  const addShape = useCallback((overlay, kind) => {
+    const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const isExclusion = kind === 'exclusion';
+    overlay.setOptions({
+      fillColor: isExclusion ? EXCLUSION_FILL : AREA_FILL,
+      strokeColor: isExclusion ? EXCLUSION_STROKE : AREA_STROKE,
+      fillOpacity: isExclusion ? 0.45 : 0.3,
+      strokeWeight: 2,
+      editable: true,
+      draggable: false,
+      zIndex: isExclusion ? 2 : 1,
+    });
+    const sqft = computeSqft(overlay);
+    shapesRef.current.set(id, overlay);
+    attachEditListeners(id, overlay);
+
+    setShapes(prev => {
+      const sameKind = prev.filter(s => s.kind === kind).length + 1;
+      const label = (kind === 'area' ? 'Area ' : 'Exclude ') + sameKind;
+      return [...prev, { id, kind, sqft, label, hidden: false }];
+    });
+  }, [attachEditListeners, computeSqft]);
+
+  // ---- Initialize map ----
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current || mapInstanceRef.current) return;
+    const g = window.google.maps;
 
-    const map = new window.google.maps.Map(mapRef.current, {
-      center: { lat: 40.8136, lng: -96.7026 }, // Lincoln, NE
+    const map = new g.Map(mapRef.current, {
+      center: { lat: 40.8136, lng: -96.7026 },
       zoom: 18,
       mapTypeId: 'satellite',
       tilt: 0,
       mapTypeControl: true,
       mapTypeControlOptions: {
-        style: window.google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
-        position: window.google.maps.ControlPosition.TOP_RIGHT,
+        style: g.MapTypeControlStyle.HORIZONTAL_BAR,
+        position: g.ControlPosition.TOP_RIGHT,
       },
       streetViewControl: false,
       fullscreenControl: true,
       zoomControl: true,
-      zoomControlOptions: {
-        position: window.google.maps.ControlPosition.RIGHT_CENTER,
-      },
+      zoomControlOptions: { position: g.ControlPosition.RIGHT_CENTER },
+      gestureHandling: 'greedy',
     });
     mapInstanceRef.current = map;
 
-    // Drawing manager
-    const drawingManager = new window.google.maps.drawing.DrawingManager({
+    const drawingManager = new g.drawing.DrawingManager({
       drawingMode: null,
-      drawingControl: false, // We'll use our own controls
-      polygonOptions: {
-        fillColor: POLYGON_COLORS[0].fill,
-        fillOpacity: 0.3,
-        strokeColor: POLYGON_COLORS[0].stroke,
-        strokeWeight: 2,
-        editable: true,
-        draggable: true,
-      },
+      drawingControl: false,
+      polygonOptions: { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
+      rectangleOptions: { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
+      circleOptions:    { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
     });
     drawingManager.setMap(map);
     drawingManagerRef.current = drawingManager;
 
-    // Listen for polygon completion
-    window.google.maps.event.addListener(drawingManager, 'polygoncomplete', (polygon) => {
-      const colorIndex = areas.length % POLYGON_COLORS.length;
-      const area = window.google.maps.geometry.spherical.computeArea(polygon.getPath());
-      const sqft = area * 10.7639; // Convert m² to sqft
-
-      const newArea = {
-        id: `area-${Date.now()}`,
-        polygon,
-        sqft: Math.round(sqft),
-        label: `Area ${areas.length + 1}`,
-        colorIndex,
-      };
-
-      setAreas(prev => [...prev, newArea]);
+    const onComplete = (overlay) => {
+      // Read kind from the dataset of drawingManager (set when tool changes)
+      const kind = drawingManager.__kind || 'area';
+      addShape(overlay, kind);
       drawingManager.setDrawingMode(null);
-      setIsDrawing(false);
+      setActiveTool(null);
+    };
+    g.event.addListener(drawingManager, 'polygoncomplete',   onComplete);
+    g.event.addListener(drawingManager, 'rectanglecomplete', onComplete);
+    g.event.addListener(drawingManager, 'circlecomplete',    onComplete);
 
-      // Listen for edits to recalculate
-      ['set_at', 'insert_at', 'remove_at'].forEach(event => {
-        window.google.maps.event.addListener(polygon.getPath(), event, () => {
-          const updatedArea = window.google.maps.geometry.spherical.computeArea(polygon.getPath());
-          const updatedSqft = Math.round(updatedArea * 10.7639);
-          setAreas(prev => prev.map(a => a.id === newArea.id ? { ...a, sqft: updatedSqft } : a));
-        });
-      });
-    });
-
-    // Initialize Places autocomplete
+    // Places autocomplete
     if (searchInputRef.current) {
-      const autocomplete = new window.google.maps.places.Autocomplete(searchInputRef.current, {
+      const autocomplete = new g.places.Autocomplete(searchInputRef.current, {
         types: ['address'],
         componentRestrictions: { country: 'us' },
         fields: ['geometry', 'formatted_address', 'address_components'],
       });
       autocomplete.bindTo('bounds', map);
       autocompleteRef.current = autocomplete;
-
       autocomplete.addListener('place_changed', () => {
         const place = autocomplete.getPlace();
         if (place.geometry?.location) {
@@ -145,105 +209,212 @@ export default function MeasurePage() {
         }
       });
     }
-  }, [mapsLoaded]);
+  }, [mapsLoaded, addShape]);
 
-  // Start drawing mode
-  const startDrawing = useCallback(() => {
-    if (!drawingManagerRef.current) return;
-
-    const colorIndex = areas.length % POLYGON_COLORS.length;
-    drawingManagerRef.current.setOptions({
-      polygonOptions: {
-        fillColor: POLYGON_COLORS[colorIndex].fill,
-        fillOpacity: 0.3,
-        strokeColor: POLYGON_COLORS[colorIndex].stroke,
-        strokeWeight: 2,
-        editable: true,
-        draggable: true,
-      },
-    });
-    drawingManagerRef.current.setDrawingMode(window.google.maps.drawing.OverlayType.POLYGON);
-    setIsDrawing(true);
-  }, [areas.length]);
+  // ---- Tool selection drives the drawing mode ----
+  const selectTool = useCallback((toolId) => {
+    const dm = drawingManagerRef.current;
+    if (!dm) return;
+    if (toolId === activeTool || toolId == null) {
+      dm.setDrawingMode(null);
+      dm.__kind = null;
+      setActiveTool(null);
+      return;
+    }
+    const tool = TOOLS.find(t => t.id === toolId);
+    if (!tool) return;
+    const g = window.google.maps;
+    const isExclusion = tool.kind === 'exclusion';
+    const opts = {
+      fillColor: isExclusion ? EXCLUSION_FILL : AREA_FILL,
+      strokeColor: isExclusion ? EXCLUSION_STROKE : AREA_STROKE,
+      fillOpacity: isExclusion ? 0.4 : 0.3,
+      strokeWeight: 2,
+      editable: true,
+    };
+    dm.setOptions({ polygonOptions: opts, rectangleOptions: opts, circleOptions: opts });
+    dm.__kind = tool.kind;
+    const modeMap = {
+      polygon: g.drawing.OverlayType.POLYGON,
+      rectangle: g.drawing.OverlayType.RECTANGLE,
+      circle: g.drawing.OverlayType.CIRCLE,
+    };
+    dm.setDrawingMode(modeMap[tool.shape]);
+    setActiveTool(toolId);
+  }, [activeTool]);
 
   // Cancel drawing
   const cancelDrawing = useCallback(() => {
-    if (!drawingManagerRef.current) return;
-    drawingManagerRef.current.setDrawingMode(null);
-    setIsDrawing(false);
+    const dm = drawingManagerRef.current;
+    if (dm) {
+      dm.setDrawingMode(null);
+      dm.__kind = null;
+    }
+    setActiveTool(null);
   }, []);
 
-  // Remove area
-  const removeArea = useCallback((areaId) => {
-    setAreas(prev => {
-      const area = prev.find(a => a.id === areaId);
-      if (area?.polygon) {
-        area.polygon.setMap(null);
-      }
-      return prev.filter(a => a.id !== areaId);
-    });
+  // Remove a shape
+  const removeShape = useCallback((id) => {
+    const overlay = shapesRef.current.get(id);
+    if (overlay) overlay.setMap(null);
+    shapesRef.current.delete(id);
+    setShapes(prev => prev.filter(s => s.id !== id));
   }, []);
 
-  // Clear all areas
+  // Toggle visibility
+  const toggleHidden = useCallback((id) => {
+    const overlay = shapesRef.current.get(id);
+    setShapes(prev => prev.map(s => {
+      if (s.id !== id) return s;
+      const next = !s.hidden;
+      if (overlay) overlay.setMap(next ? null : mapInstanceRef.current);
+      return { ...s, hidden: next };
+    }));
+  }, []);
+
+  // Clear everything
   const clearAll = useCallback(() => {
-    areas.forEach(a => a.polygon?.setMap(null));
-    setAreas([]);
-  }, [areas]);
+    shapesRef.current.forEach(o => o.setMap(null));
+    shapesRef.current.clear();
+    setShapes([]);
+    candidateOverlaysRef.current.forEach(o => o.setMap(null));
+    candidateOverlaysRef.current.clear();
+    setCandidates([]);
+  }, []);
 
-  // Copy to clipboard
+  // ---- Auto-detect buildings via OpenStreetMap Overpass ----
+  const detectBuildings = useCallback(async () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const bounds = map.getBounds();
+    if (!bounds) return;
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    setDetecting(true);
+
+    // Clear prior candidates
+    candidateOverlaysRef.current.forEach(o => o.setMap(null));
+    candidateOverlaysRef.current.clear();
+    setCandidates([]);
+
+    try {
+      const q = `[out:json][timeout:25];(way["building"](${sw.lat()},${sw.lng()},${ne.lat()},${ne.lng()}););out geom;`;
+      const res = await fetch(OVERPASS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(q),
+      });
+      if (!res.ok) throw new Error(`Overpass ${res.status}`);
+      const data = await res.json();
+      const elements = (data.elements || []).filter(e => e.type === 'way' && Array.isArray(e.geometry) && e.geometry.length >= 3);
+
+      const g = window.google.maps;
+      const found = [];
+      elements.forEach((el) => {
+        const path = el.geometry.map(pt => ({ lat: pt.lat, lng: pt.lon }));
+        const overlay = new g.Polygon({
+          paths: path,
+          fillColor: CANDIDATE_FILL,
+          fillOpacity: 0.45,
+          strokeColor: CANDIDATE_STROKE,
+          strokeWeight: 2,
+          strokeOpacity: 0.95,
+          clickable: true,
+          zIndex: 5,
+          map,
+        });
+        const sqft = Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
+        if (sqft < 30) {
+          overlay.setMap(null);
+          return; // ignore tiny artifacts
+        }
+        const cid = `cand-${el.id}`;
+        candidateOverlaysRef.current.set(cid, overlay);
+        found.push({ id: cid, sqft, tag: el.tags?.building || 'building' });
+
+        // Click-to-add-as-exclusion
+        overlay.addListener('click', () => acceptCandidate(cid));
+      });
+
+      setCandidates(found);
+      if (found.length === 0) {
+        showToast('No buildings found in this area. Try zooming or panning.', 'info');
+      } else {
+        showToast(`Found ${found.length} building${found.length === 1 ? '' : 's'}. Tap to subtract.`, 'success');
+      }
+    } catch (err) {
+      console.error('Building detection failed', err);
+      showToast('Could not load building data. Try again.', 'error');
+    } finally {
+      setDetecting(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showToast]);
+
+  // Accept a single candidate -> turn into exclusion
+  const acceptCandidate = useCallback((cid) => {
+    const overlay = candidateOverlaysRef.current.get(cid);
+    if (!overlay) return;
+    candidateOverlaysRef.current.delete(cid);
+    addShape(overlay, 'exclusion');
+    setCandidates(prev => prev.filter(c => c.id !== cid));
+  }, [addShape]);
+
+  const acceptAllCandidates = useCallback(() => {
+    const ids = Array.from(candidateOverlaysRef.current.keys());
+    ids.forEach(acceptCandidate);
+  }, [acceptCandidate]);
+
+  const dismissCandidates = useCallback(() => {
+    candidateOverlaysRef.current.forEach(o => o.setMap(null));
+    candidateOverlaysRef.current.clear();
+    setCandidates([]);
+  }, []);
+
+  // Copy helper
   const copyToClipboard = useCallback((value, label) => {
     navigator.clipboard.writeText(String(value)).then(() => {
       setCopied(label);
-      setTimeout(() => setCopied(null), 2000);
+      setTimeout(() => setCopied(null), 1800);
     });
   }, []);
 
-  // Navigate to customer address
+  // Search by address (manual Enter)
+  const handleSearchKeyDown = useCallback((e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const query = searchInputRef.current?.value?.trim();
+    if (!query || !mapInstanceRef.current) return;
+    document.querySelectorAll('.pac-container').forEach(c => { c.style.display = 'none'; });
+    setIsSearching(true);
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: query }, (results, status) => {
+      setIsSearching(false);
+      if (status === 'OK' && results[0]) {
+        mapInstanceRef.current.setCenter(results[0].geometry.location);
+        mapInstanceRef.current.setZoom(20);
+        searchInputRef.current.value = results[0].formatted_address || query;
+        setHasSearchText(true);
+      }
+    });
+  }, []);
+
   const goToAddress = useCallback((address) => {
     if (!mapInstanceRef.current) return;
     setIsSearching(true);
-
     const geocoder = new window.google.maps.Geocoder();
     geocoder.geocode({ address }, (results, status) => {
       setIsSearching(false);
       if (status === 'OK' && results[0]) {
         mapInstanceRef.current.setCenter(results[0].geometry.location);
         mapInstanceRef.current.setZoom(20);
-        if (searchInputRef.current) {
-          searchInputRef.current.value = address;
-        }
+        if (searchInputRef.current) searchInputRef.current.value = address;
         setHasSearchText(true);
         setShowCustomerAddresses(false);
       }
     });
   }, []);
 
-  // Handle Enter key for manual geocoding search
-  const handleSearchKeyDown = useCallback((e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const query = searchInputRef.current?.value?.trim();
-      if (!query || !mapInstanceRef.current) return;
-
-      // Dismiss any open autocomplete dropdown
-      const pacContainers = document.querySelectorAll('.pac-container');
-      pacContainers.forEach(c => c.style.display = 'none');
-
-      setIsSearching(true);
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: query }, (results, status) => {
-        setIsSearching(false);
-        if (status === 'OK' && results[0]) {
-          mapInstanceRef.current.setCenter(results[0].geometry.location);
-          mapInstanceRef.current.setZoom(20);
-          searchInputRef.current.value = results[0].formatted_address || query;
-          setHasSearchText(true);
-        }
-      });
-    }
-  }, []);
-
-  // Clear search
   const clearSearch = useCallback(() => {
     if (searchInputRef.current) {
       searchInputRef.current.value = '';
@@ -252,10 +423,21 @@ export default function MeasurePage() {
     setHasSearchText(false);
   }, []);
 
-  // Total sqft
-  const totalSqft = areas.reduce((sum, a) => sum + a.sqft, 0);
+  const totals = useMemo(() => {
+    const visible = shapes.filter(s => !s.hidden);
+    const areaTotal = visible.filter(s => s.kind === 'area').reduce((s, x) => s + x.sqft, 0);
+    const exclusionTotal = visible.filter(s => s.kind === 'exclusion').reduce((s, x) => s + x.sqft, 0);
+    return { areaTotal, exclusionTotal, net: Math.max(0, areaTotal - exclusionTotal) };
+  }, [shapes]);
 
-  // No API key message
+  // Cleanup on unmount: remove all overlays
+  useEffect(() => () => {
+    shapesRef.current.forEach(o => o?.setMap?.(null));
+    shapesRef.current.clear();
+    candidateOverlaysRef.current.forEach(o => o?.setMap?.(null));
+    candidateOverlaysRef.current.clear();
+  }, []);
+
   if (!GOOGLE_MAPS_KEY) {
     return (
       <div className="page animate-fade-in">
@@ -276,238 +458,244 @@ export default function MeasurePage() {
     );
   }
 
-  const [mobileShowPanel, setMobileShowPanel] = useState(false);
+  const areasCount = shapes.filter(s => s.kind === 'area').length;
+  const exclusionsCount = shapes.filter(s => s.kind === 'exclusion').length;
 
   return (
     <div className="measure-page page animate-fade-in">
-      {/* Header */}
-      <div className="measure-header">
-        <div>
-          <h1 style={{ fontSize: '1.25rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Ruler size={22} /> Measure
-          </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
-            Draw polygons on the satellite map to calculate square footage.
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: 'var(--space-sm)', alignItems: 'center' }}>
-          {areas.length > 0 && (
-            <button className="btn btn-danger btn-sm" onClick={clearAll}>
-              <Trash2 size={14} /> Clear All
+      {/* Map fills the viewport. Header floats on top. */}
+      <div className="measure-stage">
+        <div ref={mapRef} className="measure-map-canvas" />
+
+        {/* Top-left: search */}
+        <div className="measure-search-bar">
+          {isSearching ? (
+            <Loader2 size={16} className="spin" style={{ color: 'var(--lucky-green-light)', flexShrink: 0 }} />
+          ) : (
+            <Search size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
+          )}
+          <input
+            ref={searchInputRef}
+            type="text"
+            placeholder="Search address..."
+            onChange={(e) => setHasSearchText(!!e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            className="measure-search-input"
+            autoComplete="off"
+          />
+          {hasSearchText && (
+            <button className="measure-search-clear" onClick={clearSearch} title="Clear search">
+              <X size={14} />
+            </button>
+          )}
+          {customers.length > 0 && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowCustomerAddresses(s => !s)}
+              title="Customer addresses"
+              style={{ padding: '4px 8px' }}
+            >
+              <MapPin size={16} />
             </button>
           )}
         </div>
-      </div>
 
-      {/* Mobile toggle between map and panel */}
-      <div className="measure-mobile-toggle">
-        <button
-          className={`tab ${!mobileShowPanel ? 'active' : ''}`}
-          onClick={() => setMobileShowPanel(false)}
-        >
-          🗺️ Map
-        </button>
-        <button
-          className={`tab ${mobileShowPanel ? 'active' : ''}`}
-          onClick={() => setMobileShowPanel(true)}
-        >
-          📐 Areas {areas.length > 0 && `(${areas.length})`}
-        </button>
-      </div>
-
-      {/* Main content: Map + Panel */}
-      <div className="measure-layout">
-        {/* Map */}
-        <div className={`measure-map-container ${mobileShowPanel ? 'mobile-hidden' : ''}`}>
-          {/* Search bar overlay */}
-          <div className="measure-search-bar">
-            {isSearching ? (
-              <Loader2 size={16} className="spin" style={{ color: 'var(--lucky-green-light)', flexShrink: 0 }} />
-            ) : (
-              <Search size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-            )}
-            <input
-              ref={searchInputRef}
-              type="text"
-              placeholder="Search address..."
-              onChange={(e) => setHasSearchText(!!e.target.value)}
-              onKeyDown={handleSearchKeyDown}
-              className="measure-search-input"
-              autoComplete="off"
-            />
-            {hasSearchText && (
+        {showCustomerAddresses && (
+          <div className="measure-customer-dropdown">
+            <div className="measure-customer-header">Customer Addresses</div>
+            {customers.filter(c => c.address).map(c => (
               <button
-                className="measure-search-clear"
-                onClick={clearSearch}
-                title="Clear search"
+                key={c.id}
+                className="measure-customer-item"
+                onClick={() => goToAddress(`${c.address}, ${c.city}, ${c.state} ${c.zip}`)}
               >
+                <MapPin size={14} />
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{c.firstName} {c.lastName}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.address}, {c.city}</div>
+                </div>
+              </button>
+            ))}
+            {customers.filter(c => c.address).length === 0 && (
+              <div style={{ padding: '12px', color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
+                No customers with addresses yet.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Top-center: net total chip */}
+        <div className="measure-net-chip" aria-live="polite">
+          <div>
+            <div className="measure-net-label">Net Area</div>
+            <div className="measure-net-value">
+              {totals.net.toLocaleString()}<span> sqft</span>
+            </div>
+          </div>
+          {(totals.exclusionTotal > 0) && (
+            <div className="measure-net-breakdown">
+              <span style={{ color: 'var(--lucky-green-light)' }}>+{totals.areaTotal.toLocaleString()}</span>
+              <span style={{ color: '#fca5a5' }}>−{totals.exclusionTotal.toLocaleString()}</span>
+            </div>
+          )}
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => copyToClipboard(totals.net, 'net')}
+            title="Copy net sqft"
+            style={{ marginLeft: 8 }}
+          >
+            {copied === 'net' ? <CheckCircle size={14} /> : <Copy size={14} />}
+          </button>
+        </div>
+
+        {/* Toolbar (floating, dock bottom on mobile) */}
+        <div className={`measure-toolbar ${activeTool ? 'is-drawing' : ''}`}>
+          {TOOLS.map(({ id, label, Icon, kind }) => (
+            <button
+              key={id}
+              className={`measure-tool-btn ${activeTool === id ? 'active' : ''} ${kind === 'exclusion' ? 'tool-exclude' : ''}`}
+              onClick={() => selectTool(id)}
+              title={label}
+            >
+              <Icon size={16} />
+              <span className="measure-tool-label">{label}</span>
+            </button>
+          ))}
+
+          <div className="measure-tool-sep" />
+
+          <button
+            className="measure-tool-btn"
+            onClick={detectBuildings}
+            disabled={detecting}
+            title="Auto-detect buildings in view"
+          >
+            {detecting ? <Loader2 size={16} className="spin" /> : <Building2 size={16} />}
+            <span className="measure-tool-label">{detecting ? 'Detecting…' : 'Detect Buildings'}</span>
+          </button>
+
+          {(shapes.length > 0 || candidates.length > 0) && (
+            <button className="measure-tool-btn measure-tool-danger" onClick={clearAll} title="Clear all">
+              <Trash2 size={16} />
+              <span className="measure-tool-label">Clear</span>
+            </button>
+          )}
+        </div>
+
+        {/* Drawing hint banner */}
+        {activeTool && (
+          <div className="measure-drawing-hint">
+            <Pencil size={14} />
+            <span>
+              {activeTool.includes('exclude')
+                ? 'Outline a building or feature to subtract.'
+                : activeTool.includes('rectangle')
+                  ? 'Click and drag to draw a rectangle.'
+                  : activeTool.includes('circle')
+                    ? 'Click and drag to draw a circle.'
+                    : 'Tap points to draw. Tap the first point to close.'}
+            </span>
+            <button className="measure-hint-cancel" onClick={cancelDrawing}><X size={14} /></button>
+          </div>
+        )}
+
+        {/* Candidate buildings panel */}
+        {candidates.length > 0 && (
+          <div className="measure-candidates">
+            <div className="measure-candidates-head">
+              <Building2 size={14} />
+              <strong>{candidates.length}</strong> building{candidates.length === 1 ? '' : 's'} found
+              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.74rem' }}>
+                tap on map or use buttons
+              </span>
+              <button className="measure-candidates-close" onClick={dismissCandidates} title="Dismiss">
                 <X size={14} />
               </button>
-            )}
-            {customers.length > 0 && (
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={() => setShowCustomerAddresses(!showCustomerAddresses)}
-                title="Customer addresses"
-                style={{ padding: '4px 8px' }}
-              >
-                <MapPin size={16} />
+            </div>
+            <div className="measure-candidates-actions">
+              <button className="btn btn-primary btn-sm" onClick={acceptAllCandidates}>
+                <Minus size={14} /> Subtract all
               </button>
-            )}
+              <button className="btn btn-ghost btn-sm" onClick={dismissCandidates}>
+                Skip all
+              </button>
+            </div>
           </div>
+        )}
 
-          {/* Customer addresses dropdown */}
-          {showCustomerAddresses && (
-            <div className="measure-customer-dropdown">
-              <div style={{ padding: '8px 12px', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid var(--border-primary)' }}>
-                Customer Addresses
-              </div>
-              {customers
-                .filter(c => c.address)
-                .map(c => (
-                  <button
-                    key={c.id}
-                    className="measure-customer-item"
-                    onClick={() => goToAddress(`${c.address}, ${c.city}, ${c.state} ${c.zip}`)}
-                  >
-                    <MapPin size={14} />
-                    <div>
-                      <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{c.firstName} {c.lastName}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.address}, {c.city}</div>
-                    </div>
-                  </button>
-                ))}
-              {customers.filter(c => c.address).length === 0 && (
-                <div style={{ padding: '12px', color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
-                  No customers with addresses yet.
-                </div>
+        {/* Bottom sheet listing shapes */}
+        <div className={`measure-sheet ${sheetExpanded ? 'expanded' : ''}`}>
+          <button className="measure-sheet-handle" onClick={() => setSheetExpanded(s => !s)}>
+            <div className="measure-sheet-handle-bar" />
+            <div className="measure-sheet-summary">
+              <Layers size={14} />
+              <span><strong>{areasCount}</strong> area{areasCount === 1 ? '' : 's'}</span>
+              {exclusionsCount > 0 && (
+                <span style={{ color: '#fca5a5' }}>
+                  · <strong>{exclusionsCount}</strong> exclusion{exclusionsCount === 1 ? '' : 's'}
+                </span>
               )}
+              <span style={{ marginLeft: 'auto', color: 'var(--text-tertiary)' }}>
+                {sheetExpanded ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+              </span>
             </div>
-          )}
+          </button>
 
-          {/* Drawing controls overlay */}
-          <div className="measure-draw-controls">
-            {isDrawing ? (
-              <button className="btn btn-danger btn-sm" onClick={cancelDrawing}>
-                <X size={14} /> Cancel
-              </button>
-            ) : (
-              <button className="btn btn-primary btn-sm" onClick={startDrawing}>
-                <Plus size={14} /> Draw Area
-              </button>
-            )}
-          </div>
-
-          {/* Map container */}
-          <div ref={mapRef} className="measure-map-canvas" />
-
-          {/* Drawing hint overlay */}
-          {isDrawing && (
-            <div className="measure-drawing-hint">
-              <SquareIcon size={16} />
-              <span>Tap to draw polygon points. Tap the first point to close.</span>
-            </div>
-          )}
-        </div>
-
-        {/* Right panel — Area calculations */}
-        <div className={`measure-panel ${mobileShowPanel ? 'mobile-visible' : ''}`}>
-          <div className="measure-panel-header">
-            <h3 style={{ fontSize: '0.95rem' }}>
-              <Layers size={16} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-              Measured Areas
-            </h3>
-            <span className="badge badge-info" style={{ fontSize: '0.72rem' }}>
-              {areas.length} {areas.length === 1 ? 'area' : 'areas'}
-            </span>
-          </div>
-
-          {/* Total */}
-          {areas.length > 0 && (
-            <div className="measure-total-card">
-              <div>
-                <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Total Area</div>
-                <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--lucky-green-light)' }}>
-                  {totalSqft.toLocaleString()} <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-tertiary)' }}>sqft</span>
-                </div>
-              </div>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => copyToClipboard(totalSqft, 'total')}
-                title="Copy total sqft"
-              >
-                {copied === 'total' ? <CheckCircle size={14} /> : <Copy size={14} />}
-                {copied === 'total' ? 'Copied' : 'Copy'}
-              </button>
-            </div>
-          )}
-
-          {/* Area cards */}
-          <div className="measure-area-list">
-            {areas.map((area, i) => (
-              <div key={area.id} className="measure-area-card">
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div
-                    className="measure-area-swatch"
-                    style={{ background: POLYGON_COLORS[area.colorIndex]?.fill || '#666' }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{area.label}</div>
-                    <div style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-                      {area.sqft.toLocaleString()} <span style={{ fontSize: '0.72rem', fontWeight: 500, color: 'var(--text-tertiary)' }}>sqft</span>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '4px' }}>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => copyToClipboard(area.sqft, area.id)}
-                      title="Copy sqft"
-                      style={{ padding: '4px 8px' }}
-                    >
-                      {copied === area.id ? <CheckCircle size={14} /> : <Copy size={14} />}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm"
-                      onClick={() => removeArea(area.id)}
-                      title="Remove area"
-                      style={{ padding: '4px 8px', color: 'var(--status-danger)' }}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-
-            {areas.length === 0 && (
-              <div style={{ textAlign: 'center', padding: 'var(--space-xl) var(--space-md)', color: 'var(--text-tertiary)' }}>
-                <SquareIcon size={32} style={{ marginBottom: 'var(--space-sm)', opacity: 0.4 }} />
-                <p style={{ fontSize: '0.82rem', marginBottom: 'var(--space-sm)' }}>No areas measured yet</p>
-                <p style={{ fontSize: '0.75rem' }}>
-                  Search an address, then click <strong>&quot;Draw Area&quot;</strong> to start measuring.
+          <div className="measure-sheet-body">
+            {shapes.length === 0 ? (
+              <div className="measure-empty">
+                <SquareIcon size={28} style={{ opacity: 0.4 }} />
+                <p>No shapes drawn yet.</p>
+                <p className="measure-empty-hint">
+                  Pick a tool above. Use <strong>Subtract</strong> or <strong>Detect Buildings</strong> to remove
+                  driveways, houses, sheds from your area.
                 </p>
               </div>
+            ) : (
+              <div className="measure-shape-list">
+                {shapes.map(s => {
+                  const isEx = s.kind === 'exclusion';
+                  return (
+                    <div key={s.id} className={`measure-shape-row ${isEx ? 'is-exclusion' : ''} ${s.hidden ? 'is-hidden' : ''}`}>
+                      <div className="measure-shape-swatch" style={{ background: isEx ? EXCLUSION_FILL : AREA_FILL }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="measure-shape-label">{s.label}</div>
+                        <div className="measure-shape-sqft">
+                          {isEx ? '−' : ''}{s.sqft.toLocaleString()}
+                          <span> sqft</span>
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => copyToClipboard(s.sqft, s.id)}
+                        title="Copy"
+                      >
+                        {copied === s.id ? <CheckCircle size={14} /> : <Copy size={14} />}
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => toggleHidden(s.id)}
+                        title={s.hidden ? 'Show' : 'Hide'}
+                      >
+                        {s.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => removeShape(s.id)}
+                        title="Delete"
+                        style={{ color: 'var(--status-danger)' }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-
-          {/* Quick tips */}
-          {areas.length === 0 && (
-            <div className="measure-tips">
-              <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '8px' }}>
-                Quick Tips
-              </div>
-              <ul style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '6px', listStyle: 'disc', paddingLeft: '16px' }}>
-                <li>Search a customer address or enter any address</li>
-                <li>Click &quot;Draw Area&quot; and outline the landscaping area</li>
-                <li>Drag corners to adjust the polygon</li>
-                <li>Copy sqft values to use in quotes</li>
-              </ul>
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Toast */}
       {toast && (
         <div className={`toast toast-${toast.type}`}>
           <CheckCircle size={18} />
