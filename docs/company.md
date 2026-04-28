@@ -5,7 +5,7 @@
 Lucky Landscapes LLC 
 
 ## One-line description
-"Full service residential landscaping & Hardscaping company based in Lincoln, Nebraska." 
+"Full service residential & commercial landscaping & Hardscaping company based in Lincoln, Nebraska." 
 
 ## Founding & history
 - **Founded:** March 2026
@@ -20,7 +20,7 @@ Lucky Landscapes LLC
 ## Service area
 - **Primary:** Lincoln, Nebraska
 - **Secondary / will-travel-for:** Beatrice, Surrounding small towns up to an hour away, will travel for large projects.
-- **Hard no:** TODO
+- **Hard no:** None
 
 ## Customers
 - **Ideal customer profile:** High end Residential , 200k+ Homes, HOAs, Acreages, commercial properties

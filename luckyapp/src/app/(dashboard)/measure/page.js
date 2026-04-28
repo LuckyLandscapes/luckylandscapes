@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import {
   Ruler, Search, Trash2, Copy, MapPin, CheckCircle, Layers, X, SquareIcon,
-  Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp, Eye, EyeOff,
+  Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp,
+  Eye, EyeOff, Save, FolderOpen, User, Spline,
 } from 'lucide-react';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -18,44 +19,98 @@ const EXCLUSION_STROKE = '#fca5a5';
 const CANDIDATE_FILL = '#f59e0b';
 const CANDIDATE_STROKE = '#fbbf24';
 
-// Tools the user can pick from the toolbar.
 const TOOLS = [
   { id: 'polygon-area',     kind: 'area',      shape: 'polygon',   label: 'Polygon',   Icon: Hexagon },
   { id: 'rectangle-area',   kind: 'area',      shape: 'rectangle', label: 'Rectangle', Icon: SquareIcon },
   { id: 'circle-area',      kind: 'area',      shape: 'circle',    label: 'Circle',    Icon: CircleIcon },
+  { id: 'freehand-area',    kind: 'area',      shape: 'freehand',  label: 'Freehand',  Icon: Spline },
   { id: 'polygon-exclude',  kind: 'exclusion', shape: 'polygon',   label: 'Subtract',  Icon: Minus },
+  { id: 'freehand-exclude', kind: 'exclusion', shape: 'freehand',  label: 'Free Sub.', Icon: Pencil },
 ];
 
+// Convert any google.maps overlay to a portable JSON form for storage.
+function overlayToData(overlay, kind, label) {
+  if (typeof overlay.getRadius === 'function') {
+    const c = overlay.getCenter();
+    return { kind, label, type: 'circle', center: { lat: c.lat(), lng: c.lng() }, radius: overlay.getRadius() };
+  }
+  if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
+    const b = overlay.getBounds();
+    const ne = b.getNorthEast(), sw = b.getSouthWest();
+    return { kind, label, type: 'rectangle', ne: { lat: ne.lat(), lng: ne.lng() }, sw: { lat: sw.lat(), lng: sw.lng() } };
+  }
+  if (typeof overlay.getPath === 'function') {
+    const path = overlay.getPath();
+    const pts = [];
+    for (let i = 0; i < path.getLength(); i++) {
+      const p = path.getAt(i);
+      pts.push({ lat: p.lat(), lng: p.lng() });
+    }
+    return { kind, label, type: 'polygon', path: pts };
+  }
+  return null;
+}
+
+// Rebuild a google.maps overlay from a stored shape definition.
+function dataToOverlay(g, map, def, kind) {
+  const opts = {
+    fillColor: kind === 'exclusion' ? EXCLUSION_FILL : AREA_FILL,
+    strokeColor: kind === 'exclusion' ? EXCLUSION_STROKE : AREA_STROKE,
+    fillOpacity: kind === 'exclusion' ? 0.45 : 0.3,
+    strokeWeight: 2,
+    editable: true,
+    map,
+    zIndex: kind === 'exclusion' ? 2 : 1,
+  };
+  if (def.type === 'circle') {
+    return new g.Circle({ ...opts, center: def.center, radius: def.radius });
+  }
+  if (def.type === 'rectangle') {
+    return new g.Rectangle({ ...opts, bounds: { north: def.ne.lat, east: def.ne.lng, south: def.sw.lat, west: def.sw.lng } });
+  }
+  return new g.Polygon({ ...opts, paths: def.path });
+}
+
 export default function MeasurePage() {
-  const { customers } = useData();
+  const { customers, updateCustomer } = useData();
 
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
   const drawingManagerRef = useRef(null);
   const searchInputRef = useRef(null);
   const autocompleteRef = useRef(null);
-  const shapesRef = useRef(new Map()); // id -> google maps overlay
-  const candidateOverlaysRef = useRef(new Map()); // candidate id -> overlay
+  const shapesRef = useRef(new Map());
+  const candidateOverlaysRef = useRef(new Map());
+  const projectionOverlayRef = useRef(null); // for screen→latlng during freehand
+  const freehandStateRef = useRef(null);
+  const mapTypeRef = useRef('satellite');
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [shapes, setShapes] = useState([]); // [{id, kind, shape, sqft, label, hidden}]
-  const [activeTool, setActiveTool] = useState(null); // tool id or null
+  const [shapes, setShapes] = useState([]); // [{id, kind, sqft, label, hidden}]
+  const [activeTool, setActiveTool] = useState(null);
   const [hasSearchText, setHasSearchText] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [copied, setCopied] = useState(null);
   const [showCustomerAddresses, setShowCustomerAddresses] = useState(false);
-  const [candidates, setCandidates] = useState([]); // detected building candidates
+  const [candidates, setCandidates] = useState([]);
   const [detecting, setDetecting] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [toast, setToast] = useState(null);
+  const [activeCustomerId, setActiveCustomerId] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [mapTypeId, setMapTypeId] = useState('satellite');
 
-  // Show transient toast
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 2400);
   }, []);
 
-  // ---- Load Google Maps script ----
+  const activeCustomer = useMemo(
+    () => customers.find(c => c.id === activeCustomerId) || null,
+    [customers, activeCustomerId]
+  );
+
+  // ---- Load Google Maps ----
   useEffect(() => {
     if (!GOOGLE_MAPS_KEY) return;
     if (window.google?.maps?.Map) {
@@ -77,7 +132,7 @@ export default function MeasurePage() {
     document.head.appendChild(s);
   }, []);
 
-  // Helper: compute sqft for a google maps overlay (polygon/rectangle/circle).
+  // sqft for a google maps overlay
   const computeSqft = useCallback((overlay) => {
     const g = window.google.maps;
     if (!overlay) return 0;
@@ -87,8 +142,7 @@ export default function MeasurePage() {
     }
     if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
       const b = overlay.getBounds();
-      const ne = b.getNorthEast();
-      const sw = b.getSouthWest();
+      const ne = b.getNorthEast(), sw = b.getSouthWest();
       const path = [
         new g.LatLng(ne.lat(), sw.lng()),
         new g.LatLng(ne.lat(), ne.lng()),
@@ -103,12 +157,12 @@ export default function MeasurePage() {
     return 0;
   }, []);
 
-  // Helper: attach edit listeners that recalc sqft on change.
   const attachEditListeners = useCallback((id, overlay) => {
     const g = window.google.maps;
     const recalc = () => {
       const sqft = computeSqft(overlay);
       setShapes(prev => prev.map(s => s.id === id ? { ...s, sqft } : s));
+      setIsDirty(true);
     };
     if (typeof overlay.getPath === 'function') {
       const path = overlay.getPath();
@@ -123,8 +177,7 @@ export default function MeasurePage() {
     }
   }, [computeSqft]);
 
-  // Add a completed shape to state.
-  const addShape = useCallback((overlay, kind) => {
+  const addShape = useCallback((overlay, kind, presetLabel) => {
     const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const isExclusion = kind === 'exclusion';
     overlay.setOptions({
@@ -142,12 +195,13 @@ export default function MeasurePage() {
 
     setShapes(prev => {
       const sameKind = prev.filter(s => s.kind === kind).length + 1;
-      const label = (kind === 'area' ? 'Area ' : 'Exclude ') + sameKind;
+      const label = presetLabel || ((kind === 'area' ? 'Area ' : 'Exclude ') + sameKind);
       return [...prev, { id, kind, sqft, label, hidden: false }];
     });
+    setIsDirty(true);
   }, [attachEditListeners, computeSqft]);
 
-  // ---- Initialize map ----
+  // ---- Initialize map + drawing manager + projection overlay ----
   useEffect(() => {
     if (!mapsLoaded || !mapRef.current || mapInstanceRef.current) return;
     const g = window.google.maps;
@@ -155,35 +209,41 @@ export default function MeasurePage() {
     const map = new g.Map(mapRef.current, {
       center: { lat: 40.8136, lng: -96.7026 },
       zoom: 18,
-      mapTypeId: 'satellite',
+      mapTypeId: mapTypeRef.current,
       tilt: 0,
-      mapTypeControl: true,
-      mapTypeControlOptions: {
-        style: g.MapTypeControlStyle.HORIZONTAL_BAR,
-        position: g.ControlPosition.TOP_RIGHT,
-      },
+      mapTypeControl: false,
       streetViewControl: false,
-      fullscreenControl: true,
+      fullscreenControl: false,
+      rotateControl: false,
       zoomControl: true,
-      zoomControlOptions: { position: g.ControlPosition.RIGHT_CENTER },
+      zoomControlOptions: { position: g.ControlPosition.RIGHT_TOP },
       gestureHandling: 'greedy',
     });
     mapInstanceRef.current = map;
 
+    // Hidden overlay used purely to access the projection (screen px → LatLng) for freehand.
+    const Overlay = function () {};
+    Overlay.prototype = new g.OverlayView();
+    Overlay.prototype.onAdd = function () {};
+    Overlay.prototype.draw = function () {};
+    Overlay.prototype.onRemove = function () {};
+    const overlay = new Overlay();
+    overlay.setMap(map);
+    projectionOverlayRef.current = overlay;
+
     const drawingManager = new g.drawing.DrawingManager({
       drawingMode: null,
       drawingControl: false,
-      polygonOptions: { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
+      polygonOptions:   { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
       rectangleOptions: { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
       circleOptions:    { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
     });
     drawingManager.setMap(map);
     drawingManagerRef.current = drawingManager;
 
-    const onComplete = (overlay) => {
-      // Read kind from the dataset of drawingManager (set when tool changes)
+    const onComplete = (shape) => {
       const kind = drawingManager.__kind || 'area';
-      addShape(overlay, kind);
+      addShape(shape, kind);
       drawingManager.setDrawingMode(null);
       setActiveTool(null);
     };
@@ -191,7 +251,6 @@ export default function MeasurePage() {
     g.event.addListener(drawingManager, 'rectanglecomplete', onComplete);
     g.event.addListener(drawingManager, 'circlecomplete',    onComplete);
 
-    // Places autocomplete
     if (searchInputRef.current) {
       const autocomplete = new g.places.Autocomplete(searchInputRef.current, {
         types: ['address'],
@@ -211,19 +270,152 @@ export default function MeasurePage() {
     }
   }, [mapsLoaded, addShape]);
 
-  // ---- Tool selection drives the drawing mode ----
+  // ---- Tool selection ----
+  const cancelDrawing = useCallback(() => {
+    const dm = drawingManagerRef.current;
+    if (dm) { dm.setDrawingMode(null); dm.__kind = null; }
+    // Clean up freehand if active
+    if (freehandStateRef.current) {
+      freehandStateRef.current.cleanup?.();
+      freehandStateRef.current = null;
+    }
+    setActiveTool(null);
+  }, []);
+
+  // Freehand drawing implementation. Uses pointer events on the map's div
+  // and the projection overlay to convert screen points to LatLngs.
+  const startFreehand = useCallback((kind) => {
+    const map = mapInstanceRef.current;
+    const overlay = projectionOverlayRef.current;
+    const g = window.google.maps;
+    if (!map || !overlay) return;
+
+    // Save & disable map gestures so dragging draws instead of panning.
+    const prevDraggable = map.get('draggable');
+    const prevGesture = map.get('gestureHandling');
+    map.setOptions({ draggable: false, gestureHandling: 'none' });
+
+    const div = map.getDiv();
+    const previewColor = kind === 'exclusion' ? EXCLUSION_STROKE : AREA_STROKE;
+
+    const polyline = new g.Polyline({
+      map,
+      strokeColor: previewColor,
+      strokeOpacity: 0.95,
+      strokeWeight: 3,
+      clickable: false,
+      path: [],
+    });
+
+    const points = [];
+    let drawing = false;
+
+    const screenToLatLng = (x, y) => {
+      const rect = div.getBoundingClientRect();
+      const projection = overlay.getProjection();
+      if (!projection) return null;
+      return projection.fromContainerPixelToLatLng(
+        new g.Point(x - rect.left, y - rect.top)
+      );
+    };
+
+    const onDown = (e) => {
+      const t = e.touches?.[0] || e;
+      const ll = screenToLatLng(t.clientX, t.clientY);
+      if (!ll) return;
+      drawing = true;
+      points.length = 0;
+      points.push(ll);
+      polyline.setPath([ll]);
+      e.preventDefault();
+    };
+    const onMove = (e) => {
+      if (!drawing) return;
+      const t = e.touches?.[0] || e;
+      const ll = screenToLatLng(t.clientX, t.clientY);
+      if (!ll) return;
+      // Sample-down: only push if moved more than ~2 px
+      const last = points[points.length - 1];
+      if (last && g.geometry.spherical.computeDistanceBetween(last, ll) < 0.3) return;
+      points.push(ll);
+      polyline.getPath().push(ll);
+      e.preventDefault();
+    };
+    const onUp = () => {
+      if (!drawing) return;
+      drawing = false;
+      polyline.setMap(null);
+
+      if (points.length >= 3) {
+        // Simplify slightly: drop near-duplicate points
+        const simplified = [points[0]];
+        for (let i = 1; i < points.length; i++) {
+          const last = simplified[simplified.length - 1];
+          if (g.geometry.spherical.computeDistanceBetween(last, points[i]) > 0.4) {
+            simplified.push(points[i]);
+          }
+        }
+        const polygon = new g.Polygon({
+          paths: simplified,
+          fillColor: kind === 'exclusion' ? EXCLUSION_FILL : AREA_FILL,
+          strokeColor: kind === 'exclusion' ? EXCLUSION_STROKE : AREA_STROKE,
+          fillOpacity: kind === 'exclusion' ? 0.45 : 0.3,
+          strokeWeight: 2,
+          editable: true,
+          map,
+        });
+        addShape(polygon, kind);
+      }
+      cleanup();
+    };
+
+    const cleanup = () => {
+      div.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      div.removeEventListener('touchstart', onDown);
+      window.removeEventListener('touchmove', onMove, { passive: false });
+      window.removeEventListener('touchend', onUp);
+      map.setOptions({ draggable: prevDraggable !== false, gestureHandling: prevGesture || 'greedy' });
+      div.classList.remove('measure-cursor-cross');
+      freehandStateRef.current = null;
+      setActiveTool(null);
+    };
+
+    div.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    div.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    div.classList.add('measure-cursor-cross');
+    freehandStateRef.current = { cleanup };
+  }, [addShape]);
+
   const selectTool = useCallback((toolId) => {
     const dm = drawingManagerRef.current;
     if (!dm) return;
     if (toolId === activeTool || toolId == null) {
-      dm.setDrawingMode(null);
-      dm.__kind = null;
-      setActiveTool(null);
+      cancelDrawing();
       return;
+    }
+    // Always clear any prior freehand state first
+    if (freehandStateRef.current) {
+      freehandStateRef.current.cleanup?.();
+      freehandStateRef.current = null;
     }
     const tool = TOOLS.find(t => t.id === toolId);
     if (!tool) return;
     const g = window.google.maps;
+
+    if (tool.shape === 'freehand') {
+      dm.setDrawingMode(null);
+      setActiveTool(toolId);
+      startFreehand(tool.kind);
+      return;
+    }
+
     const isExclusion = tool.kind === 'exclusion';
     const opts = {
       fillColor: isExclusion ? EXCLUSION_FILL : AREA_FILL,
@@ -241,27 +433,16 @@ export default function MeasurePage() {
     };
     dm.setDrawingMode(modeMap[tool.shape]);
     setActiveTool(toolId);
-  }, [activeTool]);
+  }, [activeTool, cancelDrawing, startFreehand]);
 
-  // Cancel drawing
-  const cancelDrawing = useCallback(() => {
-    const dm = drawingManagerRef.current;
-    if (dm) {
-      dm.setDrawingMode(null);
-      dm.__kind = null;
-    }
-    setActiveTool(null);
-  }, []);
-
-  // Remove a shape
   const removeShape = useCallback((id) => {
     const overlay = shapesRef.current.get(id);
     if (overlay) overlay.setMap(null);
     shapesRef.current.delete(id);
     setShapes(prev => prev.filter(s => s.id !== id));
+    setIsDirty(true);
   }, []);
 
-  // Toggle visibility
   const toggleHidden = useCallback((id) => {
     const overlay = shapesRef.current.get(id);
     setShapes(prev => prev.map(s => {
@@ -272,8 +453,7 @@ export default function MeasurePage() {
     }));
   }, []);
 
-  // Clear everything
-  const clearAll = useCallback(() => {
+  const clearAllShapesOnly = useCallback(() => {
     shapesRef.current.forEach(o => o.setMap(null));
     shapesRef.current.clear();
     setShapes([]);
@@ -282,7 +462,40 @@ export default function MeasurePage() {
     setCandidates([]);
   }, []);
 
-  // ---- Auto-detect buildings via OpenStreetMap Overpass ----
+  const clearAll = useCallback(() => {
+    clearAllShapesOnly();
+    setIsDirty(true);
+  }, [clearAllShapesOnly]);
+
+  // ---- Map type toggle (replaces Google's mapTypeControl that we hid) ----
+  const cycleMapType = useCallback(() => {
+    const types = ['satellite', 'hybrid', 'roadmap'];
+    const idx = types.indexOf(mapTypeRef.current);
+    const next = types[(idx + 1) % types.length];
+    mapTypeRef.current = next;
+    setMapTypeId(next);
+    if (mapInstanceRef.current) mapInstanceRef.current.setMapTypeId(next);
+  }, []);
+
+  // ---- Auto-detect buildings via Overpass ----
+  const acceptCandidate = useCallback((cid) => {
+    const overlay = candidateOverlaysRef.current.get(cid);
+    if (!overlay) return;
+    candidateOverlaysRef.current.delete(cid);
+    addShape(overlay, 'exclusion');
+    setCandidates(prev => prev.filter(c => c.id !== cid));
+  }, [addShape]);
+
+  const acceptAllCandidates = useCallback(() => {
+    Array.from(candidateOverlaysRef.current.keys()).forEach(acceptCandidate);
+  }, [acceptCandidate]);
+
+  const dismissCandidates = useCallback(() => {
+    candidateOverlaysRef.current.forEach(o => o.setMap(null));
+    candidateOverlaysRef.current.clear();
+    setCandidates([]);
+  }, []);
+
   const detectBuildings = useCallback(async () => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -292,7 +505,6 @@ export default function MeasurePage() {
     const ne = bounds.getNorthEast();
     setDetecting(true);
 
-    // Clear prior candidates
     candidateOverlaysRef.current.forEach(o => o.setMap(null));
     candidateOverlaysRef.current.clear();
     setCandidates([]);
@@ -307,7 +519,6 @@ export default function MeasurePage() {
       if (!res.ok) throw new Error(`Overpass ${res.status}`);
       const data = await res.json();
       const elements = (data.elements || []).filter(e => e.type === 'way' && Array.isArray(e.geometry) && e.geometry.length >= 3);
-
       const g = window.google.maps;
       const found = [];
       elements.forEach((el) => {
@@ -324,21 +535,15 @@ export default function MeasurePage() {
           map,
         });
         const sqft = Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
-        if (sqft < 30) {
-          overlay.setMap(null);
-          return; // ignore tiny artifacts
-        }
+        if (sqft < 30) { overlay.setMap(null); return; }
         const cid = `cand-${el.id}`;
         candidateOverlaysRef.current.set(cid, overlay);
         found.push({ id: cid, sqft, tag: el.tags?.building || 'building' });
-
-        // Click-to-add-as-exclusion
         overlay.addListener('click', () => acceptCandidate(cid));
       });
-
       setCandidates(found);
       if (found.length === 0) {
-        showToast('No buildings found in this area. Try zooming or panning.', 'info');
+        showToast('No buildings found in this view. Try zooming or panning.', 'info');
       } else {
         showToast(`Found ${found.length} building${found.length === 1 ? '' : 's'}. Tap to subtract.`, 'success');
       }
@@ -348,30 +553,110 @@ export default function MeasurePage() {
     } finally {
       setDetecting(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showToast]);
+  }, [acceptCandidate, showToast]);
 
-  // Accept a single candidate -> turn into exclusion
-  const acceptCandidate = useCallback((cid) => {
-    const overlay = candidateOverlaysRef.current.get(cid);
-    if (!overlay) return;
-    candidateOverlaysRef.current.delete(cid);
-    addShape(overlay, 'exclusion');
-    setCandidates(prev => prev.filter(c => c.id !== cid));
-  }, [addShape]);
+  // ---- Per-customer save / load ----
+  const loadFromCustomer = useCallback((customer) => {
+    if (!customer) return;
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const g = window.google.maps;
 
-  const acceptAllCandidates = useCallback(() => {
-    const ids = Array.from(candidateOverlaysRef.current.keys());
-    ids.forEach(acceptCandidate);
-  }, [acceptCandidate]);
+    clearAllShapesOnly();
 
-  const dismissCandidates = useCallback(() => {
-    candidateOverlaysRef.current.forEach(o => o.setMap(null));
-    candidateOverlaysRef.current.clear();
-    setCandidates([]);
+    const stored = customer.measurements;
+    if (!stored?.shapes?.length) {
+      setIsDirty(false);
+      return;
+    }
+    stored.shapes.forEach((def) => {
+      const overlay = dataToOverlay(g, map, def, def.kind);
+      const id = `shape-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      shapesRef.current.set(id, overlay);
+      attachEditListeners(id, overlay);
+      const sqft = computeSqft(overlay);
+      setShapes(prev => [...prev, { id, kind: def.kind, sqft, label: def.label || (def.kind === 'area' ? 'Area' : 'Exclude'), hidden: false }]);
+    });
+
+    if (stored.center) {
+      map.setCenter(stored.center);
+      if (stored.zoom) map.setZoom(stored.zoom);
+    }
+    setIsDirty(false);
+  }, [attachEditListeners, computeSqft, clearAllShapesOnly]);
+
+  const handleSelectCustomer = useCallback((customer) => {
+    setActiveCustomerId(customer.id);
+    setShowCustomerAddresses(false);
+    if (searchInputRef.current && customer.address) {
+      searchInputRef.current.value = `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim();
+      setHasSearchText(true);
+    }
+    // If the customer has measurements, restore them. Otherwise just go to address.
+    if (customer.measurements?.shapes?.length) {
+      loadFromCustomer(customer);
+      // Center to stored center if present, else geocode address
+      const stored = customer.measurements;
+      if (!stored.center && customer.address && mapInstanceRef.current) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}` }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            mapInstanceRef.current.setCenter(results[0].geometry.location);
+            mapInstanceRef.current.setZoom(20);
+          }
+        });
+      }
+      showToast(`Loaded ${stored.shapes.length} saved shape${stored.shapes.length === 1 ? '' : 's'}.`, 'success');
+    } else if (customer.address && mapInstanceRef.current) {
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}` }, (results, status) => {
+        if (status === 'OK' && results[0]) {
+          mapInstanceRef.current.setCenter(results[0].geometry.location);
+          mapInstanceRef.current.setZoom(20);
+        }
+      });
+    }
+  }, [loadFromCustomer, showToast]);
+
+  const saveToCustomer = useCallback(async () => {
+    if (!activeCustomer) {
+      showToast('Pick a customer first.', 'info');
+      return;
+    }
+    const defs = [];
+    shapes.forEach(s => {
+      const overlay = shapesRef.current.get(s.id);
+      const def = overlayToData(overlay, s.kind, s.label);
+      if (def) defs.push(def);
+    });
+    const map = mapInstanceRef.current;
+    const center = map ? { lat: map.getCenter().lat(), lng: map.getCenter().lng() } : null;
+    const zoom = map ? map.getZoom() : null;
+    const totalSqft = shapes.filter(s => !s.hidden && s.kind === 'area').reduce((a, b) => a + b.sqft, 0)
+      - shapes.filter(s => !s.hidden && s.kind === 'exclusion').reduce((a, b) => a + b.sqft, 0);
+
+    const measurements = {
+      shapes: defs,
+      center,
+      zoom,
+      totalSqft: Math.max(0, totalSqft),
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await updateCustomer(activeCustomer.id, { measurements });
+      setIsDirty(false);
+      showToast(`Saved ${defs.length} shape${defs.length === 1 ? '' : 's'} to ${activeCustomer.firstName || 'customer'}.`, 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('Save failed. See console.', 'error');
+    }
+  }, [activeCustomer, shapes, updateCustomer, showToast]);
+
+  const detachCustomer = useCallback(() => {
+    setActiveCustomerId(null);
   }, []);
 
-  // Copy helper
+  // ---- Search ----
   const copyToClipboard = useCallback((value, label) => {
     navigator.clipboard.writeText(String(value)).then(() => {
       setCopied(label);
@@ -379,7 +664,6 @@ export default function MeasurePage() {
     });
   }, []);
 
-  // Search by address (manual Enter)
   const handleSearchKeyDown = useCallback((e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -399,22 +683,6 @@ export default function MeasurePage() {
     });
   }, []);
 
-  const goToAddress = useCallback((address) => {
-    if (!mapInstanceRef.current) return;
-    setIsSearching(true);
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address }, (results, status) => {
-      setIsSearching(false);
-      if (status === 'OK' && results[0]) {
-        mapInstanceRef.current.setCenter(results[0].geometry.location);
-        mapInstanceRef.current.setZoom(20);
-        if (searchInputRef.current) searchInputRef.current.value = address;
-        setHasSearchText(true);
-        setShowCustomerAddresses(false);
-      }
-    });
-  }, []);
-
   const clearSearch = useCallback(() => {
     if (searchInputRef.current) {
       searchInputRef.current.value = '';
@@ -430,12 +698,12 @@ export default function MeasurePage() {
     return { areaTotal, exclusionTotal, net: Math.max(0, areaTotal - exclusionTotal) };
   }, [shapes]);
 
-  // Cleanup on unmount: remove all overlays
   useEffect(() => () => {
     shapesRef.current.forEach(o => o?.setMap?.(null));
     shapesRef.current.clear();
     candidateOverlaysRef.current.forEach(o => o?.setMap?.(null));
     candidateOverlaysRef.current.clear();
+    if (freehandStateRef.current) freehandStateRef.current.cleanup?.();
   }, []);
 
   if (!GOOGLE_MAPS_KEY) {
@@ -460,10 +728,10 @@ export default function MeasurePage() {
 
   const areasCount = shapes.filter(s => s.kind === 'area').length;
   const exclusionsCount = shapes.filter(s => s.kind === 'exclusion').length;
+  const customersWithMeasurements = customers.filter(c => c.measurements?.shapes?.length).length;
 
   return (
     <div className="measure-page page animate-fade-in">
-      {/* Map fills the viewport. Header floats on top. */}
       <div className="measure-stage">
         <div ref={mapRef} className="measure-map-canvas" />
 
@@ -492,30 +760,43 @@ export default function MeasurePage() {
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => setShowCustomerAddresses(s => !s)}
-              title="Customer addresses"
+              title="Customer list"
               style={{ padding: '4px 8px' }}
             >
-              <MapPin size={16} />
+              <FolderOpen size={16} />
+              {customersWithMeasurements > 0 && (
+                <span className="measure-saved-badge">{customersWithMeasurements}</span>
+              )}
             </button>
           )}
         </div>
 
         {showCustomerAddresses && (
           <div className="measure-customer-dropdown">
-            <div className="measure-customer-header">Customer Addresses</div>
-            {customers.filter(c => c.address).map(c => (
-              <button
-                key={c.id}
-                className="measure-customer-item"
-                onClick={() => goToAddress(`${c.address}, ${c.city}, ${c.state} ${c.zip}`)}
-              >
-                <MapPin size={14} />
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>{c.firstName} {c.lastName}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.address}, {c.city}</div>
-                </div>
-              </button>
-            ))}
+            <div className="measure-customer-header">Customers · click to load saved yard</div>
+            {customers.filter(c => c.address).map(c => {
+              const hasMeasurements = !!c.measurements?.shapes?.length;
+              return (
+                <button
+                  key={c.id}
+                  className="measure-customer-item"
+                  onClick={() => handleSelectCustomer(c)}
+                >
+                  <MapPin size={14} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.82rem' }}>
+                      {c.firstName} {c.lastName}
+                      {hasMeasurements && (
+                        <span className="measure-saved-pill">
+                          {c.measurements.shapes.length} saved
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{c.address}, {c.city}</div>
+                  </div>
+                </button>
+              );
+            })}
             {customers.filter(c => c.address).length === 0 && (
               <div style={{ padding: '12px', color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>
                 No customers with addresses yet.
@@ -524,7 +805,33 @@ export default function MeasurePage() {
           </div>
         )}
 
-        {/* Top-center: net total chip */}
+        {/* Active customer indicator */}
+        {activeCustomer && (
+          <div className="measure-active-customer">
+            <User size={14} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Working on</div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {activeCustomer.firstName} {activeCustomer.lastName}
+              </div>
+            </div>
+            {isDirty && <span className="measure-dirty-dot" title="Unsaved changes" />}
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={saveToCustomer}
+              disabled={!isDirty}
+              title="Save to this customer"
+              style={{ padding: '4px 8px' }}
+            >
+              <Save size={14} />
+            </button>
+            <button className="measure-search-clear" onClick={detachCustomer} title="Detach customer">
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Net total chip */}
         <div className="measure-net-chip" aria-live="polite">
           <div>
             <div className="measure-net-label">Net Area</div>
@@ -532,7 +839,7 @@ export default function MeasurePage() {
               {totals.net.toLocaleString()}<span> sqft</span>
             </div>
           </div>
-          {(totals.exclusionTotal > 0) && (
+          {totals.exclusionTotal > 0 && (
             <div className="measure-net-breakdown">
               <span style={{ color: 'var(--lucky-green-light)' }}>+{totals.areaTotal.toLocaleString()}</span>
               <span style={{ color: '#fca5a5' }}>−{totals.exclusionTotal.toLocaleString()}</span>
@@ -548,7 +855,13 @@ export default function MeasurePage() {
           </button>
         </div>
 
-        {/* Toolbar (floating, dock bottom on mobile) */}
+        {/* Map type toggle (replaces Google's hidden mapTypeControl) */}
+        <button className="measure-maptype-btn" onClick={cycleMapType} title="Cycle map type">
+          <Layers size={14} />
+          <span>{mapTypeId === 'satellite' ? 'Satellite' : mapTypeId === 'hybrid' ? 'Hybrid' : 'Map'}</span>
+        </button>
+
+        {/* Floating toolbar */}
         <div className={`measure-toolbar ${activeTool ? 'is-drawing' : ''}`}>
           {TOOLS.map(({ id, label, Icon, kind }) => (
             <button
@@ -582,24 +895,24 @@ export default function MeasurePage() {
           )}
         </div>
 
-        {/* Drawing hint banner */}
         {activeTool && (
           <div className="measure-drawing-hint">
             <Pencil size={14} />
             <span>
-              {activeTool.includes('exclude')
-                ? 'Outline a building or feature to subtract.'
-                : activeTool.includes('rectangle')
-                  ? 'Click and drag to draw a rectangle.'
-                  : activeTool.includes('circle')
-                    ? 'Click and drag to draw a circle.'
-                    : 'Tap points to draw. Tap the first point to close.'}
+              {activeTool.includes('freehand')
+                ? 'Press and drag to draw a free shape. Release to finish.'
+                : activeTool.includes('exclude')
+                  ? 'Outline a building or feature to subtract.'
+                  : activeTool.includes('rectangle')
+                    ? 'Click and drag to draw a rectangle.'
+                    : activeTool.includes('circle')
+                      ? 'Click and drag to draw a circle.'
+                      : 'Tap points to draw. Tap the first point to close.'}
             </span>
             <button className="measure-hint-cancel" onClick={cancelDrawing}><X size={14} /></button>
           </div>
         )}
 
-        {/* Candidate buildings panel */}
         {candidates.length > 0 && (
           <div className="measure-candidates">
             <div className="measure-candidates-head">
@@ -623,7 +936,6 @@ export default function MeasurePage() {
           </div>
         )}
 
-        {/* Bottom sheet listing shapes */}
         <div className={`measure-sheet ${sheetExpanded ? 'expanded' : ''}`}>
           <button className="measure-sheet-handle" onClick={() => setSheetExpanded(s => !s)}>
             <div className="measure-sheet-handle-bar" />
@@ -647,8 +959,8 @@ export default function MeasurePage() {
                 <SquareIcon size={28} style={{ opacity: 0.4 }} />
                 <p>No shapes drawn yet.</p>
                 <p className="measure-empty-hint">
-                  Pick a tool above. Use <strong>Subtract</strong> or <strong>Detect Buildings</strong> to remove
-                  driveways, houses, sheds from your area.
+                  Pick a tool. Use <strong>Subtract</strong> or <strong>Detect Buildings</strong> to remove
+                  driveways, houses, sheds. Pick a customer from the folder icon to load or save a yard.
                 </p>
               </div>
             ) : (
@@ -665,26 +977,13 @@ export default function MeasurePage() {
                           <span> sqft</span>
                         </div>
                       </div>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => copyToClipboard(s.sqft, s.id)}
-                        title="Copy"
-                      >
+                      <button className="btn btn-ghost btn-sm" onClick={() => copyToClipboard(s.sqft, s.id)} title="Copy">
                         {copied === s.id ? <CheckCircle size={14} /> : <Copy size={14} />}
                       </button>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => toggleHidden(s.id)}
-                        title={s.hidden ? 'Show' : 'Hide'}
-                      >
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggleHidden(s.id)} title={s.hidden ? 'Show' : 'Hide'}>
                         {s.hidden ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => removeShape(s.id)}
-                        title="Delete"
-                        style={{ color: 'var(--status-danger)' }}
-                      >
+                      <button className="btn btn-ghost btn-sm" onClick={() => removeShape(s.id)} title="Delete" style={{ color: 'var(--status-danger)' }}>
                         <Trash2 size={14} />
                       </button>
                     </div>

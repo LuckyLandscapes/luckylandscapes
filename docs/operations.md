@@ -4,13 +4,13 @@
 # Operations — How the work gets done
 
 ## Crew structure
-- **Total headcount:** Full Time(2) Seasonal(6)
-- **Crews / teams:** 2 Crews
+- **Total headcount:** Full Time(1) Seasonal(6)
+- **Crews / teams:** 1 Crews (4 people a crew)
 - **Roles on a crew:** Crew Leader, Laborer
-- **Pay structure:** Hourly
+- **Pay structure:** Hourly $17.50 for laborers, $22.50 for crew leaders.
 
 ## Scheduling
-- **How jobs get on the calendar:** Once a quote is approved and 50% of the payment is made, we schedule the job on the calendar, can pay rush fee to get moved forward.
+- **How jobs get on the calendar:** Once a quote is approved and 50% of the payment is made, we schedule the job on the calendar, can pay rush fee to get moved forward. (% of of volume of work moved backwards by rush fees is unknown as of now)
 - **Tool of record:** luckyapp calendar / Google Calendar (the app syncs with Google Calendar via [`src/lib/googleCalendar.js`](../luckyapp/src/lib/googleCalendar.js))
 - **Routing logic:** TODO (geographic clustering? service-type batching?)
 - **What blows up the schedule:** Weather, Not having enough crew members, poor planning on our part, customers not paying us. 

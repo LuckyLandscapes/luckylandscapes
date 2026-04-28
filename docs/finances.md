@@ -14,28 +14,28 @@
 ## Cost structure
 | Bucket | Approx % of revenue | Notes |
 |---|---|---|
-| Labor (wages + payroll tax + workers comp) | TODO | TODO |
+| Labor (wages + payroll tax(.2) + workers comp) | TODO | TODO |
 | Materials (mulch, plants, stone, etc.) | TODO | TODO |
-| Equipment (fuel, maintenance, depreciation) | TODO | TODO |
-| Vehicles | TODO | TODO |
+| Equipment (fuel, maintenance, depreciation) fuel is $750 a month, maintenance is around $150 a month, depreciation is around $200 a month | TODO | TODO |
+| Vehicles | $800/month | TODO |
 | Insurance | TODO | TODO |
-| Software / subscriptions | TODO | TODO |
-| Marketing | TODO | TODO |
-| Owner draw / salary | TODO | TODO |
-| Other overhead | TODO | TODO |
+| Software / subscriptions | $288/month | TODO |
+| Marketing | ($2500/month + $500/month ) | TODO |
+| Owner draw / $48,000 | TODO | TODO |
+| Other overhead | shop rent $3500/month,  | TODO |
 
 ## Margin targets
-- **Gross margin target (per job):** TODO
-- **Net margin target (annual):** TODO
-- **Where we tend to leak margin:** TODO
+- **Gross margin target (per job):** 30%
+- **Net margin target (annual):** 20%
+- **Where we tend to leak margin:** Not paying ourselves, Insurance, Payroll tax, workers comp, shop rent, overspending on materials, not charging enough for labor.
 
 ## Current snapshot
 - **As of:** 4/27/2026
 - **YTD revenue:** $14,000
-- **YTD net:** $0
-- **AR balance / 30/60/90 aging:** $1000 (luckyapp computes this — see [`src/lib/finance.js`](../luckyapp/src/lib/finance.js) `buildARAging`)
-- **Cash on hand:** $3000
-- **Outstanding debt / equipment loans:** $0
+- **YTD net:** $-1000
+- **AR balance / 30/60/90 aging:** $3320 30 days (luckyapp computes this — see [`src/lib/finance.js`](../luckyapp/src/lib/finance.js) `buildARAging`)
+- **Cash on hand:** $2000
+- **Outstanding debt / equipment loans:** $1,200
 
 ## Banking & financial accounts
 - **Operating bank:** Pinaccle Bank (*Personal Account*)
