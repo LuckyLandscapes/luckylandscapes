@@ -1134,6 +1134,9 @@ if (galleryGrid) {
 // GUIDED QUESTIONNAIRE WIZARD
 // ============================================
 const QUOTES_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwB-7peAjT_cYSONjylBKFMKPMax95KK0ZWtOY0_DfDAX64_L80XV76hBmtmjL07Svd/exec'; // ← Paste your deployed Apps Script URL here
+// luckyapp public lead-intake endpoint — creates a customer (tagged "lead", source "website").
+// Set to '' to disable; e.g. 'https://app.luckylandscapes.com/api/leads/public'.
+const LEADS_INTAKE_URL = 'https://app.luckylandscapes.com/api/leads/public';
 
 const qzCategoryBtns = document.querySelectorAll('#qz-categories .qz-option-card, .qz-notsure-btn[data-category]');
 if (qzCategoryBtns.length > 0) {
@@ -1488,27 +1491,49 @@ if (qzCategoryBtns.length > 0) {
         return photoData;
     }
 
-    // --- Submit to Google Sheets ---
+    // --- Submit to Google Sheets + luckyapp lead intake ---
     async function submitQuestionnaire(data) {
-        if (!QUOTES_SCRIPT_URL) {
-            console.warn('QUOTES_SCRIPT_URL not set — skipping submission');
-            return;
+        const payload = { ...data };
+        if (selectedPhotos.length > 0) {
+            payload.photos = await getPhotoData();
         }
-        try {
-            const payload = { ...data };
-            // Include photos as base64 if present
-            if (selectedPhotos.length > 0) {
-                payload.photos = await getPhotoData();
-            }
-            await fetch(QUOTES_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: { 'Content-Type': 'text/plain' },
-                body: JSON.stringify(payload)
-            });
-        } catch (err) {
-            console.error('Quote submission error:', err);
+
+        const tasks = [];
+
+        // 1. Google Apps Script (Sheets/Drive/Gmail) — keeps existing flow intact.
+        if (QUOTES_SCRIPT_URL) {
+            tasks.push(
+                fetch(QUOTES_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain' },
+                    body: JSON.stringify(payload),
+                }).catch(err => console.error('Apps Script submission error:', err))
+            );
+        } else {
+            console.warn('QUOTES_SCRIPT_URL not set — skipping Sheets submission');
         }
+
+        // 2. luckyapp lead intake — creates the customer record. Photos are not sent
+        //    here (Drive/Sheets is the canonical photo store); only the count is sent.
+        if (LEADS_INTAKE_URL) {
+            const { photos, ...leadPayload } = payload;
+            tasks.push(
+                fetch(LEADS_INTAKE_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(leadPayload),
+                })
+                    .then(async r => {
+                        const txt = await r.text().catch(() => '');
+                        if (!r.ok) console.error('Lead intake failed', r.status, txt);
+                        else console.log('Lead intake ok', txt);
+                    })
+                    .catch(err => console.error('Lead intake error:', err))
+            );
+        }
+
+        await Promise.allSettled(tasks);
     }
 
     // --- Confetti ---

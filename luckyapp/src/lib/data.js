@@ -249,16 +249,63 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   const deleteCustomer = useCallback(async (id) => {
+    // Collect all dependent records up front (so we can update local state for both modes)
+    const customerJobIds = jobs.filter(j => j.customerId === id).map(j => j.id);
+    const customerQuoteIds = quotes.filter(q => q.customerId === id).map(q => q.id);
+    const customerInvoiceIds = invoices.filter(i => i.customerId === id).map(i => i.id);
+    // Calendar events: those tied directly to the customer OR to one of their jobs
+    const customerEventIds = calendarEvents
+      .filter(e => e.customerId === id || (e.jobId && customerJobIds.includes(e.jobId)))
+      .map(e => e.id);
+
     if (connected) {
+      // Delete in dependency order so RLS / FKs don't trip
+      if (customerInvoiceIds.length) {
+        const { error } = await supabase.from('invoices').delete().in('id', customerInvoiceIds);
+        if (error) throw error;
+      }
+      if (customerEventIds.length) {
+        const { error } = await supabase.from('calendar_events').delete().in('id', customerEventIds);
+        if (error) throw error;
+      }
+      if (customerJobIds.length) {
+        const { error } = await supabase.from('jobs').delete().in('id', customerJobIds);
+        if (error) throw error;
+      }
+      if (customerQuoteIds.length) {
+        const { error } = await supabase.from('quotes').delete().in('id', customerQuoteIds);
+        if (error) throw error;
+      }
       const { error } = await supabase.from('customers').delete().eq('id', id);
       if (error) throw error;
     }
+
+    setInvoices(prev => {
+      const next = prev.filter(i => !customerInvoiceIds.includes(i.id));
+      if (!connected) saveLocal('invoices', next);
+      return next;
+    });
+    setCalendarEvents(prev => {
+      const next = prev.filter(e => !customerEventIds.includes(e.id));
+      if (!connected) saveLocal('calendar_events', next);
+      return next;
+    });
+    setJobs(prev => {
+      const next = prev.filter(j => !customerJobIds.includes(j.id));
+      if (!connected) saveLocal('jobs', next);
+      return next;
+    });
+    setQuotes(prev => {
+      const next = prev.filter(q => !customerQuoteIds.includes(q.id));
+      if (!connected) saveLocal('quotes', next);
+      return next;
+    });
     setCustomers(prev => {
       const next = prev.filter(c => c.id !== id);
       if (!connected) saveLocal('customers', next);
       return next;
     });
-  }, [connected]);
+  }, [connected, jobs, quotes, invoices, calendarEvents]);
 
   // ─── Quote CRUD ─────────────────────────────────────────
   const addQuote = useCallback(async (data) => {
@@ -351,9 +398,16 @@ export function DataProvider({ children }) {
 
   const deleteJob = useCallback(async (id) => {
     if (connected) {
+      // calendar_events.job_id is ON DELETE CASCADE in the DB, so no explicit child delete needed
       const { error } = await supabase.from('jobs').delete().eq('id', id);
       if (error) throw error;
     }
+    // localStorage path needs explicit cascade
+    setCalendarEvents(prev => {
+      const next = prev.filter(e => e.jobId !== id);
+      if (!connected) saveLocal('calendar_events', next);
+      return next;
+    });
     setJobs(prev => {
       const next = prev.filter(j => j.id !== id);
       if (!connected) saveLocal('jobs', next);

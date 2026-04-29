@@ -69,3 +69,7 @@ SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/
 
 ### Public payment links
 Invoice public-pay tokens are URL-safe hex generated via `window.crypto.getRandomValues` (with a Math.random fallback) — see `makeUrlSafeToken` in `data.js`. Migration `015_fix_public_token_url_safe.sql` exists because earlier tokens were not URL-safe; preserve the URL-safe property when changing token logic.
+
+
+## When finished with response
+Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.

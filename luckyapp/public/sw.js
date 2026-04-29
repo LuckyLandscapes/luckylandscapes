@@ -50,6 +50,49 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// Push: show a notification when the server pushes an event.
+// Payload format: { title, body, link, tag, data }
+self.addEventListener('push', (event) => {
+  let payload = {};
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch {
+    payload = { title: 'Lucky Landscapes', body: event.data ? event.data.text() : '' };
+  }
+
+  const title = payload.title || 'Lucky Landscapes';
+  const options = {
+    body: payload.body || '',
+    icon: '/icon-192x192.png',
+    badge: '/icon-192x192.png',
+    tag: payload.tag || 'lucky-app',
+    renotify: true,
+    data: { link: payload.link || '/', ...(payload.data || {}) },
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Notification click: focus an existing tab on the link, or open a new one.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const link = event.notification.data?.link || '/';
+  event.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    for (const client of allClients) {
+      try {
+        const url = new URL(client.url);
+        // If we already have a luckyapp tab open, focus it and navigate
+        if (url.origin === self.location.origin) {
+          await client.focus();
+          if ('navigate' in client) await client.navigate(link);
+          return;
+        }
+      } catch {}
+    }
+    await self.clients.openWindow(link);
+  })());
+});
+
 // Fetch: network-first strategy
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests

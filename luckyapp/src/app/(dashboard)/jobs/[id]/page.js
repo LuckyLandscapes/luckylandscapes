@@ -4,11 +4,12 @@ import { use, useState } from 'react';
 import { useData } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft, CalendarDays, Clock, MapPin, User, Phone, Mail, FileText,
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
-  Edit3, Save, Search, Check,
+  Edit3, Save, Search, Check, AlertTriangle,
 } from 'lucide-react';
 
 function formatTime12(time) {
@@ -48,8 +49,10 @@ const EXPENSE_CATEGORIES = [
 export default function JobDetailPage({ params }) {
   const resolvedParams = use(params);
   const jobId = resolvedParams.id;
-  const { getJob, getCustomer, getQuote, getTeamMember, updateJob, teamMembers,
-    getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries } = useData();
+  const router = useRouter();
+  const { getJob, getCustomer, getQuote, getTeamMember, updateJob, deleteJob, teamMembers,
+    getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries,
+    calendarEvents, invoices } = useData();
   const { isOwnerOrAdmin, isWorker } = useAuth();
 
   const job = getJob(jobId);
@@ -64,6 +67,9 @@ export default function JobDetailPage({ params }) {
   const [editForm, setEditForm] = useState({});
   const [crewSearch, setCrewSearch] = useState('');
   const [editError, setEditError] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   if (!job) {
     return (
@@ -121,6 +127,22 @@ export default function JobDetailPage({ params }) {
     setEditError(null);
     setShowEditModal(true);
   };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteJob(job.id);
+      router.push(isWorker ? '/crew-dashboard' : '/jobs');
+    } catch (err) {
+      console.error('Error deleting job:', err);
+      setDeleteError(err?.message || 'Failed to delete job. Please try again.');
+      setDeleting(false);
+    }
+  };
+
+  const linkedEventCount = calendarEvents.filter(e => e.jobId === jobId).length;
+  const linkedInvoices = invoices.filter(i => i.jobId === jobId);
 
   const handleEditSave = async () => {
     setUpdating(true);
@@ -190,6 +212,9 @@ export default function JobDetailPage({ params }) {
                 <XCircle size={14} /> Cancel
               </button>
             )}
+            <button className="btn btn-danger btn-sm" onClick={() => { setDeleteError(null); setShowDeleteModal(true); }}>
+              <Trash2 size={14} /> Delete
+            </button>
           </div>
         )}
       </div>
@@ -591,6 +616,50 @@ export default function JobDetailPage({ params }) {
               <button className="btn btn-secondary" onClick={() => setShowEditModal(false)} disabled={updating}>Cancel</button>
               <button className="btn btn-primary" onClick={handleEditSave} disabled={updating}>
                 {updating ? 'Saving...' : <><Save size={16} /> Save Changes</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Job Modal */}
+      {showDeleteModal && (
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+            <div className="modal-header">
+              <h2>Delete Job</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => !deleting && setShowDeleteModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: '2px' }} />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: '4px' }}>This action cannot be undone</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    <strong>{job.title}</strong> will be permanently deleted along with:
+                  </div>
+                  <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '8px 0 0', paddingLeft: '20px' }}>
+                    <li><strong>{linkedEventCount}</strong> calendar event{linkedEventCount !== 1 ? 's' : ''}</li>
+                  </ul>
+                  {linkedInvoices.length > 0 && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: '8px' }}>
+                      Note: {linkedInvoices.length} invoice{linkedInvoices.length !== 1 ? 's' : ''} linked to this job will be kept (unlinked).
+                    </div>
+                  )}
+                </div>
+              </div>
+              {deleteError && (
+                <div style={{ fontSize: '0.82rem', color: 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <XCircle size={14} /> {deleteError}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? 'Deleting...' : <><Trash2 size={16} /> Delete Job</>}
               </button>
             </div>
           </div>
