@@ -9,7 +9,8 @@ import {
 } from 'lucide-react';
 import MaterialFormModal from '@/components/MaterialFormModal';
 import { getQuickSearchLinks } from '@/lib/supplierSearch';
-import { OUTDOOR_SOLUTIONS_CATALOG, normalizeName } from '@/lib/seedOutdoorSolutionsLincoln';
+import { OUTDOOR_SOLUTIONS_CATALOG, normalizeName, getImageForName } from '@/lib/seedOutdoorSolutionsLincoln';
+import { OUTDOOR_SOLUTIONS_IMAGES } from '@/lib/outdoorSolutionsImages';
 
 function getSupplierClass(s) {
   if (!s) return 'supplier-other';
@@ -118,8 +119,12 @@ export default function CatalogPage() {
     setImporting(true);
     setImportResult(null);
     try {
+      const withImages = OUTDOOR_SOLUTIONS_CATALOG.map(item => {
+        const img = getImageForName(item.name, OUTDOOR_SOLUTIONS_IMAGES);
+        return img ? { ...item, image: img, imageUrl: img } : item;
+      });
       const result = await bulkUpsertMaterials(
-        OUTDOOR_SOLUTIONS_CATALOG,
+        withImages,
         (m) => normalizeName(m.name)
       );
       setImportResult(result);

@@ -228,7 +228,7 @@ export const OUTDOOR_SOLUTIONS_CATALOG = [
   m('6′x100′ 3oz. Fabric',                'Other', 'each', 67,  67),
   m('6′x100′ 4oz. Fabric',                'Other', 'each', 98,  98),
   m('6′x250′ 4oz. Fabric',                'Other', 'each', 225, 225),
-  m('Fabric Staples (50ct)',              'Other', 'each', 7,   7),
+  m('Fabric Staples 50ct Package',        'Other', 'each', 7,   7),
   m('Geo-Grid Bidirectional',             'Other', 'each', 83,  83),
 
   // ── Hardscape Accessories ───────────────────────────────────
@@ -330,4 +330,77 @@ export function normalizeName(s) {
     .replace(/[′']/g, '')
     .replace(/[–—-]/g, '')
     .replace(/[^a-z0-9]/g, '');
+}
+
+// Best-effort image lookup. Many OS items share a category-level image
+// (pumps, skimmers, fast falls, etc.), so we try in order:
+//   1. exact normalized name
+//   2. with parenthesized variant suffix dropped — "SRW X-Treme (Tan)" → "srwxtreme"
+//   3. with a trailing qualifier word dropped — "Black Hills Drystack" → "blackhills"
+//   4. category bucket — "TT1500 TidalWave 3 Pump" → "pumps"
+const STRIP_TAIL = /(mulch(?:es)?|edging|drystack|boulders?|flagstone|cobble|minis|fabric|pumps?|pumpvaults?|fastfalls|filterfalls|fountainbasins?|plumbingkit|steps|columncaps?)$/;
+
+const CATEGORY_BUCKETS = [
+  { test: /pumpvault|^pv\d/i,                key: 'pumpvaults' },
+  { test: /(?:^|\b)pump(?!vault)|^tt\d|^a-?\d|^l-?\d|^md\d/i, key: 'pumps' },
+  { test: /skimmer|^ps\d/i,                  key: 'pondskimmers' },
+  { test: /fastfalls|^sp\d/i,                key: 'fastfalls' },
+  { test: /filterfalls|^bf\d/i,              key: 'filterfalls' },
+  { test: /fountainbasin|^fb\d|^fbkit/i,     key: 'fountainbasins' },
+  { test: /pondliner|underlayment/i,         key: 'pondlinerunderlayment' },
+  { test: /basaltcolumn/i,                   key: 'basaltcolumns' },
+  { test: /eco.?blox|eco.?rise/i,            key: 'ecobloxecorise' },
+  { test: /versalokcap/i,                    key: 'versalokcaps' },
+  { test: /versalokstandard/i,               key: 'versalokstandard' },
+  { test: /srwpavermate/i,                   key: 'srwpavermatez3' },
+  { test: /srwxtreme/i,                      key: 'srwxtreme' },
+  { test: /fireglass/i,                      key: 'fireglass' },
+  { test: /aeration|aerator|ionizer|typhoon/i, key: 'aeratorsionizers' },
+  { test: /biomax|ecoklean|reclaim|sludge/i, key: 'waterfeaturetreatments' },
+  // Anything else under pond / accessories — flex hoses, check valves, etc.
+  { test: /flexhose|checkvalve|matalafilter|mediabag|waterfallfoam|autofillkit/i, key: 'accessories' },
+];
+
+// The OS site is inconsistent: sometimes it writes "1.5", sometimes "1 1/2",
+// sometimes spells out "degree" instead of "°". We try every input both ways.
+function nameVariants(name) {
+  const set = new Set();
+  const candidates = [
+    name,
+    name.replace(/°/g, ' degree '),
+    name.replace(/(\d)\.5\b/g, '$1 1/2'),
+    name.replace(/°/g, ' degree ').replace(/(\d)\.5\b/g, '$1 1/2'),
+    name.replace(/\s*\([^)]*\)\s*/g, ' '),                  // drop parenthesized variant
+    name.replace(/\s*\(([^)]*)\)\s*/g, ' $1 '),             // unwrap parenthesized variant
+  ];
+  for (const c of candidates) set.add(c);
+  return [...set];
+}
+
+function tryLookup(imageMap, key) {
+  if (imageMap[key]) return imageMap[key];
+  if (imageMap[key + 's']) return imageMap[key + 's'];
+  if (key.endsWith('s') && imageMap[key.slice(0, -1)]) return imageMap[key.slice(0, -1)];
+  return null;
+}
+
+export function getImageForName(name, imageMap) {
+  if (!name || !imageMap) return null;
+  for (const variant of nameVariants(name)) {
+    const k = normalizeName(variant);
+    const direct = tryLookup(imageMap, k);
+    if (direct) return direct;
+    let stripped = k;
+    for (let i = 0; i < 4 && STRIP_TAIL.test(stripped); i++) {
+      stripped = stripped.replace(STRIP_TAIL, '');
+      const hit = tryLookup(imageMap, stripped);
+      if (hit) return hit;
+    }
+  }
+  // Category bucket fallback (using the original name's normalized form)
+  const k0 = normalizeName(name);
+  for (const { test, key } of CATEGORY_BUCKETS) {
+    if (test.test(k0) && imageMap[key]) return imageMap[key];
+  }
+  return null;
 }
