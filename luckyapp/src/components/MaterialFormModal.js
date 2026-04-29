@@ -65,6 +65,9 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
         stockLastChecked: data.checkedAt,
         soldOut: data.stockStatus === 'out_of_stock',
       }));
+      if (data.image && !imagePreview) {
+        setImagePreview(data.image);
+      }
       setVerifyMsg(`Updated from supplier (${data.stockStatus.replace('_', ' ')}, $${data.price ?? '—'}).`);
     } catch (err) {
       setVerifyMsg('Lookup failed: ' + (err.message || err));
@@ -84,7 +87,11 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
     if (!form.name || !form.category) return;
     setSaving(true);
     try {
+      // Priority: a freshly uploaded file > whatever is currently in the
+      // preview (which Verify-live may have set to a supplier-hosted URL) >
+      // the saved material's existing image.
       let imageUrl = material?.imageUrl || material?.image || '';
+      if (imagePreview && imagePreview.startsWith('http')) imageUrl = imagePreview;
       if (imageFile && supabase) {
         const ext = imageFile.name.split('.').pop();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;

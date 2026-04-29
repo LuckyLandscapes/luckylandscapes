@@ -9,8 +9,8 @@ import {
 } from 'lucide-react';
 import MaterialFormModal from '@/components/MaterialFormModal';
 import { getQuickSearchLinks } from '@/lib/supplierSearch';
-import { OUTDOOR_SOLUTIONS_CATALOG, normalizeName, getImageForName } from '@/lib/seedOutdoorSolutionsLincoln';
-import { OUTDOOR_SOLUTIONS_IMAGES } from '@/lib/outdoorSolutionsImages';
+import { OUTDOOR_SOLUTIONS_CATALOG, normalizeName, getProductForName } from '@/lib/seedOutdoorSolutionsLincoln';
+import { OUTDOOR_SOLUTIONS_PRODUCTS } from '@/lib/outdoorSolutionsProducts';
 
 function getSupplierClass(s) {
   if (!s) return 'supplier-other';
@@ -134,8 +134,17 @@ export default function CatalogPage() {
     setImportResult(null);
     try {
       const withImages = OUTDOOR_SOLUTIONS_CATALOG.map(item => {
-        const img = getImageForName(item.name, OUTDOOR_SOLUTIONS_IMAGES);
-        return img ? { ...item, image: img, imageUrl: img } : item;
+        // For OS items, look up the scraped product (image + product detail URL).
+        // Items already declaring a supplierUrl (Menards/HD section) keep theirs.
+        if (item.supplier !== 'Outdoor Solutions') return item;
+        const p = getProductForName(item.name, OUTDOOR_SOLUTIONS_PRODUCTS);
+        if (!p) return item;
+        return {
+          ...item,
+          image: p.image,
+          imageUrl: p.image,
+          supplierUrl: item.supplierUrl || p.url || null,
+        };
       });
       const result = await bulkUpsertMaterials(
         withImages,
@@ -167,6 +176,7 @@ export default function CatalogPage() {
         soldOut: data.stockStatus === 'out_of_stock',
       };
       if (data.price != null) { patch.costLow = data.price; patch.costHigh = data.price; }
+      if (data.image && !m.imageUrl && !m.image) { patch.imageUrl = data.image; patch.image = data.image; }
       await updateMaterial(m.id, patch);
       setSelectedMaterial(prev => prev && prev.id === m.id ? { ...prev, ...patch } : prev);
       setRefreshMsg(`Updated ${m.name}: ${data.stockStatus.replace('_', ' ')}${data.price != null ? ` at $${data.price}` : ''}.`);
@@ -570,13 +580,12 @@ export default function CatalogPage() {
             </div>
             <div className="modal-body">
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-                Will insert or update <strong>{OUTDOOR_SOLUTIONS_CATALOG.length}</strong> items, each tagged with the right supplier:
+                Will insert or update <strong>{OUTDOOR_SOLUTIONS_CATALOG.length}</strong> items.
               </p>
               <ul style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', paddingLeft: 'var(--space-md)', lineHeight: 1.7 }}>
-                <li><strong style={{ color: '#d4a267' }}>Outdoor Solutions</strong> — bulk mulch & landscape rock (32 items)</li>
-                <li><strong style={{ color: '#4ade80' }}>Menards</strong> — hardscape: edging, pavers, retaining wall block, drystack, steps, boulders, flagstone, gravel (129 items)</li>
-                <li><strong style={{ color: '#fb923c' }}>Home Depot</strong> — bagged soil, sod & seed, fabric, fire pit kits, water-feature pumps & accessories, sealers (109 items)</li>
-                <li>Each item gets a product image; existing materials with the same name are price-refreshed.</li>
+                <li><strong style={{ color: '#d4a267' }}>Outdoor Solutions</strong> ({OUTDOOR_SOLUTIONS_CATALOG.filter(i => i.supplier === 'Outdoor Solutions').length}) — full OS price list with verified product images and direct links to each product page on outdoorsolutions-lincoln.com.</li>
+                <li><strong style={{ color: '#4ade80' }}>Menards</strong> ({OUTDOOR_SOLUTIONS_CATALOG.filter(i => i.supplier === 'Menards').length}) — starter set of generic edgers, retaining wall blocks, paver sand, fabric. Links go to Menards Lincoln-South-store search; no image until you Verify Live or upload one.</li>
+                <li><strong style={{ color: '#fb923c' }}>Home Depot</strong> ({OUTDOOR_SOLUTIONS_CATALOG.filter(i => i.supplier === 'Home Depot').length}) — same idea, scoped to Home Depot South Lincoln (#3204).</li>
                 <li>Tip: <em>Clear catalog</em> first if you want a clean slate.</li>
               </ul>
             </div>

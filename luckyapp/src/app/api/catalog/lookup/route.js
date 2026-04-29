@@ -38,14 +38,40 @@ function* productNodes(node) {
   if (node['@graph']) yield* productNodes(node['@graph']);
 }
 
+// Walks for ANY node that exposes a name + image — used when a page has
+// JSON-LD but no Product type (e.g. WordPress AIOSEO emits BlogPosting).
+function* namedImageNodes(node) {
+  if (!node) return;
+  if (Array.isArray(node)) {
+    for (const n of node) yield* namedImageNodes(n);
+    return;
+  }
+  if (typeof node !== 'object') return;
+  if (node.name && node.image && node['@type'] !== 'Person') yield node;
+  if (node['@graph']) yield* namedImageNodes(node['@graph']);
+}
+
+function imageOf(node) {
+  const i = node?.image;
+  if (!i) return null;
+  if (typeof i === 'string') return i;
+  if (Array.isArray(i)) return imageOf({ image: i[0] });
+  if (i.url) return i.url;
+  return null;
+}
+
 function extractFromHtml(html) {
   // Pull every <script type="application/ld+json"> block. There can be more
   // than one (breadcrumb + product), so we collect, parse, and pick the first
   // Product node we find.
   const blocks = [...html.matchAll(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)];
+  const parsedBlocks = [];
   for (const [, raw] of blocks) {
-    let parsed;
-    try { parsed = JSON.parse(raw.trim()); } catch { continue; }
+    try { parsedBlocks.push(JSON.parse(raw.trim())); } catch { /* skip */ }
+  }
+
+  // Pass 1 — proper Product nodes (HD, Menards, etc.)
+  for (const parsed of parsedBlocks) {
     for (const product of productNodes(parsed)) {
       const offers = Array.isArray(product.offers) ? product.offers[0] : product.offers;
       const price = offers?.price ?? offers?.lowPrice ?? null;
@@ -54,9 +80,25 @@ function extractFromHtml(html) {
         price: price != null ? Number(price) : null,
         currency: offers?.priceCurrency || 'USD',
         stockStatus: mapAvailability(offers?.availability),
+        image: imageOf(product),
       };
     }
   }
+
+  // Pass 2 — any named node carrying an image (WordPress AIOSEO emits
+  // BlogPosting/WebPage, e.g. on outdoorsolutions-lincoln.com).
+  for (const parsed of parsedBlocks) {
+    for (const node of namedImageNodes(parsed)) {
+      const img = imageOf(node);
+      if (!img) continue;
+      return { name: node.name || null, price: null, currency: 'USD', stockStatus: 'unknown', image: img };
+    }
+  }
+
+  // Pass 3 — og:image meta tag as a last-resort image-only fallback.
+  const og = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (og) return { name: null, price: null, currency: 'USD', stockStatus: 'unknown', image: og[1] };
   return null;
 }
 
@@ -75,7 +117,11 @@ export async function POST(request) {
   try { host = new URL(url).hostname.toLowerCase(); } catch {
     return NextResponse.json({ ok: false, error: 'Invalid url' }, { status: 400 });
   }
-  const allowed = ['homedepot.com', 'www.homedepot.com', 'menards.com', 'www.menards.com'];
+  const allowed = [
+    'homedepot.com', 'www.homedepot.com',
+    'menards.com', 'www.menards.com',
+    'outdoorsolutions-lincoln.com', 'www.outdoorsolutions-lincoln.com',
+  ];
   if (!allowed.some(d => host === d || host.endsWith('.' + d))) {
     return NextResponse.json({ ok: false, error: 'Supplier not supported for live lookup' }, { status: 400 });
   }
