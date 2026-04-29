@@ -430,35 +430,37 @@ export default function FinancePage() {
                           {fmtCurrency(inv.balance, 2)}
                         </div>
                       </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '8px' }}>
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', flex: '1 1 100%', minWidth: 0 }}>
                           {inv.reminderCount > 0
                             ? `${inv.reminderCount} reminder${inv.reminderCount !== 1 ? 's' : ''} sent · last ${fmtRelative(inv.lastReminderAt)}`
                             : 'No reminders sent yet'}
                         </div>
-                        <a
-                          href={`/api/preview-invoice-reminder?invoiceId=${inv.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="btn btn-sm btn-ghost"
-                          style={{ padding: '4px 8px', fontSize: '0.72rem' }}
-                          title="Preview the email the customer would see"
-                        >
-                          <Eye size={12} /> Preview
-                        </a>
-                        <button
-                          className="btn btn-sm"
-                          style={{
-                            background: tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)',
-                            color: '#fff', padding: '4px 10px', fontSize: '0.72rem',
-                            opacity: hasEmail ? 1 : 0.5, cursor: hasEmail ? 'pointer' : 'not-allowed',
-                          }}
-                          onClick={() => handleSendReminder(inv)}
-                          disabled={!hasEmail || sending}
-                          title={hasEmail ? `Send ${tone} reminder now` : 'No email on file'}
-                        >
-                          {sending ? <><Loader2 size={12} className="spin" /> Sending</> : <><Send size={12} /> Remind</>}
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px', flex: '1 1 100%', justifyContent: 'flex-end' }}>
+                          <a
+                            href={`/api/preview-invoice-reminder?invoiceId=${inv.id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-sm btn-secondary"
+                            style={{ padding: '5px 10px', fontSize: '0.72rem', textDecoration: 'none' }}
+                            title="Preview the email the customer would see (opens in new tab)"
+                          >
+                            <Eye size={12} /> Preview
+                          </a>
+                          <button
+                            className="btn btn-sm"
+                            style={{
+                              background: tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)',
+                              color: '#fff', padding: '5px 10px', fontSize: '0.72rem',
+                              opacity: hasEmail ? 1 : 0.5, cursor: hasEmail ? 'pointer' : 'not-allowed',
+                            }}
+                            onClick={() => handleSendReminder(inv)}
+                            disabled={!hasEmail || sending}
+                            title={hasEmail ? `Send ${tone} reminder now` : 'No email on file'}
+                          >
+                            {sending ? <><Loader2 size={12} className="spin" /> Sending</> : <><Send size={12} /> Remind</>}
+                          </button>
+                        </div>
                       </div>
                       {result && (
                         <div style={{ marginTop: '6px', fontSize: '0.7rem', color: result.ok ? 'var(--status-success)' : 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
