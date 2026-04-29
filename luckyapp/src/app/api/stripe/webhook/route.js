@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getStripe, isStripeConfigured, getServiceSupabase } from '@/lib/stripeServer';
+import { notifyOrg } from '@/lib/notify';
+
+const fmtMoney = (n) => `$${Number(n || 0).toFixed(2)}`;
+const fmtCustomerName = (c) => [c?.first_name, c?.last_name].filter(Boolean).join(' ').trim() || 'Customer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -93,6 +97,27 @@ export async function POST(request) {
           deposit_payment_intent_id: intent.id,
         }).eq('id', quoteId);
 
+        // Notify the team — quote accepted + deposit paid (single combined event)
+        try {
+          const { data: q } = await supabase
+            .from('quotes')
+            .select('quote_number, customers ( first_name, last_name )')
+            .eq('id', quoteId)
+            .maybeSingle();
+          const quoteNumber = q?.quote_number || meta.quote_number || '';
+          const customerName = fmtCustomerName(q?.customers);
+          await notifyOrg({
+            orgId,
+            type: 'quote_accepted',
+            title: `Quote #${quoteNumber} accepted — ${customerName}`,
+            body: `${customerName} accepted Quote #${quoteNumber} and paid the ${fmtMoney(amount)} deposit via ${method === 'ach' ? 'bank transfer' : 'card'}.`,
+            link: `/quotes/${quoteId}`,
+            data: { quoteId, amount, method },
+          });
+        } catch (notifyErr) {
+          console.error('[stripe webhook] quote_accepted notify failed', notifyErr);
+        }
+
         return NextResponse.json({ received: true });
       }
 
@@ -146,12 +171,13 @@ export async function POST(request) {
       // Update invoice totals
       const { data: inv } = await supabase
         .from('invoices')
-        .select('total, amount_paid')
+        .select('total, amount_paid, invoice_number, customer_id')
         .eq('id', invoiceId)
         .single();
+      let newStatus = null;
       if (inv) {
         const newPaid = Number(inv.amount_paid || 0) + amount;
-        const newStatus = newPaid >= Number(inv.total || 0) ? 'paid' : 'partial';
+        newStatus = newPaid >= Number(inv.total || 0) ? 'paid' : 'partial';
         const updates = {
           amount_paid: newPaid,
           status: newStatus,
@@ -159,6 +185,32 @@ export async function POST(request) {
         };
         if (newStatus === 'paid') updates.paid_date = new Date().toISOString().split('T')[0];
         await supabase.from('invoices').update(updates).eq('id', invoiceId);
+      }
+
+      // Notify the team — only when the invoice is fully paid
+      if (inv && newStatus === 'paid') {
+        try {
+          let customer = null;
+          if (inv.customer_id) {
+            const { data: c } = await supabase
+              .from('customers')
+              .select('first_name, last_name')
+              .eq('id', inv.customer_id)
+              .maybeSingle();
+            customer = c;
+          }
+          const customerName = fmtCustomerName(customer);
+          await notifyOrg({
+            orgId,
+            type: 'invoice_paid',
+            title: `Invoice #${inv.invoice_number || ''} paid — ${customerName}`,
+            body: `${customerName} paid ${fmtMoney(amount)} via ${method === 'ach' ? 'bank transfer' : 'card'}. Invoice is now fully paid.`,
+            link: `/invoices/${invoiceId}`,
+            data: { invoiceId, amount, method },
+          });
+        } catch (notifyErr) {
+          console.error('[stripe webhook] invoice_paid notify failed', notifyErr);
+        }
       }
     }
 
