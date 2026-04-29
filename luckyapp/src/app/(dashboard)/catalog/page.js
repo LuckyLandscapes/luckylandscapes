@@ -5,8 +5,10 @@ import { useData } from '@/lib/data';
 import {
   Search, Maximize2, X, ChevronLeft, ChevronRight, Star, Plus,
   Grid3x3, List, ExternalLink, Edit3, Trash2, AlertTriangle, Clock,
+  RefreshCw, Loader2,
 } from 'lucide-react';
 import MaterialFormModal from '@/components/MaterialFormModal';
+import { getQuickSearchLinks } from '@/lib/supplierSearch';
 
 function getSupplierClass(s) {
   if (!s) return 'supplier-other';
@@ -30,6 +32,18 @@ function getImageSrc(m) {
   return null;
 }
 
+const STOCK_LABEL = {
+  in_stock: 'In stock',
+  low_stock: 'Low',
+  out_of_stock: 'Out',
+  unknown: '',
+};
+function StockBadge({ m }) {
+  const s = m.soldOut ? 'out_of_stock' : (m.stockStatus || 'unknown');
+  if (s === 'unknown') return null;
+  return <span className={`stock-badge stock-${s.replace('_', '-')}`}>{STOCK_LABEL[s]}{m.stockQty ? ` · ${m.stockQty}` : ''}</span>;
+}
+
 export default function CatalogPage() {
   const { materials, addMaterial, updateMaterial, deleteMaterial } = useData();
   const [search, setSearch] = useState('');
@@ -42,6 +56,8 @@ export default function CatalogPage() {
   const [showDelete, setShowDelete] = useState(null);
   const [presMode, setPresMode] = useState(false);
   const [presIndex, setPresIndex] = useState(0);
+  const [refreshingId, setRefreshingId] = useState(null);
+  const [refreshMsg, setRefreshMsg] = useState('');
 
   // Filters
   const categories = ['all', ...new Set(materials.map(m => m.category).filter(Boolean))];
@@ -92,6 +108,34 @@ export default function CatalogPage() {
   };
 
   const startPresentation = (idx) => { setPresIndex(idx); setPresMode(true); };
+
+  const refreshFromSupplier = async (m) => {
+    if (!m.supplierUrl) { setRefreshMsg('Add a supplier URL first.'); return; }
+    setRefreshingId(m.id); setRefreshMsg('');
+    try {
+      const res = await fetch('/api/catalog/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: m.supplierUrl }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setRefreshMsg(data.error || 'Lookup failed.'); return; }
+      const patch = {
+        stockStatus: data.stockStatus,
+        stockLastChecked: data.checkedAt,
+        lastPriceCheck: data.checkedAt,
+        soldOut: data.stockStatus === 'out_of_stock',
+      };
+      if (data.price != null) { patch.costLow = data.price; patch.costHigh = data.price; }
+      await updateMaterial(m.id, patch);
+      setSelectedMaterial(prev => prev && prev.id === m.id ? { ...prev, ...patch } : prev);
+      setRefreshMsg(`Updated ${m.name}: ${data.stockStatus.replace('_', ' ')}${data.price != null ? ` at $${data.price}` : ''}.`);
+    } catch (err) {
+      setRefreshMsg('Lookup failed: ' + (err.message || err));
+    } finally {
+      setRefreshingId(null);
+    }
+  };
 
   return (
     <div className="page animate-fade-in">
@@ -160,7 +204,10 @@ export default function CatalogPage() {
                 <div className="material-card-img">
                   {imgSrc ? <img src={imgSrc} alt={m.name} /> : <div className="material-emoji">{m.imageEmoji || '🪨'}</div>}
                   <div className="material-card-badges">
-                    <div>{m.soldOut && <span className="material-sold-out-badge">Sold Out</span>}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                      {m.soldOut && <span className="material-sold-out-badge">Sold Out</span>}
+                      {!m.soldOut && <StockBadge m={m} />}
+                    </div>
                     <button className={`material-fav-btn ${m.isFavorite ? 'active' : ''}`} onClick={e => toggleFav(e, m)}>
                       <Star size={14} fill={m.isFavorite ? 'currentColor' : 'none'} />
                     </button>
@@ -209,7 +256,14 @@ export default function CatalogPage() {
                     <td style={{ color: 'var(--text-tertiary)' }}>{m.category}</td>
                     <td><span style={{ fontWeight: 600, color: 'var(--lucky-green-light)' }}>{formatPrice(m)}</span></td>
                     <td>{m.supplier && <span className={`material-card-supplier ${getSupplierClass(m.supplier)}`}>{m.supplier}</span>}</td>
-                    <td>{m.soldOut ? <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.78rem' }}>Sold Out</span> : m.isFavorite ? <Star size={14} style={{ color: 'var(--lucky-gold)', fill: 'var(--lucky-gold)' }} /> : null}</td>
+                    <td>
+                      {m.soldOut
+                        ? <span style={{ color: '#ef4444', fontWeight: 600, fontSize: '0.78rem' }}>Sold Out</span>
+                        : <StockBadge m={m} />}
+                      {!m.soldOut && (m.stockStatus === 'unknown' || !m.stockStatus) && m.isFavorite && (
+                        <Star size={14} style={{ color: 'var(--lucky-gold)', fill: 'var(--lucky-gold)' }} />
+                      )}
+                    </td>
                     <td>
                       <button className="btn btn-icon btn-ghost" onClick={e => { e.stopPropagation(); setEditingMaterial(m); setShowForm(true); }}><Edit3 size={14} /></button>
                     </td>
@@ -259,17 +313,33 @@ export default function CatalogPage() {
                 </div>
               )}
 
-              {/* Price */}
+              {/* Price + Stock */}
               <div className="material-detail-section">
-                <div className="material-detail-section-title">Pricing</div>
+                <div className="material-detail-section-title">Pricing & Stock</div>
                 <div className="material-detail-price-row">
                   <div className="material-detail-price-value">{formatPrice(selectedMaterial)}</div>
+                  <StockBadge m={selectedMaterial} />
                   {selectedMaterial.lastPriceCheck && (
                     <div className="material-detail-price-verified">
                       <Clock size={12} /> Verified {new Date(selectedMaterial.lastPriceCheck).toLocaleDateString()}
                     </div>
                   )}
                 </div>
+                {selectedMaterial.supplierUrl && (
+                  <button
+                    className="btn btn-secondary"
+                    style={{ marginTop: 'var(--space-sm)' }}
+                    onClick={() => refreshFromSupplier(selectedMaterial)}
+                    disabled={refreshingId === selectedMaterial.id}
+                  >
+                    {refreshingId === selectedMaterial.id
+                      ? <><Loader2 size={14} className="spin" /> Checking…</>
+                      : <><RefreshCw size={14} /> Refresh price & stock</>}
+                  </button>
+                )}
+                {refreshMsg && refreshingId === null && (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 6 }}>{refreshMsg}</div>
+                )}
               </div>
 
               {/* Details Grid */}
@@ -311,6 +381,19 @@ export default function CatalogPage() {
                   </div>
                 </div>
               )}
+
+              {/* Quick search at our three suppliers (Lincoln NE stores) */}
+              <div className="material-detail-section">
+                <div className="material-detail-section-title">Find at Lincoln Suppliers</div>
+                <div className="supplier-quicksearch-row">
+                  {getQuickSearchLinks(selectedMaterial.sku || selectedMaterial.name).map(link => (
+                    <a key={link.key} href={link.url} target="_blank" rel="noopener noreferrer" className={`supplier-quicksearch-chip supplier-${link.key}`}>
+                      {link.label}
+                      <ExternalLink size={12} />
+                    </a>
+                  ))}
+                </div>
+              </div>
 
               {selectedMaterial.notes && (
                 <div className="material-detail-section">

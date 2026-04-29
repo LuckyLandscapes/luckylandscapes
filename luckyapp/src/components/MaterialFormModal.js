@@ -1,10 +1,16 @@
 'use client';
 import { useState, useRef } from 'react';
-import { X, Upload, Trash2, Loader2 } from 'lucide-react';
+import { X, Upload, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const CATEGORIES = ['Mulch','Rock','Pavers','Retaining Wall','Soil & Amendments','Edging','Flagstone','Boulders','Sand & Gravel','Sod & Seed','Pottery','Other'];
 const SUPPLIERS = ['Outdoor Solutions','Menards','Home Depot','Other'];
+const STOCK_STATUSES = [
+  { value: 'unknown', label: 'Unknown' },
+  { value: 'in_stock', label: 'In stock' },
+  { value: 'low_stock', label: 'Low stock' },
+  { value: 'out_of_stock', label: 'Out of stock' },
+];
 
 export default function MaterialFormModal({ material, onClose, onSave }) {
   const isEdit = !!material;
@@ -24,15 +30,48 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
     supplier: material?.supplier || '',
     supplierUrl: material?.supplierUrl || '',
     supplierUrlAlt: material?.supplierUrlAlt || '',
+    sku: material?.sku || '',
     color: material?.color || '',
     texture: material?.texture || '',
     coveragePerUnit: material?.coveragePerUnit || '',
     notes: material?.notes || '',
     isFavorite: material?.isFavorite || false,
     soldOut: material?.soldOut || false,
+    stockStatus: material?.stockStatus || 'unknown',
+    stockQty: material?.stockQty ?? '',
+    stockLastChecked: material?.stockLastChecked || null,
   });
+  const [verifying, setVerifying] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState('');
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const verifyNow = async () => {
+    if (!form.supplierUrl) { setVerifyMsg('Add a supplier product URL first.'); return; }
+    setVerifying(true); setVerifyMsg('');
+    try {
+      const res = await fetch('/api/catalog/lookup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: form.supplierUrl }),
+      });
+      const data = await res.json();
+      if (!data.ok) { setVerifyMsg(data.error || 'Could not read live data.'); return; }
+      setForm(p => ({
+        ...p,
+        costLow: data.price != null ? String(data.price) : p.costLow,
+        costHigh: data.price != null ? String(data.price) : p.costHigh,
+        stockStatus: data.stockStatus || p.stockStatus,
+        stockLastChecked: data.checkedAt,
+        soldOut: data.stockStatus === 'out_of_stock',
+      }));
+      setVerifyMsg(`Updated from supplier (${data.stockStatus.replace('_', ' ')}, $${data.price ?? '—'}).`);
+    } catch (err) {
+      setVerifyMsg('Lookup failed: ' + (err.message || err));
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   const handleImage = (e) => {
     const file = e.target.files?.[0];
@@ -60,6 +99,7 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
         imageUrl: imageUrl,
         costLow: parseFloat(form.costLow) || 0,
         costHigh: parseFloat(form.costHigh) || 0,
+        stockQty: form.stockQty === '' ? null : parseInt(form.stockQty, 10) || 0,
         lastPriceCheck: new Date().toISOString(),
       });
       onClose();
@@ -156,6 +196,39 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
               <label className="form-label">Alt Supplier URL</label>
               <input className="form-input" value={form.supplierUrlAlt} onChange={e => set('supplierUrlAlt', e.target.value)} placeholder="https://..." />
             </div>
+            <div className="form-group">
+              <label className="form-label">SKU / Model #</label>
+              <input className="form-input" value={form.sku} onChange={e => set('sku', e.target.value)} placeholder="e.g. 100571540" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Stock Status</label>
+              <select className="form-select" value={form.stockStatus} onChange={e => set('stockStatus', e.target.value)}>
+                {STOCK_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Stock Qty (optional)</label>
+              <input className="form-input" type="number" value={form.stockQty} onChange={e => set('stockQty', e.target.value)} placeholder="e.g. 24" />
+            </div>
+            <div className="form-group" style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={verifyNow}
+                disabled={verifying || !form.supplierUrl}
+                style={{ width: '100%' }}
+                title={form.supplierUrl ? 'Fetch live price/stock from supplier URL' : 'Add a supplier URL above first'}
+              >
+                {verifying ? <><Loader2 size={14} className="spin" /> Checking…</> : <><RefreshCw size={14} /> Verify live</>}
+              </button>
+            </div>
+            {verifyMsg && (
+              <div className="form-group full-width" style={{ marginTop: 'calc(-1 * var(--space-sm))' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <CheckCircle2 size={12} /> {verifyMsg}
+                </div>
+              </div>
+            )}
             <div className="form-group full-width">
               <label className="form-label">Coverage per Unit</label>
               <input className="form-input" value={form.coveragePerUnit} onChange={e => set('coveragePerUnit', e.target.value)} placeholder='e.g. 1 cu yd ≈ 100 sqft at 3" depth' />
