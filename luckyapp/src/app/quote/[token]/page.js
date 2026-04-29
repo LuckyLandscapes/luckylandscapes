@@ -262,8 +262,8 @@ export default function QuotePage({ params }) {
             {view === 'changes-sent' && (
               <div style={{ textAlign: 'center', padding: '32px 20px' }}>
                 <div style={{ fontSize: 56 }}>✉️</div>
-                <h3 style={{ margin: '12px 0 6px', color: '#1f6f3a' }}>Got it — we&rsquo;ll be in touch</h3>
-                <p style={{ color: '#666', fontSize: 14, lineHeight: 1.5 }}>
+                <h3 style={{ margin: '12px 0 6px', color: '#1f6f3a', fontSize: 18 }}>Got it — we&rsquo;ll be in touch</h3>
+                <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.5 }}>
                   We received your notes and will follow up with a revised estimate or a quick call to walk through the changes.
                 </p>
               </div>
@@ -272,12 +272,12 @@ export default function QuotePage({ params }) {
             {view === 'accepted' && (
               <div style={{ textAlign: 'center', padding: '32px 20px' }}>
                 <div style={{ fontSize: 56 }}>✓</div>
-                <h3 style={{ margin: '12px 0 6px', color: '#1f6f3a' }}>Deposit Received!</h3>
-                <p style={{ color: '#666', fontSize: 14, lineHeight: 1.5 }}>
+                <h3 style={{ margin: '12px 0 6px', color: '#1f6f3a', fontSize: 18 }}>Deposit Received!</h3>
+                <p style={{ color: '#374151', fontSize: 14, lineHeight: 1.5 }}>
                   Your deposit for Quote #{quote.quote_number} has been received.
                   We&rsquo;ll reach out within one business day to lock in your scheduled date.
                 </p>
-                <p style={{ color: '#999', fontSize: 12, marginTop: 16 }}>
+                <p style={{ color: '#6b7280', fontSize: 12, marginTop: 16 }}>
                   Bank transfers may take 3-5 business days to fully clear, but your spot is reserved.
                 </p>
               </div>
@@ -288,7 +288,9 @@ export default function QuotePage({ params }) {
         <footer style={styles.footer}>
           <div>Lucky Landscapes • (402) 405-5475 • rileykopf@luckylandscapes.com</div>
           <div style={{ marginTop: 4 }}>109 South Canopy ST, Lincoln, NE</div>
-          <div style={{ marginTop: 12, fontSize: 11, color: '#aaa' }}>Prefer to pay cash or check? Call us and we&rsquo;ll arrange pickup or mailing.</div>
+          <div style={{ marginTop: 12, fontSize: 11, color: '#9ca3af' }}>
+            Prefer to pay cash or check? Call us and we&rsquo;ll arrange pickup or mailing.
+          </div>
         </footer>
       </div>
     </div>
@@ -300,21 +302,21 @@ export default function QuotePage({ params }) {
 function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges }) {
   return (
     <div>
-      <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>How does it look?</h3>
-      <p style={{ color: '#666', fontSize: 13, lineHeight: 1.5, margin: '0 0 18px' }}>
-        Take a moment to review the line items and notes. When you&rsquo;re ready, accept the estimate to lock in your spot — or send us what you&rsquo;d like adjusted.
+      <h3 style={styles.panelHeading}>How does it look? 🌿</h3>
+      <p style={styles.panelBody}>
+        Have a look through the line items below. When you&rsquo;re ready, accept to lock in your spot — or let us know what you&rsquo;d like adjusted and we&rsquo;ll send a revised estimate.
       </p>
 
       {deposit > 0 && (
         <div style={styles.depositBox}>
-          <div style={{ fontSize: 11, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>
+          <div style={{ fontSize: 11, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
             Deposit to Schedule
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#666', padding: '4px 0' }}>
-            <span>Materials</span><span>{formatUSD(materials)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+            <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#666', padding: '4px 0' }}>
-            <span>Delivery</span><span>{formatUSD(delivery)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+            <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
           </div>
           <div style={{
             display: 'flex', justifyContent: 'space-between',
@@ -323,7 +325,7 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
           }}>
             <span>Due now</span><span>{formatUSD(deposit)}</span>
           </div>
-          <p style={{ fontSize: 11, color: '#888', marginTop: 8, lineHeight: 1.4 }}>
+          <p style={{ fontSize: 12, color: '#4b5563', marginTop: 8, lineHeight: 1.4 }}>
             The remainder is invoiced after the work is done.
           </p>
         </div>
@@ -331,8 +333,8 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
 
       {deposit === 0 && (
         <div style={styles.depositBox}>
-          <p style={{ fontSize: 13, color: '#555', margin: 0 }}>
-            No deposit required for this estimate. Accept it and we&rsquo;ll reach out to schedule.
+          <p style={{ fontSize: 13, color: '#374151', margin: 0 }}>
+            No deposit needed — just hit accept and we&rsquo;ll reach out to schedule.
           </p>
         </div>
       )}
@@ -346,8 +348,10 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
         </button>
       </div>
 
-      <p style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 14, lineHeight: 1.4 }}>
-        Prefer to pay by cash or check? Call <a href="tel:+14024055475" style={{ color: '#2d7a3a' }}>(402) 405-5475</a> and we&rsquo;ll arrange pickup or mailing.
+      <p style={styles.helperText}>
+        Prefer to pay by cash or check?{' '}
+        <a href="tel:+14024055475" style={styles.helperLink}>Call (402) 405-5475</a>
+        {' '}and we&rsquo;ll arrange pickup or mailing.
       </p>
     </div>
   );
@@ -358,20 +362,20 @@ function AcceptPanel({ deposit, materials, delivery, clientSecret, paymentError,
     <div>
       <button onClick={onBack} style={styles.backLink}>← Back</button>
 
-      <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>Pay deposit to schedule</h3>
-      <p style={{ color: '#666', fontSize: 13, lineHeight: 1.5, margin: '0 0 16px' }}>
+      <h3 style={styles.panelHeading}>Pay deposit to schedule</h3>
+      <p style={styles.panelBody}>
         Once payment clears, your estimate is auto-accepted and we&rsquo;ll reach out to set your date.
       </p>
 
       <div style={styles.depositBox}>
         {materials > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#666', padding: '4px 0' }}>
-            <span>Materials</span><span>{formatUSD(materials)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+            <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
           </div>
         )}
         {delivery > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#666', padding: '4px 0' }}>
-            <span>Delivery</span><span>{formatUSD(delivery)}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+            <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
           </div>
         )}
         <div style={{
@@ -392,12 +396,12 @@ function AcceptPanel({ deposit, materials, delivery, clientSecret, paymentError,
       {paymentLoading && (
         <div style={{ padding: 20, textAlign: 'center' }}>
           <div style={styles.spinner} />
-          <p style={{ color: '#666', marginTop: 12, fontSize: 13 }}>Setting up secure payment…</p>
+          <p style={{ color: '#374151', marginTop: 12, fontSize: 13 }}>Setting up secure payment…</p>
         </div>
       )}
 
       {!paymentLoading && !paymentError && !stripePromise && (
-        <p style={{ color: '#666', fontSize: 13, marginTop: 14 }}>
+        <p style={{ color: '#374151', fontSize: 13, marginTop: 14 }}>
           Online payments aren&rsquo;t configured. Please call (402) 405-5475 to schedule.
         </p>
       )}
@@ -423,8 +427,8 @@ function ChangesPanel({ value, onChange, submitting, error, onBack, onSubmit }) 
     <div>
       <button onClick={onBack} style={styles.backLink} disabled={submitting}>← Back</button>
 
-      <h3 style={{ margin: '0 0 6px', fontSize: 18 }}>What would you like changed?</h3>
-      <p style={{ color: '#666', fontSize: 13, lineHeight: 1.5, margin: '0 0 14px' }}>
+      <h3 style={styles.panelHeading}>What would you like changed?</h3>
+      <p style={styles.panelBody}>
         Tell us what you&rsquo;d like adjusted, removed, or have questions about. We&rsquo;ll send a revised estimate.
       </p>
 
@@ -451,8 +455,9 @@ function ChangesPanel({ value, onChange, submitting, error, onBack, onSubmit }) 
         {submitting ? 'Sending…' : 'Send to Lucky Landscapes'}
       </button>
 
-      <p style={{ fontSize: 11, color: '#999', textAlign: 'center', marginTop: 12, lineHeight: 1.4 }}>
-        Want to talk it through? Call <a href="tel:+14024055475" style={{ color: '#2d7a3a' }}>(402) 405-5475</a>.
+      <p style={styles.helperText}>
+        Want to talk it through?{' '}
+        <a href="tel:+14024055475" style={styles.helperLink}>Call (402) 405-5475</a>.
       </p>
     </div>
   );
@@ -637,6 +642,31 @@ const styles = {
     lineHeight: 1.5,
   },
   notesLabel: { fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: '#999', marginBottom: 4, letterSpacing: '0.05em' },
+  panelHeading: {
+    margin: '0 0 8px',
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#1f2937',
+  },
+  panelBody: {
+    color: '#374151',
+    fontSize: 14,
+    lineHeight: 1.55,
+    margin: '0 0 18px',
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#4b5563',
+    textAlign: 'center',
+    marginTop: 14,
+    lineHeight: 1.5,
+  },
+  helperLink: {
+    color: '#1f6f3a',
+    fontWeight: 600,
+    textDecoration: 'none',
+    whiteSpace: 'nowrap',
+  },
   depositBox: {
     background: '#f7f5f0',
     border: '1px solid #e5e7eb',
@@ -689,7 +719,7 @@ const styles = {
     marginTop: 32,
     textAlign: 'center',
     fontSize: 12,
-    color: '#888',
+    color: '#6b7280',
   },
   card: {
     background: '#fff',

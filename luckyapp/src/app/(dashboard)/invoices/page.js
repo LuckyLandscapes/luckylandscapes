@@ -25,7 +25,7 @@ const STATUS_CONFIG = {
 };
 
 export default function InvoicesPage() {
-  const { invoices, jobs, customers, quotes, getCustomer, getJob, getQuote, addInvoice } = useData();
+  const { invoices, jobs, customers, quotes, payments, getCustomer, getJob, getQuote, addInvoice, updatePayment } = useData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -78,21 +78,51 @@ export default function InvoicesPage() {
         : [{ name: job?.title || 'Service', quantity: 1, unitPrice: billable, total: billable }];
       const subtotal = items.reduce((s, i) => s + (i.total || 0), 0) || billable;
 
-      await addInvoice({
+      // Credit any deposit the customer already paid via the public quote page.
+      // If they paid $2000 of a $3000 quote upfront, the new invoice opens with
+      // amountPaid = $2000 and status = 'partial' so the balance due is $1000.
+      const depositPaid = quote?.depositPaidAt
+        ? Math.max(0, Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0))
+        : 0;
+      const amountPaid = Math.min(depositPaid, subtotal);
+      let status = 'unpaid';
+      if (amountPaid >= subtotal && subtotal > 0) status = 'paid';
+      else if (amountPaid > 0) status = 'partial';
+
+      const depositNote = depositPaid > 0
+        ? `Deposit of ${formatCurrency(depositPaid)} paid ${formatDate((quote.depositPaidAt || '').split('T')[0])} via the quote acceptance page has been credited. Balance due: ${formatCurrency(Math.max(0, subtotal - amountPaid))}.`
+        : '';
+
+      const newInvoice = await addInvoice({
         jobId: selectedJobId,
         quoteId: job?.quoteId || null,
         customerId: job?.customerId || null,
         invoiceNumber,
-        status: 'unpaid',
+        status,
         subtotal,
         taxRate: 0,
         tax: 0,
         total: subtotal,
-        amountPaid: 0,
+        amountPaid,
         items,
         dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
-        notes: '',
+        paidDate: status === 'paid' ? new Date().toISOString().split('T')[0] : null,
+        notes: depositNote,
       });
+
+      // Back-link the deposit payment row to the new invoice so the audit trail
+      // (payments list, AR aging, P&L) can tie the cash to the right invoice.
+      if (depositPaid > 0 && newInvoice?.id && quote?.depositPaymentIntentId) {
+        const depositPayment = payments.find(p => p.stripePaymentIntentId === quote.depositPaymentIntentId);
+        if (depositPayment && !depositPayment.invoiceId) {
+          try {
+            await updatePayment(depositPayment.id, { invoiceId: newInvoice.id });
+          } catch (err) {
+            console.warn('Could not link deposit payment to invoice:', err);
+          }
+        }
+      }
+
       setShowCreateModal(false);
       setSelectedJobId('');
     } catch (err) {
@@ -255,6 +285,9 @@ export default function InvoicesPage() {
                       const customer = job.customerId ? getCustomer(job.customerId) : null;
                       const quote = job.quoteId ? getQuote(job.quoteId) : null;
                       const billable = Number(job.revenue || job.total || quote?.total || 0);
+                      const depositPaid = quote?.depositPaidAt
+                        ? Math.max(0, Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0))
+                        : 0;
                       const isSelected = selectedJobId === job.id;
                       return (
                         <button
@@ -268,6 +301,11 @@ export default function InvoicesPage() {
                               {customer ? `${customer.firstName} ${customer.lastName || ''}` : 'No customer'}
                               {quote ? ` • Quote #${quote.quoteNumber}` : ''}
                             </div>
+                            {depositPaid > 0 && (
+                              <div style={{ fontSize: '0.72rem', color: 'var(--status-success)', marginTop: '2px', fontWeight: 600 }}>
+                                ✓ Deposit credit: {formatCurrency(depositPaid)} → balance {formatCurrency(Math.max(0, billable - depositPaid))}
+                              </div>
+                            )}
                           </div>
                           <div style={{ fontWeight: 800, color: 'var(--lucky-green-light)', fontSize: '0.95rem' }}>
                             {formatCurrency(billable)}

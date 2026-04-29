@@ -710,6 +710,18 @@ export function DataProvider({ children }) {
     }
   }, [connected, orgId]);
 
+  const updatePayment = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('payments').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setPayments(prev => {
+      const next = prev.map(p => p.id === id ? { ...p, ...data } : p);
+      if (!connected) saveLocal('payments', next);
+      return next;
+    });
+  }, [connected]);
+
   const deletePayment = useCallback(async (id) => {
     if (connected) {
       const { error } = await supabase.from('payments').delete().eq('id', id);
@@ -816,7 +828,7 @@ export function DataProvider({ children }) {
     addInvoice, updateInvoice, deleteInvoice,
 
     // Payments (online + manual)
-    addPayment, deletePayment,
+    addPayment, updatePayment, deletePayment,
 
     // Materials
     addMaterial, updateMaterial, deleteMaterial,
