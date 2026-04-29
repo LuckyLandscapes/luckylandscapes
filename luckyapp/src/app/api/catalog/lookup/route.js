@@ -85,8 +85,19 @@ export async function POST(request) {
     res = await fetch(url, {
       headers: {
         'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not.A/Brand";v="99"',
+        'Sec-Ch-Ua-Mobile': '?0',
+        'Sec-Ch-Ua-Platform': '"Windows"',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1',
       },
       redirect: 'follow',
       cache: 'no-store',
@@ -95,7 +106,14 @@ export async function POST(request) {
     return NextResponse.json({ ok: false, error: 'Fetch failed: ' + (err.message || err) }, { status: 502 });
   }
   if (!res.ok) {
-    return NextResponse.json({ ok: false, error: `Supplier returned ${res.status}` }, { status: 502 });
+    // 403/429 from HD/Menards is bot-detection on the supplier CDN — common
+    // when running from a datacenter IP. The UI handles this by falling back
+    // to the "Find at Lincoln Suppliers" deep-link chips so the user can
+    // verify in the browser instead.
+    const friendly = res.status === 403 || res.status === 429
+      ? 'Supplier blocked the lookup (bot detection). Open the supplier page directly to check stock.'
+      : `Supplier returned ${res.status}`;
+    return NextResponse.json({ ok: false, error: friendly, status: res.status }, { status: 502 });
   }
 
   const html = await res.text();

@@ -5,10 +5,11 @@ import { useData } from '@/lib/data';
 import {
   Search, Maximize2, X, ChevronLeft, ChevronRight, Star, Plus,
   Grid3x3, List, ExternalLink, Edit3, Trash2, AlertTriangle, Clock,
-  RefreshCw, Loader2,
+  RefreshCw, Loader2, Download,
 } from 'lucide-react';
 import MaterialFormModal from '@/components/MaterialFormModal';
 import { getQuickSearchLinks } from '@/lib/supplierSearch';
+import { OUTDOOR_SOLUTIONS_CATALOG, normalizeName } from '@/lib/seedOutdoorSolutionsLincoln';
 
 function getSupplierClass(s) {
   if (!s) return 'supplier-other';
@@ -45,7 +46,7 @@ function StockBadge({ m }) {
 }
 
 export default function CatalogPage() {
-  const { materials, addMaterial, updateMaterial, deleteMaterial } = useData();
+  const { materials, addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials } = useData();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSupplier, setActiveSupplier] = useState('all');
@@ -58,6 +59,9 @@ export default function CatalogPage() {
   const [presIndex, setPresIndex] = useState(0);
   const [refreshingId, setRefreshingId] = useState(null);
   const [refreshMsg, setRefreshMsg] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [confirmImport, setConfirmImport] = useState(false);
 
   // Filters
   const categories = ['all', ...new Set(materials.map(m => m.category).filter(Boolean))];
@@ -109,6 +113,23 @@ export default function CatalogPage() {
 
   const startPresentation = (idx) => { setPresIndex(idx); setPresMode(true); };
 
+  const importOutdoorSolutions = async () => {
+    setConfirmImport(false);
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const result = await bulkUpsertMaterials(
+        OUTDOOR_SOLUTIONS_CATALOG,
+        (m) => normalizeName(m.name)
+      );
+      setImportResult(result);
+    } catch (err) {
+      setImportResult({ inserted: 0, updated: 0, errors: [{ item: 'import', error: err.message || String(err) }] });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const refreshFromSupplier = async (m) => {
     if (!m.supplierUrl) { setRefreshMsg('Add a supplier URL first.'); return; }
     setRefreshingId(m.id); setRefreshMsg('');
@@ -145,6 +166,14 @@ export default function CatalogPage() {
           <p>Browse & present materials to customers. {materials.length} items.</p>
         </div>
         <div className="page-header-actions">
+          <button
+            className="btn btn-secondary"
+            onClick={() => setConfirmImport(true)}
+            disabled={importing}
+            title="Insert or refresh prices for the full Outdoor Solutions Lincoln catalog"
+          >
+            {importing ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Download size={16} /> Import OS catalog</>}
+          </button>
           <button className="btn btn-secondary" onClick={() => startPresentation(0)} disabled={filtered.length === 0}>
             <Maximize2 size={16} /> Present
           </button>
@@ -473,6 +502,74 @@ export default function CatalogPage() {
           onClose={() => { setShowForm(false); setEditingMaterial(null); }}
           onSave={handleSave}
         />
+      )}
+
+      {/* Import Outdoor Solutions — confirm */}
+      {confirmImport && (
+        <div className="modal-overlay" onClick={() => setConfirmImport(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>Import Outdoor Solutions Catalog</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setConfirmImport(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
+                Will insert or update <strong>{OUTDOOR_SOLUTIONS_CATALOG.length}</strong> items from the Outdoor Solutions Lincoln price list.
+              </p>
+              <ul style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', paddingLeft: 'var(--space-md)', lineHeight: 1.7 }}>
+                <li>Existing items with a matching name (and same or no supplier) will have their price, unit, and category refreshed.</li>
+                <li>New items will be inserted with supplier set to “Outdoor Solutions”.</li>
+                <li>Items not on the Outdoor Solutions list are left untouched.</li>
+                <li>Pricing source: outdoorsolutions-lincoln.com/price-list.</li>
+              </ul>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setConfirmImport(false)}>Cancel</button>
+              <button className="btn btn-primary" onClick={importOutdoorSolutions}>
+                <Download size={16} /> Import {OUTDOOR_SOLUTIONS_CATALOG.length} items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import result */}
+      {importResult && (
+        <div className="modal-overlay" onClick={() => setImportResult(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <h2>Import complete</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setImportResult(null)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+                <div style={{ flex: 1, padding: 'var(--space-md)', background: 'rgba(34,197,94,0.10)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#4ade80' }}>{importResult.inserted}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Inserted</div>
+                </div>
+                <div style={{ flex: 1, padding: 'var(--space-md)', background: 'rgba(59,130,246,0.10)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700, color: '#60a5fa' }}>{importResult.updated}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Price-refreshed</div>
+                </div>
+                <div style={{ flex: 1, padding: 'var(--space-md)', background: importResult.errors.length ? 'rgba(239,68,68,0.10)' : 'rgba(148,163,184,0.10)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '1.6rem', fontWeight: 700, color: importResult.errors.length ? '#f87171' : 'var(--text-tertiary)' }}>{importResult.errors.length}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Errors</div>
+                </div>
+              </div>
+              {importResult.errors.length > 0 && (
+                <details>
+                  <summary style={{ cursor: 'pointer', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Show errors</summary>
+                  <ul style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)', maxHeight: 240, overflowY: 'auto' }}>
+                    {importResult.errors.map((e, i) => <li key={i}><strong>{e.item}:</strong> {e.error}</li>)}
+                  </ul>
+                </details>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setImportResult(null)}>Done</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Delete Confirm */}

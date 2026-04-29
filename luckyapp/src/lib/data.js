@@ -841,6 +841,60 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // Bulk insert-or-update materials (used by the supplier catalog import).
+  // Match logic: if `matchKey(existing)` equals `matchKey(item)` AND the
+  // existing supplier matches (or is empty), update price/unit/etc. Otherwise
+  // insert a new row. Returns { inserted, updated, errors }.
+  const bulkUpsertMaterials = useCallback(async (items, matchKey) => {
+    let inserted = 0, updated = 0;
+    const errors = [];
+    const stamp = new Date().toISOString();
+    // Snapshot the current list so we don't re-match against rows we just
+    // inserted (which would force every duplicate to update the first one).
+    const indexAtStart = new Map();
+    materials.forEach(existing => {
+      const key = matchKey(existing);
+      if (!indexAtStart.has(key)) indexAtStart.set(key, existing);
+    });
+    for (const item of items) {
+      try {
+        const key = matchKey(item);
+        const match = indexAtStart.get(key);
+        const supplierMatches = !match || !match.supplier || match.supplier === item.supplier;
+        if (match && supplierMatches) {
+          const patch = { ...item, lastPriceCheck: stamp };
+          if (connected) {
+            const { error } = await supabase.from('materials').update(camelToSnake(patch)).eq('id', match.id);
+            if (error) throw error;
+          }
+          setMaterials(prev => {
+            const next = prev.map(m => m.id === match.id ? { ...m, ...patch } : m);
+            if (!connected) saveLocal('materials', next);
+            return next;
+          });
+          updated += 1;
+        } else {
+          const payload = { ...item, lastPriceCheck: stamp };
+          if (connected) {
+            const { data: row, error } = await supabase.from('materials')
+              .insert({ ...camelToSnake(payload), org_id: orgId })
+              .select().single();
+            if (error) throw error;
+            const m = snakeToCamel(row);
+            setMaterials(prev => [m, ...prev]);
+          } else {
+            const m = { ...payload, id: crypto.randomUUID(), orgId, createdAt: stamp };
+            setMaterials(prev => { const next = [m, ...prev]; saveLocal('materials', next); return next; });
+          }
+          inserted += 1;
+        }
+      } catch (err) {
+        errors.push({ item: item.name, error: err.message || String(err) });
+      }
+    }
+    return { inserted, updated, errors };
+  }, [connected, orgId, materials]);
+
   // ─── Context value ──────────────────────────────────────
   const value = {
     // State
@@ -885,7 +939,7 @@ export function DataProvider({ children }) {
     addPayment, updatePayment, deletePayment,
 
     // Materials
-    addMaterial, updateMaterial, deleteMaterial,
+    addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
