@@ -27,8 +27,10 @@ import {
   Wallet,
   Sun,
   Moon,
+  Camera,
 } from 'lucide-react';
 import { useState } from 'react';
+import QuickReceiptModal from './QuickReceiptModal';
 
 // Owner/Admin navigation
 const ownerNavItems = [
@@ -39,6 +41,7 @@ const ownerNavItems = [
   { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
   { href: '/invoices', label: 'Invoices', icon: Receipt, roles: ['owner', 'admin'], badgeKey: 'unpaidInvoices' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
+  { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['owner', 'admin'] },
   { label: 'Tools', type: 'section', roles: ['owner', 'admin'] },
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
@@ -55,6 +58,7 @@ const workerNavItems = [
   { label: 'My Work', type: 'section' },
   { href: '/crew-dashboard', label: 'My Dashboard', icon: HardHat, roles: ['worker'] },
   { href: '/crew-schedule', label: 'My Schedule', icon: CalendarDays, roles: ['worker'] },
+  { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['worker'] },
 ];
 
 // Bottom nav for owners/admins
@@ -77,6 +81,11 @@ export default function Sidebar() {
   const { quotes, calendarEvents, jobs, invoices } = useData();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+
+  const sidebarActions = {
+    logReceipt: () => { setReceiptOpen(true); setMobileOpen(false); },
+  };
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
   const activeJobs = jobs.filter(j => j.status === 'scheduled' || j.status === 'in_progress').length;
@@ -147,6 +156,24 @@ export default function Sidebar() {
             }
 
             const Icon = item.icon;
+
+            // Action items (e.g. "Log Receipt") open a modal instead of navigating
+            if (item.type === 'action') {
+              const handler = sidebarActions[item.actionKey];
+              return (
+                <button
+                  key={item.actionKey}
+                  type="button"
+                  className="sidebar-link"
+                  onClick={handler}
+                  style={{ textAlign: 'left', background: 'transparent', border: 0, width: '100%', cursor: 'pointer' }}
+                >
+                  <Icon size={20} />
+                  <span>{item.label}</span>
+                </button>
+              );
+            }
+
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             const badge = item.badgeKey ? badges[item.badgeKey] : null;
 
@@ -205,6 +232,14 @@ export default function Sidebar() {
           );
         })}
         <button
+          className="mobile-bottom-nav-item"
+          onClick={() => setReceiptOpen(true)}
+          aria-label="Log a receipt"
+        >
+          <Camera size={20} />
+          <span>Receipt</span>
+        </button>
+        <button
           className={`mobile-bottom-nav-item ${mobileOpen ? 'active' : ''}`}
           onClick={() => setMobileOpen(!mobileOpen)}
         >
@@ -212,6 +247,9 @@ export default function Sidebar() {
           <span>More</span>
         </button>
       </nav>
+
+      {/* Global quick-receipt modal — reachable from anywhere */}
+      <QuickReceiptModal open={receiptOpen} onClose={() => setReceiptOpen(false)} />
     </>
   );
 }
