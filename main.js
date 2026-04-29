@@ -1523,7 +1523,13 @@ if (qzCategoryBtns.length > 0) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(leadPayload),
-                }).catch(err => console.error('Lead intake error:', err))
+                })
+                    .then(async r => {
+                        const txt = await r.text().catch(() => '');
+                        if (!r.ok) console.error('Lead intake failed', r.status, txt);
+                        else console.log('Lead intake ok', txt);
+                    })
+                    .catch(err => console.error('Lead intake error:', err))
             );
         }
 
