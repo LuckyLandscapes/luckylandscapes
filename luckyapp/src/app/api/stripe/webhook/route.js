@@ -36,8 +36,68 @@ export async function POST(request) {
     if (event.type === 'payment_intent.succeeded') {
       const intent = event.data.object;
       const meta = intent.metadata || {};
-      const invoiceId = meta.invoice_id;
       const orgId = meta.org_id;
+
+      // ── Quote deposit (materials + delivery to schedule the job) ──────────
+      if (meta.kind === 'quote_deposit') {
+        const quoteId = meta.quote_id;
+        if (!quoteId || !orgId) {
+          console.warn('[stripe webhook] quote_deposit missing metadata');
+          return NextResponse.json({ received: true });
+        }
+
+        const charge = intent.latest_charge
+          ? await stripe.charges.retrieve(typeof intent.latest_charge === 'string' ? intent.latest_charge : intent.latest_charge.id)
+          : null;
+        const pm = charge?.payment_method_details;
+        const method = pm?.us_bank_account ? 'ach' : 'card';
+        const fee = charge?.balance_transaction
+          ? (await stripe.balanceTransactions.retrieve(typeof charge.balance_transaction === 'string' ? charge.balance_transaction : charge.balance_transaction.id)).fee / 100
+          : 0;
+        const amount = intent.amount_received / 100;
+        const paidAt = new Date(intent.created * 1000).toISOString();
+
+        // Idempotency: have we already recorded this payment intent against the quote?
+        const { data: existingQuote } = await supabase
+          .from('quotes')
+          .select('id, deposit_payment_intent_id')
+          .eq('id', quoteId)
+          .maybeSingle();
+
+        if (existingQuote?.deposit_payment_intent_id === intent.id) {
+          console.log('[stripe webhook] quote deposit already recorded:', intent.id);
+          return NextResponse.json({ received: true });
+        }
+
+        // Record a payment row (no invoice_id yet — this is a quote deposit)
+        await supabase.from('payments').insert({
+          org_id: orgId,
+          invoice_id: null,
+          customer_id: meta.customer_id || null,
+          amount,
+          method,
+          status: 'succeeded',
+          stripe_payment_intent_id: intent.id,
+          stripe_charge_id: charge?.id || null,
+          processor_fee: fee,
+          net_amount: amount - fee,
+          paid_at: paidAt,
+          notes: `Quote #${meta.quote_number || ''} deposit (materials + delivery) via ${method === 'ach' ? 'bank transfer' : 'card'}`,
+        });
+
+        // Mark quote accepted + record the deposit
+        await supabase.from('quotes').update({
+          status: 'accepted',
+          accepted_at: paidAt,
+          deposit_paid_at: paidAt,
+          deposit_payment_intent_id: intent.id,
+        }).eq('id', quoteId);
+
+        return NextResponse.json({ received: true });
+      }
+
+      // ── Invoice payment (existing flow) ───────────────────────────────────
+      const invoiceId = meta.invoice_id;
       if (!invoiceId || !orgId) {
         console.warn('[stripe webhook] payment_intent.succeeded missing invoice metadata');
         return NextResponse.json({ received: true });

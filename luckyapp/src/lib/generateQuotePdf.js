@@ -29,8 +29,9 @@ function loadImageAsBase64(src) {
  * @param {Object} quote - The quote object
  * @param {Object} customer - The customer object
  * @param {Object} [company] - Optional company info override
+ * @param {Object} [opts] - { publicLink: string } for the customer-facing link
  */
-async function buildQuotePdf(quote, customer, company = {}) {
+async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   const doc = new jsPDF('p', 'pt', 'letter');
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
@@ -251,6 +252,57 @@ async function buildQuotePdf(quote, customer, company = {}) {
 
   y += 40;
 
+  // =============== DEPOSIT TO SCHEDULE ===============
+  {
+    const materialsCost = Number(quote.materialsCost || 0);
+    const deliveryFee = Number(quote.deliveryFee || 0);
+    const deposit = materialsCost + deliveryFee;
+
+    if (deposit > 0) {
+      if (y + 80 > doc.internal.pageSize.getHeight() - 60) {
+        doc.addPage();
+        y = margin;
+      }
+      doc.setFillColor(...LIGHT_BG);
+      doc.roundedRect(margin, y, contentWidth, 64, 4, 4, 'F');
+      doc.setDrawColor(229, 231, 235);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(margin, y, contentWidth, 64, 4, 4, 'S');
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...CLOVER);
+      doc.text('DEPOSIT TO SCHEDULE', margin + 16, y + 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(...CHARCOAL);
+      const depLeftX = margin + 16;
+      const depRightX = pageWidth - margin - 16;
+
+      let dY = y + 34;
+      doc.setTextColor(...GRAY);
+      doc.text(`Materials`, depLeftX, dY);
+      doc.setTextColor(...CHARCOAL);
+      doc.text(formatCurrency(materialsCost), depRightX, dY, { align: 'right' });
+
+      dY += 12;
+      doc.setTextColor(...GRAY);
+      doc.text(`Delivery`, depLeftX, dY);
+      doc.setTextColor(...CHARCOAL);
+      doc.text(formatCurrency(deliveryFee), depRightX, dY, { align: 'right' });
+
+      // Highlighted deposit total
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...CLOVER);
+      doc.text(`Due to schedule:`, depLeftX + 200, dY);
+      doc.text(formatCurrency(deposit), depRightX, dY, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+
+      y += 80;
+    }
+  }
+
   // =============== NOTES ===============
   if (quote.notes) {
     doc.setFontSize(8);
@@ -266,39 +318,67 @@ async function buildQuotePdf(quote, customer, company = {}) {
     y += noteLines.length * 13 + 16;
   }
 
-  // =============== TERMS / ACCEPTANCE ===============
-  if (y + 120 > doc.internal.pageSize.getHeight() - 60) {
+  // =============== HOW TO RESPOND (replaces signature/acceptance) ===============
+  const materialsCost = Number(quote.materialsCost || 0);
+  const deliveryFee = Number(quote.deliveryFee || 0);
+  const deposit = materialsCost + deliveryFee;
+
+  const stepsBoxHeight = 130;
+  if (y + stepsBoxHeight + 30 > doc.internal.pageSize.getHeight() - 60) {
     doc.addPage();
     y = margin;
   }
 
   doc.setFillColor(...LIGHT_BG);
-  doc.roundedRect(margin, y, contentWidth, 90, 4, 4, 'F');
-  doc.setDrawColor(229, 231, 235); // gray-200
+  doc.roundedRect(margin, y, contentWidth, stepsBoxHeight, 4, 4, 'F');
+  doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.5);
-  doc.roundedRect(margin, y, contentWidth, 90, 4, 4, 'S');
+  doc.roundedRect(margin, y, contentWidth, stepsBoxHeight, 4, 4, 'S');
 
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...CHARCOAL);
-  doc.text('Acceptance', margin + 16, y + 20);
+  doc.setTextColor(...CLOVER);
+  doc.text('HOW TO RESPOND', margin + 16, y + 20);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
-  doc.setTextColor(...GRAY);
-  doc.text(
-    'By signing below, you accept this estimate and authorize Lucky Landscapes to begin work as described above.',
-    margin + 16, y + 36
-  );
+  doc.setFontSize(9);
+  doc.setTextColor(...CHARCOAL);
 
-  // Signature line
-  doc.setDrawColor(...GRAY);
-  doc.setLineWidth(0.5);
-  doc.line(margin + 16, y + 70, margin + 200, y + 70);
-  doc.text('Signature', margin + 16, y + 82);
+  const depositLine = deposit > 0
+    ? `Tap "Looks good" on the link in your email/text to pay the ${formatCurrency(deposit)} deposit (materials${deliveryFee > 0 ? ' + delivery' : ''}) — that locks in your spot and we’ll reach out to schedule.`
+    : 'Tap "Looks good" on the link in your email/text to accept the estimate, and we’ll reach out to schedule.';
+  const changesLine = 'Want changes? Tap "Request changes" on the same link and tell us what to adjust or remove — we’ll send a revised estimate.';
+  const cashLine = 'Prefer cash or check? Call (402) 405-5475 and we’ll arrange pickup or mailing — no need to send anything by mail unless we’ve coordinated it first.';
 
-  doc.line(margin + 240, y + 70, margin + 380, y + 70);
-  doc.text('Date', margin + 240, y + 82);
+  let textY = y + 38;
+  [depositLine, changesLine, cashLine].forEach((line, i) => {
+    const wrapped = doc.splitTextToSize(line, contentWidth - 60);
+    // bullet
+    doc.setFillColor(...CLOVER);
+    doc.circle(margin + 22, textY - 3, 1.6, 'F');
+    doc.text(wrapped, margin + 32, textY);
+    textY += wrapped.length * 12 + 4;
+  });
+
+  y += stepsBoxHeight + 18;
+
+  // Public link (printed prominently if provided so paper-PDF readers can type it in)
+  if (opts.publicLink) {
+    if (y + 30 > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = margin;
+    }
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY);
+    doc.text('Review and respond online:', margin, y);
+    y += 12;
+    doc.setFontSize(9);
+    doc.setTextColor(...CLOVER_DARK);
+    doc.setFont('helvetica', 'bold');
+    doc.textWithLink(opts.publicLink, margin, y, { url: opts.publicLink });
+    doc.setFont('helvetica', 'normal');
+    y += 16;
+  }
 
   // =============== FOOTER ===============
   drawFooter(doc, co, pageWidth, margin);
@@ -311,8 +391,13 @@ async function buildQuotePdf(quote, customer, company = {}) {
  * Generate and open the PDF in a new browser tab.
  * (Original behavior — kept for the "PDF" button.)
  */
-export async function generateQuotePdf(quote, customer, company = {}) {
-  const doc = await buildQuotePdf(quote, customer, company);
+export async function generateQuotePdf(quote, customer, company = {}, opts = {}) {
+  // Default the public link to the customer-facing /quote/[token] page when running in the browser
+  const publicLink = opts.publicLink
+    || (quote?.publicToken && typeof window !== 'undefined'
+      ? `${window.location.origin}/quote/${quote.publicToken}`
+      : '');
+  const doc = await buildQuotePdf(quote, customer, company, { ...opts, publicLink });
   const pdfBlob = doc.output('blob');
   const blobUrl = URL.createObjectURL(new Blob([pdfBlob], { type: 'application/pdf' }));
   window.open(blobUrl, '_blank');
@@ -321,8 +406,12 @@ export async function generateQuotePdf(quote, customer, company = {}) {
 /**
  * Generate the PDF and return it as a Blob (for uploading to storage).
  */
-export async function generateQuotePdfBlob(quote, customer, company = {}) {
-  const doc = await buildQuotePdf(quote, customer, company);
+export async function generateQuotePdfBlob(quote, customer, company = {}, opts = {}) {
+  const publicLink = opts.publicLink
+    || (quote?.publicToken && typeof window !== 'undefined'
+      ? `${window.location.origin}/quote/${quote.publicToken}`
+      : '');
+  const doc = await buildQuotePdf(quote, customer, company, { ...opts, publicLink });
   return doc.output('blob');
 }
 

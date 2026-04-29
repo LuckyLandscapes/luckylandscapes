@@ -21,6 +21,8 @@ function NewQuoteContent() {
   const [category, setCategory] = useState('');
   const [items, setItems] = useState([]);
   const [notes, setNotes] = useState('');
+  const [materialsCost, setMaterialsCost] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -88,6 +90,8 @@ function NewQuoteContent() {
         items,
         notes,
         total: subtotal,
+        materialsCost: parseFloat(materialsCost) || 0,
+        deliveryFee: parseFloat(deliveryFee) || 0,
         status: 'draft',
       });
       if (newQuote?.id) {
@@ -331,6 +335,51 @@ function NewQuoteContent() {
               </button>
             </div>
           )}
+
+          {/* Deposit (Materials + Delivery) — what customer pays online to lock in the job */}
+          <div className="card" style={{ marginTop: 'var(--space-lg)', maxWidth: '600px' }}>
+            <h4 style={{ marginBottom: 'var(--space-xs)' }}>Deposit to Schedule</h4>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
+              When the customer accepts this quote online, they pay this amount to lock in their spot.
+              Set delivery to $0 if pickup or no delivery is needed.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Materials cost</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={materialsCost}
+                  onChange={(e) => setMaterialsCost(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label className="form-label">Delivery fee</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={deliveryFee}
+                  onChange={(e) => setDeliveryFee(e.target.value)}
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+            <div style={{
+              marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)',
+              borderTop: '1px solid var(--border-primary)', display: 'flex',
+              justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Deposit due to schedule</span>
+              <span style={{ fontWeight: 800, color: 'var(--lucky-green-light)' }}>
+                {formatCurrency((parseFloat(materialsCost) || 0) + (parseFloat(deliveryFee) || 0))}
+              </span>
+            </div>
+          </div>
 
           <div className="form-group" style={{ marginTop: 'var(--space-lg)', maxWidth: '600px' }}>
             <label className="form-label">Notes (internal or for customer)</label>

@@ -4,10 +4,11 @@ import { useState } from 'react';
 import { useData } from '@/lib/data';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { generateQuotePdf, generateQuotePdfBlob } from '@/lib/generateQuotePdf';
+import { generateQuotePdf } from '@/lib/generateQuotePdf';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Printer, Edit3, Trash2, X, AlertTriangle,
   Mail, Loader2, CheckCircle, AlertCircle, MessageSquare, Phone, CalendarDays,
+  Copy, ExternalLink,
 } from 'lucide-react';
 import ScheduleJobModal from '@/components/ScheduleJobModal';
 
@@ -32,6 +33,10 @@ export default function QuoteDetailPage() {
   const quote = getQuote(id);
   const customer = quote ? getCustomer(quote.customerId) : null;
   const linkedJob = quote ? jobs.find(j => j.quoteId === id) : null;
+  const depositAmount = quote ? (Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0)) : 0;
+  const publicLink = quote?.publicToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/quote/${quote.publicToken}`
+    : '';
 
   if (!quote) {
     return (
@@ -70,31 +75,34 @@ export default function QuoteDetailPage() {
   };
 
   // ─── Build SMS text body ──────────────────────────────────
-  const buildSmsBody = (pdfUrl) => {
+  const buildSmsBody = () => {
     const lines = [
-      `Hi ${customer?.firstName || 'there'}! 🍀 Thanks for considering Lucky Landscapes — we'd love to help bring your project to life!`,
+      `Hi ${customer?.firstName || 'there'}! 🍀 Your Lucky Landscapes estimate is ready.`,
       '',
       `📄 Quote #${quote.quoteNumber}${quote.category ? ` (${quote.category})` : ''}`,
       `💰 Estimated Total: ${formatCurrency(quote.total)}`,
-      `📅 Valid for 30 days`,
     ];
 
     if (sendMessage) {
       lines.push('', sendMessage);
     }
 
-    if (pdfUrl) {
-      lines.push('', `View your full estimate (PDF):`, pdfUrl);
+    if (publicLink) {
+      lines.push(
+        '',
+        `Review and respond here:`,
+        publicLink,
+        '',
+        `Tap "Looks good" to pay the deposit${depositAmount > 0 ? ` (${formatCurrency(depositAmount)} for materials + delivery)` : ''} and schedule, or "Request changes" to send us what you'd like adjusted.`,
+      );
+    } else {
+      lines.push(
+        '',
+        `Reply with "yes" to schedule or let us know what you'd like changed.`,
+      );
     }
 
-    lines.push(
-      '',
-      `Ready to move forward? Just reply with a "yes" or call us at (402) 405-5475 — we'll get you scheduled!`,
-      '',
-      `Have questions or want to make changes? We're happy to revise.`,
-      '',
-      `— The Lucky Landscapes Team`,
-    );
+    lines.push('', `Questions? Call (402) 405-5475.`, '— The Lucky Landscapes Team');
 
     return lines.filter(Boolean).join('\n');
   };
@@ -116,6 +124,10 @@ export default function QuoteDetailPage() {
           items: quote.items || [],
           total: quote.total,
           message: sendMessage || undefined,
+          publicLink,
+          depositAmount,
+          materialsCost: Number(quote.materialsCost || 0),
+          deliveryFee: Number(quote.deliveryFee || 0),
         }),
       });
 
@@ -160,24 +172,12 @@ export default function QuoteDetailPage() {
     } catch { /* best effort */ }
   };
 
-  // ─── Build SMS body, uploading the PDF first ──────────────
-  const prepareSmsMessage = async () => {
-    const pdfBlob = await generateQuotePdfBlob(quote, customer);
-    const formData = new FormData();
-    formData.append('file', new File([pdfBlob], `quote-${quote.quoteNumber}.pdf`, { type: 'application/pdf' }));
-    formData.append('quoteNumber', quote.quoteNumber);
-    const uploadRes = await fetch('/api/upload-quote-pdf', { method: 'POST', body: formData });
-    const uploadData = await uploadRes.json();
-    if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload PDF');
-    return buildSmsBody(uploadData.url);
-  };
-
   const handleCopySms = async () => {
     setSendState({ loading: true, success: false, error: null });
     try {
-      const body = await prepareSmsMessage();
+      const body = buildSmsBody();
       await navigator.clipboard.writeText(body);
-      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with PDF link` : 'Sent via copied SMS');
+      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with quote link` : 'Sent via copied SMS');
       setSendState({ loading: false, success: true, error: null });
       setTimeout(() => {
         setShowSendModal(false);
@@ -192,12 +192,12 @@ export default function QuoteDetailPage() {
   const handleOpenInMessages = async () => {
     setSendState({ loading: true, success: false, error: null });
     try {
-      const body = await prepareSmsMessage();
+      const body = buildSmsBody();
       const phoneClean = (sendPhone || '').replace(/[^\d+]/g, '');
       const href = phoneClean
         ? `sms:${phoneClean}?&body=${encodeURIComponent(body)}`
         : `sms:?&body=${encodeURIComponent(body)}`;
-      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with PDF link` : 'Sent via Messages');
+      await markQuoteSent(sendPhone ? `Texted to ${sendPhone} with quote link` : 'Sent via Messages');
       setSendState({ loading: false, success: false, error: null });
       window.location.href = href;
       setTimeout(() => {
@@ -206,6 +206,16 @@ export default function QuoteDetailPage() {
       }, 400);
     } catch (err) {
       setSendState({ loading: false, success: false, error: err.message || 'Could not prepare message' });
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!publicLink) return;
+    try {
+      await navigator.clipboard.writeText(publicLink);
+      showToast('success', 'Public quote link copied to clipboard');
+    } catch {
+      showToast('error', 'Could not copy link');
     }
   };
 
@@ -269,6 +279,50 @@ export default function QuoteDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Decline reason banner — shows the customer's feedback when they hit "Request Changes" */}
+      {quote.status === 'declined' && quote.declineReason && (
+        <div style={{
+          background: 'rgba(239,68,68,0.08)',
+          border: '1px solid rgba(239,68,68,0.25)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-md)',
+          marginBottom: 'var(--space-md)',
+          display: 'flex',
+          gap: 'var(--space-sm)',
+          alignItems: 'flex-start',
+        }}>
+          <AlertTriangle size={20} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: '2px' }} />
+          <div>
+            <div style={{ fontWeight: 700, marginBottom: '4px' }}>
+              Customer requested changes
+              {quote.declinedAt ? ` • ${new Date(quote.declinedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}
+            </div>
+            <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap' }}>{quote.declineReason}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Deposit-paid banner */}
+      {quote.depositPaidAt && (
+        <div style={{
+          background: 'rgba(34,197,94,0.08)',
+          border: '1px solid rgba(34,197,94,0.25)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-md)',
+          marginBottom: 'var(--space-md)',
+          display: 'flex',
+          gap: 'var(--space-sm)',
+          alignItems: 'center',
+        }}>
+          <CheckCircle size={20} style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+          <div style={{ fontSize: '0.9rem' }}>
+            <strong>Deposit paid</strong> — {formatCurrency(depositAmount)} on{' '}
+            {new Date(quote.depositPaidAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}.
+            Quote auto-marked accepted — ready to schedule.
+          </div>
+        </div>
+      )}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 'var(--space-md)' }}>
         {/* Quote Content */}
@@ -385,6 +439,70 @@ export default function QuoteDetailPage() {
               </div>
             </div>
           </div>
+
+          {/* Deposit Card */}
+          <div className="card">
+            <h4 style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>Deposit to Schedule</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-tertiary)' }}>Materials</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(quote.materialsCost || 0)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                <span style={{ color: 'var(--text-tertiary)' }}>Delivery</span>
+                <span style={{ fontWeight: 600 }}>{formatCurrency(quote.deliveryFee || 0)}</span>
+              </div>
+              <div style={{
+                display: 'flex', justifyContent: 'space-between',
+                paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--border-primary)',
+              }}>
+                <span style={{ fontWeight: 700 }}>Deposit due</span>
+                <span style={{ fontWeight: 800, color: 'var(--lucky-green-light)' }}>
+                  {formatCurrency(depositAmount)}
+                </span>
+              </div>
+              {depositAmount === 0 && (
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>
+                  No deposit set — customer can accept without paying. Edit the quote to charge for materials/delivery.
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Customer Link Card */}
+          {publicLink && (
+            <div className="card">
+              <h4 style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>Customer Link</h4>
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-sm)' }}>
+                The customer reviews and responds here. Anyone with this link can view the quote.
+              </p>
+              <div style={{
+                background: 'var(--bg-elevated)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '8px 10px',
+                fontSize: '0.75rem',
+                wordBreak: 'break-all',
+                marginBottom: 'var(--space-sm)',
+                fontFamily: 'monospace',
+                color: 'var(--text-secondary)',
+              }}>
+                {publicLink}
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+                <button className="btn btn-secondary btn-sm" onClick={handleCopyLink} style={{ flex: 1 }}>
+                  <Copy size={14} /> Copy
+                </button>
+                <a className="btn btn-secondary btn-sm" href={publicLink} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
+                  <ExternalLink size={14} /> Preview
+                </a>
+              </div>
+              {quote.lastViewedAt && (
+                <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  Last viewed {new Date(quote.lastViewedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -526,7 +644,7 @@ export default function QuoteDetailPage() {
                         color: 'var(--status-info)',
                       }}>
                         <Mail size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>A branded email with full quote details will be sent to the customer.</span>
+                        <span>The email includes a link to the customer-facing quote page — they can accept (and pay the deposit) or request changes right from there.</span>
                       </div>
                     </>
                   )}
@@ -577,7 +695,7 @@ export default function QuoteDetailPage() {
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>
                           Message Preview
                         </div>
-                        {buildSmsBody('https://your-pdf-link.pdf')}
+                        {buildSmsBody()}
                       </div>
 
                       <div style={{
@@ -592,7 +710,7 @@ export default function QuoteDetailPage() {
                         color: 'var(--status-info)',
                       }}>
                         <Phone size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>Your PDF is uploaded and a download link is added to the message. Copy it into iMessage, WhatsApp, or any messaging app — free, no SMS service needed.</span>
+                        <span>Includes a link to the customer-facing quote page where they can review, accept (and pay the deposit) or request changes.</span>
                       </div>
                     </>
                   )}

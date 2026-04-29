@@ -22,6 +22,8 @@ export default function EditQuotePage() {
   const [category, setCategory] = useState('');
   const [items, setItems] = useState([]);
   const [notes, setNotes] = useState('');
+  const [materialsCost, setMaterialsCost] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(0);
   const [status, setStatus] = useState('draft');
   const [loaded, setLoaded] = useState(false);
 
@@ -32,6 +34,8 @@ export default function EditQuotePage() {
       setCategory(quote.category || '');
       setItems((quote.items || []).map((item, i) => ({ ...item, id: item.id || `li${i}` })));
       setNotes(quote.notes || '');
+      setMaterialsCost(quote.materialsCost || 0);
+      setDeliveryFee(quote.deliveryFee || 0);
       setStatus(quote.status || 'draft');
       setLoaded(true);
     }
@@ -112,6 +116,8 @@ export default function EditQuotePage() {
       notes,
       status,
       total: subtotal,
+      materialsCost: parseFloat(materialsCost) || 0,
+      deliveryFee: parseFloat(deliveryFee) || 0,
     });
     router.push(`/quotes/${id}`);
   };
@@ -321,6 +327,50 @@ export default function EditQuotePage() {
           </button>
         </div>
       )}
+
+      {/* Deposit (Materials + Delivery) */}
+      <div className="card" style={{ maxWidth: '600px', marginBottom: 'var(--space-lg)' }}>
+        <h4 style={{ marginBottom: 'var(--space-xs)' }}>Deposit to Schedule</h4>
+        <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
+          What the customer pays online to lock in their job. Set delivery to $0 if not needed.
+        </p>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Materials cost</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={materialsCost}
+              onChange={(e) => setMaterialsCost(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+          <div className="form-group" style={{ margin: 0 }}>
+            <label className="form-label">Delivery fee</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={deliveryFee}
+              onChange={(e) => setDeliveryFee(e.target.value)}
+              placeholder="0.00"
+            />
+          </div>
+        </div>
+        <div style={{
+          marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)',
+          borderTop: '1px solid var(--border-primary)', display: 'flex',
+          justifyContent: 'space-between', alignItems: 'center',
+        }}>
+          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Deposit due to schedule</span>
+          <span style={{ fontWeight: 800, color: 'var(--lucky-green-light)' }}>
+            {formatCurrency((parseFloat(materialsCost) || 0) + (parseFloat(deliveryFee) || 0))}
+          </span>
+        </div>
+      </div>
 
       {/* Notes */}
       <div className="form-group" style={{ maxWidth: '600px', marginBottom: 'var(--space-xl)' }}>

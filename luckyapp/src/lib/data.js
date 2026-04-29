@@ -266,12 +266,16 @@ export function DataProvider({ children }) {
     const maxNum = quotes.reduce((max, q) => Math.max(max, q.quoteNumber || 0), 1000);
     const nextQuoteNumber = maxNum + 1;
 
+    // URL-safe public token for the customer-facing /quote/[token] link
+    const publicToken = data.publicToken || makeUrlSafeToken();
+    const payload = { ...data, publicToken };
+
     if (connected) {
-      const payload = { ...camelToSnake(data), org_id: orgId, quote_number: nextQuoteNumber };
+      const dbPayload = { ...camelToSnake(payload), org_id: orgId, quote_number: nextQuoteNumber };
       // Remove 'id' if it's undefined/null (let Supabase generate it)
-      if (!payload.id) delete payload.id;
+      if (!dbPayload.id) delete dbPayload.id;
       const { data: row, error } = await supabase.from('quotes')
-        .insert(payload)
+        .insert(dbPayload)
         .select().single();
       if (error) {
         console.error('[addQuote] Supabase error:', JSON.stringify(error, null, 2));
@@ -281,7 +285,7 @@ export function DataProvider({ children }) {
       setQuotes(prev => [q, ...prev]);
       return q;
     } else {
-      const q = { ...data, id: crypto.randomUUID(), orgId, quoteNumber: nextQuoteNumber, createdAt: new Date().toISOString() };
+      const q = { ...payload, id: crypto.randomUUID(), orgId, quoteNumber: nextQuoteNumber, createdAt: new Date().toISOString() };
       setQuotes(prev => { const next = [q, ...prev]; saveLocal('quotes', next); return next; });
       return q;
     }

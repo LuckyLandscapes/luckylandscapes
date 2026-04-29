@@ -1,0 +1,19 @@
+/* Public quote page — mobile responsive */
+@media (max-width: 768px) {
+  .quote-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .quote-card-sticky {
+    position: static !important;
+  }
+  .quote-action-row {
+    flex-direction: column !important;
+  }
+  .quote-action-row > * {
+    width: 100% !important;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
