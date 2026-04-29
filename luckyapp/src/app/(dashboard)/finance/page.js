@@ -11,7 +11,7 @@ import {
 import {
   Plus, X, Trash2, Edit3, Save, DollarSign, Calendar, Repeat,
   Receipt, AlertTriangle, BarChart3, TrendingDown, FileText, Building2,
-  Send, Mail, Loader2, CheckCircle2,
+  Send, Mail, Loader2, CheckCircle2, Eye,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 
@@ -404,7 +404,7 @@ export default function FinancePage() {
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{overdueInvoices.length} overdue</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '0 0 var(--space-md)' }}>
-                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d.
+                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d. Auto-sends after 14 days overdue (max once a week per invoice).
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {overdueInvoices.map(inv => {
@@ -436,6 +436,16 @@ export default function FinancePage() {
                             ? `${inv.reminderCount} reminder${inv.reminderCount !== 1 ? 's' : ''} sent · last ${fmtRelative(inv.lastReminderAt)}`
                             : 'No reminders sent yet'}
                         </div>
+                        <a
+                          href={`/api/preview-invoice-reminder?invoiceId=${inv.id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="btn btn-sm btn-ghost"
+                          style={{ padding: '4px 8px', fontSize: '0.72rem' }}
+                          title="Preview the email the customer would see"
+                        >
+                          <Eye size={12} /> Preview
+                        </a>
                         <button
                           className="btn btn-sm"
                           style={{
@@ -445,7 +455,7 @@ export default function FinancePage() {
                           }}
                           onClick={() => handleSendReminder(inv)}
                           disabled={!hasEmail || sending}
-                          title={hasEmail ? `Send ${tone} reminder` : 'No email on file'}
+                          title={hasEmail ? `Send ${tone} reminder now` : 'No email on file'}
                         >
                           {sending ? <><Loader2 size={12} className="spin" /> Sending</> : <><Send size={12} /> Remind</>}
                         </button>

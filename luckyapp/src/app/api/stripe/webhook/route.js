@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getStripe, isStripeConfigured, getServiceSupabase } from '@/lib/stripeServer';
 import { notifyOrg } from '@/lib/notify';
+import { sendDepositReceipt, sendInvoicePaidReceipt } from '@/lib/customerEmails';
 
 const fmtMoney = (n) => `$${Number(n || 0).toFixed(2)}`;
 const fmtCustomerName = (c) => [c?.first_name, c?.last_name].filter(Boolean).join(' ').trim() || 'Customer';
@@ -97,15 +98,25 @@ export async function POST(request) {
           deposit_payment_intent_id: intent.id,
         }).eq('id', quoteId);
 
-        // Notify the team — quote accepted + deposit paid (single combined event)
+        // Look up the quote + customer (used for both team notification + customer receipt)
+        let quoteRecord = null;
+        let customerRecord = null;
         try {
           const { data: q } = await supabase
             .from('quotes')
-            .select('quote_number, customers ( first_name, last_name )')
+            .select('id, quote_number, customers ( id, first_name, last_name, email )')
             .eq('id', quoteId)
             .maybeSingle();
-          const quoteNumber = q?.quote_number || meta.quote_number || '';
-          const customerName = fmtCustomerName(q?.customers);
+          quoteRecord = q;
+          customerRecord = q?.customers || null;
+        } catch (lookupErr) {
+          console.error('[stripe webhook] quote/customer lookup failed', lookupErr);
+        }
+
+        // Notify the team — quote accepted + deposit paid (single combined event)
+        try {
+          const quoteNumber = quoteRecord?.quote_number || meta.quote_number || '';
+          const customerName = fmtCustomerName(customerRecord);
           await notifyOrg({
             orgId,
             type: 'quote_accepted',
@@ -116,6 +127,24 @@ export async function POST(request) {
           });
         } catch (notifyErr) {
           console.error('[stripe webhook] quote_accepted notify failed', notifyErr);
+        }
+
+        // Customer-facing deposit receipt (best-effort; never blocks)
+        try {
+          const customerEmail = customerRecord?.email;
+          if (customerEmail) {
+            await sendDepositReceipt({
+              to: customerEmail,
+              customer: customerRecord,
+              quote: quoteRecord || { quote_number: meta.quote_number },
+              amount,
+              method,
+            });
+          } else {
+            console.warn('[stripe webhook] deposit paid but customer has no email on file');
+          }
+        } catch (mailErr) {
+          console.error('[stripe webhook] deposit receipt failed', mailErr);
         }
 
         return NextResponse.json({ received: true });
@@ -168,10 +197,10 @@ export async function POST(request) {
       });
       if (payErr) console.error('[stripe webhook] failed to insert payment:', payErr);
 
-      // Update invoice totals
+      // Update invoice totals — also pull items so the receipt email can show them
       const { data: inv } = await supabase
         .from('invoices')
-        .select('total, amount_paid, invoice_number, customer_id')
+        .select('total, amount_paid, invoice_number, customer_id, items')
         .eq('id', invoiceId)
         .single();
       let newStatus = null;
@@ -187,18 +216,24 @@ export async function POST(request) {
         await supabase.from('invoices').update(updates).eq('id', invoiceId);
       }
 
-      // Notify the team — only when the invoice is fully paid
+      // Notify the team — only when the invoice is fully paid.
+      // Also send the customer their paid receipt at the same time.
       if (inv && newStatus === 'paid') {
-        try {
-          let customer = null;
-          if (inv.customer_id) {
+        let customer = null;
+        if (inv.customer_id) {
+          try {
             const { data: c } = await supabase
               .from('customers')
-              .select('first_name, last_name')
+              .select('first_name, last_name, email')
               .eq('id', inv.customer_id)
               .maybeSingle();
             customer = c;
+          } catch (lookupErr) {
+            console.error('[stripe webhook] invoice customer lookup failed', lookupErr);
           }
+        }
+
+        try {
           const customerName = fmtCustomerName(customer);
           await notifyOrg({
             orgId,
@@ -210,6 +245,23 @@ export async function POST(request) {
           });
         } catch (notifyErr) {
           console.error('[stripe webhook] invoice_paid notify failed', notifyErr);
+        }
+
+        // Customer-facing paid receipt (best-effort)
+        try {
+          if (customer?.email) {
+            await sendInvoicePaidReceipt({
+              to: customer.email,
+              customer,
+              invoice: inv,
+              amount,
+              method,
+            });
+          } else {
+            console.warn('[stripe webhook] invoice paid but customer has no email on file');
+          }
+        } catch (mailErr) {
+          console.error('[stripe webhook] invoice paid receipt failed', mailErr);
         }
       }
     }
