@@ -36,11 +36,17 @@ const activityIcons = {
 export default function CustomerDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getCustomer, getCustomerQuotes, getCustomerActivity, updateCustomer, deleteCustomer, deleteQuote } = useData();
+  const { getCustomer, getCustomerQuotes, getCustomerJobs, getCustomerActivity, updateCustomer, deleteCustomer, calendarEvents, invoices } = useData();
 
   const customer = getCustomer(id);
   const customerQuotes = getCustomerQuotes(id);
+  const customerJobs = getCustomerJobs(id);
   const customerActivity = getCustomerActivity(id);
+  const customerJobIds = customerJobs.map(j => j.id);
+  const customerInvoices = invoices.filter(i => i.customerId === id);
+  const customerEvents = calendarEvents.filter(
+    e => e.customerId === id || (e.jobId && customerJobIds.includes(e.jobId))
+  );
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -70,8 +76,6 @@ export default function CustomerDetailPage() {
   };
 
   const handleDelete = async () => {
-    // Also delete orphaned quotes for this customer
-    await Promise.all(customerQuotes.map(q => deleteQuote(q.id)));
     await deleteCustomer(id);
     router.push('/customers');
   };
@@ -386,10 +390,14 @@ export default function CustomerDetailPage() {
                 <div>
                   <div style={{ fontWeight: 600, marginBottom: '4px' }}>This action cannot be undone</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    <strong>{customer.firstName} {customer.lastName}</strong> and {customerQuotes.length > 0 ? (
-                      <span>their <strong>{customerQuotes.length} quote{customerQuotes.length !== 1 ? 's' : ''}</strong></span>
-                    ) : 'all associated data'} will be permanently deleted.
+                    <strong>{customer.firstName} {customer.lastName}</strong> will be permanently deleted along with:
                   </div>
+                  <ul style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: '8px 0 0', paddingLeft: '20px' }}>
+                    <li><strong>{customerQuotes.length}</strong> quote{customerQuotes.length !== 1 ? 's' : ''}</li>
+                    <li><strong>{customerJobs.length}</strong> job{customerJobs.length !== 1 ? 's' : ''}</li>
+                    <li><strong>{customerEvents.length}</strong> calendar event{customerEvents.length !== 1 ? 's' : ''}</li>
+                    <li><strong>{customerInvoices.length}</strong> invoice{customerInvoices.length !== 1 ? 's' : ''}</li>
+                  </ul>
                 </div>
               </div>
             </div>
