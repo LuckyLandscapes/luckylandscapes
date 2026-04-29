@@ -5,7 +5,7 @@ import { useData } from '@/lib/data';
 import {
   Search, Maximize2, X, ChevronLeft, ChevronRight, Star, Plus,
   Grid3x3, List, ExternalLink, Edit3, Trash2, AlertTriangle, Clock,
-  RefreshCw, Loader2, Download,
+  RefreshCw, Loader2, Download, Eraser,
 } from 'lucide-react';
 import MaterialFormModal from '@/components/MaterialFormModal';
 import { getQuickSearchLinks } from '@/lib/supplierSearch';
@@ -47,7 +47,7 @@ function StockBadge({ m }) {
 }
 
 export default function CatalogPage() {
-  const { materials, addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials } = useData();
+  const { materials, addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials, clearAllMaterials } = useData();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSupplier, setActiveSupplier] = useState('all');
@@ -63,6 +63,8 @@ export default function CatalogPage() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [confirmImport, setConfirmImport] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   // Filters
   const categories = ['all', ...new Set(materials.map(m => m.category).filter(Boolean))];
@@ -113,6 +115,18 @@ export default function CatalogPage() {
   };
 
   const startPresentation = (idx) => { setPresIndex(idx); setPresMode(true); };
+
+  const clearCatalog = async () => {
+    setConfirmClear(false);
+    setClearing(true);
+    try {
+      await clearAllMaterials();
+    } catch (err) {
+      alert('Failed to clear: ' + (err.message || err));
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const importOutdoorSolutions = async () => {
     setConfirmImport(false);
@@ -173,11 +187,19 @@ export default function CatalogPage() {
         <div className="page-header-actions">
           <button
             className="btn btn-secondary"
-            onClick={() => setConfirmImport(true)}
-            disabled={importing}
-            title="Insert or refresh prices for the full Outdoor Solutions Lincoln catalog"
+            onClick={() => setConfirmClear(true)}
+            disabled={clearing || importing || materials.length === 0}
+            title="Delete every material in the catalog"
           >
-            {importing ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Download size={16} /> Import OS catalog</>}
+            {clearing ? <><Loader2 size={16} className="spin" /> Clearing…</> : <><Eraser size={16} /> Clear catalog</>}
+          </button>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setConfirmImport(true)}
+            disabled={importing || clearing}
+            title="Import the full supplier catalog (mulch & rock from OS, hardscape from Menards, retail from Home Depot)"
+          >
+            {importing ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Download size={16} /> Import full catalog</>}
           </button>
           <button className="btn btn-secondary" onClick={() => startPresentation(0)} disabled={filtered.length === 0}>
             <Maximize2 size={16} /> Present
@@ -509,23 +531,53 @@ export default function CatalogPage() {
         />
       )}
 
-      {/* Import Outdoor Solutions — confirm */}
+      {/* Clear catalog — confirm */}
+      {confirmClear && (
+        <div className="modal-overlay" onClick={() => setConfirmClear(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
+            <div className="modal-header">
+              <h2>Clear entire catalog?</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setConfirmClear(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)' }}>
+                <AlertTriangle size={20} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>This deletes all {materials.length} materials</div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                    Every item in the catalog will be permanently removed — including any custom items you added. Use this before re-importing the full supplier catalog.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setConfirmClear(false)}>Cancel</button>
+              <button className="btn btn-danger" onClick={clearCatalog}>
+                <Eraser size={16} /> Delete all {materials.length} items
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import full supplier catalog — confirm */}
       {confirmImport && (
         <div className="modal-overlay" onClick={() => setConfirmImport(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
             <div className="modal-header">
-              <h2>Import Outdoor Solutions Catalog</h2>
+              <h2>Import full supplier catalog</h2>
               <button className="btn btn-icon btn-ghost" onClick={() => setConfirmImport(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-                Will insert or update <strong>{OUTDOOR_SOLUTIONS_CATALOG.length}</strong> items from the Outdoor Solutions Lincoln price list.
+                Will insert or update <strong>{OUTDOOR_SOLUTIONS_CATALOG.length}</strong> items, each tagged with the right supplier:
               </p>
               <ul style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', paddingLeft: 'var(--space-md)', lineHeight: 1.7 }}>
-                <li>Existing items with a matching name (and same or no supplier) will have their price, unit, and category refreshed.</li>
-                <li>New items will be inserted with supplier set to “Outdoor Solutions”.</li>
-                <li>Items not on the Outdoor Solutions list are left untouched.</li>
-                <li>Pricing source: outdoorsolutions-lincoln.com/price-list.</li>
+                <li><strong style={{ color: '#d4a267' }}>Outdoor Solutions</strong> — bulk mulch & landscape rock (32 items)</li>
+                <li><strong style={{ color: '#4ade80' }}>Menards</strong> — hardscape: edging, pavers, retaining wall block, drystack, steps, boulders, flagstone, gravel (129 items)</li>
+                <li><strong style={{ color: '#fb923c' }}>Home Depot</strong> — bagged soil, sod & seed, fabric, fire pit kits, water-feature pumps & accessories, sealers (109 items)</li>
+                <li>Each item gets a product image; existing materials with the same name are price-refreshed.</li>
+                <li>Tip: <em>Clear catalog</em> first if you want a clean slate.</li>
               </ul>
             </div>
             <div className="modal-footer">

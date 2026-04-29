@@ -841,6 +841,20 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  const clearAllMaterials = useCallback(async () => {
+    const ids = materials.map(m => m.id);
+    if (ids.length === 0) return { deleted: 0 };
+    if (connected) {
+      const { error } = await supabase.from('materials').delete().eq('org_id', orgId);
+      if (error) throw error;
+    }
+    setMaterials(() => {
+      if (!connected) saveLocal('materials', []);
+      return [];
+    });
+    return { deleted: ids.length };
+  }, [connected, orgId, materials]);
+
   // Bulk insert-or-update materials (used by the supplier catalog import).
   // Match logic: if `matchKey(existing)` equals `matchKey(item)` AND the
   // existing supplier matches (or is empty), update price/unit/etc. Otherwise
@@ -939,7 +953,7 @@ export function DataProvider({ children }) {
     addPayment, updatePayment, deletePayment,
 
     // Materials
-    addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials,
+    addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials, clearAllMaterials,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
