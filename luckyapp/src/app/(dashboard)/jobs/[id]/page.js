@@ -9,8 +9,9 @@ import {
   ArrowLeft, CalendarDays, Clock, MapPin, User, Phone, Mail, FileText,
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
-  Edit3, Save, Search, Check, AlertTriangle,
+  Edit3, Save, Search, Check, AlertTriangle, Receipt,
 } from 'lucide-react';
+import ReceiptUpload from '@/components/ReceiptUpload';
 
 function formatTime12(time) {
   if (!time) return '';
@@ -53,7 +54,7 @@ export default function JobDetailPage({ params }) {
   const { getJob, getCustomer, getQuote, getTeamMember, updateJob, deleteJob, teamMembers,
     getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries,
     calendarEvents, invoices } = useData();
-  const { isOwnerOrAdmin, isWorker } = useAuth();
+  const { user, isOwnerOrAdmin, isWorker } = useAuth();
 
   const job = getJob(jobId);
   const customer = job?.customerId ? getCustomer(job.customerId) : null;
@@ -61,7 +62,18 @@ export default function JobDetailPage({ params }) {
   const financials = job ? getJobFinancials(jobId) : null;
   const [updating, setUpdating] = useState(false);
   const [showAddExpense, setShowAddExpense] = useState(false);
-  const [expenseForm, setExpenseForm] = useState({ category: 'materials', description: '', amount: '' });
+  const todayISO = () => new Date().toISOString().split('T')[0];
+  const emptyExpense = () => ({
+    category: 'materials',
+    description: '',
+    amount: '',
+    date: todayISO(),
+    vendor: '',
+    receipt: { url: null, path: null },
+  });
+  const [expenseForm, setExpenseForm] = useState(emptyExpense());
+  const [savingExpense, setSavingExpense] = useState(false);
+  const [expenseError, setExpenseError] = useState(null);
   const [activeTab, setActiveTab] = useState('details');
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -104,15 +116,32 @@ export default function JobDetailPage({ params }) {
   };
 
   const handleAddExpense = async () => {
-    if (!expenseForm.description || !expenseForm.amount) return;
-    await addJobExpense({
-      jobId,
-      category: expenseForm.category,
-      description: expenseForm.description,
-      amount: parseFloat(expenseForm.amount),
-    });
-    setExpenseForm({ category: 'materials', description: '', amount: '' });
-    setShowAddExpense(false);
+    const amount = parseFloat(expenseForm.amount);
+    if (!expenseForm.description.trim() || !amount || amount <= 0) {
+      setExpenseError('Description and a positive amount are required.');
+      return;
+    }
+    setSavingExpense(true);
+    setExpenseError(null);
+    try {
+      await addJobExpense({
+        jobId,
+        category: expenseForm.category,
+        description: expenseForm.description.trim(),
+        amount,
+        date: expenseForm.date || todayISO(),
+        vendor: expenseForm.vendor.trim() || null,
+        receiptUrl: expenseForm.receipt?.url || null,
+        receiptPath: expenseForm.receipt?.path || null,
+      });
+      setExpenseForm(emptyExpense());
+      setShowAddExpense(false);
+    } catch (err) {
+      console.error('Error saving expense:', err);
+      setExpenseError(err?.message || 'Failed to save expense.');
+    } finally {
+      setSavingExpense(false);
+    }
   };
 
   const openEditModal = () => {
@@ -219,8 +248,8 @@ export default function JobDetailPage({ params }) {
         )}
       </div>
 
-      {/* Profit Summary Banner */}
-      {financials && (
+      {/* Profit Summary Banner — owner/admin only (workers don't see margin) */}
+      {financials && isOwnerOrAdmin && (
         <div className="job-financials-banner">
           <div className="job-financials-item">
             <span className="job-financials-label">Revenue</span>
@@ -258,14 +287,12 @@ export default function JobDetailPage({ params }) {
         </div>
       )}
 
-      {/* Tab Bar — workers see details only */}
+      {/* Tab Bar — workers can add receipts/expenses; only owners see margin & labor cost */}
       <div className="tabs" style={{ marginBottom: 'var(--space-lg)' }}>
         <button className={`tab ${activeTab === 'details' ? 'active' : ''}`} onClick={() => setActiveTab('details')}>Details</button>
-        {isOwnerOrAdmin && (
-          <button className={`tab ${activeTab === 'financials' ? 'active' : ''}`} onClick={() => setActiveTab('financials')}>
-            Financials {financials?.expenses?.length ? `(${financials.expenses.length})` : ''}
-          </button>
-        )}
+        <button className={`tab ${activeTab === 'financials' ? 'active' : ''}`} onClick={() => setActiveTab('financials')}>
+          {isOwnerOrAdmin ? 'Financials' : 'Receipts'} {financials?.expenses?.length ? `(${financials.expenses.length})` : ''}
+        </button>
       </div>
 
       {activeTab === 'details' && (
@@ -421,15 +448,21 @@ export default function JobDetailPage({ params }) {
               </button>
             </div>
 
-            {/* Add Expense Form */}
+            {/* Add Expense Form — receipt-first, mobile-friendly */}
             {showAddExpense && (
-              <div className="expense-add-form">
-                <div className="form-row" style={{ gap: '8px' }}>
+              <div className="expense-add-form" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <ReceiptUpload
+                  orgId={user?.orgId}
+                  scope="job"
+                  value={expenseForm.receipt}
+                  onChange={(receipt) => setExpenseForm(prev => ({ ...prev, receipt }))}
+                />
+                <div className="form-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
                   <select
                     className="form-input"
                     value={expenseForm.category}
                     onChange={e => setExpenseForm(prev => ({ ...prev, category: e.target.value }))}
-                    style={{ maxWidth: '160px' }}
+                    style={{ minWidth: '150px', flex: '0 0 auto' }}
                   >
                     {EXPENSE_CATEGORIES.map(c => (
                       <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
@@ -437,23 +470,52 @@ export default function JobDetailPage({ params }) {
                   </select>
                   <input
                     className="form-input"
-                    placeholder="Description..."
-                    value={expenseForm.description}
-                    onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
-                    style={{ flex: 1 }}
+                    type="date"
+                    value={expenseForm.date}
+                    onChange={e => setExpenseForm(prev => ({ ...prev, date: e.target.value }))}
+                    style={{ flex: '0 0 auto', minWidth: '140px' }}
                   />
+                </div>
+                <input
+                  className="form-input"
+                  placeholder="What was this for? (e.g. mulch + bagged stone)"
+                  value={expenseForm.description}
+                  onChange={e => setExpenseForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+                <div className="form-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
                   <input
                     className="form-input"
-                    type="number"
-                    step="0.01"
-                    placeholder="Amount"
-                    value={expenseForm.amount}
-                    onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
-                    style={{ maxWidth: '120px' }}
+                    placeholder="Vendor (Outdoor Solutions, Menards…)"
+                    value={expenseForm.vendor}
+                    onChange={e => setExpenseForm(prev => ({ ...prev, vendor: e.target.value }))}
+                    style={{ flex: 1, minWidth: '180px' }}
                   />
-                  <button className="btn btn-primary btn-sm" onClick={handleAddExpense}>Add</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAddExpense(false)}>
-                    <X size={14} />
+                  <div style={{ position: 'relative', flex: '0 0 140px' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }}>$</span>
+                    <input
+                      className="form-input"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={expenseForm.amount}
+                      onChange={e => setExpenseForm(prev => ({ ...prev, amount: e.target.value }))}
+                      style={{ paddingLeft: '24px' }}
+                    />
+                  </div>
+                </div>
+                {expenseError && (
+                  <div style={{ padding: 'var(--space-sm) var(--space-md)', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
+                    {expenseError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddExpense(false); setExpenseForm(emptyExpense()); setExpenseError(null); }} disabled={savingExpense}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={handleAddExpense} disabled={savingExpense}>
+                    <Save size={14} /> {savingExpense ? 'Saving…' : 'Save Expense'}
                   </button>
                 </div>
               </div>
@@ -466,10 +528,21 @@ export default function JobDetailPage({ params }) {
                   const catInfo = EXPENSE_CATEGORIES.find(c => c.value === exp.category) || EXPENSE_CATEGORIES[6];
                   return (
                     <div key={exp.id} className="expense-row">
-                      <span className="expense-icon">{catInfo.icon}</span>
-                      <div style={{ flex: 1 }}>
+                      {exp.receiptUrl ? (
+                        <a href={exp.receiptUrl} target="_blank" rel="noopener noreferrer" title="View receipt" style={{ flexShrink: 0 }}>
+                          <img src={exp.receiptUrl} alt="" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+                        </a>
+                      ) : (
+                        <span className="expense-icon">{catInfo.icon}</span>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{exp.description}</div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'capitalize' }}>{catInfo.label}</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                          {catInfo.label}
+                          {exp.vendor && <> · {exp.vendor}</>}
+                          {exp.date && <> · {new Date(exp.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>}
+                          {exp.receiptUrl && <span style={{ color: 'var(--status-success)', marginLeft: '6px' }}>📎 receipt</span>}
+                        </div>
                       </div>
                       <div style={{ fontWeight: 700, color: 'var(--status-danger)', fontSize: '0.9rem' }}>
                         -{formatCurrency(exp.amount)}
@@ -478,6 +551,7 @@ export default function JobDetailPage({ params }) {
                         className="btn btn-icon btn-ghost"
                         style={{ width: 28, height: 28 }}
                         onClick={() => deleteJobExpense(exp.id)}
+                        title="Delete expense"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -487,12 +561,15 @@ export default function JobDetailPage({ params }) {
               </div>
             ) : (
               <div style={{ padding: 'var(--space-md)', color: 'var(--text-tertiary)', fontSize: '0.85rem', textAlign: 'center' }}>
-                No expenses recorded yet.
+                <Receipt size={28} style={{ opacity: 0.3, marginBottom: '4px' }} />
+                <p style={{ margin: 0 }}>No expenses recorded yet.</p>
+                <p style={{ margin: '2px 0 0', fontSize: '0.75rem' }}>Snap a photo of every receipt — it tracks margins and saves on taxes.</p>
               </div>
             )}
           </div>
 
-          {/* Labor Costs */}
+          {/* Labor Costs — owner/admin only (shows individual hourly rates) */}
+          {isOwnerOrAdmin && (
           <div className="card">
             <h3 style={{ marginBottom: 'var(--space-md)' }}>Labor Costs (from Time Tracking)</h3>
             {jobTimeEntries.length > 0 ? (
@@ -535,6 +612,7 @@ export default function JobDetailPage({ params }) {
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 

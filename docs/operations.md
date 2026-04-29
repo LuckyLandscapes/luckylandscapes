@@ -56,9 +56,9 @@ Landscaping is brutally seasonal. Spell out the year:
 ## Customer lifecycle
 1. **Lead in:** Refferals, family, social media, yard signs, we rank fairly well on google for lincoln nebraska landscaping, yelp.
 2. **Quote:** We go out and see the property and get measurements and assess the job, sometimes being able to do digital quotes, but usually go out and see the job, then we create a quote in the luckyapp and send it to the customer.
-3. **Sold:** We require 50% of the payment upfront to secure the job, then we schedule it on the calendar.
+3. **Sold:** We require materials, delievry fee, etc upfront to secure the job, then we schedule it on the calendar.
 4. **Scheduled & worked:** We usually work the job within the next week of the customer paying the deposit, we try to get as much done in one day as possible to be efficient, we try to be done with most residential jobs in 1-2 days unless its something big like hardscaping.
-5. **Invoiced & paid:** We usually invoice the customer for the remaining 50% upon job completion, we try to get paid within 7-14 days of the invoice date, the invoice says the have 30 days to pay, if they dont we will call them and remind them, we havent had to send anyone to collections yet.
+5. **Invoiced & paid:** We usually invoice the customer for the remaining balance upon job completion, we try to get paid within 7-14 days of the invoice date, the invoice says the have 30 days to pay, if they dont we will call them and remind them, we havent had to send anyone to collections yet.
 6. **Retained:** We try to get recurring customers by doing good work and being reliable, word of mouth is our best form of marketing, we put yard signs in yards and ask for google reviews.
 
 ## Known operational pain points

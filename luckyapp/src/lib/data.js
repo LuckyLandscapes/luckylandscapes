@@ -606,7 +606,14 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   const deleteJobExpense = useCallback(async (id) => {
+    // Best-effort storage cleanup so deleted receipts don't sit in the bucket
+    // chewing through the free-tier 1GB cap.
+    const existing = jobExpenses.find(e => e.id === id);
     if (connected) {
+      if (existing?.receiptPath) {
+        try { await supabase.storage.from('receipts').remove([existing.receiptPath]); }
+        catch (err) { console.warn('[deleteJobExpense] storage cleanup failed', err); }
+      }
       const { error } = await supabase.from('job_expenses').delete().eq('id', id);
       if (error) throw error;
     }
@@ -615,7 +622,7 @@ export function DataProvider({ children }) {
       if (!connected) saveLocal('job_expenses', next);
       return next;
     });
-  }, [connected]);
+  }, [connected, jobExpenses]);
 
   // ─── Financial Helpers ─────────────────────────────────
   const getJobFinancials = useCallback((jobId) => {
@@ -736,7 +743,12 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   const deleteCompanyExpense = useCallback(async (id) => {
+    const existing = companyExpenses.find(e => e.id === id);
     if (connected) {
+      if (existing?.receiptPath) {
+        try { await supabase.storage.from('receipts').remove([existing.receiptPath]); }
+        catch (err) { console.warn('[deleteCompanyExpense] storage cleanup failed', err); }
+      }
       const { error } = await supabase.from('company_expenses').delete().eq('id', id);
       if (error) throw error;
     }
@@ -745,7 +757,7 @@ export function DataProvider({ children }) {
       if (!connected) saveLocal('company_expenses', next);
       return next;
     });
-  }, [connected]);
+  }, [connected, companyExpenses]);
 
   // ─── Payment CRUD ───────────────────────────────────────
   const addPayment = useCallback(async (data) => {

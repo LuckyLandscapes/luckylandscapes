@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useData } from '@/lib/data';
+import { useAuth } from '@/lib/auth';
 import {
   OPEX_CATEGORIES, OPEX_LABELS, RECURRING_INTERVALS,
   buildARAging, AGING_LABELS, fmtCurrency, getPeriodRange, isInPeriod,
@@ -10,7 +11,9 @@ import {
 import {
   Plus, X, Trash2, Edit3, Save, DollarSign, Calendar, Repeat,
   Receipt, AlertTriangle, BarChart3, TrendingDown, FileText, Building2,
+  Send, Mail, Loader2, CheckCircle2,
 } from 'lucide-react';
+import ReceiptUpload from '@/components/ReceiptUpload';
 
 const CATEGORY_ICONS = {
   vehicle: '🚐',
@@ -44,14 +47,16 @@ function emptyForm() {
     vendor: '',
     recurring: false,
     recurringInterval: 'monthly',
+    receipt: { url: null, path: null },
   };
 }
 
 export default function FinancePage() {
   const {
     companyExpenses, addCompanyExpense, updateCompanyExpense, deleteCompanyExpense,
-    invoices,
+    invoices, customers, getCustomer, updateInvoice,
   } = useData();
+  const { user } = useAuth();
 
   const [period, setPeriod] = useState('month');
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -89,6 +94,52 @@ export default function FinancePage() {
 
   const aging = useMemo(() => buildARAging(invoices), [invoices]);
 
+  // Flatten all overdue invoices (not in 'current' bucket) for the dunning list,
+  // sorted oldest first so the worst offenders bubble to the top.
+  const overdueInvoices = useMemo(() => {
+    const arr = [
+      ...aging.buckets.days30,
+      ...aging.buckets.days60,
+      ...aging.buckets.days90,
+      ...aging.buckets.days90plus,
+    ];
+    arr.sort((a, b) => b.daysOver - a.daysOver);
+    return arr;
+  }, [aging]);
+
+  // Track in-flight + per-invoice feedback for the reminder action
+  const [sendingId, setSendingId] = useState(null);
+  const [reminderResult, setReminderResult] = useState({}); // { [invoiceId]: { ok, msg } }
+
+  const handleSendReminder = async (invoice) => {
+    const customer = invoice.customerId ? getCustomer(invoice.customerId) : null;
+    if (!customer?.email) {
+      setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: false, msg: 'No email on file' } }));
+      return;
+    }
+    setSendingId(invoice.id);
+    setReminderResult(prev => ({ ...prev, [invoice.id]: null }));
+    try {
+      const res = await fetch('/api/send-invoice-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: invoice.id, sentBy: user?.id || null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Send failed');
+      setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: true, msg: `Sent (${json.tone})` } }));
+      // Optimistically bump local state — realtime will reconcile within a second
+      await updateInvoice(invoice.id, {
+        lastReminderAt: new Date().toISOString(),
+        reminderCount: (invoice.reminderCount || 0) + 1,
+      });
+    } catch (err) {
+      setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: false, msg: err.message || 'Failed' } }));
+    } finally {
+      setSendingId(null);
+    }
+  };
+
   const openNew = () => {
     setForm(emptyForm());
     setEditingId(null);
@@ -105,6 +156,7 @@ export default function FinancePage() {
       vendor: expense.vendor || '',
       recurring: !!expense.recurring,
       recurringInterval: expense.recurringInterval || 'monthly',
+      receipt: { url: expense.receiptUrl || null, path: expense.receiptPath || null },
     });
     setEditingId(expense.id);
     setError(null);
@@ -128,6 +180,8 @@ export default function FinancePage() {
         vendor: form.vendor.trim() || null,
         recurring: form.recurring,
         recurringInterval: form.recurring ? form.recurringInterval : null,
+        receiptUrl: form.receipt?.url || null,
+        receiptPath: form.receipt?.path || null,
       };
       if (editingId) await updateCompanyExpense(editingId, payload);
       else await addCompanyExpense(payload);
@@ -244,7 +298,16 @@ export default function FinancePage() {
                       )}
                     </span>
                   </td>
-                  <td style={{ fontSize: '0.85rem', fontWeight: 500 }}>{e.description || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</td>
+                  <td style={{ fontSize: '0.85rem', fontWeight: 500 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {e.receiptUrl && (
+                        <a href={e.receiptUrl} target="_blank" rel="noopener noreferrer" title="View receipt" style={{ flexShrink: 0 }}>
+                          <img src={e.receiptUrl} alt="" style={{ width: 28, height: 28, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+                        </a>
+                      )}
+                      <span>{e.description || <span style={{ color: 'var(--text-tertiary)' }}>—</span>}</span>
+                    </div>
+                  </td>
                   <td style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{e.vendor || '—'}</td>
                   <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--status-warning)' }}>
                     {fmtCurrency(e.amount, 2)}
@@ -332,6 +395,73 @@ export default function FinancePage() {
               <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>No outstanding invoices.</p>
             )}
           </div>
+
+          {/* Dunning — overdue invoice nudges */}
+          {overdueInvoices.length > 0 && (
+            <div className="card">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
+                <h4 style={{ margin: 0 }}>Send Payment Reminders</h4>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{overdueInvoices.length} overdue</span>
+              </div>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '0 0 var(--space-md)' }}>
+                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {overdueInvoices.map(inv => {
+                  const customer = inv.customerId ? getCustomer(inv.customerId) : null;
+                  const customerName = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : (inv.customerName || 'Unknown');
+                  const hasEmail = !!customer?.email;
+                  const tone = inv.daysOver > 60 ? 'urgent' : inv.daysOver > 30 ? 'firm' : 'friendly';
+                  const toneColor = tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)';
+                  const result = reminderResult[inv.id];
+                  const sending = sendingId === inv.id;
+                  return (
+                    <div key={inv.id} style={{ padding: '8px', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)', border: '1px solid var(--border-subtle)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {customerName}
+                          </div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                            {inv.invoiceNumber || inv.invoice_number} · <span style={{ color: toneColor, fontWeight: 600 }}>{inv.daysOver}d over</span>
+                          </div>
+                        </div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--status-danger)', whiteSpace: 'nowrap' }}>
+                          {fmtCurrency(inv.balance, 2)}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '6px', gap: '8px' }}>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', flex: 1, minWidth: 0 }}>
+                          {inv.reminderCount > 0
+                            ? `${inv.reminderCount} reminder${inv.reminderCount !== 1 ? 's' : ''} sent · last ${fmtRelative(inv.lastReminderAt)}`
+                            : 'No reminders sent yet'}
+                        </div>
+                        <button
+                          className="btn btn-sm"
+                          style={{
+                            background: tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)',
+                            color: '#fff', padding: '4px 10px', fontSize: '0.72rem',
+                            opacity: hasEmail ? 1 : 0.5, cursor: hasEmail ? 'pointer' : 'not-allowed',
+                          }}
+                          onClick={() => handleSendReminder(inv)}
+                          disabled={!hasEmail || sending}
+                          title={hasEmail ? `Send ${tone} reminder` : 'No email on file'}
+                        >
+                          {sending ? <><Loader2 size={12} className="spin" /> Sending</> : <><Send size={12} /> Remind</>}
+                        </button>
+                      </div>
+                      {result && (
+                        <div style={{ marginTop: '6px', fontSize: '0.7rem', color: result.ok ? 'var(--status-success)' : 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          {result.ok ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
+                          {result.msg}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -388,6 +518,16 @@ export default function FinancePage() {
                 )}
               </div>
 
+              <div className="form-group">
+                <label className="form-label"><Receipt size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Receipt</label>
+                <ReceiptUpload
+                  orgId={user?.orgId}
+                  scope="company"
+                  value={form.receipt}
+                  onChange={(receipt) => setForm(f => ({ ...f, receipt }))}
+                />
+              </div>
+
               {error && (
                 <div style={{ padding: 'var(--space-sm) var(--space-md)', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
                   {error}
@@ -420,4 +560,17 @@ function fmtDate(d) {
 function fmtRange({ start, end }) {
   const f = (d) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return `${f(start)} – ${f(end)}`;
+}
+
+function fmtRelative(ts) {
+  if (!ts) return '';
+  const diffMs = Date.now() - new Date(ts).getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  if (diffMin < 1) return 'just now';
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  if (diffDay < 30) return `${diffDay}d ago`;
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
