@@ -94,14 +94,16 @@ export default function FinancePage() {
 
   const aging = useMemo(() => buildARAging(invoices), [invoices]);
 
-  // Flatten all overdue invoices (not in 'current' bucket) for the dunning list,
-  // sorted oldest first so the worst offenders bubble to the top.
-  const overdueInvoices = useMemo(() => {
+  // All unpaid invoices (current + overdue), sorted worst-offender first.
+  // The card stays visible whenever there's anything outstanding so the Preview
+  // button is reachable even before anything goes past due.
+  const outstandingInvoices = useMemo(() => {
     const arr = [
-      ...aging.buckets.days30,
-      ...aging.buckets.days60,
-      ...aging.buckets.days90,
       ...aging.buckets.days90plus,
+      ...aging.buckets.days90,
+      ...aging.buckets.days60,
+      ...aging.buckets.days30,
+      ...aging.buckets.current,
     ];
     arr.sort((a, b) => b.daysOver - a.daysOver);
     return arr;
@@ -396,23 +398,26 @@ export default function FinancePage() {
             )}
           </div>
 
-          {/* Dunning — overdue invoice nudges */}
-          {overdueInvoices.length > 0 && (
+          {/* Dunning — outstanding invoice nudges */}
+          {outstandingInvoices.length > 0 && (
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-md)' }}>
                 <h4 style={{ margin: 0 }}>Send Payment Reminders</h4>
-                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{overdueInvoices.length} overdue</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{outstandingInvoices.length} outstanding</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '0 0 var(--space-md)' }}>
-                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d. Auto-sends after 14 days overdue (max once a week per invoice).
+                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d. Auto-sends after 14 days overdue (max once a week per invoice). Preview shows what the customer sees.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {overdueInvoices.map(inv => {
+                {outstandingInvoices.map(inv => {
                   const customer = inv.customerId ? getCustomer(inv.customerId) : null;
                   const customerName = customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() : (inv.customerName || 'Unknown');
                   const hasEmail = !!customer?.email;
+                  const isOverdue = inv.daysOver > 0;
                   const tone = inv.daysOver > 60 ? 'urgent' : inv.daysOver > 30 ? 'firm' : 'friendly';
-                  const toneColor = tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)';
+                  const toneColor = isOverdue
+                    ? (tone === 'urgent' ? 'var(--status-danger)' : tone === 'firm' ? 'var(--lucky-gold)' : 'var(--status-info)')
+                    : 'var(--text-tertiary)';
                   const result = reminderResult[inv.id];
                   const sending = sendingId === inv.id;
                   return (
@@ -423,7 +428,9 @@ export default function FinancePage() {
                             {customerName}
                           </div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
-                            {inv.invoiceNumber || inv.invoice_number} · <span style={{ color: toneColor, fontWeight: 600 }}>{inv.daysOver}d over</span>
+                            {inv.invoiceNumber || inv.invoice_number} · <span style={{ color: toneColor, fontWeight: 600 }}>
+                              {isOverdue ? `${inv.daysOver}d over` : 'Not yet due'}
+                            </span>
                           </div>
                         </div>
                         <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--status-danger)', whiteSpace: 'nowrap' }}>
