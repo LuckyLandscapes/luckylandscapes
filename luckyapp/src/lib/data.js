@@ -87,7 +87,25 @@ export function DataProvider({ children }) {
     if (connected) {
       fetchAllFromSupabase();
       const unsub = subscribeRealtime();
-      return unsub;
+      // Re-fetch when the tab becomes visible again. This fixes stale state
+      // after the worker hands their phone to a customer to sign a contract
+      // in-person on /sign/[token] — that route is outside the dashboard
+      // layout, so realtime is briefly torn down. On return we want fresh data
+      // immediately rather than waiting for the next realtime ping.
+      const onVisible = () => {
+        if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+          fetchAllFromSupabase();
+        }
+      };
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisible);
+      }
+      return () => {
+        unsub?.();
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', onVisible);
+        }
+      };
     } else {
       // Demo mode — load from localStorage
       setCustomers(loadLocal('customers'));

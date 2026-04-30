@@ -98,9 +98,16 @@ export default function QuoteDetailPage() {
     }
   };
 
-  const handleGenerateContract = async () => {
+  // Generate a contract from this quote. Two modes:
+  //   { send: false } — create a draft, hop to the contract detail page
+  //   { send: true  } — create AND immediately email the customer the sign link
+  const handleGenerateContract = async ({ send = false } = {}) => {
     if (linkedContract) {
       router.push(`/contracts/${linkedContract.id}`);
+      return;
+    }
+    if (send && !customer?.email) {
+      showToast('error', 'No email on file for this customer — add one before sending, or click Generate Contract to review first.');
       return;
     }
     try {
@@ -111,7 +118,30 @@ export default function QuoteDetailPage() {
         customerId: quote.customerId,
         status: 'draft',
       });
-      showToast('success', `Contract #${created.contractNumber} generated`);
+
+      if (send) {
+        const res = await fetch('/api/send-contract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contractId: created.id,
+            to: customer.email,
+            customerName: `${customer.firstName || ''} ${customer.lastName || ''}`.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not email contract');
+        await addActivity({
+          customerId: quote.customerId,
+          quoteId: quote.id,
+          type: 'contract_sent',
+          title: `Contract #${created.contractNumber} sent`,
+          description: `Sign link emailed to ${customer.email}`,
+        });
+        showToast('success', `Contract #${created.contractNumber} generated and emailed to ${customer.email}`);
+      } else {
+        showToast('success', `Contract #${created.contractNumber} generated`);
+      }
       router.push(`/contracts/${created.id}`);
     } catch (err) {
       console.error('[generate contract] error:', err);
@@ -330,9 +360,25 @@ export default function QuoteDetailPage() {
               <FileSignature size={16} /> Contract #{linkedContract.contractNumber}
             </Link>
           ) : (
-            <button className="btn btn-secondary" onClick={handleGenerateContract}>
-              <FileSignature size={16} /> Generate Contract
-            </button>
+            <>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleGenerateContract({ send: true })}
+                title={customer?.email
+                  ? `Generates a contract from this quote and emails the sign link to ${customer.email}`
+                  : 'Add an email to the customer first to use Generate & Send'}
+                disabled={!customer?.email}
+              >
+                <FileSignature size={16} /> Generate &amp; Send Contract
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={() => handleGenerateContract({ send: false })}
+                title="Create a draft contract — review it before sending to the customer"
+              >
+                <FileSignature size={16} /> Generate Draft
+              </button>
+            </>
           )}
           <Link href={`/quotes/${id}/edit`} className="btn btn-secondary">
             <Edit3 size={16} /> Edit

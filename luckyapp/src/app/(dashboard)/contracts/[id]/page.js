@@ -7,6 +7,7 @@ import Link from 'next/link';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Trash2, Copy, ExternalLink,
   AlertTriangle, FileSignature, X, FileDown, Smartphone, Download,
+  Mail, Loader2,
 } from 'lucide-react';
 
 function formatCurrency(n) {
@@ -27,6 +28,10 @@ export default function ContractDetailPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState(null);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [sendEmail, setSendEmail] = useState('');
+  const [sendMessage, setSendMessage] = useState('');
+  const [sendState, setSendState] = useState({ loading: false, success: false, error: null });
 
   const contract = getContract(id);
   const customer = contract ? getCustomer(contract.customerId) : null;
@@ -53,18 +58,49 @@ export default function ContractDetailPage() {
     );
   }
 
-  const handleMarkSent = async () => {
+  const openSendModal = () => {
+    setSendEmail(customer?.email || contract.customerSnapshot?.email || '');
+    setSendMessage('');
+    setSendState({ loading: false, success: false, error: null });
+    setShowSendModal(true);
+  };
+
+  const handleSend = async () => {
+    if (!sendEmail) {
+      setSendState({ loading: false, success: false, error: 'Email address is required.' });
+      return;
+    }
+    setSendState({ loading: true, success: false, error: null });
     try {
-      await updateContract(id, { status: 'sent', sentAt: new Date().toISOString() });
+      const res = await fetch('/api/send-contract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contractId: contract.id,
+          to: sendEmail,
+          customerName: customer
+            ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim()
+            : (contract.customerSnapshot?.name || ''),
+          message: sendMessage || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send contract');
+
       await addActivity?.({
         customerId: contract.customerId,
         type: 'contract_sent',
         title: `Contract #${contract.contractNumber} sent`,
-        description: `Public sign link shared with customer.`,
+        description: `Sign link emailed to ${sendEmail}`,
       });
-      showToast('success', 'Marked as sent');
+
+      setSendState({ loading: false, success: true, error: null });
+      setTimeout(() => {
+        setShowSendModal(false);
+        showToast('success', `Contract #${contract.contractNumber} emailed to ${sendEmail}`);
+      }, 1200);
     } catch (err) {
-      showToast('error', err?.message || 'Could not update status');
+      setSendState({ loading: false, success: false, error: err.message });
     }
   };
 
@@ -131,11 +167,13 @@ export default function ContractDetailPage() {
         <div className="page-header-actions">
           {!isSigned && !isVoid && (
             <>
+              <button className="btn btn-primary" onClick={openSendModal}>
+                <Mail size={16} /> {contract.status === 'draft' ? 'Send to Client' : 'Resend to Client'}
+              </button>
               <a
                 href={publicLink || '#'}
                 onClick={(e) => { if (!publicLink) e.preventDefault(); }}
-                className="btn btn-primary"
-                style={{ background: '#2d7a3a', borderColor: '#2d7a3a' }}
+                className="btn btn-secondary"
               >
                 <Smartphone size={16} /> Sign In Person
               </a>
@@ -146,11 +184,6 @@ export default function ContractDetailPage() {
                 <a href={publicLink} target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
                   <ExternalLink size={16} /> Preview
                 </a>
-              )}
-              {contract.status === 'draft' && (
-                <button className="btn btn-secondary" onClick={handleMarkSent}>
-                  <Send size={16} /> Mark Sent
-                </button>
               )}
               <button className="btn btn-danger" onClick={handleVoid}>
                 <XCircle size={16} /> Void
@@ -361,6 +394,78 @@ export default function ContractDetailPage() {
                 {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showSendModal && (
+        <div className="modal-overlay" onClick={() => !sendState.loading && setShowSendModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Mail size={20} />
+                <h3 style={{ margin: 0 }}>Send Contract to Client</h3>
+              </div>
+              <button className="modal-close" onClick={() => setShowSendModal(false)} disabled={sendState.loading}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              {sendState.success ? (
+                <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                  <CheckCircle2 size={48} style={{ color: 'var(--status-success)' }} />
+                  <h4 style={{ margin: '12px 0 4px' }}>Sent!</h4>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                    The customer will receive an email with the sign link.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <p style={{ marginTop: 0, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                    Emails Contract #{contract.contractNumber} with a link the customer can review and sign on any device.
+                  </p>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', marginBottom: 6, marginTop: 16 }}>
+                    To
+                  </label>
+                  <input
+                    type="email"
+                    className="input"
+                    value={sendEmail}
+                    onChange={(e) => setSendEmail(e.target.value)}
+                    placeholder="customer@example.com"
+                    disabled={sendState.loading}
+                    style={{ width: '100%' }}
+                  />
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', marginBottom: 6, marginTop: 16 }}>
+                    Personal note <span style={{ fontWeight: 400, textTransform: 'none', color: 'var(--text-tertiary)' }}>(optional)</span>
+                  </label>
+                  <textarea
+                    className="input"
+                    value={sendMessage}
+                    onChange={(e) => setSendMessage(e.target.value)}
+                    placeholder="Add a personal message (otherwise we'll use a friendly default)…"
+                    rows={4}
+                    disabled={sendState.loading}
+                    style={{ width: '100%', resize: 'vertical', fontFamily: 'inherit' }}
+                  />
+                  {sendState.error && (
+                    <div style={{ marginTop: 12, padding: 10, background: 'rgba(239,68,68,0.08)', color: 'var(--status-danger)', borderRadius: 6, fontSize: 13 }}>
+                      {sendState.error}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+            {!sendState.success && (
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowSendModal(false)} disabled={sendState.loading}>
+                  Cancel
+                </button>
+                <button className="btn btn-primary" onClick={handleSend} disabled={sendState.loading || !sendEmail}>
+                  {sendState.loading ? (<><Loader2 size={16} className="spin" /> Sending…</>) : (<><Send size={16} /> Send Email</>)}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
