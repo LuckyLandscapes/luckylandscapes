@@ -9,9 +9,10 @@ import {
   ArrowLeft, CalendarDays, Clock, MapPin, User, Phone, Mail, FileText,
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
-  Edit3, Save, Search, Check, AlertTriangle, Receipt,
+  Edit3, Save, Search, Check, AlertTriangle, Receipt, Image as ImageIcon, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
+import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 
 function formatTime12(time) {
   if (!time) return '';
@@ -82,6 +83,12 @@ export default function JobDetailPage({ params }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   if (!job) {
     return (
@@ -110,9 +117,27 @@ export default function JobDetailPage({ params }) {
 
   const handleStatusChange = async (newStatus) => {
     setUpdating(true);
-    try { await updateJob(job.id, { status: newStatus }); }
-    catch (err) { console.error('Error updating status:', err); }
-    finally { setUpdating(false); }
+    try {
+      await updateJob(job.id, { status: newStatus });
+      const labels = { in_progress: 'started', completed: 'completed', cancelled: 'cancelled', scheduled: 'scheduled' };
+      showToast('success', `Job ${labels[newStatus] || newStatus}`);
+    } catch (err) {
+      console.error('Error updating status:', err);
+      showToast('error', err?.message || `Could not update job to ${newStatus}. Try again.`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleDeleteExpense = async (expenseId) => {
+    if (!confirm('Delete this expense?')) return;
+    try {
+      await deleteJobExpense(expenseId);
+      showToast('success', 'Expense deleted');
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      showToast('error', err?.message || 'Could not delete the expense. Try again.');
+    }
   };
 
   const handleAddExpense = async () => {
@@ -434,6 +459,19 @@ export default function JobDetailPage({ params }) {
               </Link>
             </div>
           )}
+
+          {/* Quote Site Photos — read-only for the crew */}
+          {quote && (
+            <div className="job-detail-section job-detail-full-width">
+              <div className="job-detail-section-title">
+                <ImageIcon size={16} /> Site Photos
+                <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontWeight: 400, marginLeft: '8px' }}>
+                  from Quote #{quote.quoteNumber}
+                </span>
+              </div>
+              <QuoteMediaGallery quoteId={quote.id} readOnly />
+            </div>
+          )}
         </div>
       )}
 
@@ -550,7 +588,7 @@ export default function JobDetailPage({ params }) {
                       <button
                         className="btn btn-icon btn-ghost"
                         style={{ width: 28, height: 28 }}
-                        onClick={() => deleteJobExpense(exp.id)}
+                        onClick={() => handleDeleteExpense(exp.id)}
                         title="Delete expense"
                       >
                         <Trash2 size={14} />
@@ -741,6 +779,14 @@ export default function JobDetailPage({ params }) {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}><X size={14} /></button>
         </div>
       )}
     </div>

@@ -69,6 +69,7 @@ export function DataProvider({ children }) {
   const [activity, setActivity] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
   const [jobMedia, setJobMedia] = useState([]);
+  const [quoteMedia, setQuoteMedia] = useState([]);
   const [jobExpenses, setJobExpenses] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [services, setServices] = useState([]);
@@ -95,6 +96,7 @@ export function DataProvider({ children }) {
       setActivity(loadLocal('activity'));
       setTimeEntries(loadLocal('time_entries'));
       setJobMedia(loadLocal('job_media'));
+      setQuoteMedia(loadLocal('quote_media'));
       setJobExpenses(loadLocal('job_expenses'));
       setMaterials(loadLocal('materials'));
       setServices(loadLocal('services'));
@@ -109,7 +111,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -124,6 +126,7 @@ export function DataProvider({ children }) {
         supabase.from('job_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('payments').select('*').eq('org_id', orgId).order('paid_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('quote_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -140,6 +143,7 @@ export function DataProvider({ children }) {
       if (jmed?.data) setJobMedia(snakeToCamel(jmed.data));
       if (cexp?.data) setCompanyExpenses(snakeToCamel(cexp.data));
       if (pay?.data) setPayments(snakeToCamel(pay.data));
+      if (qmed?.data) setQuoteMedia(snakeToCamel(qmed.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -200,6 +204,10 @@ export function DataProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => {
         supabase.from('payments').select('*').eq('org_id', orgId).order('paid_at', { ascending: false })
           .then(({ data }) => { if (data) setPayments(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'quote_media' }, () => {
+        supabase.from('quote_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+          .then(({ data }) => { if (data) setQuoteMedia(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -361,6 +369,82 @@ export function DataProvider({ children }) {
       return next;
     });
   }, [connected]);
+
+  // ─── Quote Media ───────────────────────────────────────
+  // Photos are customer-anchored: every photo carries both the
+  // originating quote_id (for cleanup-eligibility decisions) AND
+  // the customer_id, so when a quote is rebuilt or the customer
+  // comes back for another quote the gallery follows them.
+  // The 30-day cleanup runs when a customer has no active work.
+  const getQuoteMedia = useCallback((quoteId) => {
+    const q = quotes.find(x => x.id === quoteId);
+    if (q?.customerId) {
+      return quoteMedia.filter(m => m.customerId === q.customerId);
+    }
+    // Fallback for quotes without a customer (legacy): match by quote_id
+    return quoteMedia.filter(m => m.quoteId === quoteId);
+  }, [quoteMedia, quotes]);
+
+  const addQuoteMedia = useCallback(async ({ quoteId, filePath, fileUrl, fileSize, caption = '' }) => {
+    const q = quotes.find(x => x.id === quoteId);
+    const payload = {
+      quoteId,
+      customerId: q?.customerId || null,
+      filePath, fileUrl,
+      fileSize: fileSize || 0,
+      caption,
+      pinned: false,
+      uploadedBy: user?.id || null,
+    };
+    if (connected) {
+      const { data: row, error } = await supabase.from('quote_media')
+        .insert({ ...camelToSnake(payload), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const m = snakeToCamel(row);
+      setQuoteMedia(prev => [m, ...prev]);
+      return m;
+    } else {
+      const m = { ...payload, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setQuoteMedia(prev => { const next = [m, ...prev]; saveLocal('quote_media', next); return next; });
+      return m;
+    }
+  }, [connected, orgId, user, quotes]);
+
+  const deleteQuoteMedia = useCallback(async (id) => {
+    const existing = quoteMedia.find(m => m.id === id);
+    if (connected) {
+      if (existing?.filePath) {
+        try { await supabase.storage.from('quote-media').remove([existing.filePath]); }
+        catch (err) { console.warn('[deleteQuoteMedia] storage cleanup failed', err); }
+      }
+      const { error } = await supabase.from('quote_media').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setQuoteMedia(prev => {
+      const next = prev.filter(m => m.id !== id);
+      if (!connected) saveLocal('quote_media', next);
+      return next;
+    });
+  }, [connected, quoteMedia]);
+
+  // Toggle the pinned flag — pinned photos are exempt from the
+  // 30-day cleanup, so the user can hold onto important "before"
+  // shots even after the customer's work wraps up.
+  const togglePinQuoteMedia = useCallback(async (id) => {
+    const existing = quoteMedia.find(m => m.id === id);
+    if (!existing) return;
+    const next = !existing.pinned;
+    if (connected) {
+      const { error } = await supabase.from('quote_media').update({ pinned: next }).eq('id', id);
+      if (error) throw error;
+    }
+    setQuoteMedia(prev => {
+      const updated = prev.map(m => m.id === id ? { ...m, pinned: next } : m);
+      if (!connected) saveLocal('quote_media', updated);
+      return updated;
+    });
+  }, [connected, quoteMedia]);
 
   // ─── Job CRUD ───────────────────────────────────────────
   const addJob = useCallback(async (data) => {
@@ -927,10 +1011,11 @@ export function DataProvider({ children }) {
     customers, quotes, jobs, calendarEvents, teamMembers,
     activity, timeEntries, jobMedia, jobExpenses, materials,
     services, invoices, companyExpenses, payments, loading,
+    quoteMedia,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
-    getInvoicePayments,
+    getInvoicePayments, getQuoteMedia,
     getCustomerQuotes, getCustomerJobs, getCustomerActivity,
 
     // Customers
@@ -938,6 +1023,7 @@ export function DataProvider({ children }) {
 
     // Quotes
     addQuote, updateQuote, deleteQuote,
+    addQuoteMedia, deleteQuoteMedia, togglePinQuoteMedia,
 
     // Jobs
     addJob, updateJob, deleteJob, convertQuoteToJob,

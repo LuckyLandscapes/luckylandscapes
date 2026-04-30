@@ -11,6 +11,7 @@ import {
   Copy, ExternalLink,
 } from 'lucide-react';
 import ScheduleJobModal from '@/components/ScheduleJobModal';
+import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -21,6 +22,8 @@ export default function QuoteDetailPage() {
   const router = useRouter();
   const { getQuote, getCustomer, updateQuote, deleteQuote, addActivity, jobs } = useData();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendTab, setSendTab] = useState('email'); // 'email' | 'sms'
   const [sendState, setSendState] = useState({ loading: false, success: false, error: null });
@@ -51,18 +54,46 @@ export default function QuoteDetailPage() {
     );
   }
 
-  const handleStatusChange = async (newStatus) => {
-    await updateQuote(id, { status: newStatus });
-  };
-
-  const handleDelete = async () => {
-    await deleteQuote(id);
-    router.push('/quotes');
-  };
-
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 5000);
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    if (quote.status === newStatus) {
+      showToast('error', `Quote is already marked ${newStatus}.`);
+      return;
+    }
+    try {
+      await updateQuote(id, { status: newStatus });
+      const labels = { accepted: 'accepted', declined: 'declined', sent: 'sent', draft: 'draft' };
+      showToast('success', `Quote marked ${labels[newStatus] || newStatus}`);
+    } catch (err) {
+      showToast('error', err?.message || `Could not mark quote ${newStatus}. Try again.`);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteQuote(id);
+      router.push('/quotes');
+    } catch (err) {
+      console.error('Error deleting quote:', err);
+      setDeleteError(err?.message || 'Could not delete quote. Try again.');
+      setDeleting(false);
+    }
+  };
+
+  const handleGeneratePdf = async () => {
+    try {
+      await generateQuotePdf(quote, customer);
+      showToast('success', 'PDF generated');
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      showToast('error', err?.message || 'Could not generate the PDF. Try again.');
+    }
   };
 
   const openSendModal = () => {
@@ -268,13 +299,13 @@ export default function QuoteDetailPage() {
               <CalendarDays size={16} /> View Job →
             </Link>
           )}
-          <button className="btn btn-secondary" onClick={async () => await generateQuotePdf(quote, customer)}>
+          <button className="btn btn-secondary" onClick={handleGeneratePdf}>
             <Printer size={16} /> PDF
           </button>
           <Link href={`/quotes/${id}/edit`} className="btn btn-secondary">
             <Edit3 size={16} /> Edit
           </Link>
-          <button className="btn btn-danger" onClick={() => setShowDeleteModal(true)}>
+          <button className="btn btn-danger" onClick={() => { setDeleteError(null); setShowDeleteModal(true); }}>
             <Trash2 size={16} /> Delete
           </button>
         </div>
@@ -394,6 +425,17 @@ export default function QuoteDetailPage() {
               <p style={{ fontSize: '0.85rem' }}>{quote.notes}</p>
             </div>
           )}
+
+          {/* Photos — uploaded by whoever takes the quote, visible to crew on the job */}
+          <div className="card" style={{ marginTop: 'var(--space-md)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
+              <h4 style={{ margin: 0, color: 'var(--text-secondary)' }}>Site Photos</h4>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                Visible to the crew on the linked job
+              </span>
+            </div>
+            <QuoteMediaGallery quoteId={id} />
+          </div>
         </div>
 
         {/* Right Sidebar */}
@@ -788,11 +830,11 @@ export default function QuoteDetailPage() {
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
             <div className="modal-header">
               <h2>Delete Quote</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowDeleteModal(false)}>
+              <button className="btn btn-icon btn-ghost" onClick={() => !deleting && setShowDeleteModal(false)}>
                 <X size={20} />
               </button>
             </div>
@@ -806,11 +848,16 @@ export default function QuoteDetailPage() {
                   </div>
                 </div>
               </div>
+              {deleteError && (
+                <div style={{ fontSize: '0.82rem', color: 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={14} /> {deleteError}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDelete}>
-                <Trash2 size={16} /> Delete Quote
+              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <><Loader2 size={16} className="spin" /> Deleting...</> : <><Trash2 size={16} /> Delete Quote</>}
               </button>
             </div>
           </div>

@@ -5,7 +5,7 @@ import { useData } from '@/lib/data';
 import Link from 'next/link';
 import {
   Receipt, Plus, Search, Filter, DollarSign, Clock, CheckCircle2,
-  AlertCircle, FileText, ChevronRight, X, CalendarDays, Loader2,
+  AlertCircle, FileText, ChevronRight, X, CalendarDays, Loader2, CheckCircle,
 } from 'lucide-react';
 
 function formatCurrency(n) {
@@ -31,6 +31,13 @@ export default function InvoicesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedJobId, setSelectedJobId] = useState('');
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Jobs that don't already have an invoice
   const invoiceableJobs = useMemo(() => {
@@ -57,9 +64,31 @@ export default function InvoicesPage() {
     .reduce((s, i) => s + (i.total || 0), 0);
   const overdueCount = invoices.filter(i => i.status === 'overdue').length;
 
+  const handleOpenCreateModal = () => {
+    if (jobs.length === 0) {
+      showToast('error', 'You don\'t have any jobs yet. Schedule a job from a quote first.');
+      return;
+    }
+    if (invoiceableJobs.length === 0) {
+      const completedCount = jobs.filter(j => j.status === 'completed').length;
+      if (completedCount === 0) {
+        showToast('error', 'No jobs are marked complete yet. Mark a job complete on its detail page before creating an invoice.');
+      } else {
+        showToast('error', 'Every completed job already has an invoice.');
+      }
+      return;
+    }
+    setCreateError(null);
+    setShowCreateModal(true);
+  };
+
   const handleCreateInvoice = async () => {
-    if (!selectedJobId) return;
+    if (!selectedJobId) {
+      setCreateError('Pick a job before creating the invoice.');
+      return;
+    }
     setCreating(true);
+    setCreateError(null);
     try {
       const job = getJob(selectedJobId);
       const quote = job?.quoteId ? getQuote(job.quoteId) : null;
@@ -125,8 +154,10 @@ export default function InvoicesPage() {
 
       setShowCreateModal(false);
       setSelectedJobId('');
+      showToast('success', `Invoice ${invoiceNumber} created`);
     } catch (err) {
       console.error('Error creating invoice:', err);
+      setCreateError(err?.message || 'Could not create the invoice. Check your connection and try again.');
     } finally {
       setCreating(false);
     }
@@ -140,7 +171,7 @@ export default function InvoicesPage() {
           <p>Track payments and billing for completed jobs.</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={() => setShowCreateModal(true)} disabled={invoiceableJobs.length === 0}>
+          <button className="btn btn-primary" onClick={handleOpenCreateModal}>
             <Plus size={18} /> Create Invoice
           </button>
         </div>
@@ -316,6 +347,19 @@ export default function InvoicesPage() {
                   </div>
                 )}
               </div>
+              {createError && (
+                <div style={{
+                  marginTop: 'var(--space-md)',
+                  background: 'var(--status-danger-bg)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-md)',
+                  display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
+                  fontSize: '0.82rem', color: 'var(--status-danger)',
+                }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>{createError}</span>
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)} disabled={creating}>Cancel</button>
@@ -324,6 +368,14 @@ export default function InvoicesPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}><X size={14} /></button>
         </div>
       )}
     </div>

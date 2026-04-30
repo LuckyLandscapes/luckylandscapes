@@ -5,6 +5,7 @@ import { useData } from '@/lib/data';
 import Link from 'next/link';
 import {
   Plus, Search, Phone, Mail, MapPin, X, UserPlus, ArrowRight,
+  AlertCircle, CheckCircle,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
 
@@ -28,6 +29,14 @@ export default function CustomersPage() {
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '',
   });
+  const [formError, setFormError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const filtered = customers.filter(c => {
     const matchSearch = `${c.firstName} ${c.lastName} ${c.email} ${c.phone} ${c.address}`
@@ -43,10 +52,27 @@ export default function CustomersPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.firstName) return;
-    await addCustomer(form);
-    setForm({ firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '' });
-    setShowModal(false);
+    if (!form.firstName.trim()) {
+      setFormError('First name is required.');
+      return;
+    }
+    if (form.email && !/^\S+@\S+\.\S+$/.test(form.email)) {
+      setFormError('Please enter a valid email address.');
+      return;
+    }
+    setSaving(true);
+    setFormError(null);
+    try {
+      await addCustomer(form);
+      setForm({ firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '' });
+      setShowModal(false);
+      showToast('success', `Customer ${form.firstName.trim()} added`);
+    } catch (err) {
+      console.error('Error adding customer:', err);
+      setFormError(err?.message || 'Could not save the customer. Try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getCustomerQuoteCount = (cId) => quotes.filter(q => q.customerId === cId).length;
@@ -180,11 +206,11 @@ export default function CustomersPage() {
 
       {/* Add Customer Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => !saving && setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Add New Customer</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowModal(false)}>
+              <button className="btn btn-icon btn-ghost" onClick={() => !saving && setShowModal(false)}>
                 <X size={20} />
               </button>
             </div>
@@ -193,7 +219,7 @@ export default function CustomersPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">First Name <span className="required">*</span></label>
-                    <input className="form-input" placeholder="John" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
+                    <input className="form-input" placeholder="John" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Last Name</label>
@@ -242,15 +268,28 @@ export default function CustomersPage() {
                   <label className="form-label">Notes</label>
                   <textarea className="form-textarea" rows={3} placeholder="Any notes about this customer..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
                 </div>
+                {formError && (
+                  <div style={{ padding: 'var(--space-sm) var(--space-md)', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <AlertCircle size={14} /> {formError}
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">
-                  <UserPlus size={16} /> Add Customer
+                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)} disabled={saving}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  <UserPlus size={16} /> {saving ? 'Saving...' : 'Add Customer'}
                 </button>
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}><X size={14} /></button>
         </div>
       )}
     </div>

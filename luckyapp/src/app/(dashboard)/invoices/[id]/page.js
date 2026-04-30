@@ -59,6 +59,8 @@ export default function InvoiceDetailPage() {
   const [payNotes, setPayNotes] = useState('');
   const [recording, setRecording] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [showSendModal, setShowSendModal] = useState(false);
   const [sendTab, setSendTab] = useState('email');
   const [sendEmail, setSendEmail] = useState('');
@@ -148,20 +150,50 @@ export default function InvoiceDetailPage() {
   };
 
   const handleMarkPaid = async () => {
-    await updateInvoice(id, {
-      amountPaid: invoice.total,
-      status: 'paid',
-      paidDate: new Date().toISOString().split('T')[0],
-    });
+    if (invoice.status === 'paid') {
+      showToast('error', 'This invoice is already marked paid.');
+      return;
+    }
+    try {
+      await updateInvoice(id, {
+        amountPaid: invoice.total,
+        status: 'paid',
+        paidDate: new Date().toISOString().split('T')[0],
+      });
+      showToast('success', 'Invoice marked paid');
+    } catch (err) {
+      showToast('error', err?.message || 'Could not mark invoice paid. Try again.');
+    }
   };
 
   const handleMarkOverdue = async () => {
-    await updateInvoice(id, { status: 'overdue' });
+    if (invoice.status === 'overdue') {
+      showToast('error', 'This invoice is already marked overdue.');
+      return;
+    }
+    if (invoice.status === 'paid') {
+      showToast('error', 'A paid invoice can\'t be marked overdue.');
+      return;
+    }
+    try {
+      await updateInvoice(id, { status: 'overdue' });
+      showToast('success', 'Invoice marked overdue');
+    } catch (err) {
+      showToast('error', err?.message || 'Could not mark invoice overdue. Try again.');
+    }
   };
 
   const handleDelete = async () => {
-    await deleteInvoice(id);
-    router.push('/invoices');
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteInvoice(id);
+      router.push('/invoices');
+    } catch (err) {
+      console.error('Error deleting invoice:', err);
+      setDeleteError(err?.message || 'Could not delete invoice. Try again.');
+      setDeleting(false);
+    }
   };
 
   const copyPayLink = async () => {
@@ -334,7 +366,7 @@ export default function InvoiceDetailPage() {
               )}
             </>
           )}
-          <button className="btn btn-danger" onClick={() => setShowDeleteModal(true)}>
+          <button className="btn btn-danger" onClick={() => { setDeleteError(null); setShowDeleteModal(true); }}>
             <Trash2 size={16} /> Delete
           </button>
         </div>
@@ -761,11 +793,11 @@ export default function InvoiceDetailPage() {
 
       {/* ========== DELETE MODAL ========== */}
       {showDeleteModal && (
-        <div className="modal-overlay" onClick={() => setShowDeleteModal(false)}>
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
             <div className="modal-header">
               <h2>Delete Invoice</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowDeleteModal(false)}><X size={20} /></button>
+              <button className="btn btn-icon btn-ghost" onClick={() => !deleting && setShowDeleteModal(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', padding: 'var(--space-md)', background: 'rgba(239,68,68,0.08)', borderRadius: 'var(--radius-md)' }}>
@@ -777,10 +809,17 @@ export default function InvoiceDetailPage() {
                   </div>
                 </div>
               </div>
+              {deleteError && (
+                <div style={{ marginTop: 'var(--space-md)', fontSize: '0.82rem', color: 'var(--status-danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <AlertCircle size={14} /> {deleteError}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)}>Cancel</button>
-              <button className="btn btn-danger" onClick={handleDelete}><Trash2 size={16} /> Delete</button>
+              <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
+                {deleting ? <><Loader2 size={16} className="spin" /> Deleting...</> : <><Trash2 size={16} /> Delete</>}
+              </button>
             </div>
           </div>
         </div>

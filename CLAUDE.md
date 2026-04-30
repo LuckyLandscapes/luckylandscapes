@@ -74,4 +74,8 @@ Invoice public-pay tokens are URL-safe hex generated via `window.crypto.getRando
 ## When finished with response
 Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.
 
-## If you think an idea is bad, tell me why, be very upfront and critical, don't suger coat it, provide a better alternative if you have one, and always have an idea of how you would improve the app.
+## Critical thinking
+If you think an idea is bad, tell me why, be very upfront and critical, don't suger coat it, provide a better alternative if you have one, and always have an idea of how you would improve the app.
+
+## Updating Claude file and docs
+Update the docs as we go, if you see any inconsistencies or missing information, update the docs. If we have a change in our workflow or the way we do things, update the docs. If you find a better way to do things, update the docs.

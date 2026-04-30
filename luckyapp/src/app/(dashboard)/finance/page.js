@@ -11,7 +11,7 @@ import {
 import {
   Plus, X, Trash2, Edit3, Save, DollarSign, Calendar, Repeat,
   Receipt, AlertTriangle, BarChart3, TrendingDown, FileText, Building2,
-  Send, Mail, Loader2, CheckCircle2, Eye,
+  Send, Mail, Loader2, CheckCircle2, Eye, AlertCircle, CheckCircle,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 
@@ -65,6 +65,12 @@ export default function FinancePage() {
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   // Filtered expenses (period + category)
   const filtered = useMemo(() => {
@@ -190,6 +196,7 @@ export default function FinancePage() {
       setShowForm(false);
       setForm(emptyForm());
       setEditingId(null);
+      showToast('success', editingId ? 'Expense updated' : 'Expense saved');
     } catch (err) {
       setError(err.message || 'Failed to save expense.');
     } finally {
@@ -199,7 +206,13 @@ export default function FinancePage() {
 
   const handleDelete = async (id) => {
     if (!confirm('Delete this expense? This cannot be undone.')) return;
-    await deleteCompanyExpense(id);
+    try {
+      await deleteCompanyExpense(id);
+      showToast('success', 'Expense deleted');
+    } catch (err) {
+      console.error('Error deleting expense:', err);
+      showToast('error', err?.message || 'Could not delete the expense. Try again.');
+    }
   };
 
   const range = getPeriodRange(period);
@@ -560,6 +573,14 @@ export default function FinancePage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className={`toast toast-${toast.type}`}>
+          {toast.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          <span>{toast.message}</span>
+          <button className="toast-close" onClick={() => setToast(null)}><X size={14} /></button>
         </div>
       )}
     </div>

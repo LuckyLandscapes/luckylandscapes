@@ -194,13 +194,22 @@ export default function QuotePage({ params }) {
               <tbody>
                 {items.map((item, i) => (
                   <tr key={i}>
-                    <td style={styles.td}>
+                    <td style={styles.td} className="quote-td-name">
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
                       {item.description && <div style={styles.tdSub}>{item.description}</div>}
                     </td>
-                    <td style={{ ...styles.td, textAlign: 'center' }} data-label="Qty">{item.quantity || 1}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }} data-label="Price">{formatUSD(item.unitPrice ?? item.unit_price)}</td>
-                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} data-label="Total">{formatUSD(item.total)}</td>
+                    <td style={{ ...styles.td, textAlign: 'center' }} className="quote-td-num">
+                      <span className="quote-td-label">Qty</span>
+                      <span className="quote-td-value">{item.quantity || 1}</span>
+                    </td>
+                    <td style={{ ...styles.td, textAlign: 'right' }} className="quote-td-num">
+                      <span className="quote-td-label">Price</span>
+                      <span className="quote-td-value">{formatUSD(item.unitPrice ?? item.unit_price)}</span>
+                    </td>
+                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} className="quote-td-num">
+                      <span className="quote-td-label">Total</span>
+                      <span className="quote-td-value">{formatUSD(item.total)}</span>
+                    </td>
                   </tr>
                 ))}
                 {items.length === 0 && (
