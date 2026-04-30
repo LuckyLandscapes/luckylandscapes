@@ -1890,11 +1890,23 @@ body {
 }
 
 .measure-ar-step-val {
-  min-width: 38px;
+  min-width: 42px;
   text-align: center;
   font-size: 0.72rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.measure-ar-auto-pill {
+  padding: 1px 6px;
+  background: var(--lucky-green, #2d7a3a);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  border: 1px solid var(--lucky-green-light, #7dd87d);
 }
 
 /* --- Edge length labels: rendered via OverlayView, anchored at edge midpoint --- */

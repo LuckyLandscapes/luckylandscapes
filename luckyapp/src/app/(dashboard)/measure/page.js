@@ -28,6 +28,14 @@ const TOOLS = [
   { id: 'freehand-exclude', kind: 'exclusion', shape: 'freehand',  label: 'Free Sub.', Icon: Pencil },
 ];
 
+// Cache key for ElevationService lookups. Rounds to ~11cm so nearby vertices
+// share the same cached elevation value.
+function elevationKey(latlng) {
+  const lat = typeof latlng.lat === 'function' ? latlng.lat() : latlng.lat;
+  const lng = typeof latlng.lng === 'function' ? latlng.lng() : latlng.lng;
+  return `${lat.toFixed(6)},${lng.toFixed(6)}`;
+}
+
 // Convert any google.maps overlay to a portable JSON form for storage.
 function overlayToData(overlay, kind, label) {
   if (typeof overlay.getRadius === 'function') {
@@ -89,6 +97,10 @@ export default function MeasurePage() {
   const arOverlayRef = useRef(null);
   const edgeLabelClassRef = useRef(null);
   const edgeLabelOverlaysRef = useRef(new Map());
+  const elevationServiceRef = useRef(null);
+  const elevationCacheRef = useRef(new Map()); // "lat,lng" → metres
+  const elevFetchTimerRef = useRef(null);
+  const elevDisabledRef = useRef(false); // flips true if Elevation API rejects
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [shapes, setShapes] = useState([]); // [{id, kind, sqft, label, hidden}]
@@ -106,8 +118,10 @@ export default function MeasurePage() {
   const [mapTypeId, setMapTypeId] = useState('satellite');
   const [streetViewActive, setStreetViewActive] = useState(false);
   const [arEnabled, setArEnabled] = useState(false);
-  const [arGroundOffset, setArGroundOffset] = useState(0); // metres ± from default camera height
+  const [arGroundOffset, setArGroundOffset] = useState(0); // metres ± nudge on top of auto / default
   const [showEdgeLabels, setShowEdgeLabels] = useState(false);
+  const [elevDataVersion, setElevDataVersion] = useState(0); // bumps when new elevations arrive
+  const [elevAuto, setElevAuto] = useState(false);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -541,6 +555,84 @@ export default function MeasurePage() {
     };
   }, [streetViewActive, mapsLoaded]);
 
+  // ---- AR auto-calibration via Google's Elevation API ----
+  // Looks up bare-earth elevation at the panorama camera and at every shape
+  // vertex, so the projection can use the real ground-plane delta instead of a
+  // hardcoded camera height. Falls back gracefully if the Elevation API is not
+  // enabled on the Maps key.
+  useEffect(() => {
+    if (!arEnabled || !streetViewActive || !mapsLoaded) return;
+    if (elevDisabledRef.current) return;
+    const pano = panoInstanceRef.current;
+    if (!pano) return;
+    const g = window.google.maps;
+    if (!g.ElevationService) return;
+    if (!elevationServiceRef.current) elevationServiceRef.current = new g.ElevationService();
+
+    const collectAndFetch = () => {
+      if (elevFetchTimerRef.current) clearTimeout(elevFetchTimerRef.current);
+      elevFetchTimerRef.current = setTimeout(async () => {
+        const camPos = pano.getPosition();
+        if (!camPos) return;
+        const all = [camPos];
+        shapes.forEach(s => {
+          if (s.hidden) return;
+          const overlay = shapesRef.current.get(s.id);
+          if (!overlay) return;
+          if (typeof overlay.getRadius === 'function') {
+            all.push(overlay.getCenter());
+          } else if (typeof overlay.getPath === 'function') {
+            const path = overlay.getPath();
+            for (let i = 0; i < path.getLength(); i++) all.push(path.getAt(i));
+          } else if (typeof overlay.getBounds === 'function') {
+            const b = overlay.getBounds();
+            const ne = b.getNorthEast(), sw = b.getSouthWest();
+            all.push(new g.LatLng(ne.lat(), sw.lng()));
+            all.push(new g.LatLng(ne.lat(), ne.lng()));
+            all.push(new g.LatLng(sw.lat(), ne.lng()));
+            all.push(new g.LatLng(sw.lat(), sw.lng()));
+          }
+        });
+
+        const cache = elevationCacheRef.current;
+        const needs = [], needsKeys = [];
+        for (const ll of all) {
+          if (!ll) continue;
+          const k = elevationKey(ll);
+          if (!cache.has(k)) { needs.push(ll); needsKeys.push(k); }
+        }
+        if (needs.length === 0) {
+          // Already have everything cached for this camera position.
+          if (cache.has(elevationKey(camPos))) setElevAuto(true);
+          return;
+        }
+        try {
+          const result = await elevationServiceRef.current.getElevationForLocations({ locations: needs });
+          if (result?.results) {
+            result.results.forEach((r, i) => {
+              if (r?.elevation != null) cache.set(needsKeys[i], r.elevation);
+            });
+            setElevAuto(true);
+            setElevDataVersion(v => v + 1);
+          }
+        } catch (err) {
+          // Elevation API may not be enabled on the key; degrade silently to
+          // fallback and disable further lookups so we don't spam the console.
+          console.warn('Elevation lookup failed; AR will use heuristic fallback:', err?.message || err);
+          elevDisabledRef.current = true;
+          setElevAuto(false);
+        }
+      }, 350);
+    };
+
+    collectAndFetch();
+    const lPos = g.event.addListener(pano, 'position_changed', collectAndFetch);
+    return () => {
+      g.event.removeListener(lPos);
+      if (elevFetchTimerRef.current) clearTimeout(elevFetchTimerRef.current);
+    };
+  }, [arEnabled, streetViewActive, shapes, mapsLoaded]);
+
   // ---- AR overlay: project measurement shapes into the Street View panorama ----
   // Assumes a flat ground plane CAMERA_HEIGHT below the panorama camera.
   // Caveats: no terrain elevation, no occlusion (draws through buildings).
@@ -564,10 +656,28 @@ export default function MeasurePage() {
     if (!camPos) return;
     const pov = pano.getPov();
     const D2R = Math.PI / 180;
-    // Effective camera height above the lawn surface. Default 2.0m approximates
-    // a Street View car (≈2.5m) parked alongside a yard slightly elevated above
-    // the road (~0.5m). User can fine-tune via the AR raise/lower buttons.
-    const CAMERA_HEIGHT = Math.max(0.4, 2.0 + arGroundOffset);
+    // Typical Street View car camera height above the road surface.
+    const ROAD_CAR_HEIGHT = 2.5;
+    // Fallback when no elevation data is available (assume lawn ~0.5m above road).
+    const FALLBACK_LAWN_DROP = 2.0;
+
+    // Per-vertex elevation lookup: returns the effective camera-to-ground vertical
+    // distance for a given target. When ElevationService data is cached for both
+    // camera and target, uses the real ground-plane delta. Otherwise falls back
+    // to the FALLBACK_LAWN_DROP heuristic. arGroundOffset is a manual nudge.
+    const elevCache = elevationCacheRef.current;
+    const camKey = elevationKey(camPos);
+    const camElev = elevCache.get(camKey);
+    const heightFor = (latlng) => {
+      const tgtElev = elevCache.get(elevationKey(latlng));
+      let h0;
+      if (camElev != null && tgtElev != null) {
+        h0 = ROAD_CAR_HEIGHT - (tgtElev - camElev);
+      } else {
+        h0 = FALLBACK_LAWN_DROP;
+      }
+      return Math.max(0.4, h0 + arGroundOffset);
+    };
 
     // Horizontal FOV from zoom: zoom 1 ≈ 90°, doubles each step.
     const hFovRad = (180 / Math.pow(2, pov.zoom || 1)) * D2R;
@@ -584,7 +694,7 @@ export default function MeasurePage() {
       const bearing = g.geometry.spherical.computeHeading(camPos, latlng) * D2R;
       const dist = Math.max(g.geometry.spherical.computeDistanceBetween(camPos, latlng), 0.5);
       const wx = Math.sin(bearing) * dist;
-      const wy = -CAMERA_HEIGHT;
+      const wy = -heightFor(latlng);
       const wz = Math.cos(bearing) * dist;
       // Inverse yaw (rotate world by -heading around Y so cam forward = +Z)
       const x1 = ch * wx - sh * wz;
@@ -673,8 +783,48 @@ export default function MeasurePage() {
       polygon.setAttribute('stroke-width', '2');
       polygon.setAttribute('stroke-linejoin', 'round');
       svg.appendChild(polygon);
+
+      // Edge length labels in AR. Skip circles (no straight edges).
+      if (showEdgeLabels && typeof overlay.getRadius !== 'function') {
+        for (let i = 0; i < vertices.length; i++) {
+          const a = vertices[i];
+          const b = vertices[(i + 1) % vertices.length];
+          const distM = g.geometry.spherical.computeDistanceBetween(a, b);
+          const distFt = distM * 3.28084;
+          const mid = g.geometry.spherical.interpolate(a, b, 0.5);
+          const midCam = toCam(mid);
+          if (midCam.z < NEAR) continue;
+          const lsx = w / 2 + focal * (midCam.x / midCam.z);
+          const lsy = h / 2 - focal * (midCam.y / midCam.z);
+          if (lsx < -50 || lsx > w + 50 || lsy < -50 || lsy > h + 50) continue;
+
+          const text = `${distFt < 100 ? distFt.toFixed(1) : distFt.toFixed(0)} ft`;
+          const tnode = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          tnode.setAttribute('x', lsx.toFixed(1));
+          tnode.setAttribute('y', lsy.toFixed(1));
+          tnode.setAttribute('text-anchor', 'middle');
+          tnode.setAttribute('dominant-baseline', 'middle');
+          tnode.setAttribute('font-size', '13');
+          tnode.setAttribute('font-weight', '700');
+          tnode.setAttribute('font-family', 'system-ui, -apple-system, sans-serif');
+          tnode.setAttribute('fill', '#fff');
+          tnode.setAttribute('stroke', 'rgba(0,0,0,0.85)');
+          tnode.setAttribute('stroke-width', '4');
+          tnode.setAttribute('paint-order', 'stroke fill');
+          tnode.textContent = text;
+          svg.appendChild(tnode);
+        }
+      }
     });
-  }, [arEnabled, streetViewActive, shapes, arGroundOffset]);
+  }, [arEnabled, streetViewActive, shapes, arGroundOffset, showEdgeLabels]);
+
+  // Re-draw the AR overlay when elevation data lands. drawAR reads the cache
+  // via ref so its identity doesn't change with elevDataVersion, but we still
+  // need a kick to re-render with the new values.
+  useEffect(() => {
+    if (elevDataVersion === 0) return;
+    drawAR();
+  }, [elevDataVersion, drawAR]);
 
   // Wire pano events (pov / position / resize) to redraw the AR overlay.
   useEffect(() => {
@@ -1036,6 +1186,7 @@ export default function MeasurePage() {
     candidateOverlaysRef.current.clear();
     edgeLabelOverlaysRef.current.forEach(arr => arr.forEach(o => o?.setMap?.(null)));
     edgeLabelOverlaysRef.current.clear();
+    if (elevFetchTimerRef.current) clearTimeout(elevFetchTimerRef.current);
     if (freehandStateRef.current) freehandStateRef.current.cleanup?.();
   }, []);
 
@@ -1082,6 +1233,11 @@ export default function MeasurePage() {
               </button>
               {arEnabled && (
                 <div className="measure-ar-adjust">
+                  {elevAuto && (
+                    <span className="measure-ar-auto-pill" title="Using Google Elevation API per vertex">
+                      Auto
+                    </span>
+                  )}
                   <button
                     className="measure-ar-step"
                     onClick={() => setArGroundOffset(o => Math.max(-1.5, +(o - 0.2).toFixed(1)))}
@@ -1089,8 +1245,8 @@ export default function MeasurePage() {
                   >
                     <ChevronUp size={14} />
                   </button>
-                  <span className="measure-ar-step-val" title="Assumed lawn drop below camera">
-                    {(2.0 + arGroundOffset).toFixed(1)}m
+                  <span className="measure-ar-step-val" title="Manual offset on top of auto-elevation">
+                    {arGroundOffset > 0 ? '+' : ''}{arGroundOffset.toFixed(1)}m
                   </span>
                   <button
                     className="measure-ar-step"
