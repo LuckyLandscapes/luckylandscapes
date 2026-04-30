@@ -87,6 +87,8 @@ export default function MeasurePage() {
   const panoRef = useRef(null);
   const panoInstanceRef = useRef(null);
   const arOverlayRef = useRef(null);
+  const edgeLabelClassRef = useRef(null);
+  const edgeLabelOverlaysRef = useRef(new Map());
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [shapes, setShapes] = useState([]); // [{id, kind, sqft, label, hidden}]
@@ -104,6 +106,8 @@ export default function MeasurePage() {
   const [mapTypeId, setMapTypeId] = useState('satellite');
   const [streetViewActive, setStreetViewActive] = useState(false);
   const [arEnabled, setArEnabled] = useState(false);
+  const [arGroundOffset, setArGroundOffset] = useState(0); // metres ± from default camera height
+  const [showEdgeLabels, setShowEdgeLabels] = useState(false);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -560,7 +564,10 @@ export default function MeasurePage() {
     if (!camPos) return;
     const pov = pano.getPov();
     const D2R = Math.PI / 180;
-    const CAMERA_HEIGHT = 2.5; // metres above the ground plane
+    // Effective camera height above the lawn surface. Default 2.0m approximates
+    // a Street View car (≈2.5m) parked alongside a yard slightly elevated above
+    // the road (~0.5m). User can fine-tune via the AR raise/lower buttons.
+    const CAMERA_HEIGHT = Math.max(0.4, 2.0 + arGroundOffset);
 
     // Horizontal FOV from zoom: zoom 1 ≈ 90°, doubles each step.
     const hFovRad = (180 / Math.pow(2, pov.zoom || 1)) * D2R;
@@ -667,7 +674,7 @@ export default function MeasurePage() {
       polygon.setAttribute('stroke-linejoin', 'round');
       svg.appendChild(polygon);
     });
-  }, [arEnabled, streetViewActive, shapes]);
+  }, [arEnabled, streetViewActive, shapes, arGroundOffset]);
 
   // Wire pano events (pov / position / resize) to redraw the AR overlay.
   useEffect(() => {
@@ -698,6 +705,93 @@ export default function MeasurePage() {
       if (raf) cancelAnimationFrame(raf);
     };
   }, [arEnabled, streetViewActive, drawAR]);
+
+  // ---- Edge length labels: HTML overlays at the midpoint of each polygon edge ----
+  // Renders only when showEdgeLabels is on. Uses google.maps.OverlayView so the
+  // labels reposition automatically when the user pans / zooms the map.
+  useEffect(() => {
+    // Always clear existing labels first.
+    edgeLabelOverlaysRef.current.forEach(arr => arr.forEach(o => o.setMap(null)));
+    edgeLabelOverlaysRef.current.clear();
+
+    if (!showEdgeLabels || !mapsLoaded || !mapInstanceRef.current) return;
+    const g = window.google.maps;
+    if (!g?.OverlayView) return;
+    const map = mapInstanceRef.current;
+
+    // Lazy-define the OverlayView subclass once google.maps is available.
+    // Uses prototype assignment instead of `class` because react-hooks/eslint
+    // rejects inline class declarations inside a hook.
+    if (!edgeLabelClassRef.current) {
+      function EdgeLabel(position, text) {
+        this.position_ = position;
+        this.text_ = text;
+        this.div_ = null;
+      }
+      EdgeLabel.prototype = new g.OverlayView();
+      EdgeLabel.prototype.onAdd = function () {
+        const div = document.createElement('div');
+        div.className = 'measure-edge-label';
+        div.textContent = this.text_;
+        this.div_ = div;
+        this.getPanes().floatPane.appendChild(div);
+      };
+      EdgeLabel.prototype.draw = function () {
+        const proj = this.getProjection();
+        if (!proj || !this.div_) return;
+        const px = proj.fromLatLngToDivPixel(this.position_);
+        if (px) {
+          this.div_.style.left = `${px.x}px`;
+          this.div_.style.top = `${px.y}px`;
+        }
+      };
+      EdgeLabel.prototype.onRemove = function () {
+        if (this.div_ && this.div_.parentNode) {
+          this.div_.parentNode.removeChild(this.div_);
+        }
+        this.div_ = null;
+      };
+      edgeLabelClassRef.current = EdgeLabel;
+    }
+    const EdgeLabelCtor = edgeLabelClassRef.current;
+
+    shapes.forEach(s => {
+      if (s.hidden) return;
+      const overlay = shapesRef.current.get(s.id);
+      if (!overlay) return;
+      // Skip circles (no straight edges to label).
+      if (typeof overlay.getRadius === 'function') return;
+
+      let vertices = [];
+      if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
+        const b = overlay.getBounds();
+        const ne = b.getNorthEast(), sw = b.getSouthWest();
+        vertices = [
+          new g.LatLng(ne.lat(), sw.lng()),
+          new g.LatLng(ne.lat(), ne.lng()),
+          new g.LatLng(sw.lat(), ne.lng()),
+          new g.LatLng(sw.lat(), sw.lng()),
+        ];
+      } else if (typeof overlay.getPath === 'function') {
+        const path = overlay.getPath();
+        for (let i = 0; i < path.getLength(); i++) vertices.push(path.getAt(i));
+      }
+      if (vertices.length < 2) return;
+
+      const labels = [];
+      for (let i = 0; i < vertices.length; i++) {
+        const a = vertices[i];
+        const b = vertices[(i + 1) % vertices.length];
+        const distM = g.geometry.spherical.computeDistanceBetween(a, b);
+        const distFt = distM * 3.28084;
+        const mid = g.geometry.spherical.interpolate(a, b, 0.5);
+        const label = new EdgeLabelCtor(mid, `${distFt < 100 ? distFt.toFixed(1) : distFt.toFixed(0)} ft`);
+        label.setMap(map);
+        labels.push(label);
+      }
+      edgeLabelOverlaysRef.current.set(s.id, labels);
+    });
+  }, [showEdgeLabels, shapes, mapsLoaded]);
 
   // ---- Map type toggle (replaces Google's mapTypeControl that we hid) ----
   const cycleMapType = useCallback(() => {
@@ -940,6 +1034,8 @@ export default function MeasurePage() {
     shapesRef.current.clear();
     candidateOverlaysRef.current.forEach(o => o?.setMap?.(null));
     candidateOverlaysRef.current.clear();
+    edgeLabelOverlaysRef.current.forEach(arr => arr.forEach(o => o?.setMap?.(null)));
+    edgeLabelOverlaysRef.current.clear();
     if (freehandStateRef.current) freehandStateRef.current.cleanup?.();
   }, []);
 
@@ -975,14 +1071,37 @@ export default function MeasurePage() {
           <div ref={panoRef} className="measure-pano-canvas" />
           <svg ref={arOverlayRef} className="measure-ar-overlay" />
           {streetViewActive && (
-            <button
-              className={`measure-ar-btn ${arEnabled ? 'active' : ''}`}
-              onClick={() => setArEnabled(s => !s)}
-              title={arEnabled ? 'Hide measurements in street view' : 'Project measurements onto street view (beta)'}
-            >
-              <Eye size={14} />
-              <span>{arEnabled ? 'AR On' : 'AR Off'}</span>
-            </button>
+            <div className="measure-ar-controls">
+              <button
+                className={`measure-ar-btn ${arEnabled ? 'active' : ''}`}
+                onClick={() => setArEnabled(s => !s)}
+                title={arEnabled ? 'Hide measurements in street view' : 'Project measurements onto street view (beta)'}
+              >
+                <Eye size={14} />
+                <span>{arEnabled ? 'AR On' : 'AR Off'}</span>
+              </button>
+              {arEnabled && (
+                <div className="measure-ar-adjust">
+                  <button
+                    className="measure-ar-step"
+                    onClick={() => setArGroundOffset(o => Math.max(-1.5, +(o - 0.2).toFixed(1)))}
+                    title="Raise overlay (lawn appears more elevated)"
+                  >
+                    <ChevronUp size={14} />
+                  </button>
+                  <span className="measure-ar-step-val" title="Assumed lawn drop below camera">
+                    {(2.0 + arGroundOffset).toFixed(1)}m
+                  </span>
+                  <button
+                    className="measure-ar-step"
+                    onClick={() => setArGroundOffset(o => Math.min(2.0, +(o + 0.2).toFixed(1)))}
+                    title="Lower overlay (lawn appears further below)"
+                  >
+                    <ChevronDown size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
@@ -1146,6 +1265,15 @@ export default function MeasurePage() {
           >
             {detecting ? <Loader2 size={16} className="spin" /> : <Building2 size={16} />}
             <span className="measure-tool-label">{detecting ? 'Detecting…' : 'Detect Buildings'}</span>
+          </button>
+
+          <button
+            className={`measure-tool-btn ${showEdgeLabels ? 'active' : ''}`}
+            onClick={() => setShowEdgeLabels(s => !s)}
+            title="Show length of each edge in feet"
+          >
+            <Ruler size={16} />
+            <span className="measure-tool-label">Lengths</span>
           </button>
 
           {(shapes.length > 0 || candidates.length > 0) && (
