@@ -457,17 +457,27 @@ export function DataProvider({ children }) {
     return quoteMedia.filter(m => m.quoteId === quoteId);
   }, [quoteMedia, quotes]);
 
+  // For the new-quote wizard's walkthrough step: photos can be captured
+  // before any quote row exists, so the gallery looks them up by customer.
+  const getQuoteMediaByCustomer = useCallback(
+    (customerId) => quoteMedia.filter(m => m.customerId === customerId),
+    [quoteMedia]
+  );
+
   const addQuoteMedia = useCallback(async ({
-    quoteId, filePath, fileUrl, fileSize,
+    quoteId,        // optional — null/undefined when capturing during walkthrough before the quote is created
+    customerId,     // explicit customer id; used when there's no quoteId yet
+    filePath, fileUrl, fileSize,
     mediaType = 'image',
     durationSeconds = null,
     transcript = null,
     caption = '',
   }) => {
-    const q = quotes.find(x => x.id === quoteId);
+    const q = quoteId ? quotes.find(x => x.id === quoteId) : null;
+    const resolvedCustomerId = customerId || q?.customerId || null;
     const payload = {
-      quoteId,
-      customerId: q?.customerId || null,
+      quoteId: quoteId || null,
+      customerId: resolvedCustomerId,
       filePath, fileUrl,
       fileSize: fileSize || 0,
       mediaType,
@@ -1238,7 +1248,7 @@ export function DataProvider({ children }) {
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
-    getInvoicePayments, getQuoteMedia, getContract,
+    getInvoicePayments, getQuoteMedia, getQuoteMediaByCustomer, getContract,
     getCustomerQuotes, getCustomerJobs, getCustomerActivity, getCustomerContracts,
 
     // Customers

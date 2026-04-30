@@ -4,14 +4,15 @@ import { useState, Suspense } from 'react';
 import { useData } from '@/lib/data';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward } from 'lucide-react';
+import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
 }
 
 function NewQuoteContent() {
-  const { customers, services, addQuote } = useData();
+  const { customers, services, addQuote, getQuoteMediaByCustomer } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCustomer = searchParams.get('customer') || '';
@@ -123,7 +124,7 @@ function NewQuoteContent() {
 
       {/* Progress */}
       <div className="wizard-progress">
-        {['Customer', 'Category', 'Line Items', 'Review'].map((label, i) => {
+        {['Customer', 'Walkthrough', 'Category', 'Line Items', 'Review'].map((label, i) => {
           const stepNum = i + 1;
           return (
             <div key={label} style={{ display: 'contents' }}>
@@ -133,7 +134,7 @@ function NewQuoteContent() {
                 </div>
                 <span className="wizard-step-label">{label}</span>
               </div>
-              {i < 3 && <div className={`wizard-step-line ${step > stepNum ? 'complete' : ''}`} />}
+              {i < 4 && <div className={`wizard-step-line ${step > stepNum ? 'complete' : ''}`} />}
             </div>
           );
         })}
@@ -170,8 +171,36 @@ function NewQuoteContent() {
         </div>
       )}
 
-      {/* Step 2: Category */}
+      {/* Step 2: Walkthrough — capture photos / video / voice memos
+          before building line items. Skippable for desk quotes. */}
       {step === 2 && (
+        <div style={{ maxWidth: '720px' }}>
+          <h3 style={{ marginBottom: 'var(--space-sm)' }}>
+            <Camera size={20} style={{ verticalAlign: 'middle', marginRight: '8px' }} />
+            Walkthrough Capture
+          </h3>
+          <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', marginBottom: 'var(--space-lg)' }}>
+            Walk the site with the customer. Snap photos, record video, or use a voice memo
+            to capture what they&apos;re asking for. Each item gets a note for context — you&apos;ll
+            see all of this on the next steps while you build the quote. Skip if you&apos;re
+            quoting from the desk.
+          </p>
+          <QuoteMediaGallery customerId={customerId} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-lg)' }}>
+            <button className="btn btn-secondary" onClick={() => setStep(1)}>
+              <ArrowLeft size={16} /> Back
+            </button>
+            <button className="btn btn-primary" onClick={() => setStep(3)}>
+              {(getQuoteMediaByCustomer?.(customerId) || []).length === 0
+                ? <><SkipForward size={16} /> Skip Walkthrough</>
+                : <>Continue <ArrowRight size={16} /></>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Step 3: Category */}
+      {step === 3 && (
         <div style={{ maxWidth: '700px' }}>
           <h3 style={{ marginBottom: 'var(--space-lg)' }}>Select Service Category</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-md)' }}>
@@ -179,7 +208,7 @@ function NewQuoteContent() {
               <button
                 key={cat.value}
                 className={`card card-clickable`}
-                onClick={() => { setCategory(cat.value); setStep(3); }}
+                onClick={() => { setCategory(cat.value); setStep(4); }}
                 style={{
                   textAlign: 'center',
                   padding: 'var(--space-xl)',
@@ -193,16 +222,44 @@ function NewQuoteContent() {
             ))}
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-lg)' }}>
-            <button className="btn btn-secondary" onClick={() => setStep(1)}>
+            <button className="btn btn-secondary" onClick={() => setStep(2)}>
               <ArrowLeft size={16} /> Back
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 3: Line Items */}
-      {step === 3 && (
+      {/* Step 4: Line Items */}
+      {step === 4 && (
         <div>
+          {/* Walkthrough reference — collapsible, read-only view of
+              what was captured in step 2 (gallery shows its own summary
+              panel with an Apply-to-Notes button). */}
+          {(() => {
+            const walkItems = getQuoteMediaByCustomer?.(customerId) || [];
+            if (walkItems.length === 0) return null;
+            return (
+              <details className="card" style={{ marginBottom: 'var(--space-lg)' }} open>
+                <summary style={{ cursor: 'pointer', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Camera size={16} />
+                  Walkthrough reference ({walkItems.length} item{walkItems.length !== 1 ? 's' : ''})
+                </summary>
+                <div style={{ marginTop: 'var(--space-md)' }}>
+                  <QuoteMediaGallery
+                    customerId={customerId}
+                    readOnly
+                    onApplySummary={(s) => setNotes(prev => {
+                      const trimmed = (prev || '').trim();
+                      if (!trimmed) return s;
+                      if (trimmed.includes(s.trim())) return prev;
+                      return `${trimmed}\n\n${s}`;
+                    })}
+                  />
+                </div>
+              </details>
+            );
+          })()}
+
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>
             <h3>Build Your Line Items</h3>
             <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
@@ -393,13 +450,13 @@ function NewQuoteContent() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-xl)' }}>
-            <button className="btn btn-secondary" onClick={() => setStep(2)}>
+            <button className="btn btn-secondary" onClick={() => setStep(3)}>
               <ArrowLeft size={16} /> Back
             </button>
             <button
               className="btn btn-primary"
               disabled={items.length === 0}
-              onClick={() => setStep(4)}
+              onClick={() => setStep(5)}
             >
               Review Quote <ArrowRight size={16} />
             </button>
@@ -407,8 +464,8 @@ function NewQuoteContent() {
         </div>
       )}
 
-      {/* Step 4: Review */}
-      {step === 4 && (
+      {/* Step 5: Review */}
+      {step === 5 && (
         <div style={{ maxWidth: '700px' }}>
           <h3 style={{ marginBottom: 'var(--space-lg)' }}>Review & Create Quote</h3>
 
@@ -459,7 +516,7 @@ function NewQuoteContent() {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-xl)' }}>
-            <button className="btn btn-secondary" onClick={() => setStep(3)} disabled={saving}>
+            <button className="btn btn-secondary" onClick={() => setStep(4)} disabled={saving}>
               <ArrowLeft size={16} /> Back
             </button>
             <button className="btn btn-primary btn-lg" onClick={handleSubmit} disabled={saving}>

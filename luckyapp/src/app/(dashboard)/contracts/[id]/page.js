@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Trash2, Copy, ExternalLink,
-  AlertTriangle, FileSignature, X,
+  AlertTriangle, FileSignature, X, FileDown, Smartphone, Download,
 } from 'lucide-react';
 
 function formatCurrency(n) {
@@ -131,6 +131,14 @@ export default function ContractDetailPage() {
         <div className="page-header-actions">
           {!isSigned && !isVoid && (
             <>
+              <a
+                href={publicLink || '#'}
+                onClick={(e) => { if (!publicLink) e.preventDefault(); }}
+                className="btn btn-primary"
+                style={{ background: '#2d7a3a', borderColor: '#2d7a3a' }}
+              >
+                <Smartphone size={16} /> Sign In Person
+              </a>
               <button className="btn btn-secondary" onClick={handleCopyLink}>
                 <Copy size={16} /> Copy Link
               </button>
@@ -140,13 +148,23 @@ export default function ContractDetailPage() {
                 </a>
               )}
               {contract.status === 'draft' && (
-                <button className="btn btn-primary" onClick={handleMarkSent}>
+                <button className="btn btn-secondary" onClick={handleMarkSent}>
                   <Send size={16} /> Mark Sent
                 </button>
               )}
               <button className="btn btn-danger" onClick={handleVoid}>
                 <XCircle size={16} /> Void
               </button>
+            </>
+          )}
+          {isSigned && contract.pdfUrl && (
+            <>
+              <a href={contract.pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+                <FileDown size={16} /> View Signed PDF
+              </a>
+              <a href={contract.pdfUrl} download={`Contract-${contract.contractNumber}-Signed.pdf`} className="btn btn-secondary">
+                <Download size={16} /> Download
+              </a>
             </>
           )}
           {!isSigned && (

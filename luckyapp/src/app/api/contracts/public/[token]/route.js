@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/stripeServer';
+import { buildContractPdfBytes } from '@/lib/generateContractPdf';
+import { notifyOrg } from '@/lib/notify';
 
 // ─── GET — fetch the contract by public token and mark as viewed ──────────────
 export async function GET(_request, { params }) {
@@ -16,7 +18,7 @@ export async function GET(_request, { params }) {
       total_amount, deposit_amount, start_date, completion_window,
       body, customer_snapshot, public_token,
       sent_at, last_viewed_at, signed_at, declined_at,
-      signature_typed_name, created_at,
+      signature_typed_name, pdf_url, created_at,
       customers ( first_name, last_name, email, phone, address, city, state, zip )
     `)
     .eq('public_token', token)
@@ -48,9 +50,10 @@ export async function POST(request, { params }) {
   const supabase = getServiceSupabase();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
+  // Pull the full row up front — we need org_id, body, etc. to render the PDF.
   const { data: contract, error: fetchErr } = await supabase
     .from('contracts')
-    .select('id, contract_number, status, public_token')
+    .select('*, customers ( first_name, last_name, email, phone, address, city, state, zip )')
     .eq('public_token', token)
     .single();
 
@@ -88,11 +91,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Typed name is too long.' }, { status: 400 });
     }
 
+    const signedAt = new Date().toISOString();
+
     const { error: updateErr } = await supabase
       .from('contracts')
       .update({
         status: 'signed',
-        signed_at: new Date().toISOString(),
+        signed_at: signedAt,
         signature_data_url: sigUrl,
         signature_typed_name: typedName,
         signature_ip: ip,
@@ -105,7 +110,71 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Could not save your signature. Please try again.' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true, signedAt: new Date().toISOString() });
+    // ─── Post-sign side effects (PDF, email, notification) ────────────────
+    // All best-effort. The customer's signature is already saved by this point;
+    // we don't want to block the success response on Resend or storage hiccups.
+    const enrichedContract = {
+      ...contract,
+      status: 'signed',
+      signed_at: signedAt,
+      signature_data_url: sigUrl,
+      signature_typed_name: typedName,
+      signature_ip: ip,
+      signature_user_agent: ua,
+    };
+
+    let pdfPublicUrl = null;
+    try {
+      const pdfBytes = buildContractPdfBytes(enrichedContract);
+      const path = `${contract.org_id}/${contract.id}.pdf`;
+      const { error: uploadErr } = await supabase.storage
+        .from('contract-pdfs')
+        .upload(path, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: true,
+        });
+      if (uploadErr) {
+        console.error('[contract sign] PDF upload failed:', uploadErr);
+      } else {
+        const { data: urlData } = supabase.storage.from('contract-pdfs').getPublicUrl(path);
+        pdfPublicUrl = urlData?.publicUrl || null;
+        await supabase
+          .from('contracts')
+          .update({ pdf_path: path, pdf_url: pdfPublicUrl })
+          .eq('id', contract.id);
+      }
+    } catch (pdfErr) {
+      console.error('[contract sign] PDF render failed:', pdfErr);
+    }
+
+    // Unified notification — inserts notifications row, sends Web Push to
+    // subscribed devices, and emails owners/admins with the signed PDF attached.
+    try {
+      const customer = contract.customers || {};
+      const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim()
+        || contract.customer_snapshot?.name
+        || 'Customer';
+
+      let attachmentBytes = null;
+      try { attachmentBytes = buildContractPdfBytes(enrichedContract); } catch { /* attachment optional */ }
+
+      await notifyOrg({
+        orgId: contract.org_id,
+        type: 'contract_signed',
+        title: `Contract #${contract.contract_number} signed by ${customerName}`,
+        body: `${typedName} signed ${contract.title || contract.category || 'the agreement'} for $${Number(contract.total_amount || 0).toFixed(2)}.${pdfPublicUrl ? ` Signed PDF attached.` : ''}`,
+        link: `/contracts/${contract.id}`,
+        data: { contractId: contract.id, pdfUrl: pdfPublicUrl, total: contract.total_amount },
+        attachments: attachmentBytes ? [{
+          filename: `Contract-${contract.contract_number}-Signed.pdf`,
+          content: attachmentBytes,
+        }] : undefined,
+      });
+    } catch (notifyErr) {
+      console.error('[contract sign] notify failed:', notifyErr);
+    }
+
+    return NextResponse.json({ success: true, signedAt, pdfUrl: pdfPublicUrl });
   }
 
   if (action === 'decline') {
@@ -129,6 +198,23 @@ export async function POST(request, { params }) {
     if (updateErr) {
       console.error('[contract decline] update failed:', updateErr);
       return NextResponse.json({ error: 'Could not save your message. Please try again.' }, { status: 500 });
+    }
+
+    try {
+      const customer = contract.customers || {};
+      const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim()
+        || contract.customer_snapshot?.name
+        || 'Customer';
+      await notifyOrg({
+        orgId: contract.org_id,
+        type: 'contract_declined',
+        title: `Contract #${contract.contract_number} — changes requested by ${customerName}`,
+        body: reason.slice(0, 280),
+        link: `/contracts/${contract.id}`,
+        data: { contractId: contract.id },
+      });
+    } catch (notifyErr) {
+      console.error('[contract decline] notify failed:', notifyErr);
     }
 
     return NextResponse.json({ success: true });

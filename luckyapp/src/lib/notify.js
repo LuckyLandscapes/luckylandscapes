@@ -36,8 +36,11 @@ function getAppOrigin() {
  * @param {string} [args.link]      - in-app path, e.g. '/quotes/<id>'
  * @param {object} [args.data]      - extra json payload stored with the notification
  * @param {string[]} [args.roles]   - team_members roles to notify; default ['owner','admin']
+ * @param {Array<{filename:string, content:Uint8Array|Buffer}>} [args.attachments]
+ *        - Optional email attachments. Each `content` is base64-encoded
+ *          before handing to Resend.
  */
-export async function notifyOrg({ orgId, type, title, body, link, data = {}, roles = ['owner', 'admin'] }) {
+export async function notifyOrg({ orgId, type, title, body, link, data = {}, roles = ['owner', 'admin'], attachments }) {
   if (!orgId || !type || !title) {
     console.warn('[notify] missing required fields', { orgId, type, title });
     return;
@@ -81,13 +84,13 @@ export async function notifyOrg({ orgId, type, title, body, link, data = {}, rol
   const emails = members.map(m => m.email).filter(Boolean);
 
   // 3. Email via Resend (best-effort; one email to all recipients)
-  await sendEmail({ emails, title, body, link });
+  await sendEmail({ emails, title, body, link, attachments });
 
   // 4. Web Push (best-effort; per subscription)
   await sendWebPush({ supabase, userIds, title, body, link, data, type });
 }
 
-async function sendEmail({ emails, title, body, link }) {
+async function sendEmail({ emails, title, body, link, attachments }) {
   if (!process.env.RESEND_API_KEY) return;
   if (!emails || emails.length === 0) return;
   try {
@@ -103,13 +106,22 @@ async function sendEmail({ emails, title, body, link }) {
       body ? `<p>${escapeHtml(body)}</p>` : '',
       fullLink ? `<p><a href="${fullLink}" style="color:#41a100;font-weight:600;">Open in luckyapp →</a></p>` : '',
     ].filter(Boolean).join('');
-    await resend.emails.send({
+    const sendArgs = {
       from: fromAddress,
       to: emails,
       subject: title,
       text,
       html,
-    });
+    };
+    if (Array.isArray(attachments) && attachments.length) {
+      sendArgs.attachments = attachments.map(a => ({
+        filename: a.filename,
+        content: Buffer.isBuffer(a.content)
+          ? a.content.toString('base64')
+          : Buffer.from(a.content).toString('base64'),
+      }));
+    }
+    await resend.emails.send(sendArgs);
   } catch (err) {
     console.error('[notify] email send failed', err);
   }

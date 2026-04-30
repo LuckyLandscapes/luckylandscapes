@@ -54,7 +54,7 @@ export default function JobDetailPage({ params }) {
   const router = useRouter();
   const { getJob, getCustomer, getQuote, getTeamMember, updateJob, deleteJob, teamMembers,
     getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries,
-    calendarEvents, invoices } = useData();
+    calendarEvents, invoices, contracts } = useData();
   const { user, isOwnerOrAdmin, isWorker } = useAuth();
 
   const job = getJob(jobId);
@@ -115,7 +115,25 @@ export default function JobDetailPage({ params }) {
     : '');
   const mapsUrl = fullAddress ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}` : '';
 
+  // Lookup any contract tied to this job (directly or via the quote it came from).
+  // We block "Start Job" unless that contract is signed — protects us from
+  // doing work without a written agreement.
+  const linkedContract = (contracts || []).find(c =>
+    (c.jobId && c.jobId === job?.id) ||
+    (job?.quoteId && c.quoteId === job.quoteId)
+  ) || null;
+  const contractRequired = !!(job?.quoteId || linkedContract);
+  const contractSigned = linkedContract?.status === 'signed';
+  const blockStartForContract = contractRequired && !contractSigned;
+
   const handleStatusChange = async (newStatus) => {
+    if (newStatus === 'in_progress' && blockStartForContract) {
+      showToast('error', linkedContract
+        ? `Contract #${linkedContract.contractNumber} hasn't been signed yet. Have the customer sign before starting.`
+        : 'No signed contract on file for this job. Generate one from the source quote first.'
+      );
+      return;
+    }
     setUpdating(true);
     try {
       await updateJob(job.id, { status: newStatus });
@@ -252,7 +270,12 @@ export default function JobDetailPage({ params }) {
               <Edit3 size={14} /> Edit
             </button>
             {job.status === 'scheduled' && (
-              <button className="btn btn-primary btn-sm" onClick={() => handleStatusChange('in_progress')} disabled={updating}>
+              <button
+                className={`btn btn-sm ${blockStartForContract ? 'btn-secondary' : 'btn-primary'}`}
+                onClick={() => handleStatusChange('in_progress')}
+                disabled={updating || blockStartForContract}
+                title={blockStartForContract ? 'Contract must be signed before starting this job' : 'Start the job'}
+              >
                 <Play size={14} /> Start Job
               </button>
             )}
@@ -272,6 +295,68 @@ export default function JobDetailPage({ params }) {
           </div>
         )}
       </div>
+
+      {/* Contract status banner — blocks start of unsigned-contract jobs */}
+      {isOwnerOrAdmin && job.status === 'scheduled' && (
+        contractRequired && !contractSigned ? (
+          <div style={{
+            background: 'rgba(239,68,68,0.08)',
+            border: '1px solid rgba(239,68,68,0.30)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-md) var(--space-lg)',
+            marginBottom: 'var(--space-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-md)',
+            flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <AlertTriangle size={20} style={{ color: 'var(--status-danger)' }} />
+              <div>
+                <div style={{ fontWeight: 700 }}>Contract not signed — job is locked</div>
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                  {linkedContract
+                    ? `Contract #${linkedContract.contractNumber} is ${linkedContract.status}. The customer must sign before this job can start.`
+                    : 'Generate a contract from the source quote and have the customer sign it before starting work.'}
+                </div>
+              </div>
+            </div>
+            {linkedContract ? (
+              <Link href={`/contracts/${linkedContract.id}`} className="btn btn-primary btn-sm">
+                Open Contract →
+              </Link>
+            ) : quote ? (
+              <Link href={`/quotes/${quote.id}`} className="btn btn-primary btn-sm">
+                Generate Contract →
+              </Link>
+            ) : null}
+          </div>
+        ) : contractSigned ? (
+          <div style={{
+            background: 'rgba(45,122,58,0.08)',
+            border: '1px solid rgba(45,122,58,0.25)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-sm) var(--space-md)',
+            marginBottom: 'var(--space-lg)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-md)',
+            fontSize: '0.9rem',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <CheckCircle2 size={16} style={{ color: 'var(--status-success)' }} />
+              <span>Contract #{linkedContract.contractNumber} signed by {linkedContract.signatureTypedName || 'customer'} — job is cleared to start.</span>
+            </div>
+            {linkedContract.pdfUrl && (
+              <a href={linkedContract.pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
+                View PDF →
+              </a>
+            )}
+          </div>
+        ) : null
+      )}
 
       {/* Profit Summary Banner — owner/admin only (workers don't see margin) */}
       {financials && isOwnerOrAdmin && (

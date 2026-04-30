@@ -61,9 +61,13 @@ function getMediaDuration(file) {
   });
 }
 
-export default function QuoteMediaGallery({ quoteId, readOnly = false, onApplySummary }) {
+// Pass either `quoteId` (existing quote) or `customerId` (pre-quote
+// walkthrough during the new-quote wizard). When both are absent the
+// gallery is empty. When both are given, quoteId wins (used for the
+// detail/edit pages where the quote already exists).
+export default function QuoteMediaGallery({ quoteId, customerId: customerIdProp, readOnly = false, onApplySummary }) {
   const { user } = useAuth();
-  const { getQuoteMedia, addQuoteMedia, deleteQuoteMedia, togglePinQuoteMedia, updateQuoteMediaCaption } = useData();
+  const { getQuoteMedia, getQuoteMediaByCustomer, addQuoteMedia, deleteQuoteMedia, togglePinQuoteMedia, updateQuoteMediaCaption, quotes } = useData();
   const photoInputRef = useRef(null);
   const videoInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -77,12 +81,29 @@ export default function QuoteMediaGallery({ quoteId, readOnly = false, onApplySu
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [summaryCopied, setSummaryCopied] = useState(false);
 
-  const items = getQuoteMedia(quoteId);
+  // Resolve the customer id we're uploading FOR, regardless of whether a
+  // quote exists yet. quoteId path: derive customer from the quote.
+  // customerId path: use it directly.
+  const resolvedCustomerId = quoteId
+    ? quotes.find(q => q.id === quoteId)?.customerId || null
+    : customerIdProp || null;
+
+  const items = quoteId
+    ? getQuoteMedia(quoteId)
+    : (resolvedCustomerId ? getQuoteMediaByCustomer(resolvedCustomerId) : []);
+
   const orgId = user?.orgId;
+  // Storage path uses the quoteId folder when we have one; otherwise the
+  // customer id keeps the walkthrough captures grouped before the quote
+  // is created.
+  const storageFolder = quoteId || resolvedCustomerId || 'orphan';
 
   const uploadFile = async ({ file, mediaType, durationSeconds = null, transcript = null }) => {
+    if (!resolvedCustomerId && !quoteId) {
+      throw new Error('Pick a customer first, then capture media.');
+    }
     const ext = inferExt(file, mediaType === 'image' ? 'jpg' : mediaType === 'video' ? 'mp4' : 'webm');
-    const key = `${orgId}/${quoteId}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+    const key = `${orgId}/${storageFolder}/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
 
     const { error: upErr } = await supabase.storage
       .from('quote-media')
@@ -92,6 +113,7 @@ export default function QuoteMediaGallery({ quoteId, readOnly = false, onApplySu
     const { data: pub } = supabase.storage.from('quote-media').getPublicUrl(key);
     await addQuoteMedia({
       quoteId,
+      customerId: resolvedCustomerId,
       filePath: key,
       fileUrl: pub.publicUrl,
       fileSize: file.size,
@@ -481,7 +503,7 @@ export default function QuoteMediaGallery({ quoteId, readOnly = false, onApplySu
                   <button type="button" className="btn btn-secondary btn-sm" onClick={handleCopy}>
                     {summaryCopied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy</>}
                   </button>
-                  {!readOnly && onApplySummary && (
+                  {onApplySummary && (
                     <button type="button" className="btn btn-primary btn-sm" onClick={() => onApplySummary(summary)}>
                       <ArrowDown size={14} /> Apply to Notes
                     </button>

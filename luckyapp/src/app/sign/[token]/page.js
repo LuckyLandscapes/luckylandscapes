@@ -85,7 +85,21 @@ export default function SignPage({ params }) {
 
         {isSigned && (
           <div style={{ ...styles.banner, background: '#e6f7e6', color: '#1f6f3a', borderColor: '#a5d8a5' }}>
-            ✓ This agreement was signed{contract.signed_at ? ` on ${new Date(contract.signed_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}. Thank you!
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <span>
+                ✓ This agreement was signed{contract.signed_at ? ` on ${new Date(contract.signed_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}` : ''}. Thank you!
+              </span>
+              {contract.pdf_url && (
+                <a
+                  href={contract.pdf_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ background: '#2d7a3a', color: '#fff', padding: '8px 16px', borderRadius: 8, fontWeight: 700, textDecoration: 'none', fontSize: 13 }}
+                >
+                  Download Signed PDF →
+                </a>
+              )}
+            </div>
           </div>
         )}
         {isDeclined && (
@@ -146,7 +160,7 @@ export default function SignPage({ params }) {
                 token={token}
                 defaultName={customerName}
                 onCancel={() => setView('review')}
-                onSigned={(signedAt) => setContract(prev => ({ ...prev, status: 'signed', signed_at: signedAt }))}
+                onSigned={(signedAt, pdfUrl) => setContract(prev => ({ ...prev, status: 'signed', signed_at: signedAt, pdf_url: pdfUrl || prev?.pdf_url }))}
               />
             )}
             {view === 'decline' && (
@@ -266,7 +280,7 @@ function SignForm({ token, defaultName, onCancel, onSigned }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not submit signature');
-      onSigned?.(data.signedAt || new Date().toISOString());
+      onSigned?.(data.signedAt || new Date().toISOString(), data.pdfUrl || null);
     } catch (err) {
       setError(err.message);
     } finally {
