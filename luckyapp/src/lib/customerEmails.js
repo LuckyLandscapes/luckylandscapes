@@ -102,7 +102,7 @@ export function buildDepositReceiptHtml({ customer, quote, amount, method }) {
 
     <div style="text-align:center; margin:28px 0 8px;">
       <p style="color:#1f2937; font-size:14px; margin:0; font-weight:600;">Thanks again for choosing Lucky Landscapes!</p>
-      <p style="color:#6b7280; font-size:13px; margin:4px 0 0;">— Riley, Macoy &amp; the Lucky Landscapes Team 🍀</p>
+      <p style="color:#6b7280; font-size:13px; margin:4px 0 0;">— Riley &amp; the Lucky Landscapes Team 🍀</p>
     </div>
   `);
 }
@@ -138,7 +138,7 @@ export async function sendDepositReceipt({ to, customer, quote, amount, method }
         '',
         `Questions? Reply to this email or call (402) 405-5475.`,
         '',
-        `— Riley, Macoy & the Lucky Landscapes Team 🍀`,
+        `— Riley & the Lucky Landscapes Team 🍀`,
       ].join('\n'),
     });
     if (result.error) {
@@ -205,7 +205,7 @@ export function buildInvoicePaidHtml({ customer, invoice, amount, method }) {
 
     <div style="text-align:center; margin:28px 0 8px;">
       <p style="color:#1f2937; font-size:14px; margin:0; font-weight:600;">Thank you!</p>
-      <p style="color:#6b7280; font-size:13px; margin:4px 0 0;">— Riley, Macoy &amp; the Lucky Landscapes Team 🍀</p>
+      <p style="color:#6b7280; font-size:13px; margin:4px 0 0;">— Riley &amp; the Lucky Landscapes Team 🍀</p>
     </div>
   `);
 }
@@ -234,7 +234,7 @@ export async function sendInvoicePaidReceipt({ to, customer, invoice, amount, me
         '',
         `Questions? Reply or call (402) 405-5475.`,
         '',
-        `— Riley, Macoy & the Lucky Landscapes Team 🍀`,
+        `— Riley & the Lucky Landscapes Team 🍀`,
       ].join('\n'),
     });
     if (result.error) {
