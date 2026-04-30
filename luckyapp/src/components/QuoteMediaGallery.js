@@ -181,9 +181,11 @@ export default function QuoteMediaGallery({ quoteId, customerId: customerIdProp,
     }
   };
 
-  const handleVoiceMemoSave = async ({ file, durationSeconds, transcript }) => {
+  // opts.keepOpen=true keeps the recorder modal open so the user can
+  // capture another memo back-to-back during the walkthrough.
+  const handleVoiceMemoSave = async ({ file, durationSeconds, transcript }, opts = {}) => {
     if (!orgId) { setError('Not signed in.'); setShowVoiceRecorder(false); return; }
-    setShowVoiceRecorder(false);
+    if (!opts.keepOpen) setShowVoiceRecorder(false);
     setError(null);
     setUploading(true);
     try {
@@ -258,7 +260,7 @@ export default function QuoteMediaGallery({ quoteId, customerId: customerIdProp,
         <>
           <input ref={photoInputRef} type="file" accept="image/*" capture="environment" multiple
                  style={{ display: 'none' }} onChange={(e) => handlePhotoFiles(e.target.files)} />
-          <input ref={videoInputRef} type="file" accept="video/*" capture="environment"
+          <input ref={videoInputRef} type="file" accept="video/*" capture="environment" multiple
                  style={{ display: 'none' }} onChange={(e) => handleVideoFiles(e.target.files)} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: 'var(--space-md)' }}>
             <button type="button" className="btn btn-secondary" onClick={() => photoInputRef.current?.click()} disabled={uploading}
@@ -390,21 +392,23 @@ export default function QuoteMediaGallery({ quoteId, customerId: customerIdProp,
                 <div style={{ marginTop: 'var(--space-sm)' }}>
                   {isEditing ? (
                     <div>
-                      <input
-                        className="form-input"
-                        placeholder="What did the customer say about this?"
+                      <textarea
+                        className="form-textarea"
+                        rows={4}
+                        placeholder="What did the customer say about this? (Enter for new line)"
                         value={editDraft.caption}
                         onChange={(e) => setEditDraft(d => ({ ...d, caption: e.target.value }))}
-                        style={{ marginBottom: 6 }}
+                        autoFocus
+                        style={{ marginBottom: 6, minHeight: 100, fontSize: '0.9rem', lineHeight: 1.45, resize: 'vertical' }}
                       />
                       {(type === 'audio' || item.transcript != null) && (
                         <textarea
                           className="form-textarea"
-                          rows={3}
+                          rows={4}
                           placeholder="Transcript / detailed notes"
                           value={editDraft.transcript}
                           onChange={(e) => setEditDraft(d => ({ ...d, transcript: e.target.value }))}
-                          style={{ marginBottom: 6 }}
+                          style={{ marginBottom: 6, minHeight: 100, lineHeight: 1.45, resize: 'vertical' }}
                         />
                       )}
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -415,7 +419,12 @@ export default function QuoteMediaGallery({ quoteId, customerId: customerIdProp,
                   ) : (
                     <>
                       {item.caption && (
-                        <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)', marginBottom: item.transcript ? 4 : 0 }}>
+                        <div style={{
+                          fontSize: '0.88rem', color: 'var(--text-primary)',
+                          marginBottom: item.transcript ? 4 : 0,
+                          whiteSpace: 'pre-wrap',
+                          lineHeight: 1.45,
+                        }}>
                           {item.caption}
                         </div>
                       )}

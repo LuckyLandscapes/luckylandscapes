@@ -163,13 +163,28 @@ export default function VoiceMemoRecorder({ onSave, onCancel }) {
     setPhase('idle');
   };
 
-  const save = () => {
+  const save = (keepOpen = false) => {
     if (!audioFile) return;
-    onSave({
-      file: audioFile,
-      durationSeconds: duration,
-      transcript: (transcript + interim).trim(),
-    });
+    onSave(
+      {
+        file: audioFile,
+        durationSeconds: duration,
+        transcript: (transcript + interim).trim(),
+      },
+      { keepOpen }
+    );
+    if (keepOpen) {
+      // Reset to idle for the next recording without closing the modal —
+      // lets the estimator capture several memos in a row during the walk.
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+      setAudioFile(null);
+      setTranscript('');
+      setInterim('');
+      setDuration(0);
+      finalTextRef.current = '';
+      setPhase('idle');
+    }
   };
 
   return (
@@ -290,8 +305,11 @@ export default function VoiceMemoRecorder({ onSave, onCancel }) {
               <button className="btn btn-secondary" onClick={discard}>
                 <Trash2 size={16} /> Discard
               </button>
-              <button className="btn btn-primary" onClick={save}>
-                <Check size={16} /> Save Voice Memo
+              <button className="btn btn-secondary" onClick={() => save(true)} title="Save this memo and record another">
+                <Mic size={16} /> Save &amp; Record Another
+              </button>
+              <button className="btn btn-primary" onClick={() => save(false)}>
+                <Check size={16} /> Save &amp; Close
               </button>
             </>
           ) : (
