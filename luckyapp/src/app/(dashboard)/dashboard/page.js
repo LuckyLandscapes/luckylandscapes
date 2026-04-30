@@ -103,19 +103,22 @@ export default function DashboardPage() {
 
   return (
     <div className="page animate-fade-in">
-      {/* Header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1>{greeting}, {firstName} 👋</h1>
-          <p>Here&apos;s what&apos;s happening with your business today.</p>
-        </div>
-        <div className="page-header-actions">
-          <Link href="/quotes/new" className="btn btn-primary">
-            <Plus size={18} /> New Quote
-          </Link>
-          <Link href="/customers" className="btn btn-secondary">
-            <Users size={18} /> Customers
-          </Link>
+      {/* Hero Header */}
+      <div className="dashboard-hero">
+        <div className="dashboard-hero-bg" />
+        <div className="dashboard-hero-content">
+          <div className="dashboard-hero-text">
+            <h1>{greeting}, {firstName} 👋</h1>
+            <p>Here&apos;s what&apos;s happening with your business today.</p>
+          </div>
+          <div className="dashboard-hero-actions">
+            <Link href="/quotes/new" className="btn btn-primary">
+              <Plus size={18} /> New Quote
+            </Link>
+            <Link href="/customers" className="btn btn-secondary">
+              <Users size={18} /> Customers
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -154,7 +157,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Today's Schedule + Quick Actions */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+      <div className="dashboard-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
         {/* Today's Jobs */}
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-lg)' }}>

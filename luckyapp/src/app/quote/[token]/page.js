@@ -134,16 +134,16 @@ export default function QuotePage({ params }) {
   const isAccepted = view === 'accepted' || quote.deposit_paid_at;
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="quote-page-root">
       <div style={styles.container}>
-        <header style={styles.header}>
+        <header style={styles.header} className="quote-header">
           <div style={styles.brand}>
-            <span style={styles.brandIcon}>🍀</span>
-            <span style={styles.brandName}>Lucky Landscapes</span>
+            <span style={styles.brandIcon} className="quote-brand-icon">🍀</span>
+            <span style={styles.brandName} className="quote-brand-name">Lucky Landscapes</span>
           </div>
           <div style={styles.headerRight}>
-            <div style={styles.invoiceLabel}>ESTIMATE</div>
-            <div style={styles.invoiceNumber}>#{quote.quote_number}</div>
+            <div style={styles.invoiceLabel} className="quote-invoice-label">ESTIMATE</div>
+            <div style={styles.invoiceNumber} className="quote-invoice-number">#{quote.quote_number}</div>
           </div>
         </header>
 
@@ -156,8 +156,8 @@ export default function QuotePage({ params }) {
 
         <div style={styles.grid} className="quote-grid">
           {/* Left: Estimate details */}
-          <div style={styles.detailsCard}>
-            <div style={styles.metaRow}>
+          <div style={styles.detailsCard} className="quote-details-card">
+            <div style={styles.metaRow} className="quote-meta-row">
               <div>
                 <div style={styles.metaLabel}>Prepared For</div>
                 <div style={styles.metaValue}>{customerName || '—'}</div>
@@ -182,7 +182,7 @@ export default function QuotePage({ params }) {
               </div>
             )}
 
-            <table style={styles.itemsTable}>
+            <table style={styles.itemsTable} className="quote-items-table">
               <thead>
                 <tr>
                   <th style={styles.th}>Service / Item</th>
@@ -198,9 +198,9 @@ export default function QuotePage({ params }) {
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
                       {item.description && <div style={styles.tdSub}>{item.description}</div>}
                     </td>
-                    <td style={{ ...styles.td, textAlign: 'center' }}>{item.quantity || 1}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }}>{formatUSD(item.unitPrice ?? item.unit_price)}</td>
-                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }}>{formatUSD(item.total)}</td>
+                    <td style={{ ...styles.td, textAlign: 'center' }} data-label="Qty">{item.quantity || 1}</td>
+                    <td style={{ ...styles.td, textAlign: 'right' }} data-label="Price">{formatUSD(item.unitPrice ?? item.unit_price)}</td>
+                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} data-label="Total">{formatUSD(item.total)}</td>
                   </tr>
                 ))}
                 {items.length === 0 && (
@@ -210,7 +210,7 @@ export default function QuotePage({ params }) {
             </table>
 
             <div style={styles.totals}>
-              <div style={styles.totalRow}><span>Estimated Total</span><span>{formatUSD(quote.total)}</span></div>
+              <div style={styles.totalRow} className="quote-total-row"><span>Estimated Total</span><span>{formatUSD(quote.total)}</span></div>
             </div>
 
             {quote.notes && (
@@ -222,7 +222,7 @@ export default function QuotePage({ params }) {
           </div>
 
           {/* Right: Action panel */}
-          <div style={styles.actionCard} className="quote-card-sticky">
+          <div style={styles.actionCard} className="quote-card-sticky quote-action-card">
             {view === 'review' && (
               <ReviewPanel
                 deposit={deposit}
@@ -285,7 +285,7 @@ export default function QuotePage({ params }) {
           </div>
         </div>
 
-        <footer style={styles.footer}>
+        <footer style={styles.footer} className="quote-footer">
           <div>Lucky Landscapes • (402) 405-5475 • rileykopf@luckylandscapes.com</div>
           <div style={{ marginTop: 4 }}>109 South Canopy ST, Lincoln, NE</div>
           <div style={{ marginTop: 12, fontSize: 11, color: '#9ca3af' }}>
@@ -302,13 +302,13 @@ export default function QuotePage({ params }) {
 function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges }) {
   return (
     <div>
-      <h3 style={styles.panelHeading}>How does it look? 🌿</h3>
+      <h3 style={styles.panelHeading} className="quote-panel-heading">How does it look? 🌿</h3>
       <p style={styles.panelBody}>
         Have a look through the line items below. When you&rsquo;re ready, accept to lock in your spot — or let us know what you&rsquo;d like adjusted and we&rsquo;ll send a revised estimate.
       </p>
 
       {deposit > 0 && (
-        <div style={styles.depositBox}>
+        <div style={styles.depositBox} className="quote-deposit-box">
           <div style={{ fontSize: 11, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
             Deposit to Schedule
           </div>
@@ -332,7 +332,7 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
       )}
 
       {deposit === 0 && (
-        <div style={styles.depositBox}>
+        <div style={styles.depositBox} className="quote-deposit-box">
           <p style={{ fontSize: 13, color: '#374151', margin: 0 }}>
             No deposit needed — just hit accept and we&rsquo;ll reach out to schedule.
           </p>
@@ -340,10 +340,10 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
-        <button onClick={onAccept} style={styles.primaryBtn}>
+        <button onClick={onAccept} style={styles.primaryBtn} className="quote-primary-btn">
           {deposit > 0 ? `Looks good — pay ${formatUSD(deposit)}` : 'Looks good — accept estimate'}
         </button>
-        <button onClick={onRequestChanges} style={styles.secondaryBtn}>
+        <button onClick={onRequestChanges} style={styles.secondaryBtn} className="quote-secondary-btn">
           Request changes
         </button>
       </div>
@@ -362,12 +362,12 @@ function AcceptPanel({ deposit, materials, delivery, clientSecret, paymentError,
     <div>
       <button onClick={onBack} style={styles.backLink}>← Back</button>
 
-      <h3 style={styles.panelHeading}>Pay deposit to schedule</h3>
+      <h3 style={styles.panelHeading} className="quote-panel-heading">Pay deposit to schedule</h3>
       <p style={styles.panelBody}>
         Once payment clears, your estimate is auto-accepted and we&rsquo;ll reach out to set your date.
       </p>
 
-      <div style={styles.depositBox}>
+      <div style={styles.depositBox} className="quote-deposit-box">
         {materials > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
             <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
@@ -427,7 +427,7 @@ function ChangesPanel({ value, onChange, submitting, error, onBack, onSubmit }) 
     <div>
       <button onClick={onBack} style={styles.backLink} disabled={submitting}>← Back</button>
 
-      <h3 style={styles.panelHeading}>What would you like changed?</h3>
+      <h3 style={styles.panelHeading} className="quote-panel-heading">What would you like changed?</h3>
       <p style={styles.panelBody}>
         Tell us what you&rsquo;d like adjusted, removed, or have questions about. We&rsquo;ll send a revised estimate.
       </p>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import Link from 'next/link';
@@ -21,6 +21,11 @@ import {
   Coffee,
   X,
   AlertCircle,
+  Award,
+  Sun,
+  CloudRain,
+  Cloud,
+  Zap,
 } from 'lucide-react';
 
 function formatTime12(time) {
@@ -43,6 +48,14 @@ function formatDuration(ms) {
   const minutes = totalMinutes % 60;
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
+}
+
+function formatLiveDuration(ms) {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 const PRIORITY_COLORS = {
@@ -97,16 +110,26 @@ export default function CrewDashboardPage() {
   const [showBreakPrompt, setShowBreakPrompt] = useState(false);
   const [clockingIn, setClockingIn] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
+  const [liveTick, setLiveTick] = useState(0);
 
   const firstName = user?.fullName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const todayStr = new Date().toISOString().split('T')[0];
+  const initials = (user?.fullName || 'You')
+    .split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
 
   // Get active clock entry for this user
   const activeClockEntry = useMemo(() => {
     return timeEntries.find(t => t.teamMemberId === user?.id && !t.clockOut);
   }, [timeEntries, user?.id]);
+
+  // Tick every second while clocked in so the elapsed timer updates live
+  useEffect(() => {
+    if (!activeClockEntry) return;
+    const id = setInterval(() => setLiveTick(t => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [activeClockEntry]);
 
   // Active job being clocked into
   const activeJob = useMemo(() => {
@@ -152,6 +175,58 @@ export default function CrewDashboardPage() {
       (j.scheduledDate === todayStr || j.status === 'in_progress')
     );
   }, [myJobs, todayStr]);
+
+  // ── This-week stats ────────────────────────────────────────
+  const weekStats = useMemo(() => {
+    if (!user?.id) return { hours: 0, jobsDone: 0, jobsScheduled: 0, breaks: 0 };
+    const now = new Date();
+    const weekStart = new Date(now);
+    // Monday-based week
+    const day = weekStart.getDay() || 7;
+    weekStart.setDate(weekStart.getDate() - (day - 1));
+    weekStart.setHours(0, 0, 0, 0);
+    const weekStartTs = weekStart.getTime();
+
+    let totalMs = 0;
+    let breaks = 0;
+    timeEntries.forEach(t => {
+      if (t.teamMemberId !== user.id) return;
+      const inTs = new Date(t.clockIn).getTime();
+      if (isNaN(inTs) || inTs < weekStartTs) return;
+      const outTs = t.clockOut ? new Date(t.clockOut).getTime() : Date.now();
+      const breakMin = Number(t.breakMinutes || 0);
+      const span = Math.max(0, outTs - inTs - breakMin * 60_000);
+      totalMs += span;
+      if (breakMin > 0) breaks += 1;
+    });
+
+    const jobsDone = myJobs.filter(j => {
+      if (j.status !== 'completed') return false;
+      const d = j.completedAt || j.scheduledDate;
+      if (!d) return false;
+      return new Date(d).getTime() >= weekStartTs;
+    }).length;
+
+    const jobsScheduled = myJobs.filter(j =>
+      j.scheduledDate &&
+      new Date(j.scheduledDate + 'T12:00:00').getTime() >= weekStartTs &&
+      j.status !== 'cancelled'
+    ).length;
+
+    return {
+      hours: totalMs / (1000 * 60 * 60),
+      jobsDone,
+      jobsScheduled,
+      breaks,
+    };
+    // liveTick included so an active (no clockOut) entry recomputes its elapsed hours each second
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeEntries, myJobs, user?.id, liveTick]);
+
+  // Today's earnings (rough estimate from active clock entry)
+  const todayElapsedMs = activeClockEntry
+    ? Date.now() - new Date(activeClockEntry.clockIn).getTime()
+    : 0;
 
   const handleClockInClick = () => {
     if (activeClockEntry) {
@@ -202,60 +277,149 @@ export default function CrewDashboardPage() {
 
   const breakOptions = getBreakOptions(shiftDurationHours);
 
+  // Live elapsed time string (updates each second via liveTick)
+  const liveElapsedStr = activeClockEntry ? formatLiveDuration(todayElapsedMs) : null;
+
+  // Pick a daypart icon for the hero (purely visual flavor)
+  const HeroIcon = hour < 6 || hour >= 19 ? Cloud : hour < 11 ? Sun : hour < 16 ? Sun : CloudRain;
+
   return (
     <div className="crew-dash animate-fade-in">
-      {/* Header */}
-      <div className="crew-dash-header">
-        <div className="crew-dash-greeting">
-          <h1>{greeting}, {firstName} 👷</h1>
-          <p>{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</p>
+      {/* ── Hero Header ────────────────────────────────────── */}
+      <div className="crew-hero">
+        <div className="crew-hero-bg" />
+        <div className="crew-hero-content">
+          <div className="crew-hero-avatar">{initials}</div>
+          <div className="crew-hero-text">
+            <div className="crew-hero-greeting">
+              {greeting}, {firstName}
+              <HeroIcon size={18} className="crew-hero-icon" />
+            </div>
+            <div className="crew-hero-date">
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </div>
+          </div>
+          <div className="crew-hero-badge">
+            <HardHat size={14} />
+            <span>Crew</span>
+          </div>
         </div>
       </div>
 
-      {/* Clock Widget */}
-      <div className="crew-clock-widget">
-        <div className="crew-clock-status">
-          <div className={`crew-clock-dot ${activeClockEntry ? 'active' : 'inactive'}`} />
-          <div>
-            <span>{activeClockEntry ? 'Clocked In' : 'Clocked Out'}</span>
-            {activeJob && (
-              <div style={{ fontSize: '0.72rem', color: 'var(--lucky-green-light)', marginTop: '2px' }}>
-                <Briefcase size={10} style={{ verticalAlign: 'middle', marginRight: '3px' }} />
-                {activeJob.title}
-              </div>
-            )}
+      {/* ── Clock Widget (rich, with live timer) ───────────── */}
+      <div className={`crew-clock-card ${activeClockEntry ? 'is-active' : ''}`}>
+        <div className="crew-clock-card-top">
+          <div className="crew-clock-status">
+            <div className={`crew-clock-dot ${activeClockEntry ? 'active' : 'inactive'}`} />
+            <div className="crew-clock-status-text">
+              <span className="crew-clock-status-label">{activeClockEntry ? 'On the clock' : 'Off the clock'}</span>
+              {activeJob && (
+                <span className="crew-clock-active-job">
+                  <Briefcase size={10} />
+                  {activeJob.title}
+                </span>
+              )}
+              {!activeClockEntry && clockableJobs.length > 0 && (
+                <span className="crew-clock-status-sub">
+                  {clockableJobs.length} job{clockableJobs.length !== 1 ? 's' : ''} ready to start
+                </span>
+              )}
+            </div>
           </div>
+          <button
+            className={`crew-clock-btn ${activeClockEntry ? 'is-out' : 'is-in'}`}
+            onClick={handleClockInClick}
+            disabled={clockingIn || clockingOut || (!activeClockEntry && clockableJobs.length === 0)}
+          >
+            <Clock size={16} />
+            {activeClockEntry ? 'Clock Out' : 'Clock In'}
+          </button>
         </div>
+
         {activeClockEntry && (
-          <div className="crew-clock-time">
-            Since {new Date(activeClockEntry.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-            <span style={{ display: 'block', fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
-              {formatDuration(Date.now() - new Date(activeClockEntry.clockIn).getTime())} elapsed
-            </span>
+          <div className="crew-clock-timer">
+            <div className="crew-clock-timer-num">{liveElapsedStr}</div>
+            <div className="crew-clock-timer-label">
+              Since {new Date(activeClockEntry.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </div>
           </div>
         )}
-        <button
-          className={`btn ${activeClockEntry ? 'btn-danger' : 'btn-primary'} btn-sm`}
-          onClick={handleClockInClick}
-          style={{ marginLeft: 'auto' }}
-          disabled={clockingIn || clockingOut || (!activeClockEntry && clockableJobs.length === 0)}
-        >
-          <Clock size={14} />
-          {activeClockEntry ? 'Clock Out' : 'Clock In'}
-        </button>
       </div>
 
       {/* No clockable jobs message */}
       {!activeClockEntry && clockableJobs.length === 0 && (
-        <div style={{
-          padding: '10px 14px', margin: '-8px 0 12px', borderRadius: '8px',
-          background: 'rgba(212,169,62,0.08)', border: '1px solid rgba(212,169,62,0.2)',
-          fontSize: '0.78rem', color: 'var(--lucky-gold)', display: 'flex', alignItems: 'center', gap: '8px'
-        }}>
+        <div className="crew-alert">
           <AlertCircle size={14} />
           No active or scheduled jobs to clock into today.
         </div>
       )}
+
+      {/* ── This Week Stats ────────────────────────────────── */}
+      <div className="crew-week-stats">
+        <div className="crew-week-stat">
+          <div className="crew-week-stat-icon" style={{ background: 'rgba(58, 156, 74, 0.12)', color: 'var(--lucky-green-light)' }}>
+            <Timer size={16} />
+          </div>
+          <div className="crew-week-stat-body">
+            <div className="crew-week-stat-value">{weekStats.hours.toFixed(1)}h</div>
+            <div className="crew-week-stat-label">Hours this week</div>
+          </div>
+        </div>
+        <div className="crew-week-stat">
+          <div className="crew-week-stat-icon" style={{ background: 'rgba(99, 179, 255, 0.12)', color: '#63b3ff' }}>
+            <CheckCircle2 size={16} />
+          </div>
+          <div className="crew-week-stat-body">
+            <div className="crew-week-stat-value">{weekStats.jobsDone}<span className="crew-week-stat-total"> / {weekStats.jobsScheduled}</span></div>
+            <div className="crew-week-stat-label">Jobs done this week</div>
+          </div>
+        </div>
+        <div className="crew-week-stat">
+          <div className="crew-week-stat-icon" style={{ background: 'rgba(212, 169, 62, 0.14)', color: 'var(--lucky-gold)' }}>
+            <Award size={16} />
+          </div>
+          <div className="crew-week-stat-body">
+            <div className="crew-week-stat-value">{todayJobs.length}</div>
+            <div className="crew-week-stat-label">On deck today</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Quick Actions ──────────────────────────────────── */}
+      <div className="crew-quick-actions">
+        <Link href="/crew-schedule" className="crew-quick-action">
+          <CalendarDays size={18} />
+          <span>Schedule</span>
+        </Link>
+        {(activeJob || todayJobs[0]) && (() => {
+          const j = activeJob || todayJobs[0];
+          const cust = j.customerId ? getCustomer(j.customerId) : null;
+          const addr = j.address || (cust?.address ? `${cust.address}${cust.city ? `, ${cust.city}` : ''} ${cust.zip || ''}`.trim() : '');
+          const url = addr ? `https://maps.google.com/?q=${encodeURIComponent(addr)}` : null;
+          return url ? (
+            <a href={url} target="_blank" rel="noopener noreferrer" className="crew-quick-action">
+              <Navigation size={18} />
+              <span>Navigate</span>
+            </a>
+          ) : null;
+        })()}
+        {(activeJob || todayJobs[0]) && (() => {
+          const j = activeJob || todayJobs[0];
+          const cust = j.customerId ? getCustomer(j.customerId) : null;
+          return cust?.phone ? (
+            <a href={`tel:${cust.phone}`} className="crew-quick-action">
+              <Phone size={18} />
+              <span>Call</span>
+            </a>
+          ) : null;
+        })()}
+        {activeJob && (
+          <Link href={`/jobs/${activeJob.id}`} className="crew-quick-action crew-quick-action-primary">
+            <Zap size={18} />
+            <span>Job Page</span>
+          </Link>
+        )}
+      </div>
 
       {/* Today's Jobs */}
       <div className="crew-section-header">

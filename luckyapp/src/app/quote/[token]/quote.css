@@ -1,5 +1,21 @@
 /* Public quote page — mobile responsive */
-@media (max-width: 768px) {
+
+.quote-page-root,
+.quote-page-root * {
+  box-sizing: border-box;
+}
+
+.quote-page-root {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Tablet ── */
+@media (max-width: 900px) {
   .quote-grid {
     grid-template-columns: 1fr !important;
   }
@@ -14,6 +30,108 @@
   }
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* ── Mobile ── */
+@media (max-width: 640px) {
+  .quote-page-root {
+    padding: 12px 10px !important;
+  }
+
+  .quote-header {
+    padding: 14px 16px !important;
+    margin-bottom: 14px !important;
+    gap: 10px;
+    flex-wrap: wrap;
+    border-radius: 10px !important;
+  }
+  .quote-header .quote-brand-name { font-size: 15px !important; }
+  .quote-header .quote-brand-icon { font-size: 20px !important; }
+  .quote-header .quote-invoice-number { font-size: 15px !important; }
+  .quote-header .quote-invoice-label { font-size: 10px !important; }
+
+  .quote-details-card,
+  .quote-card-sticky {
+    padding: 16px !important;
+    border-radius: 10px !important;
+  }
+
+  .quote-meta-row {
+    flex-direction: column !important;
+    gap: 14px;
+    padding-bottom: 14px !important;
+    margin-bottom: 14px !important;
+  }
+  .quote-meta-row > div:last-child {
+    text-align: left !important;
+  }
+
+  .quote-items-table {
+    display: block;
+  }
+  .quote-items-table thead {
+    display: none;
+  }
+  .quote-items-table tbody {
+    display: block;
+  }
+  .quote-items-table tbody tr {
+    display: block;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: #fafaf8;
+  }
+  .quote-items-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0 !important;
+    border: 0 !important;
+    text-align: right !important;
+    font-size: 13px !important;
+  }
+  .quote-items-table tbody td:first-child {
+    text-align: left !important;
+    border-bottom: 1px solid #eee !important;
+    padding-bottom: 8px !important;
+    margin-bottom: 6px !important;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .quote-items-table tbody td:not(:first-child)::before {
+    content: attr(data-label);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+    font-weight: 600;
+  }
+
+  .quote-total-row {
+    font-size: 16px !important;
+  }
+
+  .quote-footer {
+    margin-top: 20px !important;
+    font-size: 11px !important;
+  }
+
+  .quote-panel-heading { font-size: 16px !important; }
+  .quote-deposit-box { padding: 12px !important; }
+  .quote-primary-btn,
+  .quote-secondary-btn {
+    padding: 14px 16px !important;
+    font-size: 14px !important;
+    min-height: 48px;
+  }
+}
+
+/* ── Very small phones ── */
+@media (max-width: 380px) {
+  .quote-page-root {
+    padding: 8px 8px !important;
+  }
+  .quote-header { padding: 12px 14px !important; }
+  .quote-details-card,
+  .quote-card-sticky { padding: 14px !important; }
 }

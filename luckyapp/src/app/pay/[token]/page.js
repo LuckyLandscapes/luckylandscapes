@@ -88,16 +88,16 @@ export default function PayPage({ params }) {
   const isCancelled = invoice.status === 'cancelled';
 
   return (
-    <div style={styles.page}>
+    <div style={styles.page} className="pay-page-root">
       <div style={styles.container}>
-        <header style={styles.header}>
+        <header style={styles.header} className="pay-header">
           <div style={styles.brand}>
-            <span style={styles.brandIcon}>🍀</span>
-            <span style={styles.brandName}>Lucky Landscapes</span>
+            <span style={styles.brandIcon} className="pay-brand-icon">🍀</span>
+            <span style={styles.brandName} className="pay-brand-name">Lucky Landscapes</span>
           </div>
           <div style={styles.headerRight}>
-            <div style={styles.invoiceLabel}>INVOICE</div>
-            <div style={styles.invoiceNumber}>{invoice.invoice_number}</div>
+            <div style={styles.invoiceLabel} className="pay-invoice-label">INVOICE</div>
+            <div style={styles.invoiceNumber} className="pay-invoice-number">{invoice.invoice_number}</div>
           </div>
         </header>
 
@@ -115,8 +115,8 @@ export default function PayPage({ params }) {
 
         <div style={styles.grid} className="pay-grid">
           {/* Left: Invoice details */}
-          <div style={styles.detailsCard}>
-            <div style={styles.metaRow}>
+          <div style={styles.detailsCard} className="pay-details-card">
+            <div style={styles.metaRow} className="pay-meta-row">
               <div>
                 <div style={styles.metaLabel}>Bill To</div>
                 <div style={styles.metaValue}>{customerName || '—'}</div>
@@ -137,7 +137,7 @@ export default function PayPage({ params }) {
               </div>
             </div>
 
-            <table style={styles.itemsTable}>
+            <table style={styles.itemsTable} className="pay-items-table">
               <thead>
                 <tr>
                   <th style={styles.th}>Description</th>
@@ -153,9 +153,9 @@ export default function PayPage({ params }) {
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
                       {item.description && <div style={styles.tdSub}>{item.description}</div>}
                     </td>
-                    <td style={{ ...styles.td, textAlign: 'center' }}>{item.quantity || 1}</td>
-                    <td style={{ ...styles.td, textAlign: 'right' }}>{formatUSD(item.unitPrice || item.unit_price)}</td>
-                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }}>{formatUSD(item.total)}</td>
+                    <td style={{ ...styles.td, textAlign: 'center' }} data-label="Qty">{item.quantity || 1}</td>
+                    <td style={{ ...styles.td, textAlign: 'right' }} data-label="Price">{formatUSD(item.unitPrice || item.unit_price)}</td>
+                    <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} data-label="Total">{formatUSD(item.total)}</td>
                   </tr>
                 ))}
                 {items.length === 0 && (
@@ -169,7 +169,7 @@ export default function PayPage({ params }) {
               {Number(invoice.tax) > 0 && <div style={styles.totalRow}><span>Tax</span><span>{formatUSD(invoice.tax)}</span></div>}
               <div style={styles.totalRow}><span>Total</span><span>{formatUSD(invoice.total)}</span></div>
               {Number(invoice.amount_paid) > 0 && <div style={{ ...styles.totalRow, color: '#2d7a3a' }}><span>Paid</span><span>−{formatUSD(invoice.amount_paid)}</span></div>}
-              <div style={styles.balanceRow}><span>Balance Due</span><span>{formatUSD(balance)}</span></div>
+              <div style={styles.balanceRow} className="pay-balance-row"><span>Balance Due</span><span>{formatUSD(balance)}</span></div>
             </div>
 
             {invoice.notes && (
@@ -181,7 +181,7 @@ export default function PayPage({ params }) {
           </div>
 
           {/* Right: Payment form */}
-          <div style={styles.payCard} className="pay-card-sticky">
+          <div style={styles.payCard} className="pay-card-sticky pay-pay-card">
             {isPaid || isCancelled ? (
               <div style={{ textAlign: 'center', padding: '40px 20px' }}>
                 <div style={{ fontSize: 48 }}>{isPaid ? '✓' : '—'}</div>
@@ -212,7 +212,7 @@ export default function PayPage({ params }) {
           </div>
         </div>
 
-        <footer style={styles.footer}>
+        <footer style={styles.footer} className="pay-footer">
           <div>Lucky Landscapes • (402) 405-5475 • rileykopf@luckylandscapes.com</div>
           <div style={{ marginTop: 4 }}>109 South Canopy ST, Lincoln, NE</div>
           <div style={{ marginTop: 12, fontSize: 11, color: '#aaa' }}>Secured by Stripe</div>
@@ -281,7 +281,7 @@ function PaymentForm({ balance, invoiceNumber, customerEmail }) {
         <div style={{ fontSize: 12, color: '#666', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
           Amount Due
         </div>
-        <div style={{ fontSize: 32, fontWeight: 800, color: '#1f6f3a' }}>{formatUSD(balance)}</div>
+        <div style={{ fontSize: 32, fontWeight: 800, color: '#1f6f3a' }} className="pay-amount-due">{formatUSD(balance)}</div>
       </div>
 
       <PaymentElement options={{ layout: 'tabs' }} />
