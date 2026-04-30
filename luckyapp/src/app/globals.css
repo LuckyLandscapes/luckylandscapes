@@ -1791,6 +1791,26 @@ body {
   height: 100%;
 }
 
+.measure-pano-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: none;
+}
+
+.measure-stage.split-streetview .measure-map-canvas {
+  inset: 0 0 50% 0;
+  height: auto;
+}
+
+.measure-stage.split-streetview .measure-pano-canvas {
+  display: block;
+  inset: 50% 0 0 0;
+  height: auto;
+  border-top: 2px solid var(--lucky-green-light, #7dd87d);
+}
+
 /* ============================================
    Tablet Breakpoint (1024px)
    ============================================ */
@@ -2162,6 +2182,11 @@ body {
   .measure-maptype-btn {
     bottom: 76px; /* clear of sheet handle */
     left: 8px;
+  }
+
+  .measure-streetview-btn {
+    bottom: 76px;
+    left: 122px;
   }
 
   /* --- Dashboard two-column layout --- */
@@ -2669,6 +2694,37 @@ body {
 
 .measure-maptype-btn:hover {
   background: var(--overlay-hover);
+}
+
+/* --- Street View toggle (sits next to the map type pill) --- */
+.measure-streetview-btn {
+  position: absolute;
+  bottom: 28px;
+  left: 130px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  color: var(--text-primary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.measure-streetview-btn:hover {
+  background: var(--overlay-hover);
+}
+
+.measure-streetview-btn.active {
+  background: var(--lucky-green, #2d7a3a);
+  border-color: var(--lucky-green-light, #7dd87d);
+  color: #fff;
 }
 
 /* --- Active customer pill (top-right, sits under zoom control) --- */

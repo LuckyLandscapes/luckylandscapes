@@ -5,7 +5,7 @@ import { useData } from '@/lib/data';
 import {
   Ruler, Search, Trash2, Copy, MapPin, CheckCircle, Layers, X, SquareIcon,
   Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp,
-  Eye, EyeOff, Save, FolderOpen, User, Spline,
+  Eye, EyeOff, Save, FolderOpen, User, Spline, PersonStanding,
 } from 'lucide-react';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
@@ -84,6 +84,8 @@ export default function MeasurePage() {
   const projectionOverlayRef = useRef(null); // for screen→latlng during freehand
   const freehandStateRef = useRef(null);
   const mapTypeRef = useRef('satellite');
+  const panoRef = useRef(null);
+  const panoInstanceRef = useRef(null);
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [shapes, setShapes] = useState([]); // [{id, kind, sqft, label, hidden}]
@@ -99,6 +101,7 @@ export default function MeasurePage() {
   const [activeCustomerId, setActiveCustomerId] = useState(null);
   const [isDirty, setIsDirty] = useState(false);
   const [mapTypeId, setMapTypeId] = useState('satellite');
+  const [streetViewActive, setStreetViewActive] = useState(false);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -467,6 +470,46 @@ export default function MeasurePage() {
     setIsDirty(true);
   }, [clearAllShapesOnly]);
 
+  // ---- Street View toggle (split pane: map on top, panorama on bottom) ----
+  const toggleStreetView = useCallback(() => {
+    const map = mapInstanceRef.current;
+    if (!map || !panoRef.current) return;
+    const g = window.google.maps;
+
+    if (!panoInstanceRef.current) {
+      const pano = new g.StreetViewPanorama(panoRef.current, {
+        position: map.getCenter(),
+        pov: { heading: 0, pitch: 0 },
+        zoom: 1,
+        addressControl: true,
+        fullscreenControl: false,
+        motionTracking: false,
+        motionTrackingControl: false,
+        enableCloseButton: false,
+      });
+      panoInstanceRef.current = pano;
+      // Linking the pano lets the pegman position arrow appear on the map.
+      map.setStreetView(pano);
+      g.event.addListener(pano, 'visible_changed', () => {
+        setStreetViewActive(pano.getVisible());
+      });
+    }
+
+    const center = map.getCenter();
+    const next = !streetViewActive;
+    if (next) {
+      panoInstanceRef.current.setPosition(center);
+      panoInstanceRef.current.setVisible(true);
+    } else {
+      panoInstanceRef.current.setVisible(false);
+    }
+    // Recenter map after the layout flip so the user's view stays anchored.
+    requestAnimationFrame(() => {
+      g.event.trigger(map, 'resize');
+      if (center) map.setCenter(center);
+    });
+  }, [streetViewActive]);
+
   // ---- Map type toggle (replaces Google's mapTypeControl that we hid) ----
   const cycleMapType = useCallback(() => {
     const types = ['satellite', 'hybrid', 'roadmap'];
@@ -732,8 +775,9 @@ export default function MeasurePage() {
 
   return (
     <div className="measure-page page animate-fade-in">
-      <div className="measure-stage">
+      <div className={`measure-stage ${streetViewActive ? 'split-streetview' : ''}`}>
         <div ref={mapRef} className="measure-map-canvas" />
+        <div ref={panoRef} className="measure-pano-canvas" />
 
         {/* Top-left: search */}
         <div className="measure-search-bar">
@@ -859,6 +903,16 @@ export default function MeasurePage() {
         <button className="measure-maptype-btn" onClick={cycleMapType} title="Cycle map type">
           <Layers size={14} />
           <span>{mapTypeId === 'satellite' ? 'Satellite' : mapTypeId === 'hybrid' ? 'Hybrid' : 'Map'}</span>
+        </button>
+
+        {/* Street View toggle — opens a split panorama beneath the map */}
+        <button
+          className={`measure-streetview-btn ${streetViewActive ? 'active' : ''}`}
+          onClick={toggleStreetView}
+          title={streetViewActive ? 'Hide street view' : 'Show street view'}
+        >
+          <PersonStanding size={14} />
+          <span>{streetViewActive ? 'Hide SV' : 'Street View'}</span>
         </button>
 
         {/* Floating toolbar */}
