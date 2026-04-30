@@ -66,25 +66,74 @@ const inRange = (dateStr, start, end) => {
 
 // ─── Labor cost ─────────────────────────────────────────────
 // Sum (paid hours × rate) across entries. Breaks are subtracted (unpaid).
-export function laborCostForEntries(entries, teamMembers) {
+//
+// Segment-aware: when timeSegments are passed AND a given entry has
+// segments, paid hours = sum of (job + travel) segment durations. Falls
+// back to (clock_out - clock_in - break_minutes) for legacy entries
+// without segments.
+export function laborCostForEntries(entries, teamMembers, timeSegments = []) {
   let total = 0;
   for (const t of entries) {
     if (!t.clockIn || !t.clockOut) continue;
     const member = teamMembers.find(m => m.id === t.teamMemberId);
     const rate = Number(member?.hourlyRate || 0);
-    const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
-    const breakHrs = Number(t.breakMinutes || 0) / 60;
-    total += rate * Math.max(0, totalHours - breakHrs);
+    const segs = timeSegments.filter(s => s.timeEntryId === t.id);
+    let paidHours;
+    if (segs.length > 0) {
+      const paidMins = segs
+        .filter(s => s.kind !== 'break')
+        .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+      paidHours = paidMins / 60;
+    } else {
+      const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
+      const breakHrs = Number(t.breakMinutes || 0) / 60;
+      paidHours = Math.max(0, totalHours - breakHrs);
+    }
+    total += rate * paidHours;
   }
   return total;
 }
 
+// ─── Labor cost attributed to a specific job ────────────────
+// Uses 'job'-kind segments when available (lets one shift split labor across
+// multiple properties accurately). Falls back to the legacy time_entry.job_id
+// model for entries without segments.
+export function laborCostForJob(jobId, timeEntries, teamMembers, timeSegments = []) {
+  let total = 0;
+
+  // 1. Segment-attributed labor
+  for (const seg of timeSegments) {
+    if (seg.kind !== 'job' || seg.jobId !== jobId) continue;
+    if (!seg.endedAt) continue; // skip in-progress segments
+    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+    if (!entry) continue;
+    const member = teamMembers.find(m => m.id === (entry.teamMemberId || entry.memberId));
+    const rate = Number(member?.hourlyRate || 0);
+    total += rate * (Number(seg.durationMinutes || 0) / 60);
+  }
+
+  // 2. Legacy fallback: time_entries with this jobId AND no segments at all
+  const legacyEntries = timeEntries.filter(t =>
+    t.jobId === jobId && t.clockIn && t.clockOut &&
+    !timeSegments.some(s => s.timeEntryId === t.id)
+  );
+  total += laborCostForEntries(legacyEntries, teamMembers, []);
+  return total;
+}
+
 // ─── Per-job financials ─────────────────────────────────────
-export function jobFinancials(job, jobExpenses, timeEntries, teamMembers) {
+export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments = []) {
   if (!job) return null;
 
   const expenses = jobExpenses.filter(e => e.jobId === job.id);
-  const entries = timeEntries.filter(t => t.jobId === job.id && t.clockIn && t.clockOut);
+  // Entries we surface to the UI = any entry that touched this job (legacy
+  // jobId match) or any entry that has a 'job' segment for this job.
+  const entryIdsFromSegments = new Set(
+    timeSegments.filter(s => s.kind === 'job' && s.jobId === job.id).map(s => s.timeEntryId)
+  );
+  const entries = timeEntries.filter(t =>
+    (t.jobId === job.id || entryIdsFromSegments.has(t.id)) && t.clockIn && t.clockOut
+  );
 
   const byCategory = {};
   for (const cat of COGS_CATEGORIES) byCategory[cat] = 0;
@@ -96,7 +145,7 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers) {
   const materialCosts = byCategory.materials;
   const equipmentCosts = byCategory.equipment;
   const otherExpenses = byCategory.fuel + byCategory.dump_fees + byCategory.subcontractor + byCategory.permits + byCategory.other;
-  const laborCosts = laborCostForEntries(entries, teamMembers);
+  const laborCosts = laborCostForJob(job.id, timeEntries, teamMembers, timeSegments);
 
   const revenue = Number(job.revenue || job.total || 0);
   const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
@@ -121,7 +170,7 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers) {
 }
 
 // ─── P&L for a date range ───────────────────────────────────
-function pnlForRange({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, start, end, basis }) {
+function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, start, end, basis }) {
   // Revenue
   let revenue = 0;
   let revenueJobs = [];
@@ -146,16 +195,17 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, teamMembers, invoices, co
 
   for (const job of periodJobs) {
     const expenses = jobExpenses.filter(e => e.jobId === job.id);
-    const entries = timeEntries.filter(t => t.jobId === job.id && t.clockIn && t.clockOut);
     for (const e of expenses) {
       const cat = COGS_CATEGORIES.includes(e.category) ? e.category : 'other';
       cogsByCat[cat] += Number(e.amount || 0);
     }
-    directLabor += laborCostForEntries(entries, teamMembers);
+    directLabor += laborCostForJob(job.id, timeEntries, teamMembers, timeSegments);
   }
   const cogs = Object.values(cogsByCat).reduce((a, b) => a + b, 0) + directLabor;
 
-  // OpEx — company expenses dated in period + indirect labor (clock entries not tied to a job)
+  // OpEx — company expenses dated in period + indirect labor.
+  // With segments, "indirect labor" = travel-kind segments (driving/yard time).
+  // For legacy entries without segments, indirect = entries with no jobId.
   const opexByCat = {};
   for (const cat of OPEX_CATEGORIES) opexByCat[cat] = 0;
   for (const e of companyExpenses) {
@@ -163,8 +213,23 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, teamMembers, invoices, co
     const cat = OPEX_CATEGORIES.includes(e.category) ? e.category : 'other';
     opexByCat[cat] += Number(e.amount || 0);
   }
-  const indirectEntries = timeEntries.filter(t => !t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end));
-  const indirectLabor = laborCostForEntries(indirectEntries, teamMembers);
+
+  let indirectLabor = 0;
+  // Travel segments in the date range
+  for (const seg of timeSegments) {
+    if (seg.kind !== 'travel' || !seg.endedAt) continue;
+    if (!inRange(seg.startedAt, start, end)) continue;
+    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+    const member = teamMembers.find(m => m.id === (entry?.teamMemberId || entry?.memberId));
+    const rate = Number(member?.hourlyRate || 0);
+    indirectLabor += rate * (Number(seg.durationMinutes || 0) / 60);
+  }
+  // Legacy entries with no jobId AND no segments
+  const legacyIndirect = timeEntries.filter(t =>
+    !t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
+    !timeSegments.some(s => s.timeEntryId === t.id)
+  );
+  indirectLabor += laborCostForEntries(legacyIndirect, teamMembers, []);
   const opex = Object.values(opexByCat).reduce((a, b) => a + b, 0) + indirectLabor;
 
   const grossProfit = revenue - cogs;
@@ -184,9 +249,9 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, teamMembers, invoices, co
 }
 
 // Build full P&L plus prior-period comparison.
-export function buildPnL({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period = 'month', basis = 'completed' }) {
+export function buildPnL({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, period = 'month', basis = 'completed' }) {
   const { start, end, prevStart, prevEnd } = getPeriodRange(period);
-  const args = { jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, basis };
+  const args = { jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, basis };
   const current = pnlForRange({ ...args, start, end });
   const previous = pnlForRange({ ...args, start: prevStart, end: prevEnd });
   return { ...current, range: { start, end }, previous };

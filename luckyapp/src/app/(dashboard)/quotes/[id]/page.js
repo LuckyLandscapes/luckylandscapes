@@ -5,10 +5,11 @@ import { useData } from '@/lib/data';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateQuotePdf } from '@/lib/generateQuotePdf';
+import { buildContractFromQuote } from '@/lib/contractTemplate';
 import {
   ArrowLeft, Send, CheckCircle2, XCircle, Printer, Edit3, Trash2, X, AlertTriangle,
   Mail, Loader2, CheckCircle, AlertCircle, MessageSquare, Phone, CalendarDays,
-  Copy, ExternalLink,
+  Copy, ExternalLink, FileSignature,
 } from 'lucide-react';
 import ScheduleJobModal from '@/components/ScheduleJobModal';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
@@ -20,7 +21,7 @@ function formatCurrency(n) {
 export default function QuoteDetailPage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getQuote, getCustomer, updateQuote, deleteQuote, addActivity, jobs } = useData();
+  const { getQuote, getCustomer, updateQuote, deleteQuote, addActivity, jobs, contracts, addContract } = useData();
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [deleting, setDeleting] = useState(false);
@@ -36,6 +37,7 @@ export default function QuoteDetailPage() {
   const quote = getQuote(id);
   const customer = quote ? getCustomer(quote.customerId) : null;
   const linkedJob = quote ? jobs.find(j => j.quoteId === id) : null;
+  const linkedContract = quote ? (contracts || []).find(c => c.quoteId === id) : null;
   const depositAmount = quote ? (Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0)) : 0;
   const publicLink = quote?.publicToken && typeof window !== 'undefined'
     ? `${window.location.origin}/quote/${quote.publicToken}`
@@ -93,6 +95,27 @@ export default function QuoteDetailPage() {
     } catch (err) {
       console.error('PDF generation error:', err);
       showToast('error', err?.message || 'Could not generate the PDF. Try again.');
+    }
+  };
+
+  const handleGenerateContract = async () => {
+    if (linkedContract) {
+      router.push(`/contracts/${linkedContract.id}`);
+      return;
+    }
+    try {
+      const built = buildContractFromQuote({ quote, customer });
+      const created = await addContract({
+        ...built,
+        quoteId: quote.id,
+        customerId: quote.customerId,
+        status: 'draft',
+      });
+      showToast('success', `Contract #${created.contractNumber} generated`);
+      router.push(`/contracts/${created.id}`);
+    } catch (err) {
+      console.error('[generate contract] error:', err);
+      showToast('error', err?.message || 'Could not generate the contract. Try again.');
     }
   };
 
@@ -302,6 +325,15 @@ export default function QuoteDetailPage() {
           <button className="btn btn-secondary" onClick={handleGeneratePdf}>
             <Printer size={16} /> PDF
           </button>
+          {linkedContract ? (
+            <Link href={`/contracts/${linkedContract.id}`} className="btn btn-secondary">
+              <FileSignature size={16} /> Contract #{linkedContract.contractNumber}
+            </Link>
+          ) : (
+            <button className="btn btn-secondary" onClick={handleGenerateContract}>
+              <FileSignature size={16} /> Generate Contract
+            </button>
+          )}
           <Link href={`/quotes/${id}/edit`} className="btn btn-secondary">
             <Edit3 size={16} /> Edit
           </Link>
@@ -426,12 +458,15 @@ export default function QuoteDetailPage() {
             </div>
           )}
 
-          {/* Photos — uploaded by whoever takes the quote, visible to crew on the job */}
+          {/* Walkthrough media — photos / videos / voice memos with notes
+              captured during the customer walk-around. Stays with this
+              customer across future quotes; visible to the crew on the
+              linked job. */}
           <div className="card" style={{ marginTop: 'var(--space-md)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
-              <h4 style={{ margin: 0, color: 'var(--text-secondary)' }}>Site Photos</h4>
+              <h4 style={{ margin: 0, color: 'var(--text-secondary)' }}>Walkthrough Notes</h4>
               <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                Visible to the crew on the linked job
+                Photos · video · voice memos · visible to the crew
               </span>
             </div>
             <QuoteMediaGallery quoteId={id} />

@@ -5,6 +5,7 @@ import { useData } from '@/lib/data';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Plus, Trash2, Save, X } from 'lucide-react';
+import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -381,6 +382,31 @@ export default function EditQuotePage() {
           placeholder="Add any notes about this quote..."
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
+        />
+      </div>
+
+      {/* Walkthrough media — reference photos / videos / voice memos
+          while you build line items, or capture more in the moment.
+          The "Apply to Notes" button on the gallery's auto-generated
+          summary fills the Notes textarea above without clobbering
+          anything the user has already typed. */}
+      <div className="card" style={{ marginBottom: 'var(--space-xl)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
+          <h4 style={{ margin: 0, color: 'var(--text-secondary)' }}>Walkthrough Notes</h4>
+          <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+            What the customer asked for · stays with this customer across quotes
+          </span>
+        </div>
+        <QuoteMediaGallery
+          quoteId={id}
+          onApplySummary={(summary) => {
+            setNotes((prev) => {
+              const trimmed = (prev || '').trim();
+              if (!trimmed) return summary;
+              if (trimmed.includes(summary.trim())) return prev; // already there
+              return `${trimmed}\n\n${summary}`;
+            });
+          }}
         />
       </div>
 

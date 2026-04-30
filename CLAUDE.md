@@ -70,6 +70,9 @@ SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/
 ### Public payment links
 Invoice public-pay tokens are URL-safe hex generated via `window.crypto.getRandomValues` (with a Math.random fallback) — see `makeUrlSafeToken` in `data.js`. Migration `015_fix_public_token_url_safe.sql` exists because earlier tokens were not URL-safe; preserve the URL-safe property when changing token logic.
 
+### Time tracking — shift + segment model
+A "shift" is one `time_entries` row. Within the shift, the worker moves between `time_segments` of kind `'job' | 'travel' | 'break'`, recorded in real time. New API in [`src/lib/data.js`](luckyapp/src/lib/data.js): `startShift`, `switchSegment`, `endShift`, `annotateOpenSegment`. Legacy `clockIn` / `clockOut` are kept as wrappers — they still create a single shift but ALSO open a segment so segment-based job costing stays consistent. `time_entries.break_minutes` is recomputed as the sum of break-segment durations on `endShift`, so legacy payroll math keeps working. Per-job labor cost (in [`src/lib/finance.js`](luckyapp/src/lib/finance.js)) prefers `'job'`-kind segments when present, falling back to `time_entries.job_id` for entries without segments. Schema: [`024_time_segments.sql`](luckyapp/supabase/migrations/024_time_segments.sql).
+
 
 ## When finished with response
 Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.

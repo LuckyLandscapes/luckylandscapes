@@ -6,6 +6,7 @@ import { useData } from '@/lib/data';
 import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
+  HardHat, Truck, Coffee,
 } from 'lucide-react';
 
 function fmtDur(min) {
@@ -26,7 +27,7 @@ function fmtCurrency(n) {
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const { teamMembers, timeEntries, updateTeamMember, loadTeamMembers, deleteTimeEntry, addTeamMemberFromApi } = useData();
+  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, deleteTimeEntry, addTeamMemberFromApi } = useData();
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
@@ -56,25 +57,39 @@ export default function TeamPage() {
     return d;
   }, [dateRange]);
 
-  // Payroll data per member
+  // Payroll data per member.
+  //
+  // For paid hours we prefer SEGMENTS when an entry has them: paid = sum of
+  // (job + travel) durations. Falls back to the legacy
+  // (clock_out - clock_in - break_minutes) for entries logged before the
+  // segment system landed.
   const payrollData = useMemo(() => {
     return teamMembers.map(member => {
       const entries = timeEntries.filter(t =>
         t.teamMemberId === member.id && t.clockOut && new Date(t.clockIn) >= cutoffDate
       );
-      const totalMinutes = entries.reduce((sum, t) => {
-        // Compute from timestamps, then subtract break minutes (unpaid)
-        const shiftMins = computeDurationMinutes(t.clockIn, t.clockOut);
-        const breakMins = Number(t.breakMinutes || 0);
-        return sum + Math.max(0, (shiftMins || 0) - breakMins);
-      }, 0);
-      const totalBreakMinutes = entries.reduce((sum, t) => sum + Number(t.breakMinutes || 0), 0);
+      let totalMinutes = 0;
+      let totalBreakMinutes = 0;
+      for (const t of entries) {
+        const segs = (timeSegments || []).filter(s => s.timeEntryId === t.id);
+        if (segs.length > 0) {
+          const paidMins = segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+          const breakMins = segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+          totalMinutes += paidMins;
+          totalBreakMinutes += breakMins;
+        } else {
+          const shiftMins = computeDurationMinutes(t.clockIn, t.clockOut);
+          const breakMins = Number(t.breakMinutes || 0);
+          totalMinutes += Math.max(0, (shiftMins || 0) - breakMins);
+          totalBreakMinutes += breakMins;
+        }
+      }
       const totalHours = totalMinutes / 60;
       const totalPay = totalHours * (member.hourlyRate || 15);
       const activeEntry = timeEntries.find(t => t.teamMemberId === member.id && !t.clockOut);
       return { member, entries, totalMinutes, totalBreakMinutes, totalHours, totalPay, activeEntry };
     });
-  }, [teamMembers, timeEntries, cutoffDate]);
+  }, [teamMembers, timeEntries, timeSegments, cutoffDate]);
 
   const totalPayroll = payrollData.reduce((s, d) => s + d.totalPay, 0);
   const totalHours = payrollData.reduce((s, d) => s + d.totalHours, 0);
@@ -348,7 +363,7 @@ export default function TeamPage() {
                     <td colSpan={7} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-md)', borderTop:'1px solid var(--border-subtle)' }}>
                         <h4 style={{ margin:'0 0 var(--space-sm)', fontSize:'0.85rem' }}>Time Log — {member.fullName}</h4>
-                        <TimeLog memberId={member.id} timeEntries={timeEntries} />
+                        <TimeLog memberId={member.id} timeEntries={timeEntries} timeSegments={timeSegments} jobs={jobs} />
                       </div>
                     </td>
                   </tr>
@@ -449,8 +464,13 @@ export default function TeamPage() {
   );
 }
 
-// Sub-component: Time log for a member
-function TimeLog({ memberId, timeEntries }) {
+// Sub-component: Time log for a member.
+//
+// Each row is one shift (a closed time_entries row). Click to expand and see
+// the per-segment breakdown (job / travel / break) — that's the new audit
+// trail Riley uses when validating a paycheck.
+function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [] }) {
+  const [openRow, setOpenRow] = useState(null);
   const entries = timeEntries
     .filter(t => t.teamMemberId === memberId && t.clockOut)
     .sort((a,b) => new Date(b.clockIn) - new Date(a.clockIn))
@@ -462,14 +482,25 @@ function TimeLog({ memberId, timeEntries }) {
 
   return (
     <table style={{ width:'100%', fontSize:'0.82rem' }}>
-      <thead><tr><th>Date</th><th>In</th><th>Out</th><th>Shift</th><th>Break</th><th>Paid</th><th>Notes</th></tr></thead>
+      <thead><tr><th></th><th>Date</th><th>In</th><th>Out</th><th>Shift</th><th>Break</th><th>Paid</th><th>Notes</th></tr></thead>
       <tbody>
         {entries.map(e => {
+          const segs = timeSegments.filter(s => s.timeEntryId === e.id);
+          const hasSegs = segs.length > 0;
           const shiftMins = computeDurationMinutes(e.clockIn, e.clockOut);
-          const breakMins = Number(e.breakMinutes || 0);
-          const paidMins = Math.max(0, shiftMins - breakMins);
-          return (
-            <tr key={e.id}>
+          // Prefer segment math when available
+          const breakMins = hasSegs
+            ? segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
+            : Number(e.breakMinutes || 0);
+          const paidMins = hasSegs
+            ? segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
+            : Math.max(0, shiftMins - breakMins);
+          const isOpen = openRow === e.id;
+          return [
+            <tr key={e.id} style={{ cursor: hasSegs ? 'pointer' : 'default' }} onClick={() => hasSegs && setOpenRow(isOpen ? null : e.id)}>
+              <td style={{ color:'var(--text-tertiary)', width:18 }}>
+                {hasSegs ? (isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null}
+              </td>
               <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
               <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
               <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
@@ -479,8 +510,39 @@ function TimeLog({ memberId, timeEntries }) {
               </td>
               <td style={{ fontWeight:600 }}>{fmtDur(paidMins)}</td>
               <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
-            </tr>
-          );
+            </tr>,
+            hasSegs && isOpen && (
+              <tr key={`${e.id}-segs`}>
+                <td colSpan={8} style={{ padding:'0', background:'var(--bg-card)' }}>
+                  <div style={{ padding:'8px 16px 12px 38px' }}>
+                    {segs
+                      .slice()
+                      .sort((a,b) => new Date(a.startedAt) - new Date(b.startedAt))
+                      .map(s => {
+                        const job = s.jobId ? jobs.find(j => j.id === s.jobId) : null;
+                        const Icon = s.kind === 'job' ? HardHat : s.kind === 'travel' ? Truck : Coffee;
+                        const tint = s.kind === 'break' ? 'var(--lucky-gold)' : s.kind === 'travel' ? '#63b3ff' : 'var(--lucky-green-light)';
+                        const label = s.kind === 'job' ? (job?.title || 'Job') : s.kind === 'travel' ? 'Travel / Yard' : 'Break';
+                        return (
+                          <div key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', fontSize:'0.78rem' }}>
+                            <Icon size={12} style={{ color: tint, flexShrink:0 }} />
+                            <span style={{ minWidth:140, fontWeight:600 }}>{label}</span>
+                            <span style={{ color:'var(--text-tertiary)' }}>
+                              {new Date(s.startedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+                              {s.endedAt && <> → {new Date(s.endedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</>}
+                            </span>
+                            <span style={{ color:'var(--text-secondary)' }}>{fmtDur(Number(s.durationMinutes||0))}</span>
+                            {s.notes && (
+                              <span style={{ color:'var(--lucky-gold)', fontStyle:'italic', fontSize:'0.75rem' }}>{s.notes}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </td>
+              </tr>
+            ),
+          ];
         })}
       </tbody>
     </table>

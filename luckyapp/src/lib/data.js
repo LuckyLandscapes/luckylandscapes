@@ -68,6 +68,7 @@ export function DataProvider({ children }) {
   const [teamMembers, setTeamMembers] = useState([]);
   const [activity, setActivity] = useState([]);
   const [timeEntries, setTimeEntries] = useState([]);
+  const [timeSegments, setTimeSegments] = useState([]);
   const [jobMedia, setJobMedia] = useState([]);
   const [quoteMedia, setQuoteMedia] = useState([]);
   const [jobExpenses, setJobExpenses] = useState([]);
@@ -76,6 +77,7 @@ export function DataProvider({ children }) {
   const [invoices, setInvoices] = useState([]);
   const [companyExpenses, setCompanyExpenses] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -95,6 +97,7 @@ export function DataProvider({ children }) {
       setTeamMembers(loadLocal('team_members'));
       setActivity(loadLocal('activity'));
       setTimeEntries(loadLocal('time_entries'));
+      setTimeSegments(loadLocal('time_segments'));
       setJobMedia(loadLocal('job_media'));
       setQuoteMedia(loadLocal('quote_media'));
       setJobExpenses(loadLocal('job_expenses'));
@@ -103,6 +106,7 @@ export function DataProvider({ children }) {
       setInvoices(loadLocal('invoices'));
       setCompanyExpenses(loadLocal('company_expenses'));
       setPayments(loadLocal('payments'));
+      setContracts(loadLocal('contracts'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -111,7 +115,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -127,6 +131,8 @@ export function DataProvider({ children }) {
         supabase.from('company_expenses').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('payments').select('*').eq('org_id', orgId).order('paid_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('quote_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('time_segments').select('*').eq('org_id', orgId).order('started_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: null })),
+        supabase.from('contracts').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -144,6 +150,8 @@ export function DataProvider({ children }) {
       if (cexp?.data) setCompanyExpenses(snakeToCamel(cexp.data));
       if (pay?.data) setPayments(snakeToCamel(pay.data));
       if (qmed?.data) setQuoteMedia(snakeToCamel(qmed.data));
+      if (tseg?.data) setTimeSegments(snakeToCamel(tseg.data));
+      if (ctr?.data) setContracts(snakeToCamel(ctr.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -193,6 +201,10 @@ export function DataProvider({ children }) {
         supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(1000)
           .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId }))); });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_segments' }, () => {
+        supabase.from('time_segments').select('*').eq('org_id', orgId).order('started_at', { ascending: false }).limit(2000)
+          .then(({ data }) => { if (data) setTimeSegments(snakeToCamel(data)); });
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setInvoices(snakeToCamel(data)); });
@@ -209,6 +221,10 @@ export function DataProvider({ children }) {
         supabase.from('quote_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setQuoteMedia(snakeToCamel(data)); });
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
+        supabase.from('contracts').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
+          .then(({ data }) => { if (data) setContracts(snakeToCamel(data)); });
+      })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -221,11 +237,13 @@ export function DataProvider({ children }) {
   const getTeamMember = useCallback((id) => teamMembers.find(m => m.id === id) || null, [teamMembers]);
   const getInvoice = useCallback((id) => invoices.find(i => i.id === id) || null, [invoices]);
   const getInvoicePayments = useCallback((invId) => payments.filter(p => p.invoiceId === invId), [payments]);
+  const getContract = useCallback((id) => contracts.find(c => c.id === id) || null, [contracts]);
 
   // Customer-scoped getters (used by customer detail page)
   const getCustomerQuotes = useCallback((custId) => quotes.filter(q => q.customerId === custId), [quotes]);
   const getCustomerJobs = useCallback((custId) => jobs.filter(j => j.customerId === custId), [jobs]);
   const getCustomerActivity = useCallback((custId) => activity.filter(a => a.customerId === custId), [activity]);
+  const getCustomerContracts = useCallback((custId) => contracts.filter(c => c.customerId === custId), [contracts]);
 
   // ─── Customer CRUD ──────────────────────────────────────
   const addCustomer = useCallback(async (data) => {
@@ -370,6 +388,60 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // ─── Contract CRUD ──────────────────────────────────────
+  // Contracts are normally generated from a quote via the contractTemplate
+  // helper, but the raw add/update/delete are kept generic so the same
+  // table can power standalone agreements (e.g. seasonal maintenance).
+  const addContract = useCallback(async (data) => {
+    const maxNum = contracts.reduce((max, c) => Math.max(max, c.contractNumber || 0), 1000);
+    const nextContractNumber = maxNum + 1;
+    const publicToken = data.publicToken || makeUrlSafeToken();
+    const payload = { ...data, publicToken, contractNumber: nextContractNumber, status: data.status || 'draft' };
+
+    if (connected) {
+      const dbPayload = { ...camelToSnake(payload), org_id: orgId };
+      if (!dbPayload.id) delete dbPayload.id;
+      const { data: row, error } = await supabase.from('contracts')
+        .insert(dbPayload)
+        .select().single();
+      if (error) {
+        console.error('[addContract] Supabase error:', JSON.stringify(error, null, 2));
+        throw error;
+      }
+      const c = snakeToCamel(row);
+      setContracts(prev => [c, ...prev]);
+      return c;
+    } else {
+      const c = { ...payload, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setContracts(prev => { const next = [c, ...prev]; saveLocal('contracts', next); return next; });
+      return c;
+    }
+  }, [connected, orgId, contracts]);
+
+  const updateContract = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('contracts').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setContracts(prev => {
+      const next = prev.map(c => c.id === id ? { ...c, ...data } : c);
+      if (!connected) saveLocal('contracts', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteContract = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('contracts').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setContracts(prev => {
+      const next = prev.filter(c => c.id !== id);
+      if (!connected) saveLocal('contracts', next);
+      return next;
+    });
+  }, [connected]);
+
   // ─── Quote Media ───────────────────────────────────────
   // Photos are customer-anchored: every photo carries both the
   // originating quote_id (for cleanup-eligibility decisions) AND
@@ -385,13 +457,22 @@ export function DataProvider({ children }) {
     return quoteMedia.filter(m => m.quoteId === quoteId);
   }, [quoteMedia, quotes]);
 
-  const addQuoteMedia = useCallback(async ({ quoteId, filePath, fileUrl, fileSize, caption = '' }) => {
+  const addQuoteMedia = useCallback(async ({
+    quoteId, filePath, fileUrl, fileSize,
+    mediaType = 'image',
+    durationSeconds = null,
+    transcript = null,
+    caption = '',
+  }) => {
     const q = quotes.find(x => x.id === quoteId);
     const payload = {
       quoteId,
       customerId: q?.customerId || null,
       filePath, fileUrl,
       fileSize: fileSize || 0,
+      mediaType,
+      durationSeconds,
+      transcript,
       caption,
       pinned: false,
       uploadedBy: user?.id || null,
@@ -427,6 +508,25 @@ export function DataProvider({ children }) {
       return next;
     });
   }, [connected, quoteMedia]);
+
+  // Inline edit of the caption / transcript on a media item.
+  // Used for the Jobber-style "what the customer asked for" notes
+  // beneath each photo / video / voice memo.
+  const updateQuoteMediaCaption = useCallback(async (id, fields) => {
+    const updates = {};
+    if (fields.caption !== undefined)    updates.caption = fields.caption;
+    if (fields.transcript !== undefined) updates.transcript = fields.transcript;
+    if (Object.keys(updates).length === 0) return;
+    if (connected) {
+      const { error } = await supabase.from('quote_media').update(camelToSnake(updates)).eq('id', id);
+      if (error) throw error;
+    }
+    setQuoteMedia(prev => {
+      const next = prev.map(m => m.id === id ? { ...m, ...updates } : m);
+      if (!connected) saveLocal('quote_media', next);
+      return next;
+    });
+  }, [connected]);
 
   // Toggle the pinned flag — pinned photos are exempt from the
   // 30-day cleanup, so the user can hold onto important "before"
@@ -590,51 +690,148 @@ export function DataProvider({ children }) {
     }
   }, [connected, orgId]);
 
-  // ─── Time Entries ───────────────────────────────────────
-  const clockIn = useCallback(async (memberId, jobId = null) => {
+  // ─── Time Tracking (Shifts + Segments) ──────────────────
+  // A "shift" = one time_entries row spanning the worker's day.
+  // Within the shift, the worker moves between SEGMENTS:
+  //   - 'job'    paid, attributed to a specific job (used for job costing)
+  //   - 'travel' paid, indirect labor (driving, yard, loading)
+  //   - 'break'  unpaid, real-time start/stop (no more retroactive guessing)
+  //
+  // The legacy `clockIn(memberId, jobId)` / `clockOut(id)` API is kept as a
+  // thin wrapper so older code paths (e.g. job-detail manual logging) keep
+  // working. New worker UX should call startShift / switchSegment / endShift.
+
+  async function insertSegment({ memberId, timeEntryId, kind, jobId = null, notes = '' }) {
+    const startedAt = new Date().toISOString();
     if (connected) {
-      // DB column is `member_id`, not `team_member_id`, so build the payload explicitly
       const payload = {
         org_id: orgId,
         member_id: memberId,
-        clock_in: new Date().toISOString(),
+        time_entry_id: timeEntryId,
         job_id: jobId || null,
+        kind,
+        started_at: startedAt,
+        notes: notes || '',
       };
-      const { data: row, error } = await supabase.from('time_entries')
-        .insert(payload)
-        .select().single();
+      const { data: row, error } = await supabase.from('time_segments').insert(payload).select().single();
       if (error) throw error;
-      const te = snakeToCamel(row);
-      // Normalize: DB returns `memberId` (from `member_id`), frontend expects `teamMemberId`
-      te.teamMemberId = te.memberId;
-      setTimeEntries(prev => [te, ...prev]);
-      return te;
+      const seg = snakeToCamel(row);
+      setTimeSegments(prev => [seg, ...prev]);
+      return seg;
     } else {
-      const te = {
+      const seg = {
         id: crypto.randomUUID(),
         orgId,
-        teamMemberId: memberId,
-        memberId: memberId,
-        clockIn: new Date().toISOString(),
+        memberId,
+        timeEntryId,
         jobId: jobId || null,
+        kind,
+        startedAt,
+        endedAt: null,
+        durationMinutes: null,
+        notes: notes || '',
+        createdAt: startedAt,
       };
-      setTimeEntries(prev => { const next = [te, ...prev]; saveLocal('time_entries', next); return next; });
-      return te;
+      setTimeSegments(prev => { const next = [seg, ...prev]; saveLocal('time_segments', next); return next; });
+      return seg;
     }
+  }
+
+  async function closeSegment(segmentId, updates = {}) {
+    const seg = timeSegments.find(s => s.id === segmentId);
+    if (!seg) return null;
+    const endedAt = new Date().toISOString();
+    const duration = Math.max(0, Math.round((new Date(endedAt) - new Date(seg.startedAt)) / 60000));
+    const patch = { endedAt, durationMinutes: duration, ...updates };
+    if (connected) {
+      const { error } = await supabase.from('time_segments').update(camelToSnake(patch)).eq('id', segmentId);
+      if (error) throw error;
+    }
+    setTimeSegments(prev => {
+      const next = prev.map(s => s.id === segmentId ? { ...s, ...patch } : s);
+      if (!connected) saveLocal('time_segments', next);
+      return next;
+    });
+    return { ...seg, ...patch };
+  }
+
+  // Open a shift + an initial segment.
+  const startShift = useCallback(async (memberId, { jobId = null, kind = null, notes = '' } = {}) => {
+    const segKind = kind || (jobId ? 'job' : 'travel');
+    const clockInAt = new Date().toISOString();
+    let entry;
+    if (connected) {
+      const payload = { org_id: orgId, member_id: memberId, clock_in: clockInAt, job_id: jobId || null };
+      const { data: row, error } = await supabase.from('time_entries').insert(payload).select().single();
+      if (error) throw error;
+      entry = snakeToCamel(row);
+      entry.teamMemberId = entry.memberId;
+      setTimeEntries(prev => [entry, ...prev]);
+    } else {
+      entry = {
+        id: crypto.randomUUID(), orgId,
+        teamMemberId: memberId, memberId,
+        clockIn: clockInAt, jobId: jobId || null,
+      };
+      setTimeEntries(prev => { const next = [entry, ...prev]; saveLocal('time_entries', next); return next; });
+    }
+    const seg = await insertSegment({ memberId, timeEntryId: entry.id, kind: segKind, jobId, notes });
+    return { entry, segment: seg };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connected, orgId]);
 
-  const clockOut = useCallback(async (entryId) => {
-    const now = new Date().toISOString();
+  // Close the current open segment and open a new one.
+  const switchSegment = useCallback(async (timeEntryId, { kind, jobId = null, notes = '' } = {}) => {
+    const entry = timeEntries.find(t => t.id === timeEntryId);
+    if (!entry) return null;
+    const memberId = entry.memberId || entry.teamMemberId;
+    const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
+    if (open) await closeSegment(open.id);
+    const seg = await insertSegment({ memberId, timeEntryId, kind, jobId, notes });
+    return seg;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connected, timeEntries, timeSegments]);
+
+  // Close any open segment, set clock_out, roll up break minutes onto the entry.
+  const endShift = useCallback(async (timeEntryId, { notes = '' } = {}) => {
+    const entry = timeEntries.find(t => t.id === timeEntryId);
+    if (!entry) return null;
+    const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
+    let closedOpen = null;
+    if (open) closedOpen = await closeSegment(open.id, notes ? { notes } : {});
+
+    const segsForEntry = timeSegments
+      .map(s => (closedOpen && s.id === closedOpen.id ? closedOpen : s))
+      .filter(s => s.timeEntryId === timeEntryId);
+    const breakMins = segsForEntry
+      .filter(s => s.kind === 'break')
+      .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+
+    const clockOutAt = new Date().toISOString();
     if (connected) {
-      const { error } = await supabase.from('time_entries').update({ clock_out: now }).eq('id', entryId);
+      const { error } = await supabase.from('time_entries')
+        .update({ clock_out: clockOutAt, break_minutes: breakMins })
+        .eq('id', timeEntryId);
       if (error) throw error;
     }
     setTimeEntries(prev => {
-      const next = prev.map(t => t.id === entryId ? { ...t, clockOut: now } : t);
+      const next = prev.map(t => t.id === timeEntryId ? { ...t, clockOut: clockOutAt, breakMinutes: breakMins } : t);
       if (!connected) saveLocal('time_entries', next);
       return next;
     });
-  }, [connected]);
+    return { clockOut: clockOutAt, breakMinutes: breakMins };
+  }, [connected, timeEntries, timeSegments]);
+
+  // ─── Legacy wrappers ────────────────────────────────────
+  // Older callers (job-detail manual logging, payroll edits) still use these.
+  // They preserve original behavior but DO open a segment so segment-based
+  // reporting stays consistent across the app.
+  const clockIn = useCallback(async (memberId, jobId = null) => {
+    const { entry } = await startShift(memberId, { jobId });
+    return entry;
+  }, [startShift]);
+
+  const clockOut = useCallback(async (entryId) => endShift(entryId), [endShift]);
 
   const updateTimeEntry = useCallback(async (id, data) => {
     if (connected) {
@@ -650,15 +847,41 @@ export function DataProvider({ children }) {
 
   const deleteTimeEntry = useCallback(async (id) => {
     if (connected) {
+      // time_segments.time_entry_id is ON DELETE CASCADE — no explicit cleanup.
       const { error } = await supabase.from('time_entries').delete().eq('id', id);
       if (error) throw error;
     }
+    setTimeSegments(prev => {
+      const next = prev.filter(s => s.timeEntryId !== id);
+      if (!connected) saveLocal('time_segments', next);
+      return next;
+    });
     setTimeEntries(prev => {
       const next = prev.filter(t => t.id !== id);
       if (!connected) saveLocal('time_entries', next);
       return next;
     });
   }, [connected]);
+
+  // Append a note to the worker's currently-open segment. Used by the blocker
+  // chips so the issue is attached to the moment it happened, not day's end.
+  const annotateOpenSegment = useCallback(async (timeEntryId, note) => {
+    const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
+    if (!open) return null;
+    const trimmed = String(note || '').trim();
+    if (!trimmed) return null;
+    const merged = open.notes ? `${open.notes}\n${trimmed}` : trimmed;
+    if (connected) {
+      const { error } = await supabase.from('time_segments').update({ notes: merged }).eq('id', open.id);
+      if (error) throw error;
+    }
+    setTimeSegments(prev => {
+      const next = prev.map(s => s.id === open.id ? { ...s, notes: merged } : s);
+      if (!connected) saveLocal('time_segments', next);
+      return next;
+    });
+    return merged;
+  }, [connected, timeSegments]);
 
   // ─── Job Expenses ──────────────────────────────────────
   const addJobExpense = useCallback(async (data) => {
@@ -711,12 +934,12 @@ export function DataProvider({ children }) {
   // ─── Financial Helpers ─────────────────────────────────
   const getJobFinancials = useCallback((jobId) => {
     const job = jobs.find(j => j.id === jobId);
-    return computeJobFinancials(job, jobExpenses, timeEntries, teamMembers);
-  }, [jobs, jobExpenses, timeEntries, teamMembers]);
+    return computeJobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments);
+  }, [jobs, jobExpenses, timeEntries, teamMembers, timeSegments]);
 
   const getPnL = useCallback((period = 'month', basis = 'completed') =>
-    computeBuildPnL({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis }),
-    [jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses]);
+    computeBuildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis }),
+    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses]);
 
   const getARAging = useCallback(() => computeARAging(invoices), [invoices]);
 
@@ -1009,21 +1232,24 @@ export function DataProvider({ children }) {
   const value = {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
-    activity, timeEntries, jobMedia, jobExpenses, materials,
+    activity, timeEntries, timeSegments, jobMedia, jobExpenses, materials,
     services, invoices, companyExpenses, payments, loading,
-    quoteMedia,
+    quoteMedia, contracts,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
-    getInvoicePayments, getQuoteMedia,
-    getCustomerQuotes, getCustomerJobs, getCustomerActivity,
+    getInvoicePayments, getQuoteMedia, getContract,
+    getCustomerQuotes, getCustomerJobs, getCustomerActivity, getCustomerContracts,
 
     // Customers
     addCustomer, updateCustomer, deleteCustomer,
 
     // Quotes
     addQuote, updateQuote, deleteQuote,
-    addQuoteMedia, deleteQuoteMedia, togglePinQuoteMedia,
+    addQuoteMedia, deleteQuoteMedia, togglePinQuoteMedia, updateQuoteMediaCaption,
+
+    // Contracts
+    addContract, updateContract, deleteContract,
 
     // Jobs
     addJob, updateJob, deleteJob, convertQuoteToJob,
@@ -1034,7 +1260,9 @@ export function DataProvider({ children }) {
     // Activity
     addActivity,
 
-    // Time
+    // Time — new shift+segment API
+    startShift, endShift, switchSegment, annotateOpenSegment,
+    // Time — legacy aliases (kept so existing callers don't break)
     clockIn, clockOut, updateTimeEntry, deleteTimeEntry,
 
     // Expenses & Financials

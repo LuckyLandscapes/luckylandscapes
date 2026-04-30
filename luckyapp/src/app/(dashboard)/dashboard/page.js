@@ -8,6 +8,7 @@ import {
   DollarSign, FileText, Users, TrendingUp, Plus, ArrowRight,
   Clock, CheckCircle2, Send, AlertCircle, HardHat, Briefcase,
   CalendarDays, Receipt, MapPin, ChevronRight, BarChart3,
+  Coffee, Truck,
 } from 'lucide-react';
 import { fmtCurrency as formatCurrency } from '@/lib/finance';
 
@@ -55,7 +56,7 @@ const activityColors = {
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { customers, quotes, activity, teamMembers, timeEntries, jobs, invoices, getPnL, getCustomer } = useData();
+  const { customers, quotes, activity, teamMembers, timeEntries, timeSegments, jobs, invoices, getPnL, getCustomer } = useData();
 
   const firstName = user?.fullName?.split(' ')[0] || 'there';
   const hour = new Date().getHours();
@@ -75,6 +76,18 @@ export default function DashboardPage() {
   // Crew stats
   const clockedInWorkers = timeEntries.filter(t => !t.clockOut).length;
   const activeWorkers = teamMembers.filter(m => m.role === 'worker' && m.isActive).length;
+
+  // Live crew snapshot — for each open shift, pull the open segment so we
+  // know whether each worker is on a job, traveling, or on break right now.
+  const liveCrew = useMemo(() => {
+    const openShifts = timeEntries.filter(t => !t.clockOut);
+    return openShifts.map(shift => {
+      const member = teamMembers.find(m => m.id === shift.teamMemberId);
+      const openSeg = (timeSegments || []).find(s => s.timeEntryId === shift.id && !s.endedAt);
+      const job = openSeg?.jobId ? jobs.find(j => j.id === openSeg.jobId) : null;
+      return { shift, member, openSeg, job };
+    });
+  }, [timeEntries, timeSegments, teamMembers, jobs]);
 
   // Invoice stats (all-time outstanding A/R)
   const unpaidInvoices = invoices.filter(i => i.status === 'unpaid' || i.status === 'overdue');
@@ -155,6 +168,51 @@ export default function DashboardPage() {
           <div className="stat-card-label">{unpaidInvoices.length} Unpaid Invoice{unpaidInvoices.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
+
+      {/* Live Crew — only when at least one worker is on the clock */}
+      {liveCrew.length > 0 && (
+        <div className="card live-crew" style={{ marginBottom: 'var(--space-md)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <span className="live-crew-pulse" />
+              Live Crew
+              <span style={{ background: 'var(--lucky-green-glow)', color: 'var(--lucky-green-light)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.72rem', fontWeight: 700 }}>
+                {liveCrew.length} on clock
+              </span>
+            </h3>
+            <Link href="/team" className="btn btn-ghost btn-sm">Team <ArrowRight size={14} /></Link>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+            {liveCrew.map(({ shift, member, openSeg, job }) => {
+              const initials = member?.fullName ? member.fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '??';
+              const kind = openSeg?.kind || 'job';
+              const Icon = kind === 'break' ? Coffee : kind === 'travel' ? Truck : HardHat;
+              const tint = kind === 'break' ? 'var(--lucky-gold)' : kind === 'travel' ? '#63b3ff' : 'var(--lucky-green-light)';
+              const startedAt = openSeg?.startedAt || shift.clockIn;
+              const elapsed = Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 60000));
+              const elapsedStr = elapsed >= 60 ? `${Math.floor(elapsed/60)}h ${elapsed%60}m` : `${elapsed}m`;
+              const label = kind === 'break' ? 'On break' : kind === 'travel' ? 'Travel / Yard' : (job?.title || 'On the clock');
+              return (
+                <div key={shift.id} className="live-crew-card" style={{ borderLeft: `3px solid ${tint}` }}>
+                  <div className="live-crew-avatar" style={{ background: tint }}>{initials}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.82rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {member?.fullName || 'Unknown'}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      <Icon size={11} style={{ color: tint, flexShrink: 0 }} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textAlign: 'right', flexShrink: 0 }}>
+                    {elapsedStr}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Today's Schedule + Quick Actions */}
       <div className="dashboard-two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>

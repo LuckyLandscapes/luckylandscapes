@@ -1,516 +1,689 @@
 'use client';
 
+// ─── Crew "Today Cockpit" ─────────────────────────────────────
+// One screen per worker, mobile-first. The shift state machine drives a single
+// big primary action button:
+//
+//   OFF       → "Start Shift" (picks first job, or starts as Travel/Yard)
+//   ON_JOB    → split actions: "Take Break", "Switch Job", "End Shift"
+//   ON_TRAVEL → split actions: "Arrive at Job", "Take Break", "End Shift"
+//   ON_BREAK  → "End Break"
+//
+// Breaks are recorded in real time (not estimated retroactively at clock-out).
+// Job time is captured per segment, so a 3-property day produces 3 job-attributed
+// labor blocks instead of one lumped together.
+
 import { useState, useMemo, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import Link from 'next/link';
 import {
-  Clock,
-  MapPin,
-  Phone,
-  Mail,
-  CalendarDays,
-  Briefcase,
-  Timer,
-  Flag,
-  FileText,
-  Navigation,
-  ChevronRight,
-  HardHat,
-  CheckCircle2,
-  Coffee,
-  X,
-  AlertCircle,
-  Award,
-  Sun,
-  CloudRain,
-  Cloud,
-  Zap,
+  Clock, MapPin, Phone, CalendarDays, Briefcase, Timer,
+  Navigation, ChevronRight, HardHat, CheckCircle2, Coffee,
+  X, AlertCircle, Truck, Play, Pause, Square, ArrowRightLeft,
+  CloudRain, Users, Home, Zap, MessageSquare, RotateCcw,
 } from 'lucide-react';
+
+// ─── format helpers ────────────────────────────────────────
+function pad(n) { return String(n).padStart(2, '0'); }
 
 function formatTime12(time) {
   if (!time) return '';
   const [h, m] = String(time).split(':').map(Number);
   const ampm = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  return `${h % 12 || 12}:${pad(m)} ${ampm}`;
 }
 
-function formatDate(dateStr) {
-  if (!dateStr) return '';
-  const d = new Date(dateStr + 'T12:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+function formatHHMMSS(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
 }
 
-function formatDuration(ms) {
-  const totalMinutes = Math.floor(ms / 60000);
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
-  if (hours === 0) return `${minutes}m`;
-  return `${hours}h ${minutes}m`;
+function formatHM(minutes) {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  if (h === 0) return `${mm}m`;
+  if (mm === 0) return `${h}h`;
+  return `${h}h ${mm}m`;
 }
 
-function formatLiveDuration(ms) {
-  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.floor((totalSeconds % 3600) / 60);
-  const s = totalSeconds % 60;
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+function clockTimeOf(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-const PRIORITY_COLORS = {
-  low: 'var(--text-tertiary)',
-  normal: 'var(--status-info)',
-  high: 'var(--status-warning)',
-  urgent: 'var(--status-danger)',
-};
-
-// Legal break time options based on shift length (US DOL / common state laws)
-// These are the legally compliant break options for different shift durations
-function getBreakOptions(shiftDurationHours) {
-  const options = [
-    { value: 0, label: 'No break taken', description: 'Shift under 5 hours' },
-  ];
-
-  if (shiftDurationHours >= 5) {
-    options.push(
-      { value: 15, label: '15 min break', description: 'Paid rest break' },
-      { value: 30, label: '30 min break', description: 'Standard meal break (unpaid)' },
-    );
-  }
-  if (shiftDurationHours >= 6) {
-    options.push(
-      { value: 45, label: '45 min break', description: '30 min meal + 15 min rest' },
-    );
-  }
-  if (shiftDurationHours >= 8) {
-    options.push(
-      { value: 60, label: '1 hour break', description: '30 min meal + two 15 min rests' },
-    );
-  }
-  if (shiftDurationHours >= 10) {
-    options.push(
-      { value: 90, label: '1.5 hour break', description: 'Two 30 min meals + 30 min rest' },
-    );
-  }
-  if (shiftDurationHours >= 12) {
-    options.push(
-      { value: 120, label: '2 hour break', description: 'Extended shift double meal break' },
-    );
-  }
-
-  return options;
-}
+// ─── Quick blocker chips — tagged onto the open segment as notes ─
+// Riley sees these on the time log so issues surface without anyone
+// having to type a paragraph at the end of the day.
+const BLOCKER_CHIPS = [
+  { id: 'rain',     label: 'Rain delay',          icon: CloudRain },
+  { id: 'no-show',  label: 'Customer not home',   icon: Home },
+  { id: 'material', label: 'Need more material',  icon: AlertCircle },
+  { id: 'equip',    label: 'Equipment issue',     icon: AlertCircle },
+];
 
 export default function CrewDashboardPage() {
   const { user } = useAuth();
-  const { jobs, getCustomer, getQuote, timeEntries, clockIn, clockOut, updateTimeEntry } = useData();
+  const {
+    jobs, getCustomer,
+    timeEntries, timeSegments,
+    startShift, endShift, switchSegment, annotateOpenSegment,
+  } = useData();
 
-  const [showJobPicker, setShowJobPicker] = useState(false);
-  const [showBreakPrompt, setShowBreakPrompt] = useState(false);
-  const [clockingIn, setClockingIn] = useState(false);
-  const [clockingOut, setClockingOut] = useState(false);
-  const [liveTick, setLiveTick] = useState(0);
+  // ─── modal state ─────────────────────────────────────────
+  const [pickerMode, setPickerMode] = useState(null); // 'start' | 'switch' | null
+  const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [showBlockerNote, setShowBlockerNote] = useState(false);
+  const [customNote, setCustomNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [tick, setTick] = useState(0);
 
-  const firstName = user?.fullName?.split(' ')[0] || 'there';
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const todayStr = new Date().toISOString().split('T')[0];
-  const initials = (user?.fullName || 'You')
-    .split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  // Tick once per second so live timers refresh.
+  // Active tick is needed whenever there's an open shift, regardless of state.
+  const activeShift = useMemo(
+    () => timeEntries.find(t => t.teamMemberId === user?.id && !t.clockOut),
+    [timeEntries, user?.id]
+  );
 
-  // Get active clock entry for this user
-  const activeClockEntry = useMemo(() => {
-    return timeEntries.find(t => t.teamMemberId === user?.id && !t.clockOut);
-  }, [timeEntries, user?.id]);
-
-  // Tick every second while clocked in so the elapsed timer updates live
   useEffect(() => {
-    if (!activeClockEntry) return;
-    const id = setInterval(() => setLiveTick(t => t + 1), 1000);
+    if (!activeShift) return;
+    const id = setInterval(() => setTick(t => t + 1), 1000);
     return () => clearInterval(id);
-  }, [activeClockEntry]);
+  }, [activeShift]);
 
-  // Active job being clocked into
-  const activeJob = useMemo(() => {
-    if (!activeClockEntry?.jobId) return null;
-    return jobs.find(j => j.id === activeClockEntry.jobId) || null;
-  }, [activeClockEntry, jobs]);
+  // ─── derived state ──────────────────────────────────────
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  // My jobs: filter by assignedTo containing my user ID
+  // The currently-open segment for this shift. This is the source of truth
+  // for "what is the worker doing right now."
+  const openSegment = useMemo(() => {
+    if (!activeShift) return null;
+    return timeSegments.find(s => s.timeEntryId === activeShift.id && !s.endedAt) || null;
+  }, [activeShift, timeSegments]);
+
+  // All segments belonging to today's active shift, ordered oldest-first.
+  // Useful for "today's timeline" and break-total math.
+  const shiftSegments = useMemo(() => {
+    if (!activeShift) return [];
+    return timeSegments
+      .filter(s => s.timeEntryId === activeShift.id)
+      .sort((a, b) => new Date(a.startedAt) - new Date(b.startedAt));
+  }, [activeShift, timeSegments]);
+
+  // The job currently being worked (when openSegment.kind === 'job').
+  const currentJob = useMemo(() => {
+    if (!openSegment?.jobId) return null;
+    return jobs.find(j => j.id === openSegment.jobId) || null;
+  }, [openSegment, jobs]);
+
+  // Today's assigned jobs, sorted by scheduled time.
   const myJobs = useMemo(() => {
     if (!user?.id) return [];
-    return jobs.filter(j => {
-      const assigned = j.assignedTo || [];
-      return Array.isArray(assigned) && assigned.includes(user.id);
-    });
+    return jobs.filter(j => Array.isArray(j.assignedTo) && j.assignedTo.includes(user.id));
   }, [jobs, user?.id]);
 
-  // Today's jobs
-  const todayJobs = useMemo(() => {
-    return myJobs
-      .filter(j => j.scheduledDate === todayStr && j.status !== 'cancelled')
-      .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
-  }, [myJobs, todayStr]);
+  const todayJobs = useMemo(() => myJobs
+    .filter(j => j.scheduledDate === todayStr && j.status !== 'cancelled')
+    .sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || '')),
+    [myJobs, todayStr]);
 
-  // Upcoming jobs (next 7 days, excluding today)
-  const upcomingJobs = useMemo(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  // Jobs available to clock into right now: today's jobs + anything in_progress
+  // assigned to me (covers multi-day jobs).
+  const clockableJobs = useMemo(() => myJobs.filter(j =>
+    j.status !== 'cancelled' && j.status !== 'completed' &&
+    (j.scheduledDate === todayStr || j.status === 'in_progress')
+  ), [myJobs, todayStr]);
 
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split('T')[0];
+  // ─── live timers ────────────────────────────────────────
+  const segmentElapsedMs = openSegment
+    ? Date.now() - new Date(openSegment.startedAt).getTime()
+    : 0;
 
-    return myJobs
-      .filter(j => j.scheduledDate >= tomorrowStr && j.scheduledDate <= nextWeekStr && j.status !== 'cancelled')
-      .sort((a, b) => (a.scheduledDate || '').localeCompare(b.scheduledDate || '') || (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
-  }, [myJobs]);
+  // Total paid time today = sum of (job + travel) durations from all segments.
+  // Active job/travel segment is included as "now - startedAt".
+  const paidMsToday = useMemo(() => {
+    if (!activeShift) return 0;
+    let total = 0;
+    for (const s of shiftSegments) {
+      if (s.kind === 'break') continue;
+      if (s.endedAt) {
+        total += (Number(s.durationMinutes) || 0) * 60_000;
+      } else {
+        total += Date.now() - new Date(s.startedAt).getTime();
+      }
+    }
+    return total;
+    // tick included so it updates each second
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeShift, shiftSegments, tick]);
 
-  // Clockable jobs: today's jobs or any in-progress jobs assigned to this worker
-  const clockableJobs = useMemo(() => {
-    return myJobs.filter(j =>
-      j.status !== 'cancelled' && j.status !== 'completed' &&
-      (j.scheduledDate === todayStr || j.status === 'in_progress')
-    );
-  }, [myJobs, todayStr]);
+  // Total break minutes today (closed + open break).
+  const breakMinutesToday = useMemo(() => {
+    if (!activeShift) return 0;
+    let total = 0;
+    for (const s of shiftSegments) {
+      if (s.kind !== 'break') continue;
+      if (s.endedAt) total += Number(s.durationMinutes) || 0;
+      else total += (Date.now() - new Date(s.startedAt).getTime()) / 60_000;
+    }
+    return total;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeShift, shiftSegments, tick]);
 
-  // ── This-week stats ────────────────────────────────────────
-  const weekStats = useMemo(() => {
-    if (!user?.id) return { hours: 0, jobsDone: 0, jobsScheduled: 0, breaks: 0 };
+  // ─── this-week roll-up ──────────────────────────────────
+  const weekHours = useMemo(() => {
+    if (!user?.id) return 0;
     const now = new Date();
     const weekStart = new Date(now);
-    // Monday-based week
-    const day = weekStart.getDay() || 7;
-    weekStart.setDate(weekStart.getDate() - (day - 1));
+    const dow = weekStart.getDay() || 7; // Mon=1..Sun=7
+    weekStart.setDate(weekStart.getDate() - (dow - 1));
     weekStart.setHours(0, 0, 0, 0);
     const weekStartTs = weekStart.getTime();
 
     let totalMs = 0;
-    let breaks = 0;
-    timeEntries.forEach(t => {
-      if (t.teamMemberId !== user.id) return;
+    for (const t of timeEntries) {
+      if (t.teamMemberId !== user.id) continue;
       const inTs = new Date(t.clockIn).getTime();
-      if (isNaN(inTs) || inTs < weekStartTs) return;
+      if (isNaN(inTs) || inTs < weekStartTs) continue;
       const outTs = t.clockOut ? new Date(t.clockOut).getTime() : Date.now();
-      const breakMin = Number(t.breakMinutes || 0);
-      const span = Math.max(0, outTs - inTs - breakMin * 60_000);
-      totalMs += span;
-      if (breakMin > 0) breaks += 1;
-    });
-
-    const jobsDone = myJobs.filter(j => {
-      if (j.status !== 'completed') return false;
-      const d = j.completedAt || j.scheduledDate;
-      if (!d) return false;
-      return new Date(d).getTime() >= weekStartTs;
-    }).length;
-
-    const jobsScheduled = myJobs.filter(j =>
-      j.scheduledDate &&
-      new Date(j.scheduledDate + 'T12:00:00').getTime() >= weekStartTs &&
-      j.status !== 'cancelled'
-    ).length;
-
-    return {
-      hours: totalMs / (1000 * 60 * 60),
-      jobsDone,
-      jobsScheduled,
-      breaks,
-    };
-    // liveTick included so an active (no clockOut) entry recomputes its elapsed hours each second
+      const breakMs = Number(t.breakMinutes || 0) * 60_000;
+      totalMs += Math.max(0, outTs - inTs - breakMs);
+    }
+    return totalMs / (1000 * 60 * 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeEntries, myJobs, user?.id, liveTick]);
+  }, [timeEntries, user?.id, tick]);
 
-  // Today's earnings (rough estimate from active clock entry)
-  const todayElapsedMs = activeClockEntry
-    ? Date.now() - new Date(activeClockEntry.clockIn).getTime()
-    : 0;
-
-  const handleClockInClick = () => {
-    if (activeClockEntry) {
-      // Opening the break prompt for clock out
-      setShowBreakPrompt(true);
-    } else {
-      if (clockableJobs.length === 1) {
-        // Only one job available, clock in directly
-        handleClockInToJob(clockableJobs[0].id);
-      } else {
-        setShowJobPicker(true);
-      }
-    }
-  };
-
-  const handleClockInToJob = async (jobId) => {
-    setClockingIn(true);
+  // ─── action handlers ────────────────────────────────────
+  const handleStart = (jobId) => async () => {
+    if (busy) return;
+    setBusy(true);
     try {
-      await clockIn(user.id, jobId);
-      setShowJobPicker(false);
+      await startShift(user.id, { jobId });
+      setPickerMode(null);
     } catch (err) {
-      console.error('Error clocking in:', err);
+      console.error('startShift failed', err);
     } finally {
-      setClockingIn(false);
+      setBusy(false);
     }
   };
 
-  const handleClockOutWithBreak = async (breakMinutes) => {
-    setClockingOut(true);
+  const handleSwitchJob = (jobId) => async () => {
+    if (busy || !activeShift) return;
+    setBusy(true);
     try {
-      // Store break minutes on the time entry, then clock out
-      if (breakMinutes > 0 && activeClockEntry?.id) {
-        await updateTimeEntry(activeClockEntry.id, { breakMinutes });
-      }
-      await clockOut(activeClockEntry.id);
-      setShowBreakPrompt(false);
+      await switchSegment(activeShift.id, { kind: 'job', jobId });
+      setPickerMode(null);
     } catch (err) {
-      console.error('Error clocking out:', err);
+      console.error('switchSegment failed', err);
     } finally {
-      setClockingOut(false);
+      setBusy(false);
     }
   };
 
-  // Calculate shift duration for break options
-  const shiftDurationHours = activeClockEntry
-    ? (Date.now() - new Date(activeClockEntry.clockIn).getTime()) / (1000 * 60 * 60)
-    : 0;
+  const handleSwitchTravel = async () => {
+    if (busy || !activeShift) return;
+    setBusy(true);
+    try {
+      await switchSegment(activeShift.id, { kind: 'travel' });
+      setPickerMode(null);
+    } catch (err) {
+      console.error('switchSegment(travel) failed', err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  const breakOptions = getBreakOptions(shiftDurationHours);
+  const handleStartBreak = async () => {
+    if (busy || !activeShift) return;
+    setBusy(true);
+    try {
+      await switchSegment(activeShift.id, { kind: 'break' });
+    } catch (err) {
+      console.error('start break failed', err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  // Live elapsed time string (updates each second via liveTick)
-  const liveElapsedStr = activeClockEntry ? formatLiveDuration(todayElapsedMs) : null;
+  // Ending a break resumes whatever they were doing before. We pull the most
+  // recent non-break segment for context.
+  const handleEndBreak = async () => {
+    if (busy || !activeShift) return;
+    const previousNonBreak = [...shiftSegments].reverse().find(s => s.kind !== 'break' && s.endedAt);
+    setBusy(true);
+    try {
+      const next = previousNonBreak
+        ? { kind: previousNonBreak.kind, jobId: previousNonBreak.jobId }
+        : { kind: 'travel' };
+      await switchSegment(activeShift.id, next);
+    } catch (err) {
+      console.error('end break failed', err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
-  // Pick a daypart icon for the hero (purely visual flavor)
-  const HeroIcon = hour < 6 || hour >= 19 ? Cloud : hour < 11 ? Sun : hour < 16 ? Sun : CloudRain;
+  const handleEndShift = async () => {
+    if (busy || !activeShift) return;
+    setBusy(true);
+    try {
+      await endShift(activeShift.id);
+      setShowEndConfirm(false);
+    } catch (err) {
+      console.error('endShift failed', err);
+    } finally {
+      setBusy(false);
+    }
+  };
 
+  const handleBlocker = (label) => async () => {
+    if (busy || !activeShift) return;
+    setBusy(true);
+    try {
+      await annotateOpenSegment(activeShift.id, label);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSubmitCustomNote = async () => {
+    const trimmed = customNote.trim();
+    if (!trimmed || !activeShift) { setShowBlockerNote(false); return; }
+    setBusy(true);
+    try {
+      await annotateOpenSegment(activeShift.id, trimmed);
+      setCustomNote('');
+      setShowBlockerNote(false);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ─── header bits ────────────────────────────────────────
+  const firstName = user?.fullName?.split(' ')[0] || 'there';
+  const initials = (user?.fullName || 'You')
+    .split(' ').map(n => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
+  // What the cockpit reports as the worker's current state.
+  const stateLabel = !activeShift
+    ? 'Off the clock'
+    : openSegment?.kind === 'break'
+      ? 'On break'
+      : openSegment?.kind === 'travel'
+        ? 'Travel / Yard'
+        : currentJob ? `On site — ${currentJob.title}` : 'On the clock';
+
+  // Color & icon swap so the worker can read the state in a glance.
+  const stateColor = !activeShift
+    ? 'var(--text-tertiary)'
+    : openSegment?.kind === 'break'
+      ? 'var(--lucky-gold)'
+      : openSegment?.kind === 'travel'
+        ? '#63b3ff'
+        : 'var(--lucky-green-light)';
+
+  const StateIcon = !activeShift
+    ? Clock
+    : openSegment?.kind === 'break'
+      ? Coffee
+      : openSegment?.kind === 'travel'
+        ? Truck
+        : HardHat;
+
+  // ─── render ─────────────────────────────────────────────
   return (
-    <div className="crew-dash animate-fade-in">
-      {/* ── Hero Header ────────────────────────────────────── */}
-      <div className="crew-hero">
-        <div className="crew-hero-bg" />
-        <div className="crew-hero-content">
-          <div className="crew-hero-avatar">{initials}</div>
-          <div className="crew-hero-text">
-            <div className="crew-hero-greeting">
-              {greeting}, {firstName}
-              <HeroIcon size={18} className="crew-hero-icon" />
-            </div>
-            <div className="crew-hero-date">
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-            </div>
+    <div className="cockpit animate-fade-in">
+      {/* Greeting strip */}
+      <div className="cockpit-greet">
+        <div className="cockpit-greet-avatar">{initials}</div>
+        <div className="cockpit-greet-text">
+          <div className="cockpit-greet-line">{greeting}, {firstName}</div>
+          <div className="cockpit-greet-sub">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
           </div>
-          <div className="crew-hero-badge">
-            <HardHat size={14} />
-            <span>Crew</span>
-          </div>
+        </div>
+        <div className="cockpit-greet-week">
+          <div className="cockpit-greet-week-num">{weekHours.toFixed(1)}h</div>
+          <div className="cockpit-greet-week-label">this week</div>
         </div>
       </div>
 
-      {/* ── Clock Widget (rich, with live timer) ───────────── */}
-      <div className={`crew-clock-card ${activeClockEntry ? 'is-active' : ''}`}>
-        <div className="crew-clock-card-top">
-          <div className="crew-clock-status">
-            <div className={`crew-clock-dot ${activeClockEntry ? 'active' : 'inactive'}`} />
-            <div className="crew-clock-status-text">
-              <span className="crew-clock-status-label">{activeClockEntry ? 'On the clock' : 'Off the clock'}</span>
-              {activeJob && (
-                <span className="crew-clock-active-job">
-                  <Briefcase size={10} />
-                  {activeJob.title}
-                </span>
-              )}
-              {!activeClockEntry && clockableJobs.length > 0 && (
-                <span className="crew-clock-status-sub">
-                  {clockableJobs.length} job{clockableJobs.length !== 1 ? 's' : ''} ready to start
-                </span>
+      {/* The big state card — what's happening right now */}
+      <div className="cockpit-state" style={{ '--state-color': stateColor }}>
+        <div className="cockpit-state-row">
+          <div className="cockpit-state-icon"><StateIcon size={20} /></div>
+          <div className="cockpit-state-text">
+            <div className="cockpit-state-label">{stateLabel}</div>
+            {activeShift && openSegment && (
+              <div className="cockpit-state-sub">
+                Started at {clockTimeOf(openSegment.startedAt)}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {activeShift && (
+          <>
+            <div className="cockpit-timers">
+              <div className="cockpit-timer">
+                <div className="cockpit-timer-label">Current</div>
+                <div className="cockpit-timer-value">{formatHHMMSS(segmentElapsedMs)}</div>
+              </div>
+              <div className="cockpit-timer cockpit-timer-total">
+                <div className="cockpit-timer-label">Paid today</div>
+                <div className="cockpit-timer-value">{formatHHMMSS(paidMsToday)}</div>
+              </div>
+              {breakMinutesToday > 0 && (
+                <div className="cockpit-timer cockpit-timer-break">
+                  <div className="cockpit-timer-label">Break</div>
+                  <div className="cockpit-timer-value">{formatHM(breakMinutesToday)}</div>
+                </div>
               )}
             </div>
-          </div>
+
+            {/* Long-shift break nudge — landscape days are physical */}
+            {paidMsToday > 5 * 3600_000 && breakMinutesToday < 15 && openSegment?.kind !== 'break' && (
+              <div className="cockpit-nudge">
+                <Coffee size={14} /> You've been working 5+ hours without a break. Take 15.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Action area — primary buttons drive the state machine */}
+      <div className="cockpit-actions">
+        {!activeShift && (
           <button
-            className={`crew-clock-btn ${activeClockEntry ? 'is-out' : 'is-in'}`}
-            onClick={handleClockInClick}
-            disabled={clockingIn || clockingOut || (!activeClockEntry && clockableJobs.length === 0)}
+            className="cockpit-btn cockpit-btn-primary"
+            onClick={() => setPickerMode('start')}
+            disabled={busy}
           >
-            <Clock size={16} />
-            {activeClockEntry ? 'Clock Out' : 'Clock In'}
+            <Play size={20} /> Start Shift
           </button>
-        </div>
+        )}
 
-        {activeClockEntry && (
-          <div className="crew-clock-timer">
-            <div className="crew-clock-timer-num">{liveElapsedStr}</div>
-            <div className="crew-clock-timer-label">
-              Since {new Date(activeClockEntry.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
-            </div>
-          </div>
+        {activeShift && openSegment?.kind !== 'break' && (
+          <>
+            <button
+              className="cockpit-btn cockpit-btn-primary"
+              onClick={handleStartBreak}
+              disabled={busy}
+            >
+              <Pause size={18} /> Take Break
+            </button>
+            <button
+              className="cockpit-btn cockpit-btn-secondary"
+              onClick={() => setPickerMode('switch')}
+              disabled={busy}
+            >
+              <ArrowRightLeft size={18} /> Switch Job
+            </button>
+            <button
+              className="cockpit-btn cockpit-btn-danger"
+              onClick={() => setShowEndConfirm(true)}
+              disabled={busy}
+            >
+              <Square size={18} /> End Shift
+            </button>
+          </>
+        )}
+
+        {activeShift && openSegment?.kind === 'break' && (
+          <button
+            className="cockpit-btn cockpit-btn-primary"
+            onClick={handleEndBreak}
+            disabled={busy}
+          >
+            <Play size={20} /> End Break
+          </button>
         )}
       </div>
 
-      {/* No clockable jobs message */}
-      {!activeClockEntry && clockableJobs.length === 0 && (
-        <div className="crew-alert">
-          <AlertCircle size={14} />
-          No active or scheduled jobs to clock into today.
+      {/* Quick blocker chips — only when on the clock */}
+      {activeShift && openSegment?.kind !== 'break' && (
+        <div className="cockpit-blockers">
+          <div className="cockpit-blockers-label">
+            <MessageSquare size={12} /> Flag an issue
+          </div>
+          <div className="cockpit-chips">
+            {BLOCKER_CHIPS.map(c => {
+              const Icon = c.icon;
+              return (
+                <button
+                  key={c.id}
+                  className="cockpit-chip"
+                  onClick={handleBlocker(c.label)}
+                  disabled={busy}
+                  title={`Tag this ${openSegment?.kind} segment with: ${c.label}`}
+                >
+                  <Icon size={12} /> {c.label}
+                </button>
+              );
+            })}
+            <button
+              className="cockpit-chip cockpit-chip-custom"
+              onClick={() => setShowBlockerNote(true)}
+              disabled={busy}
+            >
+              + Note
+            </button>
+          </div>
         </div>
       )}
 
-      {/* ── This Week Stats ────────────────────────────────── */}
-      <div className="crew-week-stats">
-        <div className="crew-week-stat">
-          <div className="crew-week-stat-icon" style={{ background: 'rgba(58, 156, 74, 0.12)', color: 'var(--lucky-green-light)' }}>
-            <Timer size={16} />
-          </div>
-          <div className="crew-week-stat-body">
-            <div className="crew-week-stat-value">{weekStats.hours.toFixed(1)}h</div>
-            <div className="crew-week-stat-label">Hours this week</div>
-          </div>
+      {/* Quick navigation — call/navigate/job-page for the active context */}
+      {activeShift && (currentJob || todayJobs[0]) && (
+        <div className="cockpit-quick">
+          {(() => {
+            const j = currentJob || todayJobs[0];
+            const cust = j.customerId ? getCustomer(j.customerId) : null;
+            const addr = j.address || (cust?.address ? `${cust.address}${cust.city ? `, ${cust.city}` : ''} ${cust.zip || ''}`.trim() : '');
+            const mapsUrl = addr ? `https://maps.google.com/?q=${encodeURIComponent(addr)}` : null;
+            return (
+              <>
+                {mapsUrl && (
+                  <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="cockpit-quick-link">
+                    <Navigation size={16} /> Navigate
+                  </a>
+                )}
+                {cust?.phone && (
+                  <a href={`tel:${cust.phone}`} className="cockpit-quick-link">
+                    <Phone size={16} /> Call {cust.firstName}
+                  </a>
+                )}
+                <Link href={`/jobs/${j.id}`} className="cockpit-quick-link">
+                  <Zap size={16} /> Job Page
+                </Link>
+              </>
+            );
+          })()}
         </div>
-        <div className="crew-week-stat">
-          <div className="crew-week-stat-icon" style={{ background: 'rgba(99, 179, 255, 0.12)', color: '#63b3ff' }}>
-            <CheckCircle2 size={16} />
-          </div>
-          <div className="crew-week-stat-body">
-            <div className="crew-week-stat-value">{weekStats.jobsDone}<span className="crew-week-stat-total"> / {weekStats.jobsScheduled}</span></div>
-            <div className="crew-week-stat-label">Jobs done this week</div>
-          </div>
-        </div>
-        <div className="crew-week-stat">
-          <div className="crew-week-stat-icon" style={{ background: 'rgba(212, 169, 62, 0.14)', color: 'var(--lucky-gold)' }}>
-            <Award size={16} />
-          </div>
-          <div className="crew-week-stat-body">
-            <div className="crew-week-stat-value">{todayJobs.length}</div>
-            <div className="crew-week-stat-label">On deck today</div>
-          </div>
-        </div>
-      </div>
+      )}
 
-      {/* ── Quick Actions ──────────────────────────────────── */}
-      <div className="crew-quick-actions">
-        <Link href="/crew-schedule" className="crew-quick-action">
-          <CalendarDays size={18} />
-          <span>Schedule</span>
-        </Link>
-        {(activeJob || todayJobs[0]) && (() => {
-          const j = activeJob || todayJobs[0];
-          const cust = j.customerId ? getCustomer(j.customerId) : null;
-          const addr = j.address || (cust?.address ? `${cust.address}${cust.city ? `, ${cust.city}` : ''} ${cust.zip || ''}`.trim() : '');
-          const url = addr ? `https://maps.google.com/?q=${encodeURIComponent(addr)}` : null;
-          return url ? (
-            <a href={url} target="_blank" rel="noopener noreferrer" className="crew-quick-action">
-              <Navigation size={18} />
-              <span>Navigate</span>
-            </a>
-          ) : null;
-        })()}
-        {(activeJob || todayJobs[0]) && (() => {
-          const j = activeJob || todayJobs[0];
-          const cust = j.customerId ? getCustomer(j.customerId) : null;
-          return cust?.phone ? (
-            <a href={`tel:${cust.phone}`} className="crew-quick-action">
-              <Phone size={18} />
-              <span>Call</span>
-            </a>
-          ) : null;
-        })()}
-        {activeJob && (
-          <Link href={`/jobs/${activeJob.id}`} className="crew-quick-action crew-quick-action-primary">
-            <Zap size={18} />
-            <span>Job Page</span>
+      {/* Today's timeline — shows segment history of THIS shift */}
+      {activeShift && shiftSegments.length > 1 && (
+        <div className="cockpit-section">
+          <div className="cockpit-section-head">
+            <h3><Timer size={16} /> Today's Timeline</h3>
+          </div>
+          <div className="cockpit-timeline">
+            {shiftSegments.map(seg => {
+              const job = seg.jobId ? jobs.find(j => j.id === seg.jobId) : null;
+              const dur = seg.endedAt
+                ? Number(seg.durationMinutes || 0)
+                : (Date.now() - new Date(seg.startedAt).getTime()) / 60_000;
+              const isOpen = !seg.endedAt;
+              const segLabel = seg.kind === 'job'
+                ? (job?.title || 'Job')
+                : seg.kind === 'travel' ? 'Travel / Yard' : 'Break';
+              const segIcon = seg.kind === 'job' ? HardHat : seg.kind === 'travel' ? Truck : Coffee;
+              const Icon = segIcon;
+              return (
+                <div key={seg.id} className={`cockpit-tl-row ${seg.kind} ${isOpen ? 'open' : ''}`}>
+                  <div className="cockpit-tl-icon"><Icon size={14} /></div>
+                  <div className="cockpit-tl-body">
+                    <div className="cockpit-tl-title">{segLabel}</div>
+                    <div className="cockpit-tl-meta">
+                      {clockTimeOf(seg.startedAt)} {isOpen ? '→ now' : `→ ${clockTimeOf(seg.endedAt)}`} · {formatHM(dur)}
+                    </div>
+                    {seg.notes && <div className="cockpit-tl-note">{seg.notes}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Today's jobs */}
+      <div className="cockpit-section">
+        <div className="cockpit-section-head">
+          <h3><Briefcase size={16} /> Today's Jobs <span className="cockpit-badge">{todayJobs.length}</span></h3>
+          <Link href="/crew-schedule" className="cockpit-section-link">
+            <CalendarDays size={12} /> Full week
           </Link>
+        </div>
+
+        {todayJobs.length === 0 ? (
+          <div className="cockpit-empty">
+            <CheckCircle2 size={28} />
+            <p>No jobs scheduled for today</p>
+          </div>
+        ) : (
+          todayJobs.map(job => {
+            const cust = job.customerId ? getCustomer(job.customerId) : null;
+            const isCurrent = currentJob?.id === job.id;
+            const fullAddr = job.address || (cust?.address ? `${cust.address}${cust.city ? `, ${cust.city}` : ''} ${cust.zip || ''}`.trim() : '');
+            return (
+              <div key={job.id} className={`cockpit-job ${isCurrent ? 'is-current' : ''}`}>
+                <div className="cockpit-job-head">
+                  <div className="cockpit-job-title">
+                    {isCurrent && <span className="cockpit-job-now">NOW</span>}
+                    {job.title}
+                  </div>
+                  {job.scheduledTime && (
+                    <div className="cockpit-job-time">
+                      <Clock size={12} /> {formatTime12(job.scheduledTime)}
+                    </div>
+                  )}
+                </div>
+                {cust && (
+                  <div className="cockpit-job-cust">
+                    <Users size={12} /> {cust.firstName} {cust.lastName?.[0] || ''}.
+                    {cust.phone && <span className="cockpit-job-phone"> · {cust.phone}</span>}
+                  </div>
+                )}
+                {fullAddr && (
+                  <div className="cockpit-job-addr">
+                    <MapPin size={12} /> {fullAddr}
+                  </div>
+                )}
+                {job.crewNotes && <div className="cockpit-job-notes">{job.crewNotes}</div>}
+                <div className="cockpit-job-actions">
+                  <Link href={`/jobs/${job.id}`} className="cockpit-job-link">
+                    Details <ChevronRight size={12} />
+                  </Link>
+                  {!isCurrent && activeShift && openSegment?.kind !== 'break' && (
+                    <button
+                      className="cockpit-job-clock"
+                      onClick={handleSwitchJob(job.id)}
+                      disabled={busy}
+                    >
+                      <ArrowRightLeft size={12} /> Switch here
+                    </button>
+                  )}
+                  {!activeShift && (
+                    <button
+                      className="cockpit-job-clock"
+                      onClick={handleStart(job.id)}
+                      disabled={busy}
+                    >
+                      <Play size={12} /> Start here
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
         )}
       </div>
 
-      {/* Today's Jobs */}
-      <div className="crew-section-header">
-        <h2>
-          <Briefcase size={20} />
-          Today&apos;s Jobs
-          <span className="crew-section-count">{todayJobs.length}</span>
-        </h2>
-      </div>
+      {/* ─── Modals ────────────────────────────────────────── */}
 
-      {todayJobs.length === 0 ? (
-        <div className="crew-no-jobs">
-          <CheckCircle2 size={48} />
-          <p>No jobs scheduled for today</p>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>Check back later or view your upcoming schedule</p>
-        </div>
-      ) : (
-        todayJobs.map(job => (
-          <JobCard key={job.id} job={job} getCustomer={getCustomer} getQuote={getQuote} />
-        ))
-      )}
-
-      {/* Upcoming Jobs */}
-      {upcomingJobs.length > 0 && (
-        <>
-          <div className="crew-section-header" style={{ marginTop: 'var(--space-xl)' }}>
-            <h2>
-              <CalendarDays size={20} />
-              Upcoming
-              <span className="crew-section-count">{upcomingJobs.length}</span>
-            </h2>
-            <Link href="/crew-schedule" className="btn btn-ghost btn-sm">
-              Full Schedule <ChevronRight size={14} />
-            </Link>
-          </div>
-          {upcomingJobs.map(job => (
-            <JobCard key={job.id} job={job} getCustomer={getCustomer} getQuote={getQuote} showDate />
-          ))}
-        </>
-      )}
-
-      {/* ═══ Job Picker Modal ═══ */}
-      {showJobPicker && (
-        <div className="modal-overlay" onClick={() => !clockingIn && setShowJobPicker(false)}>
+      {/* Job picker — start shift OR switch jobs */}
+      {pickerMode && (
+        <div className="modal-overlay" onClick={() => !busy && setPickerMode(null)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
             <div className="modal-header">
-              <h2><Clock size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Select Job to Clock In</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowJobPicker(false)}>
+              <h2>
+                {pickerMode === 'start' ? <Play size={20} /> : <ArrowRightLeft size={20} />}
+                <span style={{ marginLeft: 8 }}>
+                  {pickerMode === 'start' ? 'Start Shift' : 'Switch Segment'}
+                </span>
+              </h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setPickerMode(null)}>
                 <X size={20} />
               </button>
             </div>
             <div className="modal-body" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
               <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-                Select which job you are working on. Your hours will be tracked against this job.
+                {pickerMode === 'start'
+                  ? 'Pick the job you\'re starting at, or "Travel / Yard" if you\'re loading up.'
+                  : 'Pick the next job, or switch to Travel / Yard for driving.'}
               </p>
-              {clockableJobs.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: 'var(--space-xl)', color: 'var(--text-tertiary)' }}>
-                  <Briefcase size={32} style={{ marginBottom: '8px', opacity: 0.5 }} />
-                  <p>No active jobs to clock into</p>
+
+              <button
+                className="cockpit-picker-row cockpit-picker-travel"
+                onClick={pickerMode === 'start' ? handleStart(null) : handleSwitchTravel}
+                disabled={busy}
+              >
+                <div className="cockpit-picker-icon"><Truck size={16} /></div>
+                <div className="cockpit-picker-body">
+                  <div className="cockpit-picker-title">Travel / Yard</div>
+                  <div className="cockpit-picker-meta">Driving, loading, or general yard work</div>
                 </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {clockableJobs.map(job => {
-                    const customer = job.customerId ? getCustomer(job.customerId) : null;
-                    return (
-                      <button
-                        key={job.id}
-                        className="crew-job-picker-item"
-                        onClick={() => handleClockInToJob(job.id)}
-                        disabled={clockingIn}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div className="crew-job-picker-title">{job.title}</div>
-                          <div className="crew-job-picker-meta">
-                            {job.scheduledTime && (
-                              <span><Clock size={11} /> {formatTime12(job.scheduledTime)}</span>
-                            )}
-                            {customer && (
-                              <span>• {customer.firstName} {customer.lastName?.[0] || ''}.</span>
-                            )}
-                          </div>
-                          {job.address && (
-                            <div className="crew-job-picker-address">
-                              <MapPin size={11} /> {job.address}
-                            </div>
-                          )}
-                        </div>
-                        <ChevronRight size={16} style={{ color: 'var(--text-tertiary)', flexShrink: 0 }} />
-                      </button>
-                    );
-                  })}
+                <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+              </button>
+
+              {clockableJobs.length > 0 && (
+                <div style={{ marginTop: 'var(--space-md)', fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Today's Jobs
+                </div>
+              )}
+
+              {clockableJobs.map(job => {
+                const cust = job.customerId ? getCustomer(job.customerId) : null;
+                return (
+                  <button
+                    key={job.id}
+                    className="cockpit-picker-row"
+                    onClick={pickerMode === 'start' ? handleStart(job.id) : handleSwitchJob(job.id)}
+                    disabled={busy}
+                  >
+                    <div className="cockpit-picker-icon"><HardHat size={16} /></div>
+                    <div className="cockpit-picker-body">
+                      <div className="cockpit-picker-title">{job.title}</div>
+                      <div className="cockpit-picker-meta">
+                        {job.scheduledTime && <>{formatTime12(job.scheduledTime)} · </>}
+                        {cust ? `${cust.firstName} ${cust.lastName?.[0] || ''}.` : 'No customer'}
+                      </div>
+                    </div>
+                    <ChevronRight size={16} style={{ color: 'var(--text-tertiary)' }} />
+                  </button>
+                );
+              })}
+
+              {clockableJobs.length === 0 && (
+                <div style={{ textAlign: 'center', padding: 'var(--space-lg)', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
+                  <p>No jobs assigned to you for today.</p>
+                  <p style={{ fontSize: '0.75rem' }}>Starting as Travel / Yard is fine.</p>
                 </div>
               )}
             </div>
@@ -518,184 +691,83 @@ export default function CrewDashboardPage() {
         </div>
       )}
 
-      {/* ═══ Break Time Prompt Modal ═══ */}
-      {showBreakPrompt && (
-        <div className="modal-overlay" onClick={() => !clockingOut && setShowBreakPrompt(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '460px' }}>
+      {/* End-shift confirm — show summary so they don't end mid-shift by accident */}
+      {showEndConfirm && activeShift && (
+        <div className="modal-overlay" onClick={() => !busy && setShowEndConfirm(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '440px' }}>
             <div className="modal-header">
-              <h2><Coffee size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Log Break Time</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowBreakPrompt(false)}>
+              <h2><Square size={20} /> <span style={{ marginLeft: 8 }}>End Shift?</span></h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowEndConfirm(false)}>
                 <X size={20} />
               </button>
             </div>
             <div className="modal-body">
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 14px',
-                borderRadius: '10px', background: 'var(--bg-elevated)', marginBottom: 'var(--space-md)',
-              }}>
-                <Clock size={18} style={{ color: 'var(--lucky-green-light)' }} />
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                    Shift: {formatDuration(Date.now() - new Date(activeClockEntry?.clockIn).getTime())}
-                  </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                    {new Date(activeClockEntry?.clockIn).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} → Now
-                  </div>
+              <div className="cockpit-summary">
+                <div className="cockpit-summary-row">
+                  <span>Shift started</span>
+                  <strong>{clockTimeOf(activeShift.clockIn)}</strong>
+                </div>
+                <div className="cockpit-summary-row">
+                  <span>Paid time</span>
+                  <strong>{formatHM(paidMsToday / 60_000)}</strong>
+                </div>
+                <div className="cockpit-summary-row">
+                  <span>Break time</span>
+                  <strong>{breakMinutesToday > 0 ? formatHM(breakMinutesToday) : '—'}</strong>
+                </div>
+                <div className="cockpit-summary-row">
+                  <span>Segments</span>
+                  <strong>{shiftSegments.length}</strong>
                 </div>
               </div>
-
-              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-                Select the break time taken during this shift. Break time will be deducted from your paid hours.
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-md)' }}>
+                Once ended, the shift can only be edited by an owner.
               </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowEndConfirm(false)} disabled={busy}>
+                <RotateCcw size={14} /> Keep working
+              </button>
+              <button className="btn btn-danger" onClick={handleEndShift} disabled={busy}>
+                <Square size={14} /> End Shift
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {breakOptions.map(option => (
-                  <button
-                    key={option.value}
-                    className="crew-break-option"
-                    onClick={() => handleClockOutWithBreak(option.value)}
-                    disabled={clockingOut}
-                  >
-                    <div className="crew-break-option-main">
-                      <Coffee size={16} style={{ color: option.value === 0 ? 'var(--text-tertiary)' : 'var(--lucky-gold)' }} />
-                      <span className="crew-break-option-label">{option.label}</span>
-                    </div>
-                    <span className="crew-break-option-desc">{option.description}</span>
-                  </button>
-                ))}
-              </div>
-
-              <div style={{
-                marginTop: 'var(--space-md)', padding: '10px 12px', borderRadius: '8px',
-                background: 'rgba(85, 158, 79, 0.06)', border: '1px solid rgba(85, 158, 79, 0.15)',
-                fontSize: '0.72rem', color: 'var(--text-tertiary)'
-              }}>
-                💡 <strong>Tip:</strong> Rest breaks (15 min) are typically paid. Meal breaks (30+ min) are typically unpaid. Check your local labor laws.
-              </div>
+      {/* Custom note modal */}
+      {showBlockerNote && (
+        <div className="modal-overlay" onClick={() => !busy && setShowBlockerNote(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '420px' }}>
+            <div className="modal-header">
+              <h2><MessageSquare size={20} /> <span style={{ marginLeft: 8 }}>Add a note</span></h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowBlockerNote(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
+                This note attaches to your current segment. Riley sees it on the time log.
+              </p>
+              <textarea
+                className="form-input"
+                rows={4}
+                value={customNote}
+                onChange={e => setCustomNote(e.target.value)}
+                placeholder="What happened?"
+                style={{ width: '100%', resize: 'vertical' }}
+              />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowBlockerNote(false)} disabled={busy}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSubmitCustomNote} disabled={busy || !customNote.trim()}>
+                Add note
+              </button>
             </div>
           </div>
         </div>
       )}
     </div>
-  );
-}
-
-// ─── Rich Job Card Component ────────────────────────────────
-function JobCard({ job, getCustomer, getQuote, showDate }) {
-  const customer = job.customerId ? getCustomer(job.customerId) : null;
-  const quote = job.quoteId ? getQuote(job.quoteId) : null;
-
-  const customerInitials = customer
-    ? `${customer.firstName?.[0] || ''}${customer.lastName?.[0] || ''}`.toUpperCase()
-    : '??';
-
-  const fullAddress = job.address || (customer?.address
-    ? `${customer.address}${customer.city ? `, ${customer.city}` : ''}${customer.state ? ` ${customer.state}` : ''} ${customer.zip || ''}`.trim()
-    : '');
-
-  const mapsUrl = fullAddress
-    ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}`
-    : '';
-
-  const priorityAccent = job.priority === 'urgent' ? 'var(--status-danger)'
-    : job.priority === 'high' ? 'var(--status-warning)'
-    : job.priority === 'normal' ? 'var(--lucky-green)'
-    : 'var(--text-tertiary)';
-
-  return (
-    <Link href={`/jobs/${job.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div className="crew-job-card" style={{ '--card-accent': priorityAccent }}>
-        {/* Header — title + priority */}
-        <div className="crew-job-card-header">
-          <div>
-            <div className="crew-job-card-title">{job.title}</div>
-            <div className="crew-job-card-time">
-              <Clock size={13} />
-              {showDate && <span>{formatDate(job.scheduledDate)} • </span>}
-              {job.scheduledTime ? formatTime12(job.scheduledTime) : 'Time TBD'}
-              {job.estimatedDuration && (
-                <span style={{ marginLeft: '8px', color: 'var(--text-tertiary)' }}>
-                  <Timer size={12} style={{ verticalAlign: 'middle', marginRight: '2px' }} />
-                  {job.estimatedDuration}
-                </span>
-              )}
-            </div>
-          </div>
-          {job.priority && (
-            <span className={`crew-job-card-priority ${job.priority}`}>
-              {job.priority}
-            </span>
-          )}
-        </div>
-
-        {/* Customer Info */}
-        {customer && (
-          <div className="crew-job-card-customer">
-            <div className="crew-job-card-customer-avatar">{customerInitials}</div>
-            <div className="crew-job-card-customer-info">
-              <div className="crew-job-card-customer-name">
-                {customer.firstName} {customer.lastName || ''}
-              </div>
-              {customer.phone && (
-                <div className="crew-job-card-customer-detail">
-                  <Phone size={11} />
-                  <a href={`tel:${customer.phone}`} onClick={e => e.stopPropagation()}>
-                    {customer.phone}
-                  </a>
-                </div>
-              )}
-              {customer.email && (
-                <div className="crew-job-card-customer-detail">
-                  <Mail size={11} />
-                  <a href={`mailto:${customer.email}`} onClick={e => e.stopPropagation()}>
-                    {customer.email}
-                  </a>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Address with Map Link */}
-        {fullAddress && (
-          <div className="crew-job-card-address">
-            <MapPin size={14} />
-            {mapsUrl ? (
-              <a href={mapsUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
-                {fullAddress}
-              </a>
-            ) : (
-              <span>{fullAddress}</span>
-            )}
-          </div>
-        )}
-
-        {/* Crew Notes */}
-        {job.crewNotes && (
-          <div className="crew-job-card-notes">
-            {job.crewNotes}
-          </div>
-        )}
-
-        {/* Footer — tags */}
-        <div className="crew-job-card-footer">
-          {quote && (
-            <span className="crew-job-card-tag">
-              <FileText size={12} />
-              Quote #{quote.quoteNumber}
-            </span>
-          )}
-          {job.status && (
-            <span className="crew-job-card-tag" style={{ textTransform: 'capitalize' }}>
-              <Flag size={12} />
-              {job.status.replace('_', ' ')}
-            </span>
-          )}
-          <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-            Tap for details <ChevronRight size={12} style={{ verticalAlign: 'middle' }} />
-          </span>
-        </div>
-      </div>
-    </Link>
   );
 }

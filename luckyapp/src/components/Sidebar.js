@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
+  FileSignature,
   CalendarDays,
   Palette,
   Ruler,
@@ -38,6 +39,7 @@ const ownerNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['owner', 'admin'] },
   { href: '/customers', label: 'Customers', icon: Users, roles: ['owner', 'admin'] },
   { href: '/quotes', label: 'Quotes', icon: FileText, roles: ['owner', 'admin'], badgeKey: 'draftQuotes' },
+  { href: '/contracts', label: 'Contracts', icon: FileSignature, roles: ['owner', 'admin'], badgeKey: 'unsignedContracts' },
   { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
   { href: '/invoices', label: 'Invoices', icon: Receipt, roles: ['owner', 'admin'], badgeKey: 'unpaidInvoices' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
@@ -78,7 +80,7 @@ const workerBottomNavItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout, isWorker } = useAuth();
-  const { quotes, calendarEvents, jobs, invoices } = useData();
+  const { quotes, calendarEvents, jobs, invoices, contracts } = useData();
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
@@ -93,7 +95,14 @@ export default function Sidebar() {
   const todayStr = new Date().toISOString().split('T')[0];
   const todayEvents = calendarEvents.filter(e => e.date === todayStr).length
     + jobs.filter(j => j.scheduledDate === todayStr).length;
-  const badges = { draftQuotes: draftQuotes || null, activeJobs: activeJobs || null, todayEvents: todayEvents || null, unpaidInvoices: unpaidInvoices || null };
+  const unsignedContracts = (contracts || []).filter(c => c.status === 'sent' || c.status === 'viewed').length;
+  const badges = {
+    draftQuotes: draftQuotes || null,
+    activeJobs: activeJobs || null,
+    todayEvents: todayEvents || null,
+    unpaidInvoices: unpaidInvoices || null,
+    unsignedContracts: unsignedContracts || null,
+  };
 
   const initials = user?.fullName
     ?.split(' ')

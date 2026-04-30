@@ -9,6 +9,17 @@
 - **Roles on a crew:** Crew Leader, Laborer
 - **Pay structure:** Hourly $17.50 for laborers, $22.50 for crew leaders.
 
+## Time tracking — shift + segment model
+Workers use the **Today Cockpit** at [`/crew-dashboard`](../luckyapp/src/app/(dashboard)/crew-dashboard/page.js). The model:
+- **One shift per day per worker** (clock in once, clock out once).
+- Within a shift, workers move between **segments**, recorded in real time:
+  - `job` — paid, attributed to a specific property (used for job costing)
+  - `travel` — paid, indirect (driving, yard, loading)
+  - `break` — unpaid, real-time start/stop (no more retroactive guessing)
+- Owners see a live "who's on the clock and what are they doing" strip on the main dashboard.
+- Workers can tap blocker chips ("Rain delay", "Customer not home", "Need more material") which attach a note to the current segment so issues surface without anyone having to write a paragraph at end of day.
+- Schema: see [`024_time_segments.sql`](../luckyapp/supabase/migrations/024_time_segments.sql). The legacy `time_entries.break_minutes` column is now derived (sum of break-segment durations) on shift end, so older payroll math still works.
+
 ## Scheduling
 - **How jobs get on the calendar:** Once a quote is approved and materials, delivery fee, etc. are paid, we schedule the job on the calendar, can pay rush fee to get moved forward. (% of of volume of work moved backwards by rush fees is unknown as of now)
 - **Tool of record:** luckyapp calendar / Google Calendar (the app syncs with Google Calendar via [`src/lib/googleCalendar.js`](../luckyapp/src/lib/googleCalendar.js))
