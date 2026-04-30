@@ -86,6 +86,7 @@ export default function MeasurePage() {
   const mapTypeRef = useRef('satellite');
   const panoRef = useRef(null);
   const panoInstanceRef = useRef(null);
+  const arOverlayRef = useRef(null);
 
   const [mapsLoaded, setMapsLoaded] = useState(false);
   const [shapes, setShapes] = useState([]); // [{id, kind, sqft, label, hidden}]
@@ -102,6 +103,7 @@ export default function MeasurePage() {
   const [isDirty, setIsDirty] = useState(false);
   const [mapTypeId, setMapTypeId] = useState('satellite');
   const [streetViewActive, setStreetViewActive] = useState(false);
+  const [arEnabled, setArEnabled] = useState(false);
 
   const showToast = useCallback((message, type = 'info') => {
     setToast({ message, type });
@@ -268,6 +270,9 @@ export default function MeasurePage() {
           map.setCenter(place.geometry.location);
           map.setZoom(20);
           setHasSearchText(true);
+          if (panoInstanceRef.current && panoInstanceRef.current.getVisible()) {
+            panoInstanceRef.current.setPosition(place.geometry.location);
+          }
         }
       });
     }
@@ -472,43 +477,227 @@ export default function MeasurePage() {
 
   // ---- Street View toggle (split pane: map on top, panorama on bottom) ----
   const toggleStreetView = useCallback(() => {
+    setStreetViewActive(s => !s);
+  }, []);
+
+  // Move the panorama to a new location (used by search / customer select).
+  const movePanoTo = useCallback((latlng) => {
+    const pano = panoInstanceRef.current;
+    if (pano && pano.getVisible()) pano.setPosition(latlng);
+  }, []);
+
+  // Initialize / show / hide the panorama in response to streetViewActive flips.
+  // Done in an effect (not in the click handler) so the layout flip has settled
+  // and the pano div has real dimensions before StreetViewPanorama is created.
+  useEffect(() => {
+    if (!mapsLoaded || !mapInstanceRef.current || !panoRef.current) return;
     const map = mapInstanceRef.current;
-    if (!map || !panoRef.current) return;
     const g = window.google.maps;
 
-    if (!panoInstanceRef.current) {
-      const pano = new g.StreetViewPanorama(panoRef.current, {
-        position: map.getCenter(),
-        pov: { heading: 0, pitch: 0 },
-        zoom: 1,
-        addressControl: true,
-        fullscreenControl: false,
-        motionTracking: false,
-        motionTrackingControl: false,
-        enableCloseButton: false,
-      });
-      panoInstanceRef.current = pano;
-      // Linking the pano lets the pegman position arrow appear on the map.
-      map.setStreetView(pano);
-      g.event.addListener(pano, 'visible_changed', () => {
-        setStreetViewActive(pano.getVisible());
-      });
-    }
+    let cancelled = false;
+    const raf = requestAnimationFrame(() => {
+      if (cancelled) return;
+      const center = map.getCenter();
 
-    const center = map.getCenter();
-    const next = !streetViewActive;
-    if (next) {
-      panoInstanceRef.current.setPosition(center);
-      panoInstanceRef.current.setVisible(true);
-    } else {
-      panoInstanceRef.current.setVisible(false);
-    }
-    // Recenter map after the layout flip so the user's view stays anchored.
-    requestAnimationFrame(() => {
+      if (streetViewActive) {
+        if (!panoInstanceRef.current) {
+          const pano = new g.StreetViewPanorama(panoRef.current, {
+            position: center,
+            pov: { heading: 0, pitch: 0 },
+            zoom: 1,
+            addressControl: true,
+            fullscreenControl: false,
+            motionTracking: false,
+            motionTrackingControl: false,
+            enableCloseButton: false,
+            visible: true,
+          });
+          panoInstanceRef.current = pano;
+          // Linking the pano so the pegman drag updates this panorama.
+          map.setStreetView(pano);
+        } else {
+          panoInstanceRef.current.setPosition(center);
+          panoInstanceRef.current.setVisible(true);
+        }
+      } else if (panoInstanceRef.current) {
+        panoInstanceRef.current.setVisible(false);
+      }
+
+      // Tell both the map and pano to re-measure their containers.
       g.event.trigger(map, 'resize');
+      if (panoInstanceRef.current && streetViewActive) {
+        g.event.trigger(panoInstanceRef.current, 'resize');
+      }
       if (center) map.setCenter(center);
     });
-  }, [streetViewActive]);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+    };
+  }, [streetViewActive, mapsLoaded]);
+
+  // ---- AR overlay: project measurement shapes into the Street View panorama ----
+  // Assumes a flat ground plane CAMERA_HEIGHT below the panorama camera.
+  // Caveats: no terrain elevation, no occlusion (draws through buildings).
+  const drawAR = useCallback(() => {
+    const pano = panoInstanceRef.current;
+    const svg = arOverlayRef.current;
+    const panoDiv = panoRef.current;
+    if (!svg) return;
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (!pano || !panoDiv || !arEnabled || !streetViewActive || !pano.getVisible()) return;
+
+    const w = panoDiv.clientWidth;
+    const h = panoDiv.clientHeight;
+    if (!w || !h) return;
+    svg.setAttribute('width', String(w));
+    svg.setAttribute('height', String(h));
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+
+    const g = window.google.maps;
+    const camPos = pano.getPosition();
+    if (!camPos) return;
+    const pov = pano.getPov();
+    const D2R = Math.PI / 180;
+    const CAMERA_HEIGHT = 2.5; // metres above the ground plane
+
+    // Horizontal FOV from zoom: zoom 1 ≈ 90°, doubles each step.
+    const hFovRad = (180 / Math.pow(2, pov.zoom || 1)) * D2R;
+    const focal = (w / 2) / Math.tan(hFovRad / 2);
+    const NEAR = 0.5; // metres in front of camera
+
+    const headingRad = (pov.heading || 0) * D2R;
+    const pitchRad = (pov.pitch || 0) * D2R;
+    const ch = Math.cos(headingRad), sh = Math.sin(headingRad);
+    const cp = Math.cos(pitchRad), sp = Math.sin(pitchRad);
+
+    // World vector from camera to a target latlng on the ground -> camera space
+    const toCam = (latlng) => {
+      const bearing = g.geometry.spherical.computeHeading(camPos, latlng) * D2R;
+      const dist = Math.max(g.geometry.spherical.computeDistanceBetween(camPos, latlng), 0.5);
+      const wx = Math.sin(bearing) * dist;
+      const wy = -CAMERA_HEIGHT;
+      const wz = Math.cos(bearing) * dist;
+      // Inverse yaw (rotate world by -heading around Y so cam forward = +Z)
+      const x1 = ch * wx - sh * wz;
+      const z1 = sh * wx + ch * wz;
+      // Inverse pitch (rotate by -pitch around X)
+      const yCam = cp * wy - sp * z1;
+      const zCam = sp * wy + cp * z1;
+      return { x: x1, y: yCam, z: zCam };
+    };
+
+    const project = (cs) => ({
+      x: w / 2 + focal * (cs.x / cs.z),
+      y: h / 2 - focal * (cs.y / cs.z),
+    });
+
+    shapes.forEach(s => {
+      if (s.hidden) return;
+      const overlay = shapesRef.current.get(s.id);
+      if (!overlay) return;
+
+      // Collect vertices as LatLng[]
+      let vertices = [];
+      if (typeof overlay.getRadius === 'function') {
+        const center = overlay.getCenter();
+        const radius = overlay.getRadius();
+        const N = 48;
+        for (let i = 0; i < N; i++) {
+          vertices.push(g.geometry.spherical.computeOffset(center, radius, (i / N) * 360));
+        }
+      } else if (typeof overlay.getBounds === 'function' && typeof overlay.getPath !== 'function') {
+        const b = overlay.getBounds();
+        const ne = b.getNorthEast(), sw = b.getSouthWest();
+        vertices = [
+          new g.LatLng(ne.lat(), sw.lng()),
+          new g.LatLng(ne.lat(), ne.lng()),
+          new g.LatLng(sw.lat(), ne.lng()),
+          new g.LatLng(sw.lat(), sw.lng()),
+        ];
+      } else if (typeof overlay.getPath === 'function') {
+        const path = overlay.getPath();
+        for (let i = 0; i < path.getLength(); i++) vertices.push(path.getAt(i));
+      }
+      if (vertices.length < 3) return;
+
+      const camPts = vertices.map(toCam);
+
+      // Sutherland-Hodgman clip against z = NEAR so polygons crossing the camera
+      // plane don't project to nonsense (huge / inverted coordinates).
+      const clipped = [];
+      for (let i = 0; i < camPts.length; i++) {
+        const cur = camPts[i];
+        const next = camPts[(i + 1) % camPts.length];
+        const curIn = cur.z >= NEAR;
+        const nextIn = next.z >= NEAR;
+        if (curIn) {
+          clipped.push(cur);
+          if (!nextIn) {
+            const t = (NEAR - cur.z) / (next.z - cur.z);
+            clipped.push({
+              x: cur.x + t * (next.x - cur.x),
+              y: cur.y + t * (next.y - cur.y),
+              z: NEAR,
+            });
+          }
+        } else if (nextIn) {
+          const t = (NEAR - cur.z) / (next.z - cur.z);
+          clipped.push({
+            x: cur.x + t * (next.x - cur.x),
+            y: cur.y + t * (next.y - cur.y),
+            z: NEAR,
+          });
+        }
+      }
+      if (clipped.length < 3) return;
+
+      const screenPts = clipped.map(project);
+      const inBounds = screenPts.some(p => p.x >= -w && p.x <= 2 * w && p.y >= -h && p.y <= 2 * h);
+      if (!inBounds) return;
+
+      const isEx = s.kind === 'exclusion';
+      const polygon = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      polygon.setAttribute('points', screenPts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' '));
+      polygon.setAttribute('fill', isEx ? EXCLUSION_FILL : AREA_FILL);
+      polygon.setAttribute('fill-opacity', isEx ? '0.55' : '0.4');
+      polygon.setAttribute('stroke', isEx ? EXCLUSION_STROKE : AREA_STROKE);
+      polygon.setAttribute('stroke-width', '2');
+      polygon.setAttribute('stroke-linejoin', 'round');
+      svg.appendChild(polygon);
+    });
+  }, [arEnabled, streetViewActive, shapes]);
+
+  // Wire pano events (pov / position / resize) to redraw the AR overlay.
+  useEffect(() => {
+    const svg = arOverlayRef.current;
+    if (!arEnabled || !streetViewActive || !panoInstanceRef.current) {
+      if (svg) while (svg.firstChild) svg.removeChild(svg.firstChild);
+      return;
+    }
+    const pano = panoInstanceRef.current;
+    const g = window.google.maps;
+
+    let raf = null;
+    const schedule = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => { raf = null; drawAR(); });
+    };
+    const lPov = g.event.addListener(pano, 'pov_changed', schedule);
+    const lPos = g.event.addListener(pano, 'position_changed', schedule);
+    const onResize = () => schedule();
+    window.addEventListener('resize', onResize);
+
+    schedule();
+
+    return () => {
+      g.event.removeListener(lPov);
+      g.event.removeListener(lPos);
+      window.removeEventListener('resize', onResize);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, [arEnabled, streetViewActive, drawAR]);
 
   // ---- Map type toggle (replaces Google's mapTypeControl that we hid) ----
   const cycleMapType = useCallback(() => {
@@ -640,12 +829,15 @@ export default function MeasurePage() {
       loadFromCustomer(customer);
       // Center to stored center if present, else geocode address
       const stored = customer.measurements;
-      if (!stored.center && customer.address && mapInstanceRef.current) {
+      if (stored.center) {
+        movePanoTo(stored.center);
+      } else if (customer.address && mapInstanceRef.current) {
         const geocoder = new window.google.maps.Geocoder();
         geocoder.geocode({ address: `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}` }, (results, status) => {
           if (status === 'OK' && results[0]) {
             mapInstanceRef.current.setCenter(results[0].geometry.location);
             mapInstanceRef.current.setZoom(20);
+            movePanoTo(results[0].geometry.location);
           }
         });
       }
@@ -656,10 +848,11 @@ export default function MeasurePage() {
         if (status === 'OK' && results[0]) {
           mapInstanceRef.current.setCenter(results[0].geometry.location);
           mapInstanceRef.current.setZoom(20);
+          movePanoTo(results[0].geometry.location);
         }
       });
     }
-  }, [loadFromCustomer, showToast]);
+  }, [loadFromCustomer, showToast, movePanoTo]);
 
   const saveToCustomer = useCallback(async () => {
     if (!activeCustomer) {
@@ -722,9 +915,10 @@ export default function MeasurePage() {
         mapInstanceRef.current.setZoom(20);
         searchInputRef.current.value = results[0].formatted_address || query;
         setHasSearchText(true);
+        movePanoTo(results[0].geometry.location);
       }
     });
-  }, []);
+  }, [movePanoTo]);
 
   const clearSearch = useCallback(() => {
     if (searchInputRef.current) {
@@ -777,7 +971,20 @@ export default function MeasurePage() {
     <div className="measure-page page animate-fade-in">
       <div className={`measure-stage ${streetViewActive ? 'split-streetview' : ''}`}>
         <div ref={mapRef} className="measure-map-canvas" />
-        <div ref={panoRef} className="measure-pano-canvas" />
+        <div className="measure-pano-wrap">
+          <div ref={panoRef} className="measure-pano-canvas" />
+          <svg ref={arOverlayRef} className="measure-ar-overlay" />
+          {streetViewActive && (
+            <button
+              className={`measure-ar-btn ${arEnabled ? 'active' : ''}`}
+              onClick={() => setArEnabled(s => !s)}
+              title={arEnabled ? 'Hide measurements in street view' : 'Project measurements onto street view (beta)'}
+            >
+              <Eye size={14} />
+              <span>{arEnabled ? 'AR On' : 'AR Off'}</span>
+            </button>
+          )}
+        </div>
 
         {/* Top-left: search */}
         <div className="measure-search-bar">
