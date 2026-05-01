@@ -1,4 +1,4 @@
-**Last updated:** 2026-04-27
+**Last updated:** 2026-04-30
 **Confidence:** Partially Known
 
 # Finances
@@ -43,6 +43,22 @@
 - **Books / accounting:** None Yet, but will hopefully integrate into the luckyapp in the near future.
 - **Tax preparer / CPA:** Need to figure this out ASAP, we are not LEGALLY COVERED for anything, have LLC AND EIN and have no clue what to do, We have not been paying ourselves.
 
+## Tax tooling in luckyapp
+The app provides starting points for tax filings — **none of it is a substitute for a CPA.**
+
+- **Mileage log** ([`/mileage`](../luckyapp/src/app/(dashboard)/mileage/page.js)) — IRS Pub 463 compliant per-trip records (date, miles, purpose, addresses, optional odometer photos). Year-end CSV export. 2026 standard rate is $0.70/mi.
+- **Contractors directory** ([`/contractors`](../luckyapp/src/app/(dashboard)/contractors/page.js)) — captures W-9 info (full SSN/EIN, address, classification) plus a photo of the signed W-9. Tag expenses to a contractor in the receipt modal so payments roll up.
+- **Tax Center** ([`/tax`](../luckyapp/src/app/(dashboard)/tax/page.js)) — year-end 1099-NEC totals (flags ≥$600 contractors) and a Schedule C line-by-line export. Honors a configurable LLC start date (default 2026-03-01) so pre-formation income gets excluded from the LLC's Schedule C.
+- **Schedule C mapping** ([`src/lib/finance.js`](../luckyapp/src/lib/finance.js) `buildScheduleC`) — every internal expense category maps to a Schedule C line. The mapping is best-effort and overridable at year-end.
+
+### What luckyapp does NOT do (and shouldn't)
+- File 1099-NECs with the IRS — use Tax1099 or Track1099 ($5/form)
+- Calculate self-employment tax (Schedule SE)
+- Depreciate large equipment (Form 4562, §179, MACRS)
+- Quarterly estimated tax (1040-ES) — the next due date is **2026-06-15**
+- Sales tax (NE applies it to some landscaping services — confirm with NE DoR + CPA)
+- Payroll / W-2 — outsource to Gusto when first employee is hired
+
 ## Last full-year results
 (First year in buisness we dont have anything to really show yet)
 | Year | Revenue | Net | Notes |
@@ -50,4 +66,4 @@
 | TODO | | | |
 
 ## Known financial issues / questions
-I have no clue what our margins are, we have never paid ourselves. We have never paid ourselves payroll tax or anything, we have no idea what we are doing.
+I have no clue what our margins are, we have never paid ourselves. we are not sure what to do, you will be our accountant/CPA.

@@ -25,11 +25,12 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 
 export default function QuickReceiptModal({ open, onClose }) {
   const { user } = useAuth();
-  const { jobs, addJobExpense, addCompanyExpense } = useData();
+  const { jobs, contractors = [], addJobExpense, addCompanyExpense } = useData();
 
   // Default category per scope: 'fuel' if untagged (OpEx vehicle gas);
   // 'materials' if tagged to a job (COGS).
   const [jobId, setJobId] = useState('');
+  const [contractorId, setContractorId] = useState('');
   const [form, setForm] = useState({
     category: 'fuel',
     description: '',
@@ -46,6 +47,7 @@ export default function QuickReceiptModal({ open, onClose }) {
   useEffect(() => {
     if (open) {
       setJobId('');
+      setContractorId('');
       setForm({
         category: 'fuel',
         description: '',
@@ -108,6 +110,7 @@ export default function QuickReceiptModal({ open, onClose }) {
         amount,
         date: form.date || todayISO(),
         vendor: form.vendor.trim() || null,
+        contractorId: contractorId || null,
         receiptUrl: form.receipt?.url || null,
         receiptPath: form.receipt?.path || null,
       };
@@ -188,6 +191,25 @@ export default function QuickReceiptModal({ open, onClose }) {
               placeholder={tagged ? 'e.g. mulch + bagged stone' : 'e.g. truck fuel between quotes, lunch for crew'}
             />
           </div>
+
+          {/* Contractor tag — only shown if any contractors exist. Tagging here
+              rolls the expense into the year-end 1099-NEC totals. */}
+          {contractors.filter(c => !c.archived).length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Paid to a 1099 contractor? (optional)</label>
+              <select className="form-select" value={contractorId} onChange={e => setContractorId(e.target.value)}>
+                <option value="">— Not paid to a contractor —</option>
+                {contractors.filter(c => !c.archived).map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.contactName}{c.businessName ? ` — ${c.businessName}` : ''}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: '4px' }}>
+                Tagging counts toward the contractor&apos;s 1099-NEC total ($600+ triggers a filing requirement).
+              </div>
+            </div>
+          )}
 
           <div className="form-row" style={{ gap: '8px', flexWrap: 'wrap' }}>
             <div className="form-group" style={{ flex: 1, minWidth: '180px' }}>

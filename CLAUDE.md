@@ -73,12 +73,23 @@ Invoice public-pay tokens are URL-safe hex generated via `window.crypto.getRando
 ### Time tracking — shift + segment model
 A "shift" is one `time_entries` row. Within the shift, the worker moves between `time_segments` of kind `'job' | 'travel' | 'break'`, recorded in real time. New API in [`src/lib/data.js`](luckyapp/src/lib/data.js): `startShift`, `switchSegment`, `endShift`, `annotateOpenSegment`. Legacy `clockIn` / `clockOut` are kept as wrappers — they still create a single shift but ALSO open a segment so segment-based job costing stays consistent. `time_entries.break_minutes` is recomputed as the sum of break-segment durations on `endShift`, so legacy payroll math keeps working. Per-job labor cost (in [`src/lib/finance.js`](luckyapp/src/lib/finance.js)) prefers `'job'`-kind segments when present, falling back to `time_entries.job_id` for entries without segments. Schema: [`024_time_segments.sql`](luckyapp/supabase/migrations/024_time_segments.sql).
 
+### Tax tooling — mileage, 1099, Schedule C
+Three separate features make up the year-end tax surface:
+
+1. **Mileage log** — `mileage_entries` table ([`025_mileage.sql`](luckyapp/supabase/migrations/025_mileage.sql)) captures one row per trip with date / miles / purpose / addresses / odometer / optional start+end photos. Photos go to the existing `receipts` bucket under a `mileage/` folder. Page at [`(dashboard)/mileage/page.js`](luckyapp/src/app/(dashboard)/mileage/page.js).
+
+2. **Contractors / 1099** — `contractors` table ([`026_contractors.sql`](luckyapp/supabase/migrations/026_contractors.sql)) holds W-9 info (full SSN/EIN, address, classification, signed-W-9 photo). Payments are not a separate table; `job_expenses` and `company_expenses` got a nullable `contractor_id` FK so existing expense flows tag a contractor. The same migration extends `contracts` with a `party_type` ('customer' | 'contractor') so the existing signing infrastructure can be reused for independent contractor agreements (signing flow not yet wired).
+
+3. **Schedule C export + 1099 totals** at [`(dashboard)/tax/page.js`](luckyapp/src/app/(dashboard)/tax/page.js). Aggregation lives in [`src/lib/finance.js`](luckyapp/src/lib/finance.js) `buildScheduleC` — maps every COGS_CATEGORIES + OPEX_CATEGORIES item to a Schedule C line via `COGS_TO_SCHEDULE_C` / `OPEX_TO_SCHEDULE_C`. Honors a configurable `entityStartDate` because the LLC was formed 2026-03-01 and pre-formation activity belongs on a personal sole-prop Schedule C, not the LLC return.
+
+**Tax IDs** (full SSN/EIN) are stored in `contractors.tax_id`. They're row-level-secured per org and never exposed in any public route — but if you ever build a join that touches contractors from a public token endpoint, audit it.
+
 
 ## When finished with response
 Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.
 
 ## Critical thinking
-If you think an idea is bad, tell me why, be very upfront and critical, don't suger coat it, provide a better alternative if you have one, and always have an idea of how you would improve the app.
+If you think an idea is bad, tell me why, be very upfront and critical, don't suger coat it, provide a better alternative if you have one, and always have an idea of how you would improve the app. Reminder you are a developer, act like one, question things, point out problems, and propose solutions, you can code what i can code in minutes when it would take me days.
 
 ## Updating Claude file and docs
 Update the docs as we go, if you see any inconsistencies or missing information, update the docs. If we have a change in our workflow or the way we do things, update the docs. If you find a better way to do things, update the docs.

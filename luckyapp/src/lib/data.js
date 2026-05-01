@@ -78,6 +78,8 @@ export function DataProvider({ children }) {
   const [companyExpenses, setCompanyExpenses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [mileageEntries, setMileageEntries] = useState([]);
+  const [contractors, setContractors] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -125,6 +127,8 @@ export function DataProvider({ children }) {
       setCompanyExpenses(loadLocal('company_expenses'));
       setPayments(loadLocal('payments'));
       setContracts(loadLocal('contracts'));
+      setMileageEntries(loadLocal('mileage_entries'));
+      setContractors(loadLocal('contractors'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -133,7 +137,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -151,6 +155,8 @@ export function DataProvider({ children }) {
         supabase.from('quote_media').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('time_segments').select('*').eq('org_id', orgId).order('started_at', { ascending: false }).limit(2000).then(r => r).catch(() => ({ data: null })),
         supabase.from('contracts').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('mileage_entries').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -170,6 +176,8 @@ export function DataProvider({ children }) {
       if (qmed?.data) setQuoteMedia(snakeToCamel(qmed.data));
       if (tseg?.data) setTimeSegments(snakeToCamel(tseg.data));
       if (ctr?.data) setContracts(snakeToCamel(ctr.data));
+      if (mile?.data) setMileageEntries(snakeToCamel(mile.data));
+      if (cntr?.data) setContractors(snakeToCamel(cntr.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -242,6 +250,14 @@ export function DataProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contracts' }, () => {
         supabase.from('contracts').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setContracts(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'mileage_entries' }, () => {
+        supabase.from('mileage_entries').select('*').eq('org_id', orgId).order('date', { ascending: false })
+          .then(({ data }) => { if (data) setMileageEntries(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contractors' }, () => {
+        supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true })
+          .then(({ data }) => { if (data) setContractors(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -1094,6 +1110,121 @@ export function DataProvider({ children }) {
     });
   }, [connected, companyExpenses]);
 
+  // ─── Mileage CRUD ───────────────────────────────────────
+  // Each row is one trip. Photos live in the existing `receipts` bucket
+  // under a mileage/ folder so we don't need a second storage policy set.
+  const addMileageEntry = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('mileage_entries')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const m = snakeToCamel(row);
+      setMileageEntries(prev => [m, ...prev]);
+      return m;
+    } else {
+      const m = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setMileageEntries(prev => { const next = [m, ...prev]; saveLocal('mileage_entries', next); return next; });
+      return m;
+    }
+  }, [connected, orgId]);
+
+  const updateMileageEntry = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('mileage_entries').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setMileageEntries(prev => {
+      const next = prev.map(m => m.id === id ? { ...m, ...data } : m);
+      if (!connected) saveLocal('mileage_entries', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteMileageEntry = useCallback(async (id) => {
+    const existing = mileageEntries.find(m => m.id === id);
+    if (connected) {
+      const paths = [existing?.startPhotoPath, existing?.endPhotoPath].filter(Boolean);
+      if (paths.length) {
+        try { await supabase.storage.from('receipts').remove(paths); }
+        catch (err) { console.warn('[deleteMileageEntry] storage cleanup failed', err); }
+      }
+      const { error } = await supabase.from('mileage_entries').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setMileageEntries(prev => {
+      const next = prev.filter(m => m.id !== id);
+      if (!connected) saveLocal('mileage_entries', next);
+      return next;
+    });
+  }, [connected, mileageEntries]);
+
+  // ─── Contractor CRUD ────────────────────────────────────
+  // Contractors are payees we issue 1099-NECs to. Distinct from customers
+  // (we bill them) and team_members (W-2 employees).
+  const addContractor = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('contractors')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const c = snakeToCamel(row);
+      setContractors(prev => [c, ...prev].sort((a, b) => (a.contactName || '').localeCompare(b.contactName || '')));
+      return c;
+    } else {
+      const c = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setContractors(prev => { const next = [c, ...prev]; saveLocal('contractors', next); return next; });
+      return c;
+    }
+  }, [connected, orgId]);
+
+  const updateContractor = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('contractors').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setContractors(prev => {
+      const next = prev.map(c => c.id === id ? { ...c, ...data } : c);
+      if (!connected) saveLocal('contractors', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteContractor = useCallback(async (id) => {
+    const existing = contractors.find(c => c.id === id);
+    if (connected) {
+      if (existing?.w9Path) {
+        try { await supabase.storage.from('receipts').remove([existing.w9Path]); }
+        catch (err) { console.warn('[deleteContractor] storage cleanup failed', err); }
+      }
+      const { error } = await supabase.from('contractors').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setContractors(prev => {
+      const next = prev.filter(c => c.id !== id);
+      if (!connected) saveLocal('contractors', next);
+      return next;
+    });
+  }, [connected, contractors]);
+
+  // Roll up payments to a contractor for a given tax year. Pulls from both
+  // job_expenses (subcontractor work on jobs) and company_expenses (any
+  // overhead paid to a contractor) where contractor_id matches.
+  const getContractorPaymentsForYear = useCallback((contractorId, taxYear) => {
+    const start = `${taxYear}-01-01`;
+    const end = `${taxYear}-12-31`;
+    const inYear = (d) => d && d >= start && d <= end;
+    const fromJob = jobExpenses
+      .filter(e => e.contractorId === contractorId && inYear((e.date || e.createdAt || '').slice(0, 10)))
+      .map(e => ({ id: e.id, source: 'job_expense', amount: Number(e.amount || 0), date: e.date || e.createdAt, description: e.description, jobId: e.jobId }));
+    const fromCo = companyExpenses
+      .filter(e => e.contractorId === contractorId && inYear((e.date || e.createdAt || '').slice(0, 10)))
+      .map(e => ({ id: e.id, source: 'company_expense', amount: Number(e.amount || 0), date: e.date || e.createdAt, description: e.description }));
+    const all = [...fromJob, ...fromCo].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const total = all.reduce((s, p) => s + p.amount, 0);
+    return { payments: all, total };
+  }, [jobExpenses, companyExpenses]);
+
   // ─── Payment CRUD ───────────────────────────────────────
   const addPayment = useCallback(async (data) => {
     if (connected) {
@@ -1262,7 +1393,7 @@ export function DataProvider({ children }) {
     customers, quotes, jobs, calendarEvents, teamMembers,
     activity, timeEntries, timeSegments, jobMedia, jobExpenses, materials,
     services, invoices, companyExpenses, payments, loading,
-    quoteMedia, contracts,
+    quoteMedia, contracts, mileageEntries, contractors,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
@@ -1299,6 +1430,12 @@ export function DataProvider({ children }) {
 
     // Company Expenses (overhead)
     addCompanyExpense, updateCompanyExpense, deleteCompanyExpense,
+
+    // Mileage (IRS log)
+    addMileageEntry, updateMileageEntry, deleteMileageEntry,
+
+    // Contractors / 1099
+    addContractor, updateContractor, deleteContractor, getContractorPaymentsForYear,
 
     // Invoices
     addInvoice, updateInvoice, deleteInvoice,

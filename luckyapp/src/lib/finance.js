@@ -31,6 +31,69 @@ export const OPEX_LABELS = {
 
 export const RECURRING_INTERVALS = ['weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
 
+// ─── Schedule C line mapping ────────────────────────────────
+// Best-effort default mapping from our internal category to the IRS
+// Schedule C line a single-member LLC / sole prop would report it on.
+// Year-end the user (or their CPA) can override per-line. Don't treat
+// these as tax advice — they're starting points for a Schedule C export.
+//
+// See 2025 Schedule C (Form 1040). Part II = Expenses, Part III = COGS.
+export const SCHEDULE_C_LINES = {
+  // Part II (operating expenses)
+  '8':   { label: 'Advertising', part: 'II' },
+  '9':   { label: 'Car and truck expenses', part: 'II' },
+  '11':  { label: 'Contract labor', part: 'II' },
+  '13':  { label: 'Depreciation (Form 4562)', part: 'II' },
+  '15':  { label: 'Insurance (other than health)', part: 'II' },
+  '17':  { label: 'Legal and professional services', part: 'II' },
+  '18':  { label: 'Office expense', part: 'II' },
+  '20a': { label: 'Rent or lease — vehicles, machinery, equipment', part: 'II' },
+  '20b': { label: 'Rent or lease — other (buildings)', part: 'II' },
+  '21':  { label: 'Repairs and maintenance', part: 'II' },
+  '22':  { label: 'Supplies', part: 'II' },
+  '23':  { label: 'Taxes and licenses', part: 'II' },
+  '24a': { label: 'Travel', part: 'II' },
+  '25':  { label: 'Utilities', part: 'II' },
+  '27a': { label: 'Other expenses', part: 'II' },
+  // Part III (cost of goods sold)
+  '36':  { label: 'Purchases (COGS)', part: 'III' },
+  '38':  { label: 'Materials and supplies (COGS)', part: 'III' },
+  '39':  { label: 'Other COGS', part: 'III' },
+};
+
+// COGS categories → Schedule C Part III lines.
+// Materials and small tools roll through Part III for a service-with-supplies
+// business like landscaping; large equipment ($2,500+ per IRS de minimis safe
+// harbor) belongs on Form 4562 depreciation (Line 13) instead of Line 36.
+export const COGS_TO_SCHEDULE_C = {
+  materials:     '38',
+  equipment:     '36',  // small tools; large ones → Form 4562 (Line 13)
+  fuel:          '9',
+  dump_fees:     '39',
+  subcontractor: '11',
+  permits:       '23',
+  other:         '39',
+};
+
+// OpEx categories → Schedule C Part II lines
+export const OPEX_TO_SCHEDULE_C = {
+  vehicle:         '9',
+  insurance:       '15',
+  rent:            '20b',
+  utilities:       '25',
+  software:        '18',
+  marketing:       '8',
+  office_supplies: '18',
+  fuel:            '9',
+  payroll_tax:     '23',
+  other:           '27a',
+};
+
+// Direct labor (paid to W-2 employees) goes on Schedule C Line 26 (Wages).
+// Direct labor paid to 1099 contractors goes on Line 11 (Contract labor) —
+// our contractor model handles this separately via 1099 totals.
+export const SCHEDULE_C_LINE_WAGES = '26';
+
 // ─── Period helpers ─────────────────────────────────────────
 export function getPeriodRange(period, ref = new Date()) {
   const end = new Date(ref);
@@ -309,4 +372,94 @@ export function pctChange(curr, prev) {
 export function isInPeriod(dateStr, period, ref = new Date()) {
   const { start, end } = getPeriodRange(period, ref);
   return inRange(dateStr, start, end);
+}
+
+// ─── Schedule C aggregation ─────────────────────────────────
+// Roll up COGS + OpEx + direct-contractor labor + mileage deduction into
+// Schedule C lines for a tax year. `entityStartDate` lets us split the year
+// for businesses that incorporated mid-year (e.g. LLC formed in March) —
+// only entries on/after that date count for the LLC return; pre-formation
+// activity belongs on a personal Schedule C as sole prop.
+export function buildScheduleC({
+  jobs = [],
+  jobExpenses = [],
+  companyExpenses = [],
+  contractorPayments = [],
+  mileageEntries = [],
+  taxYear,
+  entityStartDate = null,         // ISO date string or null
+  mileageRate = 0.70,             // 2026 IRS standard mileage rate ($/mi)
+} = {}) {
+  const yearStart = new Date(`${taxYear}-01-01T00:00:00`);
+  const yearEnd   = new Date(`${taxYear}-12-31T23:59:59`);
+  const cutover   = entityStartDate ? new Date(`${entityStartDate}T00:00:00`) : yearStart;
+  const start     = cutover > yearStart ? cutover : yearStart;
+  const end       = yearEnd;
+
+  const lines = {};
+  const ensure = (line) => { if (!lines[line]) lines[line] = { line, label: SCHEDULE_C_LINES[line]?.label || line, part: SCHEDULE_C_LINES[line]?.part || 'II', amount: 0, sources: [] }; return lines[line]; };
+
+  // 1. COGS — only against completed jobs in the period
+  const periodJobs = jobs.filter(j => j.status === 'completed' && inRange(j.completedAt, start, end));
+  const periodJobIds = new Set(periodJobs.map(j => j.id));
+  for (const e of jobExpenses) {
+    if (!periodJobIds.has(e.jobId)) continue;
+    const cat = COGS_CATEGORIES.includes(e.category) ? e.category : 'other';
+    const line = COGS_TO_SCHEDULE_C[cat] || '39';
+    const row = ensure(line);
+    row.amount += Number(e.amount || 0);
+    row.sources.push({ type: 'job_expense', cat, amount: Number(e.amount || 0), id: e.id, date: e.date || e.createdAt });
+  }
+
+  // 2. OpEx — company_expenses dated in the period
+  for (const e of companyExpenses) {
+    if (!inRange(e.date || e.createdAt, start, end)) continue;
+    const cat = OPEX_CATEGORIES.includes(e.category) ? e.category : 'other';
+    const line = OPEX_TO_SCHEDULE_C[cat] || '27a';
+    const row = ensure(line);
+    row.amount += Number(e.amount || 0);
+    row.sources.push({ type: 'company_expense', cat, amount: Number(e.amount || 0), id: e.id, date: e.date || e.createdAt });
+  }
+
+  // 3. Contract labor — Line 11 (1099 contractors paid in the period)
+  for (const p of contractorPayments) {
+    if (!inRange(p.paidDate || p.date || p.createdAt, start, end)) continue;
+    const row = ensure('11');
+    row.amount += Number(p.amount || 0);
+    row.sources.push({ type: 'contractor_payment', amount: Number(p.amount || 0), id: p.id, contractorId: p.contractorId, date: p.paidDate || p.date });
+  }
+
+  // 4. Mileage — Line 9 (Car/truck), standard mileage method.
+  // If the user is also tracking actual vehicle expenses (fuel/maint),
+  // they must pick one method per vehicle. We surface both totals so they
+  // can choose at year-end with their CPA.
+  let mileageTotal = 0;
+  let mileageMiles = 0;
+  for (const m of mileageEntries) {
+    if (!inRange(m.date, start, end)) continue;
+    const miles = Number(m.miles || 0);
+    mileageMiles += miles;
+    mileageTotal += miles * mileageRate;
+  }
+  if (mileageMiles > 0) {
+    // Don't auto-add to Line 9 (would double-count vehicle/fuel OpEx).
+    // Surface separately so the export can show both methods.
+  }
+
+  const sorted = Object.values(lines).sort((a, b) => {
+    if (a.part !== b.part) return a.part === 'III' ? 1 : -1;
+    return a.line.localeCompare(b.line, undefined, { numeric: true });
+  });
+
+  const totalPartII  = sorted.filter(r => r.part === 'II').reduce((s, r) => s + r.amount, 0);
+  const totalPartIII = sorted.filter(r => r.part === 'III').reduce((s, r) => s + r.amount, 0);
+
+  return {
+    taxYear,
+    range: { start, end, entityStartDate: entityStartDate || null },
+    lines: sorted,
+    totalPartII,
+    totalPartIII,
+    mileage: { miles: mileageMiles, rate: mileageRate, deductionStandardMethod: mileageTotal },
+  };
 }

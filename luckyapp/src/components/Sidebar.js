@@ -29,6 +29,8 @@ import {
   Sun,
   Moon,
   Camera,
+  Car,
+  ScrollText,
 } from 'lucide-react';
 import { useState } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
@@ -50,6 +52,9 @@ const ownerNavItems = [
   { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
   { href: '/finance', label: 'Finance', icon: Wallet, roles: ['owner', 'admin'] },
   { href: '/reports', label: 'P&L Report', icon: BarChart3, roles: ['owner', 'admin'] },
+  { href: '/mileage', label: 'Mileage', icon: Car, roles: ['owner', 'admin'] },
+  { href: '/contractors', label: 'Contractors', icon: FileSignature, roles: ['owner', 'admin'] },
+  { href: '/tax', label: 'Tax Center', icon: ScrollText, roles: ['owner', 'admin'] },
   { href: '/team', label: 'Team & Payroll', icon: UserCog, roles: ['owner'] },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },
