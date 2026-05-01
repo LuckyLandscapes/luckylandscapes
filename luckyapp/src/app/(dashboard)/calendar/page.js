@@ -4,25 +4,25 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import Link from 'next/link';
 import EventModal from '@/components/EventModal';
+import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
+import { dayLoad, eventDurationHours, STATUS_LABELS } from '@/lib/capacity';
 import {
   ChevronLeft,
   ChevronRight,
   Plus,
   CalendarDays,
   Clock,
-  MapPin,
   User,
   Briefcase,
   FileText,
-  Users as UsersIcon,
   ExternalLink,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 
 // ─── Helpers ────────────────────────────────────────────────
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-const DAYS_FULL = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 
 function pad(n) { return String(n).padStart(2, '0'); }
 function formatDate(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
@@ -45,21 +45,16 @@ function getMonthGrid(year, month) {
   const rows = [];
   let week = [];
 
-  // Previous month fill
   for (let i = firstDay - 1; i >= 0; i--) {
     const d = daysInPrevMonth - i;
     const dt = new Date(year, month - 1, d);
     week.push({ date: dt, day: d, currentMonth: false });
   }
-
-  // Current month
   for (let d = 1; d <= daysInMonth; d++) {
     const dt = new Date(year, month, d);
     week.push({ date: dt, day: d, currentMonth: true });
     if (week.length === 7) { rows.push(week); week = []; }
   }
-
-  // Next month fill
   if (week.length > 0) {
     let d = 1;
     while (week.length < 7) {
@@ -69,7 +64,6 @@ function getMonthGrid(year, month) {
     }
     rows.push(week);
   }
-
   return rows;
 }
 
@@ -86,7 +80,7 @@ function getWeekDates(date) {
 }
 
 const EVENT_TYPE_COLORS = {
-  job: '#3a9c4a',
+  job: '#6B8E4E',
   quote_appointment: '#3b82f6',
   meeting: '#d4a93e',
   other: '#64748b',
@@ -114,18 +108,24 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Build events map by date (merge calendar_events + jobs without events)
+  // Build a date-keyed index of events. Synthesize entries for jobs that
+  // don't have a calendar_event row, and attach estimatedDuration so the
+  // capacity model has a reasonable hours estimate even when end_time is null.
   const eventsByDate = useMemo(() => {
     const map = {};
 
-    // Add all calendar events
     calendarEvents.forEach(e => {
       if (!e.date) return;
+      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
       if (!map[e.date]) map[e.date] = [];
-      map[e.date].push({ ...e, source: 'event' });
+      map[e.date].push({
+        ...e,
+        source: 'event',
+        estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration,
+        jobStatus: linkedJob?.status,
+      });
     });
 
-    // Add jobs that don't have a corresponding calendar event
     jobs.forEach(j => {
       if (!j.scheduledDate) return;
       const hasEvent = calendarEvents.some(e => e.jobId === j.id);
@@ -141,14 +141,22 @@ export default function CalendarPage() {
           color: '#6B8E4E',
           customerId: j.customerId,
           source: 'job',
+          estimatedDuration: j.estimatedDuration,
+          jobStatus: j.status,
         });
       }
     });
 
+    // Sort each day by start time so timeline blocks render in order.
+    Object.values(map).forEach(arr => arr.sort((a, b) => {
+      const aa = a.allDay ? '' : (a.startTime || '99:99');
+      const bb = b.allDay ? '' : (b.startTime || '99:99');
+      return String(aa).localeCompare(String(bb));
+    }));
+
     return map;
   }, [calendarEvents, jobs]);
 
-  // Navigation
   const navigate = (dir) => {
     const d = new Date(currentDate);
     if (view === 'month') d.setMonth(d.getMonth() + dir);
@@ -162,15 +170,12 @@ export default function CalendarPage() {
     setSelectedDate(todayStr);
   };
 
-  // Selected day events
   const selectedDateStr = selectedDate || todayStr;
   const dayEvents = eventsByDate[selectedDateStr] || [];
+  const sidebarLoad = useMemo(() => dayLoad(dayEvents), [dayEvents]);
 
   const handleDayClick = (dateObj) => {
     setSelectedDate(formatDate(dateObj));
-    if (view === 'month') {
-      // Don't switch view, just highlight
-    }
   };
 
   const handleEventClick = (event) => {
@@ -180,6 +185,7 @@ export default function CalendarPage() {
   const openNewEvent = (date) => {
     setEditingEvent(null);
     setShowEventModal(true);
+    if (date) setSelectedDate(date);
   };
 
   const handleEditEvent = (event) => {
@@ -196,7 +202,6 @@ export default function CalendarPage() {
     if (!ok) return;
 
     try {
-      // Try to remove from Google Calendar (non-blocking)
       if (event.googleEventId) {
         try {
           await fetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
@@ -208,22 +213,16 @@ export default function CalendarPage() {
       if (event.source === 'event' && event.id) {
         await deleteCalendarEvent(event.id);
       }
-
-      // Unschedule the linked job (so it doesn't reappear synthetically)
       if (event.jobId) {
         await updateJob(event.jobId, { scheduledDate: null, scheduledTime: null });
       }
-
       setSelectedEvent(null);
     } catch (err) {
       console.error('Error deleting event:', err);
-      if (typeof window !== 'undefined') {
-        window.alert('Could not remove event. Please try again.');
-      }
+      if (typeof window !== 'undefined') window.alert('Could not remove event. Please try again.');
     }
   };
 
-  // Title for current view
   const viewTitle = view === 'month'
     ? `${MONTHS[month]} ${year}`
     : view === 'week'
@@ -284,6 +283,7 @@ export default function CalendarPage() {
               eventsByDate={eventsByDate}
               onDayClick={handleDayClick}
               onEventClick={handleEventClick}
+              onAddOnDay={(d) => openNewEvent(d)}
             />
           )}
           {view === 'week' && (
@@ -294,12 +294,12 @@ export default function CalendarPage() {
               eventsByDate={eventsByDate}
               onDayClick={handleDayClick}
               onEventClick={handleEventClick}
+              onAddOnDay={(d) => openNewEvent(d)}
             />
           )}
           {view === 'day' && (
             <DayView
               currentDate={currentDate}
-              todayStr={todayStr}
               eventsByDate={eventsByDate}
               onEventClick={handleEventClick}
               getCustomer={getCustomer}
@@ -307,20 +307,50 @@ export default function CalendarPage() {
           )}
         </div>
 
-        {/* Day sidebar */}
+        {/* Day drawer */}
         <div className="cal-sidebar-panel">
           <div className="cal-sidebar-header">
-            <h3>
-              {(() => {
-                const d = new Date(selectedDateStr + 'T12:00:00');
-                return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-              })()}
-            </h3>
-            <button className="btn btn-ghost btn-sm" onClick={() => openNewEvent(selectedDateStr)}>
+            <div>
+              <h3>
+                {(() => {
+                  const d = new Date(selectedDateStr + 'T12:00:00');
+                  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                })()}
+              </h3>
+              <div className="cal-sidebar-status" data-status={sidebarLoad.status}>
+                <span className="cal-sidebar-status-dot" />
+                {STATUS_LABELS[sidebarLoad.status]}
+                {sidebarLoad.count > 0 && (
+                  <span className="cal-sidebar-status-meta">
+                    · {sidebarLoad.hours.toFixed(1)}h / {sidebarLoad.capacity}h · {sidebarLoad.count} {sidebarLoad.count === 1 ? 'event' : 'events'}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={() => openNewEvent(selectedDateStr)}>
               <Plus size={14} /> Add
             </button>
           </div>
+
+          <div className="cal-sidebar-loadbar">
+            <DayLoadBar load={sidebarLoad} />
+          </div>
+
+          {sidebarLoad.status === 'overbooked' && (
+            <div className="cal-conflict-banner danger" style={{ margin: '0 var(--space-md) var(--space-md)' }}>
+              <div className="cal-conflict-banner-title">
+                <AlertTriangle size={14} /> Overbooked — {sidebarLoad.hours.toFixed(1)}h scheduled, capacity {sidebarLoad.capacity}h
+              </div>
+            </div>
+          )}
+
+          {/* Vertical timeline view of the day */}
+          <div className="cal-sidebar-timeline">
+            <DaySchedulePreview events={dayEvents} height={360} />
+          </div>
+
           <div className="cal-sidebar-events">
+            <div className="cal-sidebar-events-title">Bookings</div>
             {dayEvents.length === 0 ? (
               <div className="cal-sidebar-empty">
                 <CalendarDays size={24} />
@@ -329,6 +359,7 @@ export default function CalendarPage() {
             ) : (
               dayEvents.map(e => {
                 const customer = e.customerId ? getCustomer(e.customerId) : null;
+                const hours = eventDurationHours(e);
                 return (
                   <div
                     key={e.id}
@@ -339,7 +370,8 @@ export default function CalendarPage() {
                     <div className="cal-sidebar-event-content">
                       <div className="cal-sidebar-event-title">{e.title}</div>
                       <div className="cal-sidebar-event-meta">
-                        {e.startTime && <span><Clock size={11} /> {formatTime12(e.startTime)}</span>}
+                        {e.startTime && <span><Clock size={11} /> {formatTime12(e.startTime)}{e.endTime ? ` – ${formatTime12(e.endTime)}` : ` (${hours.toFixed(1)}h est)`}</span>}
+                        {e.allDay && <span>All day</span>}
                         <span className={`cal-type-badge cal-type-${e.type}`}>
                           {EVENT_TYPE_LABELS[e.type] || 'Event'}
                         </span>
@@ -350,7 +382,6 @@ export default function CalendarPage() {
                         </div>
                       )}
                     </div>
-                    {/* Completed ticker for jobs */}
                     {(e.source === 'job' || (e.source === 'event' && e.type === 'job')) && e.jobId && (
                       <button
                         className={`cal-job-ticker ${e.jobStatus === 'completed' ? 'done' : ''}`}
@@ -381,20 +412,19 @@ export default function CalendarPage() {
             )}
           </div>
 
-          {/* Legend */}
           <div className="cal-legend">
-            <div className="cal-legend-title">Event Types</div>
+            <div className="cal-legend-title">Day capacity</div>
             <div className="cal-legend-items">
-              <div className="cal-legend-item"><span className="cal-legend-dot" style={{ background: EVENT_TYPE_COLORS.job }} /> Jobs</div>
-              <div className="cal-legend-item"><span className="cal-legend-dot" style={{ background: EVENT_TYPE_COLORS.quote_appointment }} /> Quote Appts</div>
-              <div className="cal-legend-item"><span className="cal-legend-dot" style={{ background: EVENT_TYPE_COLORS.meeting }} /> Meetings</div>
-              <div className="cal-legend-item"><span className="cal-legend-dot" style={{ background: EVENT_TYPE_COLORS.other }} /> Other</div>
+              <div className="cal-legend-item"><span className="cal-load-swatch" data-status="open" /> Open</div>
+              <div className="cal-legend-item"><span className="cal-load-swatch" data-status="light" /> Light</div>
+              <div className="cal-legend-item"><span className="cal-load-swatch" data-status="busy" /> Busy</div>
+              <div className="cal-legend-item"><span className="cal-load-swatch" data-status="full" /> Full</div>
+              <div className="cal-legend-item"><span className="cal-load-swatch" data-status="overbooked" /> Overbooked</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Event Detail Overlay */}
       {selectedEvent && (
         <EventDetailOverlay
           event={selectedEvent}
@@ -405,7 +435,6 @@ export default function CalendarPage() {
         />
       )}
 
-      {/* New/Edit Event Modal */}
       {showEventModal && (
         <EventModal
           event={editingEvent}
@@ -418,7 +447,7 @@ export default function CalendarPage() {
 }
 
 // ─── Month View ─────────────────────────────────────────────
-function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayClick, onEventClick }) {
+function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayClick, onEventClick, onAddOnDay }) {
   const grid = getMonthGrid(year, month);
 
   return (
@@ -434,16 +463,43 @@ function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayCli
               const isToday = dateStr === todayStr;
               const isSelected = dateStr === selectedDate;
               const events = eventsByDate[dateStr] || [];
+              const load = dayLoad(events);
 
               return (
                 <div
                   key={di}
                   className={`cal-month-cell ${!currentMonth ? 'out' : ''} ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+                  data-status={load.status}
                   onClick={() => onDayClick(date)}
                 >
-                  <div className={`cal-day-number ${isToday ? 'today' : ''}`}>{day}</div>
+                  <div className="cal-month-cell-top">
+                    <div className={`cal-day-number ${isToday ? 'today' : ''}`}>{day}</div>
+                    {events.length > 0 && (
+                      <div className="cal-day-load-pill" data-status={load.status} title={`${load.hours.toFixed(1)}h scheduled, ${load.count} event${load.count === 1 ? '' : 's'}`}>
+                        {load.hours.toFixed(load.hours < 10 ? 1 : 0)}h
+                      </div>
+                    )}
+                    {currentMonth && (
+                      <button
+                        className="cal-day-add"
+                        onClick={(ev) => { ev.stopPropagation(); onAddOnDay(dateStr); }}
+                        title="Add event on this day"
+                      >
+                        <Plus size={12} />
+                      </button>
+                    )}
+                  </div>
+                  {events.length > 0 && (
+                    <div className="cal-day-load-track">
+                      <div
+                        className="cal-day-load-fill"
+                        data-status={load.status}
+                        style={{ width: `${Math.min(100, (load.hours / load.capacity) * 100)}%` }}
+                      />
+                    </div>
+                  )}
                   <div className="cal-day-events">
-                    {events.slice(0, 3).map((e, i) => (
+                    {events.slice(0, 3).map((e) => (
                       <div
                         key={e.id}
                         className="cal-event-pill"
@@ -459,7 +515,12 @@ function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayCli
                       </div>
                     ))}
                     {events.length > 3 && (
-                      <div className="cal-day-more">+{events.length - 3} more</div>
+                      <button
+                        className="cal-day-more"
+                        onClick={(ev) => { ev.stopPropagation(); onDayClick(date); }}
+                      >
+                        +{events.length - 3} more
+                      </button>
                     )}
                   </div>
                 </div>
@@ -472,60 +533,132 @@ function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayCli
   );
 }
 
-// ─── Week View ──────────────────────────────────────────────
-function WeekView({ currentDate, todayStr, selectedDate, eventsByDate, onDayClick, onEventClick }) {
+// ─── Week View — time-block layout (events positioned by start + duration) ──
+function WeekView({ currentDate, todayStr, selectedDate, eventsByDate, onDayClick, onEventClick, onAddOnDay }) {
   const weekDates = getWeekDates(currentDate);
-  const hours = Array.from({ length: 14 }, (_, i) => i + 6); // 6am to 7pm
+  const startHour = 6;
+  const endHour = 21;
+  const totalMin = (endHour - startHour) * 60;
+  const hours = [];
+  for (let h = startHour; h <= endHour; h++) hours.push(h);
+
+  // Pack overlapping blocks into side-by-side columns within each day.
+  const dayBlocks = weekDates.map(d => {
+    const dateStr = formatDate(d);
+    const events = eventsByDate[dateStr] || [];
+
+    const blocks = events.map(e => {
+      if (e.allDay) {
+        return { e, top: 0, height: 100, allDay: true };
+      }
+      const [sh, sm] = String(e.startTime || '').split(':').map(Number);
+      if (Number.isNaN(sh)) return null;
+      const start = sh * 60 + (sm || 0);
+      const dur = Math.max(0.25, eventDurationHours(e)) * 60;
+      const baseline = startHour * 60;
+      const top = Math.max(0, ((start - baseline) / totalMin) * 100);
+      const bottom = Math.min(100, ((start + dur - baseline) / totalMin) * 100);
+      if (bottom <= top) return null;
+      return { e, top, height: bottom - top, allDay: false };
+    }).filter(Boolean).sort((a, b) => a.top - b.top);
+
+    const cols = [];
+    blocks.forEach(b => {
+      let placed = false;
+      for (let i = 0; i < cols.length; i++) {
+        const last = cols[i][cols[i].length - 1];
+        if (last.top + last.height <= b.top) {
+          b.col = i;
+          cols[i].push(b);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        b.col = cols.length;
+        cols.push([b]);
+      }
+    });
+
+    return { dateStr, date: d, blocks, totalCols: Math.max(1, cols.length), load: dayLoad(events) };
+  });
 
   return (
-    <div className="cal-week">
-      <div className="cal-week-header">
-        <div className="cal-week-gutter" />
-        {weekDates.map((d, i) => {
-          const dateStr = formatDate(d);
-          const isToday = dateStr === todayStr;
+    <div className="cal-week-v2">
+      {/* Day header strip with capacity */}
+      <div className="cal-week-v2-header">
+        <div className="cal-week-v2-gutter" />
+        {dayBlocks.map((db, i) => {
+          const isToday = db.dateStr === todayStr;
+          const isSelected = db.dateStr === selectedDate;
           return (
             <div
               key={i}
-              className={`cal-week-header-cell ${isToday ? 'today' : ''}`}
-              onClick={() => onDayClick(d)}
+              className={`cal-week-v2-header-cell ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}`}
+              data-status={db.load.status}
+              onClick={() => onDayClick(db.date)}
             >
-              <div className="cal-week-header-day">{DAYS[i]}</div>
-              <div className={`cal-week-header-num ${isToday ? 'today' : ''}`}>{d.getDate()}</div>
+              <div className="cal-week-v2-header-row">
+                <div>
+                  <div className="cal-week-v2-day">{DAYS[i]}</div>
+                  <div className={`cal-week-v2-num ${isToday ? 'today' : ''}`}>{db.date.getDate()}</div>
+                </div>
+                <button
+                  className="cal-day-add"
+                  onClick={(ev) => { ev.stopPropagation(); onAddOnDay(db.dateStr); }}
+                  title="Add event"
+                >
+                  <Plus size={12} />
+                </button>
+              </div>
+              <DayLoadBar load={db.load} compact showLabel={true} />
             </div>
           );
         })}
       </div>
-      <div className="cal-week-body">
-        {hours.map(hour => (
-          <div key={hour} className="cal-week-row">
-            <div className="cal-week-gutter cal-time-label">
-              {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
+
+      {/* Time-block body — single scroll, hour grid + absolutely-positioned events */}
+      <div className="cal-week-v2-body">
+        <div className="cal-week-v2-gutter cal-week-v2-times">
+          {hours.map((h, i) => (
+            <div key={h} className="cal-week-v2-time" style={{ top: `${(i / (hours.length - 1)) * 100}%` }}>
+              <span>{h === 12 ? '12p' : h < 12 ? `${h}a` : `${h - 12}p`}</span>
             </div>
-            {weekDates.map((d, di) => {
-              const dateStr = formatDate(d);
-              const events = (eventsByDate[dateStr] || []).filter(e => {
-                if (!e.startTime) return hour === 8; // default to 8am
-                const h = parseInt(e.startTime.split(':')[0], 10);
-                return h === hour;
-              });
+          ))}
+        </div>
+        {dayBlocks.map((db, di) => (
+          <div
+            key={di}
+            className="cal-week-v2-col"
+            onClick={() => onDayClick(db.date)}
+          >
+            {hours.slice(0, -1).map((h, i) => (
+              <div key={h} className="cal-week-v2-gridline" style={{ top: `${(i / (hours.length - 1)) * 100}%` }} />
+            ))}
+            {db.blocks.map((b, i) => {
+              const colWidth = 100 / db.totalCols;
+              const e = b.e;
               return (
-                <div key={di} className="cal-week-cell" onClick={() => onDayClick(d)}>
-                  {events.map(e => (
-                    <div
-                      key={e.id}
-                      className="cal-week-event"
-                      style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }}
-                      onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
-                      title={`${e.title} — ${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`}
-                    >
-                      <span className="cal-week-event-time">
-                        {formatTime12(e.startTime)}
-                        {e.endTime ? ` – ${formatTime12(e.endTime)}` : ''}
-                      </span>
-                      <span className="cal-week-event-title">{e.title}</span>
+                <div
+                  key={`${e.id}-${i}`}
+                  className="cal-week-v2-block"
+                  style={{
+                    '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b',
+                    top: `${b.top}%`,
+                    height: `${b.height}%`,
+                    left: `calc(${b.col * colWidth}% + 2px)`,
+                    width: `calc(${colWidth}% - 4px)`,
+                  }}
+                  onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
+                  title={`${e.title}${e.startTime ? ` — ${formatTime12(e.startTime)}` : ''}`}
+                >
+                  <div className="cal-week-v2-block-title">{e.title}</div>
+                  {e.startTime && (
+                    <div className="cal-week-v2-block-time">
+                      {formatTime12(e.startTime)}
+                      {e.endTime ? ` – ${formatTime12(e.endTime)}` : ''}
                     </div>
-                  ))}
+                  )}
                 </div>
               );
             })}
@@ -537,52 +670,58 @@ function WeekView({ currentDate, todayStr, selectedDate, eventsByDate, onDayClic
 }
 
 // ─── Day View ───────────────────────────────────────────────
-function DayView({ currentDate, todayStr, eventsByDate, onEventClick, getCustomer }) {
+function DayView({ currentDate, eventsByDate, onEventClick, getCustomer }) {
   const dateStr = formatDate(currentDate);
   const events = eventsByDate[dateStr] || [];
-  const hours = Array.from({ length: 14 }, (_, i) => i + 6);
-
-  // Group events by hour
-  const eventsByHour = {};
-  events.forEach(e => {
-    const h = e.startTime ? parseInt(e.startTime.split(':')[0], 10) : 8;
-    if (!eventsByHour[h]) eventsByHour[h] = [];
-    eventsByHour[h].push(e);
-  });
+  const load = dayLoad(events);
 
   return (
-    <div className="cal-day-view">
-      {hours.map(hour => (
-        <div key={hour} className="cal-day-row">
-          <div className="cal-day-time">
-            {hour === 0 ? '12 AM' : hour < 12 ? `${hour} AM` : hour === 12 ? '12 PM' : `${hour - 12} PM`}
-          </div>
-          <div className="cal-day-slot">
-            {(eventsByHour[hour] || []).map(e => {
-              const customer = e.customerId ? getCustomer(e.customerId) : null;
-              return (
-                <div
-                  key={e.id}
-                  className="cal-day-event"
-                  style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }}
-                  onClick={() => onEventClick(e)}
-                >
-                  <div className="cal-day-event-header">
-                    <span className="cal-day-event-type">{EVENT_TYPE_LABELS[e.type]}</span>
-                    {e.startTime && <span className="cal-day-event-time">{formatTime12(e.startTime)}{e.endTime ? ` – ${formatTime12(e.endTime)}` : ''}</span>}
-                  </div>
-                  <div className="cal-day-event-title">{e.title}</div>
-                  {customer && (
-                    <div className="cal-day-event-customer">
-                      <User size={12} /> {customer.firstName} {customer.lastName || ''}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+    <div className="cal-day-v2">
+      <div className="cal-day-v2-header">
+        <div>
+          <div className="cal-day-v2-date">{currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</div>
+          <div className="cal-sidebar-status" data-status={load.status}>
+            <span className="cal-sidebar-status-dot" />
+            {STATUS_LABELS[load.status]}
+            {load.count > 0 && (
+              <span className="cal-sidebar-status-meta">
+                · {load.hours.toFixed(1)}h / {load.capacity}h · {load.count} {load.count === 1 ? 'event' : 'events'}
+              </span>
+            )}
           </div>
         </div>
-      ))}
+        <DayLoadBar load={load} />
+      </div>
+      <div style={{ flex: 1, minHeight: 480 }}>
+        <DaySchedulePreview events={events} height={520} />
+      </div>
+      {events.length > 0 && (
+        <div className="cal-day-v2-list">
+          {events.map(e => {
+            const customer = e.customerId ? getCustomer(e.customerId) : null;
+            const hours = eventDurationHours(e);
+            return (
+              <button key={e.id} className="cal-day-v2-card" style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }} onClick={() => onEventClick(e)}>
+                <div className="cal-day-v2-card-time">
+                  {e.allDay ? 'All day' : (
+                    <>
+                      {formatTime12(e.startTime)}
+                      <span style={{ opacity: 0.6 }}> · {hours.toFixed(1)}h</span>
+                    </>
+                  )}
+                </div>
+                <div className="cal-day-v2-card-title">{e.title}</div>
+                <div className="cal-day-v2-card-meta">
+                  <span className={`cal-type-badge cal-type-${e.type}`}>{EVENT_TYPE_LABELS[e.type] || 'Event'}</span>
+                  {customer && (
+                    <span><User size={11} style={{ verticalAlign: 'middle' }} /> {customer.firstName} {customer.lastName || ''}</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -610,11 +749,8 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit, onDelete }) {
         }),
       });
       const data = await res.json();
-
-      if (data.synced) {
-        setSyncStatus('synced');
-      } else if (data.url) {
-        // Fallback: open link manually
+      if (data.synced) setSyncStatus('synced');
+      else if (data.url) {
         window.open(data.url, '_blank');
         setSyncStatus('link');
       }
@@ -652,7 +788,7 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit, onDelete }) {
                 <div>
                   <div className="cal-detail-label">Time</div>
                   <div className="cal-detail-value">
-                    {formatTime12(event.startTime)}{event.endTime ? ` – ${formatTime12(event.endTime)}` : ''}
+                    {formatTime12(event.startTime)}{event.endTime ? ` – ${formatTime12(event.endTime)}` : ` (${eventDurationHours(event).toFixed(1)}h est)`}
                   </div>
                 </div>
               </div>

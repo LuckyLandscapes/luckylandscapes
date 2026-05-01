@@ -8704,3 +8704,464 @@ body {
   }
 }
 
+/* ─────────────────────────────────────────────────────────────
+   Calendar revamp — capacity bars, time-block week view, drawer
+   ───────────────────────────────────────────────────────────── */
+
+/* Status palette (open/light/busy/full/overbooked) shared across surfaces */
+.day-load,
+.cal-day-load-pill,
+.cal-load-swatch,
+.cal-sidebar-status,
+.cal-day-load-fill,
+.cal-week-v2-header-cell,
+.cal-month-cell {
+  --status-open:        #475569;     /* slate */
+  --status-light:       #6B8E4E;     /* lucky-green */
+  --status-busy:        #d4a93e;     /* lucky-gold */
+  --status-full:        #f97316;     /* orange */
+  --status-overbooked:  #ef4444;     /* red */
+}
+
+/* DayLoadBar component (compact + full) */
+.day-load { display: flex; align-items: center; gap: 8px; }
+.day-load.compact { gap: 6px; }
+
+.day-load-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid var(--border-primary);
+}
+.day-load.compact .day-load-track { height: 6px; }
+.day-load-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--transition-fast);
+}
+.day-load[data-status="open"] .day-load-fill        { background: var(--status-open); }
+.day-load[data-status="light"] .day-load-fill       { background: var(--status-light); }
+.day-load[data-status="busy"] .day-load-fill        { background: var(--status-busy); }
+.day-load[data-status="full"] .day-load-fill        { background: var(--status-full); }
+.day-load[data-status="overbooked"] .day-load-fill  { background: var(--status-overbooked); }
+
+.day-load-overflow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--status-overbooked),
+    var(--status-overbooked) 4px,
+    color-mix(in srgb, var(--status-overbooked) 60%, black) 4px,
+    color-mix(in srgb, var(--status-overbooked) 60%, black) 8px
+  );
+  border-radius: 0 999px 999px 0;
+}
+
+.day-load-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.day-load-label strong { color: var(--text-primary); margin-right: 1px; }
+.day-load-label span { color: var(--text-tertiary); }
+.day-load[data-status="overbooked"] .day-load-label strong { color: var(--status-overbooked); }
+
+/* Inline pill used in EventModal day summary */
+.day-load-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-variant-numeric: tabular-nums;
+}
+.day-load-status-open       { background: rgba(71,85,105,0.10); color: #94a3b8; border-color: rgba(71,85,105,0.30); }
+.day-load-status-light      { background: rgba(107,142,78,0.12); color: #8ab26a; border-color: rgba(107,142,78,0.35); }
+.day-load-status-busy       { background: rgba(212,169,62,0.12); color: #d4a93e; border-color: rgba(212,169,62,0.35); }
+.day-load-status-full       { background: rgba(249,115,22,0.14); color: #fb923c; border-color: rgba(249,115,22,0.40); }
+.day-load-status-overbooked { background: rgba(239,68,68,0.16); color: #f87171; border-color: rgba(239,68,68,0.45); }
+
+/* ── Month cell additions ─────────────────────────────────── */
+.cal-month-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 110px;
+}
+
+.cal-month-cell-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.cal-day-load-pill {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.3px;
+  border: 1px solid transparent;
+}
+.cal-day-load-pill[data-status="light"]      { background: rgba(107,142,78,0.18); color: #8ab26a; }
+.cal-day-load-pill[data-status="busy"]       { background: rgba(212,169,62,0.18); color: #d4a93e; }
+.cal-day-load-pill[data-status="full"]       { background: rgba(249,115,22,0.20); color: #fb923c; }
+.cal-day-load-pill[data-status="overbooked"] { background: rgba(239,68,68,0.22); color: #f87171; border-color: rgba(239,68,68,0.50); }
+
+.cal-day-add {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: transparent;
+  border: 1px dashed var(--border-primary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--transition-fast), background var(--transition-fast);
+  padding: 0;
+}
+.cal-month-cell:hover .cal-day-add,
+.cal-week-v2-header-cell:hover .cal-day-add {
+  opacity: 1;
+}
+.cal-day-add:hover {
+  background: var(--lucky-green);
+  border-color: var(--lucky-green);
+  color: white;
+}
+
+.cal-day-load-track {
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.cal-day-load-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width var(--transition-fast);
+}
+.cal-day-load-fill[data-status="open"]       { background: var(--status-open); }
+.cal-day-load-fill[data-status="light"]      { background: var(--status-light); }
+.cal-day-load-fill[data-status="busy"]       { background: var(--status-busy); }
+.cal-day-load-fill[data-status="full"]       { background: var(--status-full); }
+.cal-day-load-fill[data-status="overbooked"] { background: var(--status-overbooked); }
+
+/* Subtle background tint by capacity state */
+.cal-month-cell[data-status="busy"]       { background: linear-gradient(180deg, transparent, rgba(212,169,62,0.04)); }
+.cal-month-cell[data-status="full"]       { background: linear-gradient(180deg, transparent, rgba(249,115,22,0.06)); }
+.cal-month-cell[data-status="overbooked"] {
+  background: linear-gradient(180deg, transparent, rgba(239,68,68,0.10));
+  box-shadow: inset 0 -2px 0 0 var(--status-overbooked);
+}
+.cal-month-cell.today[data-status="open"] { background: rgba(45, 122, 58, 0.06); }
+.cal-month-cell.selected { background: rgba(45, 122, 58, 0.10); }
+
+.cal-day-more {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-weight: 700;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.cal-day-more:hover {
+  background: var(--overlay-hover);
+  color: var(--text-secondary);
+}
+
+/* ── Week view v2 — time-block layout ─────────────────────── */
+.cal-week-v2 {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.cal-week-v2-header {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+}
+.cal-week-v2-gutter { border-right: 1px solid var(--border-primary); }
+.cal-week-v2-header-cell {
+  padding: var(--space-sm) var(--space-sm) var(--space-xs);
+  border-right: 1px solid var(--border-primary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.cal-week-v2-header-cell:hover { background: var(--overlay-hover); }
+.cal-week-v2-header-cell:last-child { border-right: none; }
+.cal-week-v2-header-cell.today { background: rgba(45,122,58,0.08); }
+.cal-week-v2-header-cell.selected { background: rgba(45,122,58,0.14); }
+.cal-week-v2-header-cell[data-status="overbooked"] { box-shadow: inset 0 -3px 0 0 var(--status-overbooked); }
+
+.cal-week-v2-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.cal-week-v2-day {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  letter-spacing: 0.5px;
+}
+.cal-week-v2-num {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.cal-week-v2-num.today {
+  color: white;
+  background: var(--lucky-green);
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  font-size: 0.85rem;
+}
+
+.cal-week-v2-body {
+  display: grid;
+  grid-template-columns: 60px repeat(7, 1fr);
+  position: relative;
+  height: 720px;
+  overflow-y: auto;
+}
+
+.cal-week-v2-times {
+  position: relative;
+  height: 100%;
+}
+.cal-week-v2-time {
+  position: absolute;
+  left: 0;
+  right: 0;
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  padding-right: 6px;
+  text-align: right;
+  transform: translateY(-50%);
+}
+.cal-week-v2-time:first-child { transform: translateY(0); }
+.cal-week-v2-time:last-child { transform: translateY(-100%); }
+
+.cal-week-v2-col {
+  position: relative;
+  border-right: 1px solid var(--border-primary);
+  height: 100%;
+  cursor: pointer;
+}
+.cal-week-v2-col:last-child { border-right: none; }
+.cal-week-v2-col:hover { background: rgba(255,255,255,0.015); }
+
+.cal-week-v2-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--border-primary);
+  opacity: 0.5;
+}
+
+.cal-week-v2-block {
+  position: absolute;
+  background: color-mix(in srgb, var(--event-color) 24%, transparent);
+  border-left: 3px solid var(--event-color);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-size: 0.7rem;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+  color: var(--text-primary);
+}
+.cal-week-v2-block:hover {
+  background: color-mix(in srgb, var(--event-color) 38%, transparent);
+  z-index: 5;
+  transform: translateX(-1px);
+}
+.cal-week-v2-block-title {
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.cal-week-v2-block-time {
+  font-size: 0.62rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Day view v2 ──────────────────────────────────────────── */
+.cal-day-v2 {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.cal-day-v2-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+.cal-day-v2-date {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.cal-day-v2-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cal-day-v2-card {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: var(--space-sm);
+  align-items: center;
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-left: 3px solid var(--event-color, var(--lucky-green));
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  font-family: inherit;
+  color: inherit;
+}
+.cal-day-v2-card:hover { background: var(--overlay-hover); }
+.cal-day-v2-card-time {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.cal-day-v2-card-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.cal-day-v2-card-meta {
+  grid-column: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+/* ── Sidebar drawer ───────────────────────────────────────── */
+.cal-sidebar-header {
+  align-items: flex-start;
+}
+.cal-sidebar-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  margin-top: 4px;
+}
+.cal-sidebar-status[data-status="open"]       { color: #94a3b8; }
+.cal-sidebar-status[data-status="light"]      { color: #8ab26a; }
+.cal-sidebar-status[data-status="busy"]       { color: #d4a93e; }
+.cal-sidebar-status[data-status="full"]       { color: #fb923c; }
+.cal-sidebar-status[data-status="overbooked"] { color: #f87171; }
+.cal-sidebar-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  display: inline-block;
+}
+.cal-sidebar-status-meta {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.cal-sidebar-loadbar {
+  padding: 0 var(--space-md) var(--space-sm);
+}
+
+.cal-sidebar-timeline {
+  padding: 0 var(--space-md) var(--space-md);
+}
+
+.cal-sidebar-events-title {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  padding: 0 var(--space-md);
+  margin-bottom: 4px;
+}
+
+/* Capacity legend swatches */
+.cal-load-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-right: 4px;
+}
+.cal-load-swatch[data-status="open"]       { background: var(--status-open); }
+.cal-load-swatch[data-status="light"]      { background: var(--status-light); }
+.cal-load-swatch[data-status="busy"]       { background: var(--status-busy); }
+.cal-load-swatch[data-status="full"]       { background: var(--status-full); }
+.cal-load-swatch[data-status="overbooked"] { background: var(--status-overbooked); }
+
+/* btn-xs (used by "Next open slot" button) */
+.btn.btn-xs {
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  height: auto;
+  line-height: 1.4;
+  border-radius: 4px;
+}
+
+/* ── Mobile tightening ────────────────────────────────────── */
+@media (max-width: 768px) {
+  .cal-month-cell { min-height: 78px; padding: 4px 4px; }
+  .cal-day-events { display: none; }
+  .cal-week-v2-body { height: 540px; }
+  .cal-day-v2-card { grid-template-columns: 80px 1fr; }
+}

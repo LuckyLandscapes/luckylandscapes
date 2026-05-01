@@ -1,20 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { DayLoadBar } from '@/components/DaySchedulePreview';
+import { dayLoad, findNextOpenSlot } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
   Clock,
   FileText,
   Users,
+  Timer,
+  Zap,
   Loader2,
   CheckCircle,
   AlertCircle,
 } from 'lucide-react';
 
 export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
-  const { convertQuoteToJob, teamMembers, getQuote, getCustomer } = useData();
+  const { convertQuoteToJob, teamMembers, getQuote, getCustomer, calendarEvents, jobs } = useData();
 
   const quote = getQuote(quoteId);
   const customer = quote ? getCustomer(quote.customerId) : null;
@@ -22,9 +26,45 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
   const [form, setForm] = useState({
     scheduledDate: '',
     scheduledTime: '08:00',
+    estimatedHours: 4,
     crewNotes: '',
     assignedTo: [],
   });
+
+  // Index by date so we can show capacity for the picked day + find open slots.
+  const eventsByDate = useMemo(() => {
+    const map = {};
+    calendarEvents.forEach(e => {
+      if (!e.date) return;
+      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push({ ...e, estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration });
+    });
+    jobs.forEach(j => {
+      if (!j.scheduledDate) return;
+      if (calendarEvents.some(e => e.jobId === j.id)) return;
+      if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
+      map[j.scheduledDate].push({
+        id: `job-${j.id}`,
+        type: 'job',
+        startTime: j.scheduledTime,
+        estimatedDuration: j.estimatedDuration,
+      });
+    });
+    return map;
+  }, [calendarEvents, jobs]);
+
+  const dateLoad = useMemo(
+    () => form.scheduledDate ? dayLoad(eventsByDate[form.scheduledDate] || []) : null,
+    [eventsByDate, form.scheduledDate],
+  );
+
+  const handleFindOpenSlot = () => {
+    const needed = Number(form.estimatedHours) || 4;
+    const seed = form.scheduledDate || new Date().toISOString().split('T')[0];
+    const slot = findNextOpenSlot(eventsByDate, seed, needed);
+    if (slot) setForm(prev => ({ ...prev, scheduledDate: slot }));
+  };
 
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -50,6 +90,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
         quoteId,
         scheduledDate: form.scheduledDate,
         scheduledTime: form.scheduledTime,
+        estimatedHours: Number(form.estimatedHours) || null,
         crewNotes: form.crewNotes,
         assignedTo: form.assignedTo,
       });
@@ -140,9 +181,20 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
               {/* Date & Time */}
               <div className="form-row">
                 <div className="form-group">
-                  <label className="form-label">
-                    <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                    Scheduled Date <span className="required">*</span>
+                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
+                    <span>
+                      <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                      Scheduled Date <span className="required">*</span>
+                    </span>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={handleFindOpenSlot}
+                      title="Jump to the next day with enough headroom"
+                      style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
+                      <Zap size={11} /> Next open slot
+                    </button>
                   </label>
                   <input
                     className="form-input"
@@ -150,6 +202,11 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                     value={form.scheduledDate}
                     onChange={e => setForm(prev => ({ ...prev, scheduledDate: e.target.value }))}
                   />
+                  {dateLoad && (
+                    <div style={{ marginTop: 6 }}>
+                      <DayLoadBar load={dateLoad} compact />
+                    </div>
+                  )}
                 </div>
                 <div className="form-group">
                   <label className="form-label">
@@ -161,6 +218,20 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                     type="time"
                     value={form.scheduledTime}
                     onChange={e => setForm(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                  />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">
+                    <Timer size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                    Est. Hours
+                  </label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0.25"
+                    step="0.25"
+                    value={form.estimatedHours}
+                    onChange={e => setForm(prev => ({ ...prev, estimatedHours: e.target.value }))}
                   />
                 </div>
               </div>

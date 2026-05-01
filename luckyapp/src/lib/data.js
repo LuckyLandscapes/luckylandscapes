@@ -654,10 +654,14 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   // ─── Convert Quote → Job ───────────────────────────────
-  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledTime, crewNotes, assignedTo }) => {
+  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledTime, estimatedHours, crewNotes, assignedTo }) => {
     const quote = getQuote(quoteId);
     if (!quote) return null;
     const customer = quote.customerId ? getCustomer(quote.customerId) : null;
+
+    const hours = Number.isFinite(Number(estimatedHours)) && Number(estimatedHours) > 0
+      ? Number(estimatedHours)
+      : 4;
 
     const jobData = {
       quoteId,
@@ -669,7 +673,7 @@ export function DataProvider({ children }) {
         : '',
       scheduledDate,
       scheduledTime: scheduledTime || null,
-      estimatedDuration: '4 hours',
+      estimatedDuration: `${hours} hours`,
       assignedTo: assignedTo || [],
       crewNotes: crewNotes || '',
       total: quote.total || 0,

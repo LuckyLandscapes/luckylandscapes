@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
+import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
@@ -20,6 +22,7 @@ import {
   DollarSign,
   Navigation,
   AlertTriangle,
+  Zap,
 } from 'lucide-react';
 
 const EVENT_TYPES = [
@@ -52,6 +55,16 @@ function formatTime12(t) {
   return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
 }
 
+// Add `hours` to a "HH:MM" string, returning "HH:MM" clamped to 23:59.
+function addHoursToTime(time, hours) {
+  if (!time) return '';
+  const [h, m] = time.split(':').map(Number);
+  const total = Math.max(0, Math.min(23 * 60 + 59, h * 60 + m + Math.round(hours * 60)));
+  const eh = Math.floor(total / 60);
+  const em = total % 60;
+  return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
+}
+
 export default function EventModal({ event, defaultDate, onClose }) {
   const {
     addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
@@ -65,12 +78,27 @@ export default function EventModal({ event, defaultDate, onClose }) {
     return quotes.filter(q => q.status === 'accepted' && !jobQuoteIds.has(q.id));
   }, [quotes, jobs]);
 
+  // Default est. hours: prefer the existing event's start/end span, then the
+  // linked job's estimated_duration, otherwise 4h (a half-day, our typical job).
+  const initialHours = (() => {
+    if (event?.startTime && event?.endTime) {
+      const span = eventDurationHours(event);
+      if (span > 0) return span;
+    }
+    if (event?.jobId) {
+      const job = jobs.find(j => j.id === event.jobId);
+      if (job?.estimatedDuration) return parseDurationHours(job.estimatedDuration, 4);
+    }
+    return 4;
+  })();
+
   const [form, setForm] = useState({
     title: event?.title || '',
     type: event?.type || 'other',
     date: event?.date || defaultDate || new Date().toISOString().split('T')[0],
     startTime: event?.startTime || '09:00',
-    endTime: event?.endTime || '10:00',
+    endTime: event?.endTime || addHoursToTime(event?.startTime || '09:00', initialHours),
+    estimatedHours: initialHours,
     allDay: event?.allDay || false,
     customerId: event?.customerId || '',
     notes: event?.notes || '',
@@ -87,40 +115,47 @@ export default function EventModal({ event, defaultDate, onClose }) {
   const selectedCustomer = form.customerId ? customers.find(c => c.id === form.customerId) : null;
   const selectedQuote = form.selectedQuoteId ? quotes.find(q => q.id === form.selectedQuoteId) : null;
 
-  // Existing bookings on the chosen date — calendar events + jobs (without their own event), excluding the one being edited.
-  const dayEvents = useMemo(() => {
-    if (!form.date) return [];
-    const out = [];
+  // Build a date→events index for capacity lookups + the open-slot finder.
+  // Hot path: only re-runs when calendarEvents/jobs change, not on form edits.
+  const eventsByDate = useMemo(() => {
+    const map = {};
     calendarEvents.forEach(e => {
-      if (e.date !== form.date) return;
-      if (event?.id && e.id === event.id) return;
-      out.push({
-        id: e.id,
-        title: e.title,
-        type: e.type,
+      if (!e.date) return;
+      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
+      const enriched = {
+        ...e,
         color: e.color || TYPE_FALLBACK_COLORS[e.type] || '#64748b',
-        startTime: e.startTime,
-        endTime: e.endTime,
-        allDay: !!e.allDay,
-        assignedTo: e.assignedTo || [],
-      });
+        estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration,
+      };
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(enriched);
     });
     jobs.forEach(j => {
-      if (j.scheduledDate !== form.date) return;
+      if (!j.scheduledDate) return;
       if (calendarEvents.some(e => e.jobId === j.id)) return;
-      out.push({
+      if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
+      map[j.scheduledDate].push({
         id: `job-${j.id}`,
+        jobId: j.id,
         title: j.title,
         type: 'job',
         color: '#6B8E4E',
+        date: j.scheduledDate,
         startTime: j.scheduledTime,
         endTime: null,
         allDay: false,
         assignedTo: j.assignedTo || [],
+        estimatedDuration: j.estimatedDuration,
       });
     });
-    return out;
-  }, [calendarEvents, jobs, form.date, event?.id]);
+    return map;
+  }, [calendarEvents, jobs]);
+
+  // Existing bookings on the chosen date, excluding the one being edited.
+  const dayEvents = useMemo(() => {
+    if (!form.date) return [];
+    return (eventsByDate[form.date] || []).filter(e => !(event?.id && e.id === event.id));
+  }, [eventsByDate, form.date, event?.id]);
 
   // Tentative window for the new/edited event (in minutes)
   const tentativeWindow = useMemo(() => {
@@ -165,21 +200,6 @@ export default function EventModal({ event, defaultDate, onClose }) {
     return out;
   }, [timeConflicts, form.assignedTo, teamMembers]);
 
-  // Capacity summary for the day
-  const dayCapacity = useMemo(() => {
-    let totalMin = 0;
-    let allDayCount = 0;
-    dayEvents.forEach(e => {
-      if (e.allDay) { allDayCount++; return; }
-      const s = toMin(e.startTime);
-      let en = toMin(e.endTime);
-      if (s == null) return;
-      if (en == null) en = s + 60;
-      if (en > s) totalMin += (en - s);
-    });
-    return { count: dayEvents.length, hours: totalMin / 60, allDayCount };
-  }, [dayEvents]);
-
   const filteredCustomers = customerSearch
     ? customers.filter(c =>
       `${c.firstName} ${c.lastName || ''} ${c.email || ''} ${c.phone || ''}`
@@ -201,7 +221,35 @@ export default function EventModal({ event, defaultDate, onClose }) {
   const selectedMembers = activeMembers.filter(m => form.assignedTo.includes(m.id));
 
   const updateField = (field, value) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm(prev => {
+      const next = { ...prev, [field]: value };
+      // Keep startTime / estimatedHours / endTime mutually consistent so the
+      // user never has to do the math themselves.
+      if (field === 'startTime') {
+        next.endTime = addHoursToTime(value, prev.estimatedHours || 1);
+      } else if (field === 'estimatedHours') {
+        const h = Number(value);
+        if (Number.isFinite(h) && h > 0) {
+          next.endTime = addHoursToTime(prev.startTime, h);
+        }
+      } else if (field === 'endTime') {
+        // Manual end-time override → recompute hours.
+        const startMin = toMin(prev.startTime);
+        const endMin = toMin(value);
+        if (startMin != null && endMin != null && endMin > startMin) {
+          next.estimatedHours = (endMin - startMin) / 60;
+        }
+      }
+      return next;
+    });
+  };
+
+  const dateLoad = useMemo(() => dayLoad(dayEvents), [dayEvents]);
+
+  const handleFindOpenSlot = () => {
+    const needed = Number(form.estimatedHours) || 4;
+    const slot = findNextOpenSlot(eventsByDate, form.date || new Date().toISOString().split('T')[0], needed);
+    if (slot) updateField('date', slot);
   };
 
   const handleTypeChange = (type) => {
@@ -249,6 +297,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
           quoteId: form.selectedQuoteId,
           scheduledDate: form.date,
           scheduledTime: form.allDay ? null : form.startTime,
+          estimatedHours: form.allDay ? null : Number(form.estimatedHours) || null,
           crewNotes: form.notes || '',
           assignedTo: form.assignedTo,
         });
@@ -457,9 +506,20 @@ export default function EventModal({ event, defaultDate, onClose }) {
           {/* Date & Time */}
           <div className="form-row">
             <div className="form-group">
-              <label className="form-label">
-                <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Date <span className="required">*</span>
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
+                <span>
+                  <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                  Date <span className="required">*</span>
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs"
+                  onClick={handleFindOpenSlot}
+                  title="Jump to the next day with enough headroom"
+                  style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                >
+                  <Zap size={11} /> Next open slot
+                </button>
               </label>
               <input
                 className="form-input"
@@ -467,6 +527,11 @@ export default function EventModal({ event, defaultDate, onClose }) {
                 value={form.date}
                 onChange={e => updateField('date', e.target.value)}
               />
+              {form.date && (
+                <div style={{ marginTop: 6 }}>
+                  <DayLoadBar load={dateLoad} compact />
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
@@ -496,6 +561,20 @@ export default function EventModal({ event, defaultDate, onClose }) {
                 />
               </div>
               <div className="form-group">
+                <label className="form-label">
+                  <Timer size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                  Estimated Hours
+                </label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min="0.25"
+                  step="0.25"
+                  value={form.estimatedHours}
+                  onChange={e => updateField('estimatedHours', e.target.value)}
+                />
+              </div>
+              <div className="form-group">
                 <label className="form-label">End Time</label>
                 <input
                   className="form-input"
@@ -512,15 +591,13 @@ export default function EventModal({ event, defaultDate, onClose }) {
             <div className="form-group">
               <div className="day-schedule-summary">
                 <span>
-                  <strong>{dayCapacity.count}</strong>{' '}
-                  {dayCapacity.count === 1 ? 'event' : 'events'} on this day
-                  {dayCapacity.allDayCount > 0 && ` (${dayCapacity.allDayCount} all-day)`}
+                  <strong>{dateLoad.count}</strong>{' '}
+                  {dateLoad.count === 1 ? 'event' : 'events'} on this day
+                  {dateLoad.allDayCount > 0 && ` (${dateLoad.allDayCount} all-day)`}
                 </span>
-                {dayCapacity.hours > 0 && (
-                  <span className="day-schedule-summary-pill">
-                    <Clock size={11} /> {dayCapacity.hours.toFixed(1)}h scheduled
-                  </span>
-                )}
+                <span className={`day-load-pill day-load-status-${dateLoad.status}`}>
+                  <Clock size={11} /> {dateLoad.hours.toFixed(1)}h / {dateLoad.capacity}h
+                </span>
               </div>
 
               {timeConflicts.length > 0 && (
@@ -745,125 +822,3 @@ export default function EventModal({ event, defaultDate, onClose }) {
   );
 }
 
-// ─── Day Schedule Preview ──────────────────────────────────
-// A vertical 6am–9pm timeline showing existing bookings on the chosen date
-// plus a dashed "tentative" block for the in-progress event.
-function DaySchedulePreview({ events, tentative }) {
-  const startHour = 6;
-  const endHour = 21; // 9pm
-  const totalMin = (endHour - startHour) * 60;
-
-  const toBlock = (e, isTentative = false) => {
-    if (!e) return null;
-    if (e.allDay) {
-      return { top: 0, height: 100, label: e.title, color: e.color, isTentative, time: 'All day' };
-    }
-    const s = toMin(e.startTime);
-    let en = toMin(e.endTime);
-    if (s == null) return null;
-    if (en == null) en = s + 60;
-    const startBaseline = startHour * 60;
-    const top = Math.max(0, ((s - startBaseline) / totalMin) * 100);
-    const bottom = Math.min(100, ((en - startBaseline) / totalMin) * 100);
-    if (bottom <= top) return null;
-    return {
-      top,
-      height: bottom - top,
-      label: e.title || (isTentative ? 'New event' : ''),
-      color: e.color,
-      isTentative,
-      time: `${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`,
-    };
-  };
-
-  const blocks = events.map(e => toBlock(e)).filter(Boolean);
-  const tentBlock = tentative ? toBlock(tentative, true) : null;
-
-  // Side-by-side layout for overlapping blocks (column packing)
-  const withColumns = (() => {
-    const sorted = [...blocks].sort((a, b) => a.top - b.top);
-    const cols = []; // each col is array of blocks (their bottom edge)
-    sorted.forEach(b => {
-      let placed = false;
-      for (let i = 0; i < cols.length; i++) {
-        const last = cols[i][cols[i].length - 1];
-        if (last.top + last.height <= b.top) {
-          b.col = i;
-          cols[i].push(b);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) {
-        b.col = cols.length;
-        cols.push([b]);
-      }
-    });
-    return { blocks: sorted, totalCols: Math.max(1, cols.length) };
-  })();
-
-  const hourMarks = [];
-  for (let h = startHour; h <= endHour; h++) hourMarks.push(h);
-
-  return (
-    <div className="day-schedule">
-      <div className="day-schedule-grid">
-        <div className="day-schedule-hours">
-          {hourMarks.map((h, i) => (
-            <div key={h} className="day-schedule-hour" style={{ top: `${(i / (hourMarks.length - 1)) * 100}%` }}>
-              <span className="day-schedule-hour-label">
-                {h === 12 ? '12p' : h < 12 ? `${h}a` : `${h - 12}p`}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className="day-schedule-events">
-          {hourMarks.slice(0, -1).map((h, i) => (
-            <div
-              key={h}
-              className="day-schedule-gridline"
-              style={{ top: `${(i / (hourMarks.length - 1)) * 100}%` }}
-            />
-          ))}
-          {events.length === 0 && !tentBlock && (
-            <div className="day-schedule-empty">No events scheduled</div>
-          )}
-          {withColumns.blocks.map((b, i) => {
-            const colWidth = 100 / withColumns.totalCols;
-            return (
-              <div
-                key={i}
-                className="day-schedule-block"
-                style={{
-                  '--event-color': b.color,
-                  top: `${b.top}%`,
-                  height: `${b.height}%`,
-                  left: `calc(${b.col * colWidth}% + 2px)`,
-                  width: `calc(${colWidth}% - 4px)`,
-                }}
-                title={`${b.label} — ${b.time}`}
-              >
-                <div className="day-schedule-block-title">{b.label}</div>
-                <div className="day-schedule-block-time">{b.time}</div>
-              </div>
-            );
-          })}
-          {tentBlock && (
-            <div
-              className="day-schedule-block tentative"
-              style={{
-                '--event-color': tentBlock.color || '#3a9c4a',
-                top: `${tentBlock.top}%`,
-                height: `${tentBlock.height}%`,
-              }}
-              title={`${tentBlock.label} — ${tentBlock.time}`}
-            >
-              <div className="day-schedule-block-title">⚡ {tentBlock.label}</div>
-              <div className="day-schedule-block-time">{tentBlock.time}</div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
