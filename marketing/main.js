@@ -82,7 +82,8 @@ if (!isTouchDevice) {
 }
 
 // ============================================
-// PRELOADER
+// PRELOADER (removed at build time by scripts/inject-head.js, but the .loaded
+// class is added unconditionally below in case any CSS still keys off it).
 // ============================================
 const preloader = document.getElementById('preloader');
 if (preloader) {
@@ -90,25 +91,55 @@ if (preloader) {
         setTimeout(() => {
             preloader.classList.add('done');
             document.body.classList.add('loaded');
-            // Recalculate ScrollTrigger positions now that the preloader is
-            // gone and images have loaded — otherwise triggers can be set
-            // against stale layout positions.
-            ScrollTrigger.refresh();
         }, 800);
     });
-
     // Fallback: hide preloader after 4s even if load event doesn't fire
     setTimeout(() => {
         preloader.classList.add('done');
         document.body.classList.add('loaded');
-        ScrollTrigger.refresh();
     }, 4000);
 }
-
-// Fallback: pages without a #preloader element still need the .loaded class
-// so any CSS rules keyed off it apply. The preloader block above already adds
-// it on pages that have one — this is a no-op there but harmless.
 document.body.classList.add('loaded');
+
+// ============================================
+// SCROLLTRIGGER REFRESH — KEY MOBILE FIX
+// ============================================
+// On mobile, images and fonts often arrive AFTER ScrollTrigger has calculated
+// where each trigger lives in the document. When images then load, every
+// section below them shifts down — but ScrollTrigger still thinks the trigger
+// is at its old y-position. Result: user scrolls to a section, but
+// ScrollTrigger thinks they're somewhere else and never fires the animation.
+// (User-reported symptom: "thinks I'm looking at a different part of the page".)
+//
+// Fix: refresh ScrollTrigger every time content might have shifted layout —
+// after window.load, after each image loads, on resize, and on orientation change.
+let stRefreshScheduled = false;
+function scheduleScrollTriggerRefresh() {
+    if (stRefreshScheduled) return;
+    stRefreshScheduled = true;
+    requestAnimationFrame(() => {
+        ScrollTrigger.refresh();
+        stRefreshScheduled = false;
+    });
+}
+
+// 1. Refresh once after the window 'load' event (all initial images parsed).
+window.addEventListener('load', () => {
+    ScrollTrigger.refresh();
+    // And again after a tick, since iOS sometimes finishes layout slightly
+    // after 'load' fires.
+    setTimeout(() => ScrollTrigger.refresh(), 300);
+});
+
+// 2. Refresh whenever any image finishes loading (covers lazy-loaded gallery
+//    images that arrive long after window.load).
+document.addEventListener('load', (e) => {
+    if (e.target && e.target.tagName === 'IMG') scheduleScrollTriggerRefresh();
+}, true);  // capture phase — image 'load' events don't bubble
+
+// 3. Refresh on viewport changes (orientation change, mobile keyboard).
+window.addEventListener('resize', scheduleScrollTriggerRefresh, { passive: true });
+window.addEventListener('orientationchange', scheduleScrollTriggerRefresh, { passive: true });
 
 // ============================================
 // ANALYTICS — thin wrapper that no-ops when GA4/Clarity aren't loaded yet
@@ -298,27 +329,15 @@ const revealObs = new IntersectionObserver(
 
 revealEls.forEach(el => revealObs.observe(el));
 
-// Failsafe: if anything is still hidden after 2.5s past page load (e.g. an
-// element below the fold that the observer hasn't reported on yet because the
-// user landed mid-page or the browser throttled callbacks), force-reveal it.
-// Better to skip an animation than show a blank section.
-window.addEventListener('load', () => {
-    setTimeout(() => {
-        revealEls.forEach(el => {
-            if (!el.classList.contains('revealed')) {
-                const rect = el.getBoundingClientRect();
-                // Only force-reveal elements that are at or above the current scroll position;
-                // leave below-fold elements to animate normally as the user scrolls.
-                if (rect.top < window.innerHeight + 200) {
-                    el.classList.add('revealed');
-                    revealObs.unobserve(el);
-                }
-            }
-        });
-        // Recalculate ScrollTrigger positions after preloader hides + images load.
-        ScrollTrigger.refresh();
-    }, 2500);
-});
+// Failsafe: force-reveal every .reveal* element after 3 seconds, regardless of
+// scroll position. Content visibility must NEVER depend on the observer firing
+// — better to skip the animation than show a blank section.
+setTimeout(() => {
+    revealEls.forEach(el => {
+        el.classList.add('revealed');
+        revealObs.unobserve(el);
+    });
+}, 3000);
 
 // ============================================
 // GSAP — HERO PARALLAX
@@ -1115,8 +1134,12 @@ if (clCarouselView) {
 // ============================================
 // GSAP — GALLERY ITEMS (after dynamic generation)
 // ============================================
+// Skipped on touch devices: gsap.from() would set scale: 0.92 on every gallery
+// item immediately and only animate to 1 when ScrollTrigger fires. If a mobile
+// trigger calc is stale (the bug we're fighting), items stay slightly smaller
+// than expected. Cleaner to skip the polish on mobile entirely.
 const galleryItemsForAnim = document.querySelectorAll('.gallery-item');
-if (galleryItemsForAnim.length > 0) {
+if (galleryItemsForAnim.length > 0 && !isTouchDevice) {
     galleryItemsForAnim.forEach((item, i) => {
         gsap.from(item, {
             scale: 0.92,
