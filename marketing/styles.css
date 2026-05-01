@@ -1884,18 +1884,39 @@ textarea {
 }
 
 /* ============================================
-   MOBILE: kill all backdrop-filter blurs
+   MOBILE: kill GPU-heavy effects that evict layers
    ============================================
-   iOS Safari handles backdrop-filter very poorly when many elements use it —
-   it drops off-screen layers from the GPU compositor and re-composites them
-   slowly when scrolled to, which looks like content "not loading until 7
-   seconds later" and sometimes shows blurry artifacts during the transition.
-   The frosted-glass effect is purely cosmetic; on touch devices we fall back
-   to a flat semi-transparent background. */
+   iOS Safari handles backdrop-filter and large filter:blur on videos very
+   poorly. Under memory pressure, it drops off-screen compositor layers and
+   re-composites them slowly when scrolled into view, which looks like content
+   "not loading until 7 seconds later" or a section appearing blank/white.
+   On touch devices we strip the cosmetic blurs and force critical sections
+   to keep their own layer with translateZ(0). */
 @media (hover: none), (pointer: coarse) {
     * {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
+    }
+
+    /* Drop the heavy blur on the hero background video — its bg gradients
+       still convey the same look without forcing the GPU to blur every frame. */
+    .hero-video {
+        filter: brightness(.85) !important;
+    }
+
+    /* Force major sections to live in their own GPU layer so iOS Safari
+       cannot evict them mid-scroll. translateZ(0) is the standard
+       hardware-acceleration hint. */
+    .home-services-section,
+    .reviews-section,
+    .gallery-section,
+    .about-section,
+    .cta-section,
+    .booking-banner,
+    .stats-bar,
+    .faq-section {
+        transform: translateZ(0);
+        -webkit-transform: translateZ(0);
     }
 }
 
