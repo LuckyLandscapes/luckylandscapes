@@ -320,9 +320,9 @@ export async function POST(request) {
   const phone     = String(body.phone     || '').trim();
   const address   = String(body.address   || '').trim();
 
-  if (!firstName || !email || !phone) {
+  if (!firstName || !email) {
     return NextResponse.json(
-      { error: 'firstName, email, and phone are required' },
+      { error: 'firstName and email are required' },
       { status: 400, headers: CORS_HEADERS }
     );
   }
@@ -378,7 +378,7 @@ export async function POST(request) {
         first_name: firstName,
         last_name: lastName || null,
         email,
-        phone,
+        phone: phone || null,
         address: address || null,
         tags: ['lead'],
         source: 'website',

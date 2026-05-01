@@ -1971,6 +1971,23 @@ textarea {
     transition-delay: .48s;
 }
 
+/* Touch devices: skip JS-gated reveal hiding so content is visible immediately
+   even before main.js parses. Without this, slow phones see only section
+   backgrounds (sometimes for many seconds) until IntersectionObserver fires.
+   The animations are a desktop-only enhancement. */
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .reveal-scale,
+    .stagger-children>* {
+        opacity: 1 !important;
+        transform: none !important;
+        transition: none !important;
+    }
+}
+
 /* Hero animations */
 .hero-content .hero-badge {
     animation: fadeInUp .8s var(--ease-out) .2s both;

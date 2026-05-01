@@ -1337,6 +1337,7 @@ if (qzCategoryBtns.length > 0) {
     async function submitQuestionnaire(data) {
         const payload = { ...data };
         if (selectedPhotos.length > 0) payload.photos = await getPhotoData();
+        let leadOk = !LEADS_INTAKE_URL;
         const tasks = [];
         if (QUOTES_SCRIPT_URL) {
             tasks.push(
@@ -1353,11 +1354,15 @@ if (qzCategoryBtns.length > 0) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
-                }).then(r => { if (!r.ok) console.error('Lead intake failed', r.status); })
-                  .catch(err => console.error('Lead intake error:', err))
+                }).then(async r => {
+                    if (r.ok) { leadOk = true; return; }
+                    const text = await r.text().catch(() => '');
+                    console.error('Lead intake failed', r.status, text);
+                }).catch(err => console.error('Lead intake error:', err))
             );
         }
         await Promise.allSettled(tasks);
+        return { leadOk };
     }
 
     // ============================================
@@ -1534,7 +1539,13 @@ if (qzCategoryBtns.length > 0) {
             const turnstileResp = quoteForm.querySelector('[name="cf-turnstile-response"]');
             if (turnstileResp && turnstileResp.value) data.turnstile_token = turnstileResp.value;
 
-            await submitQuestionnaire(data);
+            const { leadOk } = await submitQuestionnaire(data);
+            if (!leadOk) {
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+                alert("We couldn't send your request just now. Please try again, or email rileykopf@luckylandscapes.com directly.");
+                return;
+            }
             clearAutosave();
 
             trackEvent('quote_submit', {
