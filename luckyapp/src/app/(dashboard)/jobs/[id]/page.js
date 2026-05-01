@@ -84,6 +84,12 @@ export default function JobDetailPage({ params }) {
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [toast, setToast] = useState(null);
+  // Margin reality-check modal — when marking complete, if gross margin is
+  // below the 30% target we pause the user with the actual numbers before
+  // they sign off. Not a hard block — just a moment of awareness.
+  const [showMarginCheck, setShowMarginCheck] = useState(false);
+
+  const TARGET_MARGIN_PCT = 30; // matches docs/finances.md gross margin target
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -126,7 +132,7 @@ export default function JobDetailPage({ params }) {
   const contractSigned = linkedContract?.status === 'signed';
   const blockStartForContract = contractRequired && !contractSigned;
 
-  const handleStatusChange = async (newStatus) => {
+  const handleStatusChange = async (newStatus, opts = {}) => {
     if (newStatus === 'in_progress' && blockStartForContract) {
       showToast('error', linkedContract
         ? `Contract #${linkedContract.contractNumber} hasn't been signed yet. Have the customer sign before starting.`
@@ -134,11 +140,23 @@ export default function JobDetailPage({ params }) {
       );
       return;
     }
+
+    // Margin reality check on completion — only for owner/admin (workers don't
+    // see margin data anyway), only when there's revenue to compute against,
+    // and only the first time through (opts.skipMarginCheck unblocks the modal).
+    if (newStatus === 'completed' && isOwnerOrAdmin && !opts.skipMarginCheck && financials && financials.revenue > 0) {
+      if (financials.margin < TARGET_MARGIN_PCT) {
+        setShowMarginCheck(true);
+        return;
+      }
+    }
+
     setUpdating(true);
     try {
       await updateJob(job.id, { status: newStatus });
       const labels = { in_progress: 'started', completed: 'completed', cancelled: 'cancelled', scheduled: 'scheduled' };
       showToast('success', `Job ${labels[newStatus] || newStatus}`);
+      setShowMarginCheck(false);
     } catch (err) {
       console.error('Error updating status:', err);
       showToast('error', err?.message || `Could not update job to ${newStatus}. Try again.`);
@@ -358,44 +376,121 @@ export default function JobDetailPage({ params }) {
         ) : null
       )}
 
-      {/* Profit Summary Banner — owner/admin only (workers don't see margin) */}
-      {financials && isOwnerOrAdmin && (
-        <div className="job-financials-banner">
-          <div className="job-financials-item">
-            <span className="job-financials-label">Revenue</span>
-            <span className="job-financials-value" style={{ color: 'var(--status-success)' }}>
-              {formatCurrency(financials.revenue)}
-            </span>
-          </div>
-          <div className="job-financials-divider">−</div>
-          <div className="job-financials-item">
-            <span className="job-financials-label">Materials</span>
-            <span className="job-financials-value">{formatCurrency(financials.materialCosts)}</span>
-          </div>
-          <div className="job-financials-divider">−</div>
-          <div className="job-financials-item">
-            <span className="job-financials-label">Equipment</span>
-            <span className="job-financials-value">{formatCurrency(financials.equipmentCosts)}</span>
-          </div>
-          <div className="job-financials-divider">−</div>
-          <div className="job-financials-item">
-            <span className="job-financials-label">Labor</span>
-            <span className="job-financials-value">{formatCurrency(financials.laborCosts)}</span>
-          </div>
-          <div className="job-financials-divider">−</div>
-          <div className="job-financials-item">
-            <span className="job-financials-label">Other</span>
-            <span className="job-financials-value">{formatCurrency(financials.otherExpenses)}</span>
-          </div>
-          <div className="job-financials-divider">=</div>
-          <div className="job-financials-item profit">
-            <span className="job-financials-label">Profit</span>
-            <span className="job-financials-value" style={{ color: financials.profit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
-              {formatCurrency(financials.profit)}
-            </span>
-          </div>
-        </div>
-      )}
+      {/* Profit Summary Banner — owner/admin only (workers don't see margin).
+          Banner is color-coded by margin tier (green ≥30%, gold 15-29%,
+          red <15%) so the owner sees at a glance whether the job is on
+          target or bleeding. */}
+      {financials && isOwnerOrAdmin && (() => {
+        const hasRevenue = financials.revenue > 0;
+        const marginPct = financials.margin || 0;
+        // Tier matches the docs/finances.md target: 30% gross margin.
+        const marginTier = !hasRevenue
+          ? { color: 'var(--text-tertiary)', label: '—', tone: 'idle' }
+          : marginPct >= 30 ? { color: 'var(--status-success)', label: 'on target', tone: 'good' }
+          : marginPct >= 15 ? { color: 'var(--lucky-gold)', label: 'below target', tone: 'warn' }
+          : marginPct >= 0  ? { color: '#f97316',            label: 'thin margin', tone: 'thin' }
+          :                   { color: 'var(--status-danger)', label: 'losing money', tone: 'bad' };
+
+        // Quote variance — only when a source quote exists.
+        const quotedRevenue = quote ? Number(quote.total || 0) : null;
+        const quotedMaterials = quote ? Number(quote.materialsCost || 0) : null;
+        const materialsVariance = quotedMaterials !== null
+          ? financials.materialCosts - quotedMaterials
+          : null;
+
+        return (
+          <>
+            <div className="job-financials-banner" style={{ borderLeft: `4px solid ${marginTier.color}` }}>
+              <div className="job-financials-item">
+                <span className="job-financials-label">Revenue</span>
+                <span className="job-financials-value" style={{ color: 'var(--status-success)' }}>
+                  {formatCurrency(financials.revenue)}
+                </span>
+              </div>
+              <div className="job-financials-divider">−</div>
+              <div className="job-financials-item">
+                <span className="job-financials-label">Materials</span>
+                <span className="job-financials-value">{formatCurrency(financials.materialCosts)}</span>
+              </div>
+              <div className="job-financials-divider">−</div>
+              <div className="job-financials-item">
+                <span className="job-financials-label">Equipment</span>
+                <span className="job-financials-value">{formatCurrency(financials.equipmentCosts)}</span>
+              </div>
+              <div className="job-financials-divider">−</div>
+              <div className="job-financials-item">
+                <span className="job-financials-label">Labor</span>
+                <span className="job-financials-value">{formatCurrency(financials.laborCosts)}</span>
+              </div>
+              <div className="job-financials-divider">−</div>
+              <div className="job-financials-item">
+                <span className="job-financials-label">Other</span>
+                <span className="job-financials-value">{formatCurrency(financials.otherExpenses)}</span>
+              </div>
+              <div className="job-financials-divider">=</div>
+              <div className="job-financials-item profit">
+                <span className="job-financials-label">Profit</span>
+                <span className="job-financials-value" style={{ color: marginTier.color }}>
+                  {formatCurrency(financials.profit)}
+                </span>
+              </div>
+              <div className="job-financials-item profit" style={{ borderLeft: '1px solid var(--border-subtle)', paddingLeft: 'var(--space-md)', marginLeft: 'var(--space-sm)' }}>
+                <span className="job-financials-label">Margin</span>
+                <span className="job-financials-value" style={{ color: marginTier.color }}>
+                  {hasRevenue ? `${marginPct.toFixed(1)}%` : '—'}
+                </span>
+                <span style={{ fontSize: '0.65rem', color: marginTier.color, textTransform: 'uppercase', letterSpacing: '0.04em', marginTop: '2px', fontWeight: 700 }}>
+                  {marginTier.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Quote variance row — only when there's a quote to compare against.
+                Materials is the only line we can compare today (the quote model
+                doesn't store estimated labor hours yet). */}
+            {quote && (
+              <div style={{
+                display: 'flex',
+                gap: 'var(--space-md)',
+                flexWrap: 'wrap',
+                padding: '8px 14px',
+                background: 'var(--bg-elevated)',
+                borderRadius: 'var(--radius-md)',
+                marginBottom: 'var(--space-md)',
+                fontSize: '0.78rem',
+                color: 'var(--text-tertiary)',
+              }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <FileText size={12} /> vs Quote #{quote.quoteNumber}:
+                </span>
+                <span>
+                  Quoted revenue <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(quotedRevenue)}</strong>
+                  {financials.revenue !== quotedRevenue && financials.revenue > 0 && (
+                    <span style={{ color: financials.revenue >= quotedRevenue ? 'var(--status-success)' : 'var(--status-danger)', marginLeft: '4px' }}>
+                      ({financials.revenue >= quotedRevenue ? '+' : ''}{formatCurrency(financials.revenue - quotedRevenue)})
+                    </span>
+                  )}
+                </span>
+                {quotedMaterials !== null && quotedMaterials > 0 && (
+                  <span>
+                    Quoted materials <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(quotedMaterials)}</strong>
+                    {materialsVariance !== 0 && (
+                      <span style={{ color: materialsVariance > 0 ? 'var(--status-danger)' : 'var(--status-success)', marginLeft: '4px' }}>
+                        ({materialsVariance > 0 ? '+' : ''}{formatCurrency(materialsVariance)} {materialsVariance > 0 ? 'over' : 'under'})
+                      </span>
+                    )}
+                  </span>
+                )}
+                {marginTier.tone === 'warn' || marginTier.tone === 'thin' || marginTier.tone === 'bad' ? (
+                  <span style={{ marginLeft: 'auto', color: marginTier.color, fontWeight: 600 }}>
+                    Target gross margin: {TARGET_MARGIN_PCT}%
+                  </span>
+                ) : null}
+              </div>
+            )}
+          </>
+        );
+      })()}
 
       {/* Tab Bar — workers can add receipts/expenses; only owners see margin & labor cost */}
       <div className="tabs" style={{ marginBottom: 'var(--space-lg)' }}>
@@ -861,6 +956,58 @@ export default function JobDetailPage({ params }) {
               <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? 'Deleting...' : <><Trash2 size={16} /> Delete Job</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Margin Reality-Check Modal — fires when marking complete on a job
+          whose gross margin is below the 30% target. Soft warning, not a
+          hard block — owner can still proceed but sees the actual numbers. */}
+      {showMarginCheck && financials && (
+        <div className="modal-overlay" onClick={() => !updating && setShowMarginCheck(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2><AlertTriangle size={20} style={{ marginRight: '8px', verticalAlign: 'middle', color: 'var(--lucky-gold)' }} /> Margin Below Target</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowMarginCheck(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.9rem', marginBottom: 'var(--space-md)', lineHeight: 1.5 }}>
+                You&apos;re about to mark this job complete, but the gross margin is below your <strong>{TARGET_MARGIN_PCT}%</strong> target. Take a second to look at the numbers — if something is missing (an expense, a labor entry, an unbilled extra), it&apos;s easier to fix now than after the invoice is out.
+              </p>
+
+              <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: '6px 16px', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-tertiary)' }}>Revenue</span>
+                  <strong style={{ color: 'var(--status-success)', textAlign: 'right' }}>{formatCurrency(financials.revenue)}</strong>
+                  <span style={{ color: 'var(--text-tertiary)' }}>Total costs</span>
+                  <strong style={{ textAlign: 'right' }}>−{formatCurrency(financials.totalExpenses)}</strong>
+                  <span style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--border-primary)', paddingTop: '6px' }}>Profit</span>
+                  <strong style={{ textAlign: 'right', borderTop: '1px solid var(--border-primary)', paddingTop: '6px', color: financials.profit >= 0 ? 'var(--status-success)' : 'var(--status-danger)' }}>
+                    {formatCurrency(financials.profit)}
+                  </strong>
+                  <span style={{ color: 'var(--text-tertiary)' }}>Gross margin</span>
+                  <strong style={{ textAlign: 'right', color: financials.margin >= 15 ? 'var(--lucky-gold)' : 'var(--status-danger)' }}>
+                    {financials.margin.toFixed(1)}% <span style={{ color: 'var(--text-tertiary)', fontWeight: 400, fontSize: '0.78rem' }}>/ {TARGET_MARGIN_PCT}% target</span>
+                  </strong>
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(212,169,62,0.08)', border: '1px solid rgba(212,169,62,0.25)', borderRadius: 'var(--radius-md)', padding: 'var(--space-sm) var(--space-md)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                <strong>Quick check:</strong> Did you log every receipt? Every clock-in? Was there an extra service the customer never got billed for? Materials gone over quote and never charged back? If the numbers are right, mark it complete and learn from it. If they&apos;re not, fix them first.
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowMarginCheck(false)} disabled={updating}>
+                Go back &amp; check
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleStatusChange('completed', { skipMarginCheck: true })}
+                disabled={updating}
+              >
+                {updating ? 'Marking…' : <><CheckCircle2 size={16} /> Yes, mark complete</>}
               </button>
             </div>
           </div>

@@ -22,8 +22,35 @@ import {
 } from '@/lib/finance';
 import {
   FileText, Download, AlertTriangle, FileSignature, Car, Calendar,
-  CheckCircle2, ExternalLink,
+  CheckCircle2, ExternalLink, Clock,
 } from 'lucide-react';
+
+// Federal 1040-ES quarterly estimated tax due dates (calendar year).
+// Q4 of year N is due Jan 15 of year N+1 — that's why we carry the source
+// `year` separately from the due date.
+const QUARTERLY_DUE_DATES = (year) => [
+  { quarter: 'Q1', taxYear: year, covers: `Jan 1 – Mar 31, ${year}`, due: new Date(`${year}-04-15T12:00:00`) },
+  { quarter: 'Q2', taxYear: year, covers: `Apr 1 – May 31, ${year}`, due: new Date(`${year}-06-15T12:00:00`) },
+  { quarter: 'Q3', taxYear: year, covers: `Jun 1 – Aug 31, ${year}`, due: new Date(`${year}-09-15T12:00:00`) },
+  { quarter: 'Q4', taxYear: year, covers: `Sep 1 – Dec 31, ${year}`, due: new Date(`${year + 1}-01-15T12:00:00`) },
+];
+
+function nextQuarterly(today = new Date()) {
+  const dates = [
+    ...QUARTERLY_DUE_DATES(today.getFullYear() - 1).slice(-1), // last year's Q4 (due Jan 15 this year)
+    ...QUARTERLY_DUE_DATES(today.getFullYear()),
+    ...QUARTERLY_DUE_DATES(today.getFullYear() + 1).slice(0, 1),
+  ];
+  return dates.find(d => d.due >= today) || dates[dates.length - 1];
+}
+
+// Rough placeholder for federal quarterly estimated tax. Hand-waves at:
+//   - SE tax (15.3% on .9235 of net, capped at SS wage base)
+//   - Income tax (10-22% bracket for low-income sole prop)
+// Combined ≈ 25% of net is a defensible "you should have at least this set
+// aside" floor for an LLC owner with no other income. NOT tax advice — the
+// disclaimer makes that explicit.
+const ROUGH_TAX_RATE = 0.25;
 
 // 2026 IRS standard mileage rate. Update annually.
 const MILEAGE_RATES = { 2024: 0.67, 2025: 0.70, 2026: 0.70 };
@@ -54,12 +81,25 @@ export default function TaxPage() {
   const {
     contractors, jobs, jobExpenses, companyExpenses,
     mileageEntries, getContractorPaymentsForYear,
+    getPnL,
   } = useData();
 
   const [year, setYear] = useState(currentYear());
   const [entityStartDate, setEntityStartDate] = useState(DEFAULT_ENTITY_START);
   const [useEntityStart, setUseEntityStart] = useState(true);
   const [scheduleCBasis, setScheduleCBasis] = useState('llc'); // 'llc' = post-cutover only, 'all' = full year
+
+  // ─── Quarterly estimated tax ──────────────────────────────
+  // Rough YTD-net × 25% as a "set aside at least this" floor. Real number
+  // depends on filing status, total income, deductions, prior-year safe
+  // harbor — that's the CPA's job, not the app's.
+  const today = useMemo(() => new Date(), []);
+  const next1040ES = useMemo(() => nextQuarterly(today), [today]);
+  const ytdPnL = useMemo(() => getPnL ? getPnL('ytd', 'completed') : null, [getPnL]);
+  const ytdNet = ytdPnL ? Math.max(0, Number(ytdPnL.netProfit || 0)) : 0;
+  const roughEstimate = ytdNet * ROUGH_TAX_RATE;
+  const daysUntilDue = Math.max(0, Math.ceil((next1040ES.due - today) / (1000 * 60 * 60 * 24)));
+  const dueDateStr = next1040ES.due.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
   // ─── 1099-NEC totals ──────────────────────────────────────
   const c1099 = useMemo(() => {
@@ -159,6 +199,72 @@ export default function TaxPage() {
         <AlertTriangle size={16} style={{ flexShrink: 0, color: 'var(--status-danger)', marginTop: 2 }} />
         <div>
           <strong>Not tax advice.</strong> These reports compute totals from the data you&apos;ve entered — they don&apos;t audit it for completeness, depreciation method, accountable plan reimbursements, or anything else only a CPA should call. File 1099-NECs through a service like Tax1099 or Track1099; don&apos;t print and mail.
+        </div>
+      </div>
+
+      {/* ─── Quarterly Estimated Tax Banner ─────────────────────
+          Federal quarterly is a real, hard deadline most first-year LLC
+          owners miss. Surfacing it with a rough number forces awareness
+          and gives the CPA something concrete to react to. */}
+      <div style={{
+        background: daysUntilDue <= 30 ? 'rgba(220,38,38,0.07)' : 'rgba(45,122,58,0.06)',
+        border: `1px solid ${daysUntilDue <= 30 ? 'rgba(220,38,38,0.30)' : 'rgba(45,122,58,0.25)'}`,
+        borderRadius: 'var(--radius-md)',
+        padding: 'var(--space-md) var(--space-lg)',
+        marginBottom: 'var(--space-lg)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+          <div style={{ flexShrink: 0, padding: '8px', borderRadius: 'var(--radius-md)', background: daysUntilDue <= 30 ? 'rgba(220,38,38,0.12)' : 'rgba(45,122,58,0.12)' }}>
+            <Clock size={20} style={{ color: daysUntilDue <= 30 ? 'var(--status-danger)' : 'var(--lucky-green-light)' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: '260px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <h3 style={{ margin: 0, fontSize: '1.05rem' }}>
+                Federal Quarterly Estimated Tax — {next1040ES.quarter} {next1040ES.taxYear}
+              </h3>
+              <span style={{
+                background: daysUntilDue <= 30 ? 'var(--status-danger-bg)' : 'var(--status-info-bg)',
+                color: daysUntilDue <= 30 ? 'var(--status-danger)' : 'var(--status-info)',
+                fontSize: '0.72rem', fontWeight: 700, padding: '2px 8px', borderRadius: 'var(--radius-pill)',
+              }}>
+                {daysUntilDue === 0 ? 'DUE TODAY' : daysUntilDue === 1 ? 'Due tomorrow' : `${daysUntilDue} days`}
+              </span>
+            </div>
+            <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Form 1040-ES · Covers {next1040ES.covers} · Due <strong>{dueDateStr}</strong>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', minWidth: '180px' }}>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              Rough estimate
+            </div>
+            <div style={{ fontSize: '1.6rem', fontWeight: 700, color: daysUntilDue <= 30 ? 'var(--status-danger)' : 'var(--text-primary)' }}>
+              {fmtCurrency(roughEstimate)}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+              25% × {fmtCurrency(ytdNet)} YTD net
+            </div>
+          </div>
+        </div>
+        <div style={{
+          marginTop: 'var(--space-md)',
+          fontSize: '0.78rem',
+          color: 'var(--text-tertiary)',
+          lineHeight: 1.55,
+          paddingTop: 'var(--space-sm)',
+          borderTop: '1px solid var(--border-subtle)',
+        }}>
+          <strong style={{ color: 'var(--text-secondary)' }}>This is a placeholder, not a calculation.</strong> The real number depends on your filing status, total household income, deductions, prior-year safe harbor, and SE tax. {ytdNet === 0
+            ? 'YTD net is $0 or negative — you may owe nothing this quarter, but confirm with your CPA before skipping a payment.'
+            : 'Set this aside in a separate account at minimum until your CPA tells you the actual amount.'}
+          {' '}
+          <a href="https://www.irs.gov/forms-pubs/about-form-1040-es" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--lucky-green-light)', whiteSpace: 'nowrap' }}>
+            Form 1040-ES instructions <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+          </a>
+          {' · '}
+          <a href="https://www.irs.gov/payments/direct-pay" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--lucky-green-light)', whiteSpace: 'nowrap' }}>
+            Pay via IRS Direct Pay <ExternalLink size={11} style={{ verticalAlign: 'middle' }} />
+          </a>
         </div>
       </div>
 

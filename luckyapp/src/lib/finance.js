@@ -109,6 +109,11 @@ export function getPeriodRange(period, ref = new Date()) {
   } else if (period === 'year') {
     start.setFullYear(start.getFullYear() - 1);
     prevStart.setFullYear(prevStart.getFullYear() - 2);
+  } else if (period === 'ytd') {
+    // Year-to-date — Jan 1 of the reference year through now. Used by the
+    // quarterly tax estimator (which needs YTD net, not "trailing 12 months").
+    start.setFullYear(start.getFullYear(), 0, 1);
+    prevStart.setFullYear(prevStart.getFullYear() - 1, 0, 1);
   } else if (period === 'all') {
     start.setFullYear(1970, 0, 1);
     prevStart.setFullYear(1970, 0, 1);

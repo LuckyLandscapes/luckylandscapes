@@ -1,10 +1,20 @@
 // Auto-dunning cron: runs daily, sends a reminder for any invoice that is
 //   - unpaid (status: unpaid / overdue / partial) with a positive balance
-//   - 14+ days past due
+//   - 3+ days past due (was 14 — lowered because cash-on-hand < AR balance and
+//     the docs target collection within 7-14 days of invoice, not 30+30 = 60)
 //   - has not been reminded in the last 7 days (or never)
 //
 // Triggered by Vercel Cron via vercel.json. Secured with CRON_SECRET when set
 // (Vercel auto-injects an Authorization header that matches).
+//
+// Tone is picked in invoiceReminder.pickTone() based on daysOver:
+//   1-30 days   → friendly
+//   31-60 days  → firm
+//   60+ days    → urgent
+// So 3-day reminders go out friendly; nothing harsh until 31+.
+//
+// Both thresholds are env-overridable so they can be tightened or loosened
+// without redeploying code.
 
 import { NextResponse } from 'next/server';
 import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
@@ -13,8 +23,8 @@ import { sendInvoiceReminder, computeDaysOver } from '@/lib/invoiceReminder';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const MIN_DAYS_OVERDUE = 14;          // first reminder threshold
-const MIN_DAYS_BETWEEN_REMINDERS = 7; // don't spam
+const MIN_DAYS_OVERDUE = Number(process.env.DUNNING_MIN_DAYS_OVERDUE) || 3;
+const MIN_DAYS_BETWEEN_REMINDERS = Number(process.env.DUNNING_MIN_DAYS_BETWEEN) || 7;
 
 export async function GET(request) {
   // Auth — Vercel sends `Authorization: Bearer <CRON_SECRET>` if set in env.

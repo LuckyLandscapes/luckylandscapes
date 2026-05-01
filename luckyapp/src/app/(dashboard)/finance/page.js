@@ -419,7 +419,7 @@ export default function FinancePage() {
                 <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{outstandingInvoices.length} outstanding</span>
               </div>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: '0 0 var(--space-md)' }}>
-                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d. Auto-sends after 14 days overdue (max once a week per invoice). Preview shows what the customer sees.
+                Email goes friendly &lt;30d, firm 31–60d, urgent 60+d. Auto-sends starting 3 days overdue (max once a week per invoice). Preview shows what the customer sees.
               </p>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {outstandingInvoices.map(inv => {

@@ -10,7 +10,7 @@ import {
   CalendarDays, Receipt, MapPin, ChevronRight, BarChart3,
   Coffee, Truck,
 } from 'lucide-react';
-import { fmtCurrency as formatCurrency } from '@/lib/finance';
+import { fmtCurrency as formatCurrency, buildARAging, AGING_LABELS } from '@/lib/finance';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -93,6 +93,13 @@ export default function DashboardPage() {
   const unpaidInvoices = invoices.filter(i => i.status === 'unpaid' || i.status === 'overdue');
   const outstandingAmount = unpaidInvoices.reduce((s, i) => s + ((i.total || 0) - (i.amountPaid || 0)), 0);
 
+  // A/R aging — surfaced on the dashboard so cash collection isn't buried under
+  // /finance. The breakdown drives action; just seeing "$3,320 outstanding"
+  // doesn't tell you whether to call or to wait.
+  const aging = useMemo(() => buildARAging(invoices), [invoices]);
+  const pastDueTotal = aging.totals.days30 + aging.totals.days60 + aging.totals.days90 + aging.totals.days90plus;
+  const pastDueCount = aging.buckets.days30.length + aging.buckets.days60.length + aging.buckets.days90.length + aging.buckets.days90plus.length;
+
   // Today's jobs
   const todayJobs = useMemo(() => {
     return jobs
@@ -168,6 +175,71 @@ export default function DashboardPage() {
           <div className="stat-card-label">{unpaidInvoices.length} Unpaid Invoice{unpaidInvoices.length !== 1 ? 's' : ''}</div>
         </div>
       </div>
+
+      {/* A/R Aging strip — only shown when there's outstanding receivable.
+          Buried in /finance previously; surfacing it here means cash collection
+          is one click from the home screen. */}
+      {aging.totalAR > 0 && (
+        <div className="card" style={{ marginBottom: 'var(--space-md)', borderLeft: pastDueTotal > 0 ? '3px solid var(--status-danger)' : '3px solid var(--status-success)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)', flexWrap: 'wrap', gap: '8px' }}>
+            <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
+              <Receipt size={18} style={{ color: pastDueTotal > 0 ? 'var(--status-danger)' : 'var(--status-info)' }} />
+              Money Owed to You
+              <span style={{
+                background: pastDueTotal > 0 ? 'var(--status-danger-bg)' : 'var(--status-info-bg)',
+                color: pastDueTotal > 0 ? 'var(--status-danger)' : 'var(--status-info)',
+                padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.72rem', fontWeight: 700,
+              }}>
+                {formatCurrency(aging.totalAR)}
+              </span>
+            </h3>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {pastDueCount > 0 && (
+                <Link href="/finance" className="btn btn-primary btn-sm">
+                  <Send size={14} /> Send Reminders ({pastDueCount})
+                </Link>
+              )}
+              <Link href="/invoices" className="btn btn-ghost btn-sm">
+                Invoices <ArrowRight size={14} />
+              </Link>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+            {['current', 'days30', 'days60', 'days90', 'days90plus'].map(key => {
+              const amt = aging.totals[key];
+              const count = aging.buckets[key].length;
+              const isOver = key !== 'current';
+              const isHot = key === 'days60' || key === 'days90' || key === 'days90plus';
+              const tint = isHot ? 'var(--status-danger)' : isOver ? 'var(--lucky-gold)' : 'var(--text-tertiary)';
+              return (
+                <div key={key} style={{
+                  padding: '8px 10px',
+                  background: amt > 0 ? 'var(--bg-elevated)' : 'transparent',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid var(--border-subtle)',
+                  opacity: amt > 0 ? 1 : 0.45,
+                }}>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {AGING_LABELS[key]}
+                  </div>
+                  <div style={{ fontSize: '1.05rem', fontWeight: 700, color: amt > 0 ? tint : 'var(--text-tertiary)', marginTop: 2 }}>
+                    {formatCurrency(amt)}
+                  </div>
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)' }}>
+                    {count} invoice{count !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {pastDueTotal > 0 && (
+            <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+              <strong style={{ color: 'var(--status-danger)' }}>{formatCurrency(pastDueTotal)}</strong> past due across {pastDueCount} invoice{pastDueCount !== 1 ? 's' : ''}.
+              {' '}Auto-reminders go out 3+ days overdue, max once per week per invoice.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Live Crew — only when at least one worker is on the clock */}
       {liveCrew.length > 0 && (

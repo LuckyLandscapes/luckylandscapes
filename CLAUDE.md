@@ -80,9 +80,27 @@ Three separate features make up the year-end tax surface:
 
 2. **Contractors / 1099** — `contractors` table ([`026_contractors.sql`](luckyapp/supabase/migrations/026_contractors.sql)) holds W-9 info (full SSN/EIN, address, classification, signed-W-9 photo). Payments are not a separate table; `job_expenses` and `company_expenses` got a nullable `contractor_id` FK so existing expense flows tag a contractor. The same migration extends `contracts` with a `party_type` ('customer' | 'contractor') so the existing signing infrastructure can be reused for independent contractor agreements (signing flow not yet wired).
 
-3. **Schedule C export + 1099 totals** at [`(dashboard)/tax/page.js`](luckyapp/src/app/(dashboard)/tax/page.js). Aggregation lives in [`src/lib/finance.js`](luckyapp/src/lib/finance.js) `buildScheduleC` — maps every COGS_CATEGORIES + OPEX_CATEGORIES item to a Schedule C line via `COGS_TO_SCHEDULE_C` / `OPEX_TO_SCHEDULE_C`. Honors a configurable `entityStartDate` because the LLC was formed 2026-03-01 and pre-formation activity belongs on a personal sole-prop Schedule C, not the LLC return.
+3. **Schedule C export + 1099 totals + quarterly estimator** at [`(dashboard)/tax/page.js`](luckyapp/src/app/(dashboard)/tax/page.js). Aggregation lives in [`src/lib/finance.js`](luckyapp/src/lib/finance.js) `buildScheduleC` — maps every COGS_CATEGORIES + OPEX_CATEGORIES item to a Schedule C line via `COGS_TO_SCHEDULE_C` / `OPEX_TO_SCHEDULE_C`. Honors a configurable `entityStartDate` because the LLC was formed 2026-03-01 and pre-formation activity belongs on a personal sole-prop Schedule C, not the LLC return. The page also surfaces a **federal 1040-ES quarterly banner** with the next due date and a rough YTD-net × 25% placeholder (NOT a real calc — disclaimer makes that explicit). YTD net comes from `getPnL('ytd', 'completed')`; the 'ytd' period is in [`finance.js`](luckyapp/src/lib/finance.js) `getPeriodRange`.
 
 **Tax IDs** (full SSN/EIN) are stored in `contractors.tax_id`. They're row-level-secured per org and never exposed in any public route — but if you ever build a join that touches contractors from a public token endpoint, audit it.
+
+### A/R collection — auto-dunning + dashboard surface
+Three layers, all sharing the same email template in [`src/lib/invoiceReminder.js`](luckyapp/src/lib/invoiceReminder.js):
+
+1. **Daily cron** at [`/api/cron/auto-dunning`](luckyapp/src/app/api/cron/auto-dunning/route.js), scheduled in `vercel.json`. Sends one reminder per outstanding invoice that is **3+ days past due** and has not been reminded in the last 7 days. Both thresholds are env-overridable (`DUNNING_MIN_DAYS_OVERDUE`, `DUNNING_MIN_DAYS_BETWEEN`). Tone is auto-picked from `pickTone(daysOver)`: friendly ≤30d, firm 31–60d, urgent 60+d.
+2. **Manual one-click** from the "Send Payment Reminders" panel on [`/finance`](luckyapp/src/app/(dashboard)/finance/page.js) → `POST /api/send-invoice-reminder`. Same template, same audit log row in `invoice_reminders`.
+3. **Dashboard A/R aging strip** on [`/dashboard`](luckyapp/src/app/(dashboard)/dashboard/page.js) — five-bucket aging with a "Send Reminders" CTA that deep-links to /finance. Shown only when `aging.totalAR > 0`.
+
+When changing the reminder cadence, change it in **both** the cron defaults and the descriptive copy on /finance + /dashboard so the displayed expectation matches what the system actually does.
+
+### Job profitability — per-job margin + reality check on completion
+The job detail page banner at [`(dashboard)/jobs/[id]/page.js`](luckyapp/src/app/(dashboard)/jobs/[id]/page.js) shows revenue − materials − equipment − labor − other = profit, **plus a margin %** color-coded by tier:
+- `≥30%` → on target (green, matches `docs/finances.md` gross margin target)
+- `15-29%` → below target (gold)
+- `0-14%` → thin margin (orange)
+- `<0%` → losing money (red)
+
+When the user clicks **Complete** on a job whose margin is below 30%, a **reality-check modal** intercepts and shows the actual numbers before the status flips. It's a soft warning, not a hard block — `handleStatusChange('completed', { skipMarginCheck: true })` bypasses it. If a source quote exists, a variance row under the banner compares actual revenue + materials against quoted revenue + `quote.materialsCost`. The constant `TARGET_MARGIN_PCT = 30` is the single source of truth — change it there to retune the threshold.
 
 
 ## When finished with response
