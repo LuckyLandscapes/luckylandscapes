@@ -146,7 +146,7 @@ export function renderContractBody({
     '2. PRICE & PAYMENT',
     `Total contract price: ${fmtMoney(total)}.`,
     depositLine,
-    'Accepted payment methods include credit/debit card, ACH bank transfer, check, and cash. Past-due balances accrue interest at 1.5% per month (18% APR) or the maximum rate permitted by Nebraska law, whichever is lower. Customer is responsible for reasonable collection costs and attorneys\' fees if collection becomes necessary.',
+    'Accepted payment methods include credit/debit card, ACH bank transfer, check, and cash. Past-due balances accrue interest at 12% per month (12% APR). Customer is responsible for reasonable collection costs and attorneys\' fees if collection becomes necessary.',
     '',
     '3. SCHEDULE',
     `Estimated start date: ${startStr}. Contractor will substantially complete the work ${completionWindow}. Both parties acknowledge that landscape work is weather-dependent, and Contractor may reschedule for rain, snow, frozen ground, or unsafe conditions without penalty. Contractor will give Customer reasonable notice of weather-related delays.`,
