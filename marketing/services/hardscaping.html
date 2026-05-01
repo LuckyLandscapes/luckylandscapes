@@ -92,7 +92,7 @@
     }
     </script>
     <link rel="stylesheet" href="/styles.css" />
-    <!-- LL:HEAD-INJECT v2 -->
+    <!-- LL:HEAD-INJECT v3 -->
     <!-- Preconnect to critical third parties -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -100,6 +100,10 @@
     <link rel="preconnect" href="https://www.clarity.ms" />
     <link rel="dns-prefetch" href="https://script.google.com" />
     <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- Google Fonts — loaded as <link> (not CSS @import) so it runs in parallel with styles.css.
+         display=swap shows fallback text immediately while the woff2 files arrive. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" />
 
     <!-- LUCKY LANDSCAPES site config — paste your real keys here.
          GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)

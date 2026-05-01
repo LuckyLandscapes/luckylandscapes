@@ -17,10 +17,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
 
-const SENTINEL_START = '<!-- LL:HEAD-INJECT v2 -->';
+const SENTINEL_START = '<!-- LL:HEAD-INJECT v3 -->';
 const SENTINEL_END = '<!-- LL:HEAD-INJECT-END -->';
 // Older sentinel(s) we want to clean up if found.
-const SENTINEL_LEGACY = ['<!-- LL:HEAD-INJECT v1 -->'];
+const SENTINEL_LEGACY = ['<!-- LL:HEAD-INJECT v1 -->', '<!-- LL:HEAD-INJECT v2 -->'];
 
 const HEAD_BLOCK = `${SENTINEL_START}
     <!-- Preconnect to critical third parties -->
@@ -30,6 +30,10 @@ const HEAD_BLOCK = `${SENTINEL_START}
     <link rel="preconnect" href="https://www.clarity.ms" />
     <link rel="dns-prefetch" href="https://script.google.com" />
     <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- Google Fonts — loaded as <link> (not CSS @import) so it runs in parallel with styles.css.
+         display=swap shows fallback text immediately while the woff2 files arrive. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" />
 
     <!-- LUCKY LANDSCAPES site config — paste your real keys here.
          GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)

@@ -3,7 +3,10 @@
    ============================================ */
 
 /* ---------- Google Fonts ---------- */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap');
+/* NOTE: Google Fonts are loaded via <link> in HTML head (see scripts/inject-head.js).
+   Don't add @import here — it serializes the font CSS request behind styles.css,
+   which on mobile causes a multi-second blank-page delay before the browser
+   unblocks rendering. */
 
 /* ---------- CSS Custom Properties ---------- */
 :root {
