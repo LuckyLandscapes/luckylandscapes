@@ -58,8 +58,9 @@ Landscaping is brutally seasonal. Spell out the year:
 - **Quote intake:** Marketing site quote form → luckyapp `POST /api/leads/public` → creates a `customers` row tagged `'lead'` with `source = 'website'`, uploads any photos to the `quote-media` Storage bucket tied to that customer, writes an `activity` row, and dispatches `notifyOrg()` (in-app feed + Resend email + web push to owners/admins). The legacy Google Apps Script path was retired 2026-05-01 — the deployment URL constant in `marketing/main.js` is intentionally blank but the variable is preserved as a kill switch in case we ever need to dual-write again.
 - **Job / customer / invoice / time tracking:** luckyapp (Next.js app on Vercel, Supabase backend).
 - **Payments:** Stripe (via luckyapp).
-- **Email to customers:** Resend (via luckyapp).
-- **Calendar sync:** Google Calendar (via luckyapp).
+- **Email (customers + team alerts):** Resend (via luckyapp). Sender domain is verified — `RESEND_FROM_EMAIL` and `RESEND_REPLY_TO` are both set in Vercel env. Customer-facing flows (`customerEmails.js`, `invoiceReminder.js`) use the reply-to so a customer hitting "Reply" reaches Riley directly. Team-alert flows (`notify.js`) currently send without reply-to — when we want hitting "Reply" on a lead-alert to reach the *lead*, we'll plumb that explicitly into `notifyOrg()` rather than abusing `RESEND_REPLY_TO`.
+- **Web push notifications:** Configured. `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` are set in Vercel env; `notifyOrg()` pushes to any device that subscribed via the in-app prompt. Stale subscriptions are auto-pruned on 404/410.
+- **Calendar sync:** Google Calendar (via luckyapp, [`src/lib/googleCalendar.js`](../luckyapp/src/lib/googleCalendar.js)).
 - **Accounting / books:** Nothing as of now but hoping the luckyapp will have something in the near future.
 - **Payroll:** we can track hours in luckyapp.
 - **Insurance / certs:** WE HAVE TO GET THIS FIGURED OUT, NOT LEGALLY COVERED FOR ANYTHING, have LLC AND EIN

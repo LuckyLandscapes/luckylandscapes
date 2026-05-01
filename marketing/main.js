@@ -1194,7 +1194,7 @@ if (qzCategoryBtns.length > 0) {
     const categoryLabels = {
         lawn:      'Lawn Care',
         garden:    'Garden & Beds',
-        hardscape: 'Hardscaping',
+        hardscape: 'Patios & Walls',
         cleanup:   'Property Cleanup',
         design:    'Design & Build',
         other:     'Something Else',

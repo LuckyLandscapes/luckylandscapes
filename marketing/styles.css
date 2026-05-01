@@ -4409,10 +4409,22 @@ body.promo-active .mobile-menu {
     margin-right: auto;
 }
 
-/* Compact category-chip grid — used by the single-page quote form. */
-.qz-grid--compact {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+/* Compact category-chip grid — used by the single-page quote form.
+   Fixed 3-up keeps the 6 categories on a perfectly balanced 2-row grid;
+   `auto-fit` was leaving 2 orphaned cards left-aligned on the second row.
+   Selector is `.qz-grid.qz-grid--compact` (specificity bumped to 2 classes)
+   so the broader `.qz-grid` responsive overrides further down in the file
+   don't clobber this layout at small breakpoints. */
+.qz-grid.qz-grid--compact {
+    grid-template-columns: repeat(3, 1fr);
     gap: .65rem;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+@media (max-width: 640px) {
+    .qz-grid.qz-grid--compact { grid-template-columns: repeat(2, 1fr); }
 }
 
 .qz-grid--compact .qz-option-card {
