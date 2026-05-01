@@ -21,21 +21,66 @@ window.scrollTo(0, 0);
 // ============================================
 // LENIS SMOOTH SCROLL
 // ============================================
-const lenis = new Lenis({
-    duration: 1.2,
-    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-    smoothWheel: true,
-    touchMultiplier: 2,
-});
+// Mobile/touch devices use native scroll. Lenis on touch caused a major
+// bug where ScrollTrigger updates were chained through gsap.ticker → lenis.raf,
+// and iOS Safari pauses rAF during momentum scrolling, so animations would
+// freeze for 5-7 seconds until the flick settled. Native scroll on mobile
+// fires scroll events directly to ScrollTrigger and IntersectionObserver.
+const isTouchDevice = window.matchMedia('(hover: none) and (pointer: coarse)').matches
+    || ('ontouchstart' in window && window.innerWidth <= 1024);
 
-// Lenis is driven by gsap.ticker below — no manual raf loop needed
+let lenis;
+if (!isTouchDevice) {
+    lenis = new Lenis({
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+        touchMultiplier: 2,
+    });
 
-// Sync Lenis with GSAP ScrollTrigger
-lenis.on('scroll', ScrollTrigger.update);
-gsap.ticker.add((time) => {
-    lenis.raf(time * 1000);
-});
-gsap.ticker.lagSmoothing(0);
+    // Sync Lenis with GSAP ScrollTrigger
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((time) => {
+        lenis.raf(time * 1000);
+    });
+    gsap.ticker.lagSmoothing(0);
+} else {
+    // Stub so the rest of the code can call lenis.* without branching.
+    // Native scroll handles wheel/touch; ScrollTrigger listens to window scroll directly.
+    lenis = {
+        scrollTo(target, opts = {}) {
+            const offset = opts.offset || 0;
+            let top = 0;
+            if (typeof target === 'number') {
+                top = target + offset;
+            } else if (target instanceof Element) {
+                top = target.getBoundingClientRect().top + window.scrollY + offset;
+            } else if (typeof target === 'string') {
+                const el = document.querySelector(target);
+                if (!el) return;
+                top = el.getBoundingClientRect().top + window.scrollY + offset;
+            }
+            window.scrollTo({ top, behavior: opts.immediate ? 'auto' : 'smooth' });
+        },
+        stop() {
+            // Lock body scroll when mobile menu opens
+            document.body.style.overflow = 'hidden';
+            document.body.style.touchAction = 'none';
+        },
+        start() {
+            document.body.style.overflow = '';
+            document.body.style.touchAction = '';
+        },
+        on() {},
+        raf() {},
+        destroy() {},
+    };
+    // Don't enable ScrollTrigger.normalizeScroll on touch — it intercepts touch
+    // events globally and can break the before/after slider drag and carousel
+    // swipe handlers below. Modern iOS Safari fires native scroll events
+    // continuously enough that ScrollTrigger updates correctly without it.
+    ScrollTrigger.config({ ignoreMobileResize: true });
+}
 
 // ============================================
 // PRELOADER
@@ -47,6 +92,10 @@ if (preloader) {
             preloader.classList.add('done');
             // Enable animations after preloader clears
             document.body.classList.add('loaded');
+            // Recalculate ScrollTrigger positions now that the preloader is
+            // gone and images have loaded — otherwise triggers can be set
+            // against stale layout positions.
+            ScrollTrigger.refresh();
         }, 800);
     });
 
@@ -54,6 +103,7 @@ if (preloader) {
     setTimeout(() => {
         preloader.classList.add('done');
         document.body.classList.add('loaded');
+        ScrollTrigger.refresh();
     }, 4000);
 }
 
@@ -189,6 +239,9 @@ const revealEls = document.querySelectorAll(
     '.reveal, .reveal-left, .reveal-right, .reveal-scale, .stagger-children'
 );
 
+// Looser thresholds + positive bottom rootMargin so reveals fire as soon as
+// any pixel of the element enters the viewport — important on mobile where
+// fast flicks otherwise blow past the trigger before it fires.
 const revealObs = new IntersectionObserver(
     (entries) => {
         entries.forEach(entry => {
@@ -198,10 +251,32 @@ const revealObs = new IntersectionObserver(
             }
         });
     },
-    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
+    { threshold: 0.01, rootMargin: '0px 0px 100px 0px' }
 );
 
 revealEls.forEach(el => revealObs.observe(el));
+
+// Failsafe: if anything is still hidden after 2.5s past page load (e.g. an
+// element below the fold that the observer hasn't reported on yet because the
+// user landed mid-page or the browser throttled callbacks), force-reveal it.
+// Better to skip an animation than show a blank section.
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        revealEls.forEach(el => {
+            if (!el.classList.contains('revealed')) {
+                const rect = el.getBoundingClientRect();
+                // Only force-reveal elements that are at or above the current scroll position;
+                // leave below-fold elements to animate normally as the user scrolls.
+                if (rect.top < window.innerHeight + 200) {
+                    el.classList.add('revealed');
+                    revealObs.unobserve(el);
+                }
+            }
+        });
+        // Recalculate ScrollTrigger positions after preloader hides + images load.
+        ScrollTrigger.refresh();
+    }, 2500);
+});
 
 // ============================================
 // GSAP — HERO PARALLAX
@@ -1822,10 +1897,16 @@ if (qzCategoryBtns.length > 0) {
             }).join('');
             suggestionsEl.classList.add('visible');
             suggestionsEl.querySelectorAll('.address-suggestion-item').forEach(item => {
-                item.addEventListener('mousedown', (e) => {
+                // Use pointerdown so it fires immediately on both mouse and touch.
+                // mousedown alone is unreliable on mobile because the browser's
+                // input-blur sequence can hide the suggestions before mousedown fires.
+                const handler = (e) => {
                     e.preventDefault();
                     selectAddress(currentResults[parseInt(item.dataset.idx, 10)]);
-                });
+                };
+                item.addEventListener('pointerdown', handler);
+                // Fallback for the rare browser without PointerEvent support.
+                if (!window.PointerEvent) item.addEventListener('mousedown', handler);
             });
         }
 
