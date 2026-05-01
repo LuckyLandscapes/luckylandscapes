@@ -4470,6 +4470,166 @@ body {
 }
 
 /* ============================================
+   Day Schedule Preview (EventModal)
+   ============================================ */
+.day-schedule {
+  margin-top: var(--space-xs);
+}
+
+.day-schedule-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.day-schedule-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.day-schedule-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  height: 320px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.day-schedule-hours {
+  position: relative;
+  border-right: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+}
+
+.day-schedule-hour {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.day-schedule-hour-label {
+  background: var(--bg-elevated);
+  padding: 0 2px;
+}
+
+.day-schedule-events {
+  position: relative;
+  overflow: hidden;
+}
+
+.day-schedule-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.day-schedule-block {
+  position: absolute;
+  background: color-mix(in srgb, var(--event-color) 22%, transparent);
+  border-left: 3px solid var(--event-color);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.68rem;
+  overflow: hidden;
+  min-height: 18px;
+  z-index: 1;
+}
+
+.day-schedule-block.tentative {
+  background: color-mix(in srgb, var(--event-color) 14%, transparent);
+  border: 1px dashed var(--event-color);
+  border-left: 3px dashed var(--event-color);
+  left: 4px;
+  right: 4px;
+  z-index: 2;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--event-color) 15%, transparent);
+}
+
+.day-schedule-block-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.day-schedule-block-time {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.day-schedule-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+/* Conflict banners (EventModal) */
+.cal-conflict-banner {
+  background: color-mix(in srgb, var(--status-warning, #d4a93e) 12%, transparent);
+  border-left: 3px solid var(--status-warning, #d4a93e);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.cal-conflict-banner.danger {
+  background: color-mix(in srgb, var(--status-error, #e26554) 12%, transparent);
+  border-left-color: var(--status-error, #e26554);
+}
+
+.cal-conflict-banner-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.cal-conflict-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.cal-conflict-list li {
+  margin-bottom: 2px;
+}
+
+/* ============================================
    Customer Preview (EventModal)
    ============================================ */
 .customer-preview {

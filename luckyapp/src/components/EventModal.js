@@ -19,6 +19,7 @@ import {
   Timer,
   DollarSign,
   Navigation,
+  AlertTriangle,
 } from 'lucide-react';
 
 const EVENT_TYPES = [
@@ -28,10 +29,34 @@ const EVENT_TYPES = [
   { value: 'other', label: 'Other', color: '#64748b', icon: '📌' },
 ];
 
+const TYPE_FALLBACK_COLORS = {
+  job: '#6B8E4E',
+  quote_appointment: '#3b82f6',
+  meeting: '#d4a93e',
+  other: '#64748b',
+};
+
+// Parse "HH:MM" → minutes-since-midnight (or null)
+function toMin(t) {
+  if (!t || typeof t !== 'string') return null;
+  const [h, m] = t.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+  return h * 60 + m;
+}
+
+function formatTime12(t) {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 || 12;
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 export default function EventModal({ event, defaultDate, onClose }) {
   const {
     addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
     convertQuoteToJob, customers, teamMembers, quotes, jobs, getCustomer,
+    calendarEvents,
   } = useData();
 
   // Find accepted quotes that don't already have a job
@@ -61,6 +86,99 @@ export default function EventModal({ event, defaultDate, onClose }) {
 
   const selectedCustomer = form.customerId ? customers.find(c => c.id === form.customerId) : null;
   const selectedQuote = form.selectedQuoteId ? quotes.find(q => q.id === form.selectedQuoteId) : null;
+
+  // Existing bookings on the chosen date — calendar events + jobs (without their own event), excluding the one being edited.
+  const dayEvents = useMemo(() => {
+    if (!form.date) return [];
+    const out = [];
+    calendarEvents.forEach(e => {
+      if (e.date !== form.date) return;
+      if (event?.id && e.id === event.id) return;
+      out.push({
+        id: e.id,
+        title: e.title,
+        type: e.type,
+        color: e.color || TYPE_FALLBACK_COLORS[e.type] || '#64748b',
+        startTime: e.startTime,
+        endTime: e.endTime,
+        allDay: !!e.allDay,
+        assignedTo: e.assignedTo || [],
+      });
+    });
+    jobs.forEach(j => {
+      if (j.scheduledDate !== form.date) return;
+      if (calendarEvents.some(e => e.jobId === j.id)) return;
+      out.push({
+        id: `job-${j.id}`,
+        title: j.title,
+        type: 'job',
+        color: '#6B8E4E',
+        startTime: j.scheduledTime,
+        endTime: null,
+        allDay: false,
+        assignedTo: j.assignedTo || [],
+      });
+    });
+    return out;
+  }, [calendarEvents, jobs, form.date, event?.id]);
+
+  // Tentative window for the new/edited event (in minutes)
+  const tentativeWindow = useMemo(() => {
+    if (form.allDay) return { allDay: true, start: 0, end: 24 * 60 };
+    const s = toMin(form.startTime);
+    const e = toMin(form.endTime);
+    if (s == null || e == null || e <= s) return null;
+    return { allDay: false, start: s, end: e };
+  }, [form.allDay, form.startTime, form.endTime]);
+
+  // Time conflicts: events whose window overlaps the tentative window
+  const timeConflicts = useMemo(() => {
+    if (!tentativeWindow) return [];
+    return dayEvents.filter(e => {
+      if (e.allDay || tentativeWindow.allDay) return true;
+      const s = toMin(e.startTime);
+      let en = toMin(e.endTime);
+      if (s == null) return false;
+      if (en == null) en = s + 60; // assume 1hr if end missing
+      return s < tentativeWindow.end && en > tentativeWindow.start;
+    });
+  }, [dayEvents, tentativeWindow]);
+
+  // Crew double-bookings: assigned crew already on a conflicting event
+  const crewConflicts = useMemo(() => {
+    if (!form.assignedTo?.length || !timeConflicts.length) return [];
+    const out = [];
+    timeConflicts.forEach(e => {
+      const overlap = form.assignedTo.filter(id => (e.assignedTo || []).includes(id));
+      overlap.forEach(memberId => {
+        const m = teamMembers.find(tm => tm.id === memberId);
+        out.push({
+          memberId,
+          memberName: m?.fullName || 'Crew member',
+          eventTitle: e.title,
+          eventTimes: e.allDay
+            ? 'All day'
+            : `${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`,
+        });
+      });
+    });
+    return out;
+  }, [timeConflicts, form.assignedTo, teamMembers]);
+
+  // Capacity summary for the day
+  const dayCapacity = useMemo(() => {
+    let totalMin = 0;
+    let allDayCount = 0;
+    dayEvents.forEach(e => {
+      if (e.allDay) { allDayCount++; return; }
+      const s = toMin(e.startTime);
+      let en = toMin(e.endTime);
+      if (s == null) return;
+      if (en == null) en = s + 60;
+      if (en > s) totalMin += (en - s);
+    });
+    return { count: dayEvents.length, hours: totalMin / 60, allDayCount };
+  }, [dayEvents]);
 
   const filteredCustomers = customerSearch
     ? customers.filter(c =>
@@ -389,6 +507,74 @@ export default function EventModal({ event, defaultDate, onClose }) {
             </div>
           )}
 
+          {/* ─── Day Schedule Preview & Conflicts ─────────── */}
+          {form.date && (
+            <div className="form-group">
+              <div className="day-schedule-summary">
+                <span>
+                  <strong>{dayCapacity.count}</strong>{' '}
+                  {dayCapacity.count === 1 ? 'event' : 'events'} on this day
+                  {dayCapacity.allDayCount > 0 && ` (${dayCapacity.allDayCount} all-day)`}
+                </span>
+                {dayCapacity.hours > 0 && (
+                  <span className="day-schedule-summary-pill">
+                    <Clock size={11} /> {dayCapacity.hours.toFixed(1)}h scheduled
+                  </span>
+                )}
+              </div>
+
+              {timeConflicts.length > 0 && (
+                <div className="cal-conflict-banner danger">
+                  <div className="cal-conflict-banner-title">
+                    <AlertTriangle size={14} /> Time conflict — overlaps {timeConflicts.length}{' '}
+                    existing {timeConflicts.length === 1 ? 'event' : 'events'}
+                  </div>
+                  <ul className="cal-conflict-list">
+                    {timeConflicts.map(e => (
+                      <li key={e.id}>
+                        <strong>{e.title}</strong>
+                        {' — '}
+                        {e.allDay
+                          ? 'All day'
+                          : `${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {crewConflicts.length > 0 && (
+                <div className="cal-conflict-banner danger">
+                  <div className="cal-conflict-banner-title">
+                    <AlertTriangle size={14} /> Crew double-booked
+                  </div>
+                  <ul className="cal-conflict-list">
+                    {crewConflicts.map((c, i) => (
+                      <li key={i}>
+                        <strong>{c.memberName}</strong> already on “{c.eventTitle}” ({c.eventTimes})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <DaySchedulePreview
+                events={dayEvents}
+                tentative={
+                  tentativeWindow
+                    ? {
+                        title: form.title || (isJobType ? 'New job' : 'New event'),
+                        color: form.color,
+                        allDay: tentativeWindow.allDay,
+                        startTime: form.startTime,
+                        endTime: form.endTime,
+                      }
+                    : null
+                }
+              />
+            </div>
+          )}
+
           {/* ─── Customer Section — non-job only ──────────── */}
           {!isJobType && (
             <div className="form-group" style={{ position: 'relative' }}>
@@ -553,6 +739,129 @@ export default function EventModal({ event, defaultDate, onClose }) {
           >
             {saving ? 'Saving...' : isJobType ? 'Schedule Job' : event ? 'Update Event' : 'Create Event'}
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Day Schedule Preview ──────────────────────────────────
+// A vertical 6am–9pm timeline showing existing bookings on the chosen date
+// plus a dashed "tentative" block for the in-progress event.
+function DaySchedulePreview({ events, tentative }) {
+  const startHour = 6;
+  const endHour = 21; // 9pm
+  const totalMin = (endHour - startHour) * 60;
+
+  const toBlock = (e, isTentative = false) => {
+    if (!e) return null;
+    if (e.allDay) {
+      return { top: 0, height: 100, label: e.title, color: e.color, isTentative, time: 'All day' };
+    }
+    const s = toMin(e.startTime);
+    let en = toMin(e.endTime);
+    if (s == null) return null;
+    if (en == null) en = s + 60;
+    const startBaseline = startHour * 60;
+    const top = Math.max(0, ((s - startBaseline) / totalMin) * 100);
+    const bottom = Math.min(100, ((en - startBaseline) / totalMin) * 100);
+    if (bottom <= top) return null;
+    return {
+      top,
+      height: bottom - top,
+      label: e.title || (isTentative ? 'New event' : ''),
+      color: e.color,
+      isTentative,
+      time: `${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`,
+    };
+  };
+
+  const blocks = events.map(e => toBlock(e)).filter(Boolean);
+  const tentBlock = tentative ? toBlock(tentative, true) : null;
+
+  // Side-by-side layout for overlapping blocks (column packing)
+  const withColumns = (() => {
+    const sorted = [...blocks].sort((a, b) => a.top - b.top);
+    const cols = []; // each col is array of blocks (their bottom edge)
+    sorted.forEach(b => {
+      let placed = false;
+      for (let i = 0; i < cols.length; i++) {
+        const last = cols[i][cols[i].length - 1];
+        if (last.top + last.height <= b.top) {
+          b.col = i;
+          cols[i].push(b);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        b.col = cols.length;
+        cols.push([b]);
+      }
+    });
+    return { blocks: sorted, totalCols: Math.max(1, cols.length) };
+  })();
+
+  const hourMarks = [];
+  for (let h = startHour; h <= endHour; h++) hourMarks.push(h);
+
+  return (
+    <div className="day-schedule">
+      <div className="day-schedule-grid">
+        <div className="day-schedule-hours">
+          {hourMarks.map((h, i) => (
+            <div key={h} className="day-schedule-hour" style={{ top: `${(i / (hourMarks.length - 1)) * 100}%` }}>
+              <span className="day-schedule-hour-label">
+                {h === 12 ? '12p' : h < 12 ? `${h}a` : `${h - 12}p`}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="day-schedule-events">
+          {hourMarks.slice(0, -1).map((h, i) => (
+            <div
+              key={h}
+              className="day-schedule-gridline"
+              style={{ top: `${(i / (hourMarks.length - 1)) * 100}%` }}
+            />
+          ))}
+          {events.length === 0 && !tentBlock && (
+            <div className="day-schedule-empty">No events scheduled</div>
+          )}
+          {withColumns.blocks.map((b, i) => {
+            const colWidth = 100 / withColumns.totalCols;
+            return (
+              <div
+                key={i}
+                className="day-schedule-block"
+                style={{
+                  '--event-color': b.color,
+                  top: `${b.top}%`,
+                  height: `${b.height}%`,
+                  left: `calc(${b.col * colWidth}% + 2px)`,
+                  width: `calc(${colWidth}% - 4px)`,
+                }}
+                title={`${b.label} — ${b.time}`}
+              >
+                <div className="day-schedule-block-title">{b.label}</div>
+                <div className="day-schedule-block-time">{b.time}</div>
+              </div>
+            );
+          })}
+          {tentBlock && (
+            <div
+              className="day-schedule-block tentative"
+              style={{
+                '--event-color': tentBlock.color || '#3a9c4a',
+                top: `${tentBlock.top}%`,
+                height: `${tentBlock.height}%`,
+              }}
+              title={`${tentBlock.label} — ${tentBlock.time}`}
+            >
+              <div className="day-schedule-block-title">⚡ {tentBlock.label}</div>
+              <div className="day-schedule-block-time">{tentBlock.time}</div>
+            </div>
+          )}
         </div>
       </div>
     </div>

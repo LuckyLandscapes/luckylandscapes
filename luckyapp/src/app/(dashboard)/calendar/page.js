@@ -449,9 +449,13 @@ function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayCli
                         className="cal-event-pill"
                         style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }}
                         onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
+                        title={`${e.title}${e.startTime ? ` — ${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}` : ''}`}
                       >
                         <span className="cal-event-pill-dot" />
-                        <span className="cal-event-pill-text">{e.title}</span>
+                        <span className="cal-event-pill-text">
+                          {e.startTime && <strong style={{ marginRight: 4, fontWeight: 700 }}>{formatTime12(e.startTime).replace(':00', '')}</strong>}
+                          {e.title}
+                        </span>
                       </div>
                     ))}
                     {events.length > 3 && (
@@ -513,8 +517,12 @@ function WeekView({ currentDate, todayStr, selectedDate, eventsByDate, onDayClic
                       className="cal-week-event"
                       style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }}
                       onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
+                      title={`${e.title} — ${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}`}
                     >
-                      <span className="cal-week-event-time">{formatTime12(e.startTime)}</span>
+                      <span className="cal-week-event-time">
+                        {formatTime12(e.startTime)}
+                        {e.endTime ? ` – ${formatTime12(e.endTime)}` : ''}
+                      </span>
                       <span className="cal-week-event-title">{e.title}</span>
                     </div>
                   ))}
