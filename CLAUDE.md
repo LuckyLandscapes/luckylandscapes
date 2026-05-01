@@ -31,7 +31,9 @@ This repo contains **two separate applications** with their own dependencies, bu
 - **Animation:** GSAP (with ScrollTrigger) + Lenis smooth scroll, wired together via `gsap.ticker` in [`marketing/main.js`](marketing/main.js).
 - **Entry points** (declared in [`marketing/vite.config.js`](marketing/vite.config.js)): `index.html`, `team.html`, `careers.html`, `gallery.html`, `quote.html`, `privacy.html`, `terms.html`, plus five service pages under [`marketing/services/`](marketing/services/).
 - **Quote form backend:** Google Apps Script. The deployed Web App URL is pasted into a `QUOTES_SCRIPT_URL` constant in `main.js`. See [`marketing/scripts/SETUP-INSTRUCTIONS.md`](marketing/scripts/SETUP-INSTRUCTIONS.md) for redeployment steps. Photos go to a Drive folder, submissions to a Google Sheet, and notifications via Gmail — all owned by the script's executing Google account.
-- **Hosting:** **Cloudflare Pages**, project connected to GitHub `LuckyLandscapes/luckylandscapes`. Production branch: `main` → `https://luckylandscapes.com`. Any non-`main` branch automatically gets a preview deployment at `https://<branch>.<project>.pages.dev`. CF Pages dashboard settings: **Root directory: `marketing`**, build command: `npm run build`, build output directory: `dist`. [`marketing/public/_redirects`](marketing/public/_redirects) enforces non-www canonical — CF Pages reads it natively (Netlify-compatible syntax). [`marketing/public/_headers`](marketing/public/_headers) sets security headers + image cache. Rollback: CF Pages dashboard retains every prior deployment; one-click rollback. Domain DNS is also on Cloudflare.
+- **Site config (analytics + 3rd-party keys):** `window.LL_CONFIG` is injected into the `<head>` of every HTML page by [`marketing/scripts/inject-head.js`](marketing/scripts/inject-head.js). Four keys: `ga4` (GA4 measurement ID), `clarity` (Microsoft Clarity project ID), `geoapify` (address autocomplete API key), `turnstile` (Cloudflare Turnstile site key). When a key is empty or contains `XXXX`, that integration is a no-op — the page works without it. **To set keys:** edit the placeholder values inside the `<script>` tag of `inject-head.js` (the constant `HEAD_BLOCK`) and re-run `node scripts/inject-head.js` to update all 12 HTML files at once. The script is idempotent and uses a `<!-- LL:HEAD-INJECT -->` sentinel to find/replace the block.
+- **Image pipeline:** Originals live in [`marketing/source-images/`](marketing/source-images/) (do not commit at full quality if they're huge — the script will re-encode on demand). Run `npm run optimize-images` ([`scripts/optimize-images.js`](marketing/scripts/optimize-images.js)) to produce the web-ready versions in `public/images/` — uses `sharp` with per-folder quality profiles. To add new gallery photos: drop a high-res original into `source-images/<folder>/<n>.jpg` (or `.webp`), then run `npm run optimize-images` and commit both the source and optimized output. Re-runnable safely; pass `--force` to re-encode unchanged files.
+- **Hosting:** **Cloudflare Pages**, project connected to GitHub `LuckyLandscapes/luckylandscapes`. Production branch: `main` → `https://luckylandscapes.com`. Any non-`main` branch automatically gets a preview deployment at `https://<branch>.<project>.pages.dev`. CF Pages dashboard settings: **Root directory: `marketing`**, build command: `npm run build`, build output directory: `dist`. [`marketing/public/_redirects`](marketing/public/_redirects) enforces non-www canonical — CF Pages reads it natively (Netlify-compatible syntax). [`marketing/public/_headers`](marketing/public/_headers) sets security headers (incl. CSP) + long image cache. Rollback: CF Pages dashboard retains every prior deployment; one-click rollback. Domain DNS is also on Cloudflare. **For 70%+ image savings on top of the local pipeline:** turn on Cloudflare Polish (Pro plan) or CF Images — auto-converts to AVIF on the fly without code changes.
 
 ### 2. `luckyapp/` — Internal business app (separate Next.js project)
 - **Stack:** Next.js 16 + React 19 (App Router), Supabase (Postgres + Auth + Storage + Realtime), Stripe (payments), Resend (transactional email), Google Calendar API, jsPDF (PDF generation).
@@ -44,9 +46,11 @@ This repo contains **two separate applications** with their own dependencies, bu
 ### Marketing site (run from `marketing/`)
 ```bash
 cd marketing
-npm run dev       # Vite dev server on http://localhost:3000 (auto-opens)
-npm run build     # Build to marketing/dist/
-npm run preview   # Preview the built dist/
+npm run dev               # Vite dev server on http://localhost:3000 (auto-opens)
+npm run build             # Build to marketing/dist/
+npm run preview           # Preview the built dist/
+npm run optimize-images   # Re-encode source-images/ → public/images/ (run after adding new photos)
+node scripts/inject-head.js  # Re-inject the analytics/preconnect block into every HTML page (idempotent)
 ```
 
 ### luckyapp (run from `luckyapp/`)

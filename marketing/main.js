@@ -37,25 +37,48 @@ gsap.ticker.add((time) => {
 });
 gsap.ticker.lagSmoothing(0);
 
-// ============================================
-// PRELOADER
-// ============================================
-const preloader = document.getElementById('preloader');
-if (preloader) {
-    window.addEventListener('load', () => {
-        setTimeout(() => {  // Short delay for visual polish
-            preloader.classList.add('done');
-            // Enable animations after preloader clears
-            document.body.classList.add('loaded');
-        }, 800);
-    });
+// Preloader was removed — content shows immediately. Keep loaded class for any
+// CSS rules that key off it.
+document.body.classList.add('loaded');
 
-    // Fallback: hide preloader after 4s even if load event doesn't fire
-    setTimeout(() => {
-        preloader.classList.add('done');
-        document.body.classList.add('loaded');
-    }, 4000);
+// ============================================
+// ANALYTICS — thin wrapper that no-ops when GA4/Clarity aren't loaded yet
+// ============================================
+function trackEvent(name, params = {}) {
+    try {
+        if (typeof window.gtag === 'function') {
+            window.gtag('event', name, params);
+        }
+        if (window.clarity && typeof window.clarity === 'function') {
+            window.clarity('set', name, JSON.stringify(params));
+        }
+    } catch (_) { /* never let analytics break the page */ }
 }
+
+// ============================================
+// CLOUDFLARE TURNSTILE — anti-bot widget on forms (only active when configured)
+// ============================================
+// Loads the Turnstile API and mounts a widget in every form-mount point on the
+// page when LL_CONFIG.turnstile is set. Forms that include a
+// `<div class="cf-turnstile-mount"></div>` will get the widget injected.
+(function setupTurnstile() {
+    const key = (window.LL_CONFIG && window.LL_CONFIG.turnstile) || '';
+    if (!key) return;
+    const mounts = document.querySelectorAll('.cf-turnstile-mount');
+    if (mounts.length === 0) return;
+    const s = document.createElement('script');
+    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__llTurnstileReady';
+    s.async = true;
+    s.defer = true;
+    window.__llTurnstileReady = function () {
+        mounts.forEach(m => {
+            if (m.dataset.rendered) return;
+            m.dataset.rendered = '1';
+            window.turnstile && window.turnstile.render(m, { sitekey: key, theme: 'light', size: 'normal' });
+        });
+    };
+    document.head.appendChild(s);
+})();
 
 // ============================================
 // NAVBAR SCROLL EFFECT
@@ -401,6 +424,7 @@ if (contactForm) {
             });
 
             // no-cors means we can't read the response, but if fetch didn't throw, it sent
+            trackEvent('contact_submit', { service: data.service || 'none' });
             btn.innerHTML = '✓ Request Sent!';
             btn.classList.remove('loading');
             btn.classList.add('success');
@@ -526,6 +550,7 @@ if (careersForm) {
                 body: params,
             });
 
+            trackEvent('careers_submit', { position: data.position || 'unspecified' });
             btn.innerHTML = '✓ Application Sent!';
             btn.classList.remove('loading');
             btn.classList.add('success');
@@ -1251,6 +1276,8 @@ if (qzCategoryBtns.length > 0) {
             qzProjectType = null;
             updateHero(qzCategory);
 
+            trackEvent('quote_step_complete', { step: 1, category: qzCategory });
+
             if (needsProjectType.includes(qzCategory)) {
                 // Show New vs Repair step
                 const t = document.getElementById('step2a-title');
@@ -1467,6 +1494,7 @@ if (qzCategoryBtns.length > 0) {
     const nextToContact = document.getElementById('qz-next-to-contact');
     if (nextToContact) {
         nextToContact.addEventListener('click', () => {
+            trackEvent('quote_step_complete', { step: 2, category: qzCategory });
             setProgress(3);
             showStep(allSteps[3]); // step 3
         });
@@ -1602,18 +1630,20 @@ if (qzCategoryBtns.length > 0) {
             const email = document.getElementById('q-email').value.trim();
             const phone = document.getElementById('q-phone').value.trim();
 
-            if (!firstName || !lastName || !email || !phone) {
+            if (!firstName || !lastName || !email) {
                 quoteForm.reportValidity();
                 return;
             }
 
-            // Phone validation
-            const digits = phone.replace(/\D/g, '');
-            if (digits.length < 10) {
-                const pg = document.getElementById('q-phone').closest('.form-group');
-                if (pg) pg.classList.add('has-error');
-                document.getElementById('q-phone').focus();
-                return;
+            // Phone is optional, but if provided it must be a real US-style number.
+            if (phone) {
+                const digits = phone.replace(/\D/g, '');
+                if (digits.length < 10) {
+                    const pg = document.getElementById('q-phone').closest('.form-group');
+                    if (pg) pg.classList.add('has-error');
+                    document.getElementById('q-phone').focus();
+                    return;
+                }
             }
 
             // Email validation
@@ -1633,6 +1663,19 @@ if (qzCategoryBtns.length > 0) {
             const data = collectData();
             await submitQuestionnaire(data);
 
+            // Successful submission — clear the autosave so next visit is fresh.
+            clearAutosave();
+
+            // Conversion tracking — primary lead event.
+            trackEvent('quote_submit', {
+                category: data.category || 'unknown',
+                project_type: data.projectType || 'unknown',
+                has_address: !!data.address,
+                has_photos: !!data.photoCount,
+            });
+            // GA4 also has a built-in 'generate_lead' event that goes into the standard conversion reports.
+            trackEvent('generate_lead', { value: 1, currency: 'USD' });
+
             setProgress(4);
             showStep(allSteps[4]); // step 4
             spawnConfetti();
@@ -1641,6 +1684,65 @@ if (qzCategoryBtns.length > 0) {
             btn.disabled = false;
         });
     }
+
+    // ============================================
+    // QUOTE FORM AUTOSAVE — keep partial leads alive across tab close
+    // ============================================
+    // Saves contact fields as the user types so a bounced visitor coming back
+    // doesn't lose their progress. Cleared on successful submit.
+    const AUTOSAVE_KEY = 'lucky_quote_partial';
+    const AUTOSAVE_TTL_DAYS = 7;
+
+    function loadAutosave() {
+        try {
+            const raw = localStorage.getItem(AUTOSAVE_KEY);
+            if (!raw) return null;
+            const data = JSON.parse(raw);
+            if (!data || !data.savedAt) return null;
+            const ageDays = (Date.now() - data.savedAt) / 86400000;
+            if (ageDays > AUTOSAVE_TTL_DAYS) {
+                localStorage.removeItem(AUTOSAVE_KEY);
+                return null;
+            }
+            return data;
+        } catch (_) { return null; }
+    }
+
+    function saveAutosave() {
+        try {
+            const fields = ['q-firstName', 'q-lastName', 'q-email', 'q-phone', 'q-address', 'q-notes'];
+            const payload = { savedAt: Date.now() };
+            fields.forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.value.trim()) payload[el.name] = el.value;
+            });
+            // Don't write an empty record.
+            if (Object.keys(payload).length <= 1) return;
+            localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
+        } catch (_) { /* localStorage may be disabled — silently noop */ }
+    }
+
+    function clearAutosave() {
+        try { localStorage.removeItem(AUTOSAVE_KEY); } catch (_) {}
+    }
+
+    // Restore saved contact info if present.
+    (function restoreAutosave() {
+        const data = loadAutosave();
+        if (!data) return;
+        const map = { firstName: 'q-firstName', lastName: 'q-lastName', email: 'q-email', phone: 'q-phone', address: 'q-address', notes: 'q-notes' };
+        Object.entries(map).forEach(([key, id]) => {
+            const el = document.getElementById(id);
+            if (el && data[key] && !el.value) el.value = data[key];
+        });
+        trackEvent('quote_autosave_restored');
+    })();
+
+    // Save on input across the whole form.
+    ['q-firstName', 'q-lastName', 'q-email', 'q-phone', 'q-address', 'q-notes'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', () => saveAutosave());
+    });
 
     // --- Phone auto-format ---
     const phoneInput = document.getElementById('q-phone');
@@ -1683,12 +1785,48 @@ if (qzCategoryBtns.length > 0) {
         });
     }
 
-    // --- Address autocomplete (Nominatim) + Mini Map ---
+    // --- Address autocomplete + Mini Map ---
+    // Uses Geoapify when LL_CONFIG.geoapify is set (free 3k req/day, sane usage policy);
+    // falls back to OpenStreetMap Nominatim otherwise. Leaflet is lazy-loaded the first
+    // time the user focuses the input so it doesn't block the quote page's first paint.
     const addressInput = document.getElementById('q-address');
     const suggestionsEl = document.getElementById('address-suggestions');
     const mapWrap = document.getElementById('address-map-wrap');
     const mapEl = document.getElementById('address-minimap');
     const mapLabel = document.getElementById('address-map-label');
+
+    let leafletLoaded = false;
+    function loadLeaflet() {
+        if (leafletLoaded || typeof L !== 'undefined') {
+            leafletLoaded = true;
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => {
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            css.crossOrigin = '';
+            document.head.appendChild(css);
+
+            const js = document.createElement('script');
+            js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            js.crossOrigin = '';
+            js.onload = () => { leafletLoaded = true; resolve(); };
+            js.onerror = () => resolve(); // fail open — autocomplete still works without the map
+            document.head.appendChild(js);
+        });
+    }
+
+    if (addressInput) {
+        // Lazy-load Leaflet on first focus or first keystroke, whichever comes first.
+        const triggerLeafletLoad = () => {
+            loadLeaflet();
+            addressInput.removeEventListener('focus', triggerLeafletLoad);
+            addressInput.removeEventListener('input', triggerLeafletLoad);
+        };
+        addressInput.addEventListener('focus', triggerLeafletLoad, { once: true });
+        addressInput.addEventListener('input', triggerLeafletLoad, { once: true });
+    }
 
     if (addressInput && suggestionsEl) {
         let debounceTimer = null;
@@ -1718,15 +1856,22 @@ if (qzCategoryBtns.length > 0) {
             </g>
         </svg>`;
 
-        const luckyPinIcon = typeof L !== 'undefined' ? L.icon({
-            iconUrl: 'data:image/svg+xml;base64,' + btoa(luckyPinSvg),
-            iconSize: [40, 52],
-            iconAnchor: [20, 52],
-            popupAnchor: [0, -52]
-        }) : null;
+        function makeLuckyPinIcon() {
+            if (typeof L === 'undefined') return null;
+            return L.icon({
+                iconUrl: 'data:image/svg+xml;base64,' + btoa(luckyPinSvg),
+                iconSize: [40, 52],
+                iconAnchor: [20, 52],
+                popupAnchor: [0, -52],
+            });
+        }
 
-        function initMiniMap(lat, lon) {
-            if (!mapEl || typeof L === 'undefined') return;
+        async function initMiniMap(lat, lon) {
+            if (!mapEl) return;
+            // Make sure Leaflet is loaded before we try to use it.
+            if (typeof L === 'undefined') await loadLeaflet();
+            if (typeof L === 'undefined') return; // load failed — silently skip the map
+            const luckyPinIcon = makeLuckyPinIcon();
 
             mapWrap.style.display = '';
             // Trigger reflow for animation
@@ -1868,59 +2013,66 @@ if (qzCategoryBtns.length > 0) {
             suggestionsEl.classList.add('visible');
 
             try {
-                // Fire two parallel searches: one biased to NE, one general
-                const neUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=7&countrycodes=us&viewbox=-104.1,43.0,-95.3,40.0&bounded=1&q=${encodeURIComponent(query)}`;
-                const usUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
+                const geoapifyKey = (window.LL_CONFIG && window.LL_CONFIG.geoapify) || '';
+                let merged = [];
 
-                const [neRes, usRes] = await Promise.allSettled([
-                    fetch(neUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
-                    fetch(usUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } })
-                ]);
-
-                if (signal.aborted) return;
-
-                let neData = [];
-                let usData = [];
-                if (neRes.status === 'fulfilled' && neRes.value.ok) {
-                    neData = await neRes.value.json();
-                }
-                if (usRes.status === 'fulfilled' && usRes.value.ok) {
-                    usData = await usRes.value.json();
-                }
-
-                if (signal.aborted) return;
-
-                // Merge & deduplicate: NE results first, then other US results
-                const seen = new Set();
-                const merged = [];
-
-                // Add Nebraska results first
-                for (const r of neData) {
-                    const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        r._fromNE = true;
-                        merged.push(r);
+                if (geoapifyKey) {
+                    // Geoapify Autocomplete — preferred path, free 3k req/day, no usage-policy
+                    // restriction on autocomplete use. Bias to Lincoln, NE.
+                    const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(query)}&filter=countrycode:us&bias=proximity:-96.7026,40.8136&limit=6&apiKey=${geoapifyKey}`;
+                    const res = await fetch(url, { signal });
+                    if (signal.aborted) return;
+                    if (res.ok) {
+                        const json = await res.json();
+                        merged = (json.features || []).map(f => {
+                            const p = f.properties || {};
+                            return {
+                                display_name: p.formatted,
+                                lat: p.lat,
+                                lon: p.lon,
+                                importance: (p.rank && p.rank.confidence) || 0.5,
+                                address: {
+                                    house_number: p.housenumber,
+                                    road: p.street,
+                                    city: p.city || p.town || p.village,
+                                    state: p.state,
+                                    postcode: p.postcode,
+                                },
+                            };
+                        });
                     }
-                }
-
-                // Add remaining US results
-                for (const r of usData) {
-                    const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
-                    if (!seen.has(key)) {
-                        seen.add(key);
-                        merged.push(r);
+                } else {
+                    // OSM Nominatim fallback. OSM's usage policy frowns on autocomplete at scale —
+                    // set window.LL_CONFIG.geoapify in production once you've got more than a few
+                    // dozen lookups per day.
+                    const neUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=7&countrycodes=us&viewbox=-104.1,43.0,-95.3,40.0&bounded=1&q=${encodeURIComponent(query)}`;
+                    const usUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
+                    const [neRes, usRes] = await Promise.allSettled([
+                        fetch(neUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
+                        fetch(usUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
+                    ]);
+                    if (signal.aborted) return;
+                    let neData = [], usData = [];
+                    if (neRes.status === 'fulfilled' && neRes.value.ok) neData = await neRes.value.json();
+                    if (usRes.status === 'fulfilled' && usRes.value.ok) usData = await usRes.value.json();
+                    if (signal.aborted) return;
+                    const seen = new Set();
+                    for (const r of neData) {
+                        const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
+                        if (!seen.has(key)) { seen.add(key); r._fromNE = true; merged.push(r); }
                     }
+                    for (const r of usData) {
+                        const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
+                        if (!seen.has(key)) { seen.add(key); merged.push(r); }
+                    }
+                    merged.sort((a, b) => {
+                        const aIsNE = (a.address?.state || '').toLowerCase().includes('nebraska');
+                        const bIsNE = (b.address?.state || '').toLowerCase().includes('nebraska');
+                        if (aIsNE && !bIsNE) return -1;
+                        if (!aIsNE && bIsNE) return 1;
+                        return (parseFloat(b.importance) || 0) - (parseFloat(a.importance) || 0);
+                    });
                 }
-
-                // Sort: Nebraska results first, then by importance
-                merged.sort((a, b) => {
-                    const aIsNE = (a.address?.state || '').toLowerCase().includes('nebraska');
-                    const bIsNE = (b.address?.state || '').toLowerCase().includes('nebraska');
-                    if (aIsNE && !bIsNE) return -1;
-                    if (!aIsNE && bIsNE) return 1;
-                    return (parseFloat(b.importance) || 0) - (parseFloat(a.importance) || 0);
-                });
 
                 renderSuggestions(merged.slice(0, 6));
             } catch (e) {

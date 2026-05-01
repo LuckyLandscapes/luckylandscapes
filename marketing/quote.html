@@ -57,26 +57,67 @@
     }
     </script>
 
-    <!-- Leaflet Map (for address mini-map) -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Leaflet (for the address mini-map) is loaded lazily by main.js the first
+         time the address input is focused — keeps it off the critical render path. -->
 
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
+    <link rel="dns-prefetch" href="https://tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+    <!-- LL:HEAD-INJECT v2 -->
+    <!-- Preconnect to critical third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.clarity.ms" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
+         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
+         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
+         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
+         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
+    <script>
+      window.LL_CONFIG = {
+        ga4:       'G-Z21C16KEMN ,
+        clarity:   'wk50251l6r',
+        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
+        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
+      };
+    </script>
+
+    <!-- GA4 loader — only fires when a real ID is set. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { anonymize_ip: true });
+      })();
+    </script>
+
+    <!-- Microsoft Clarity loader — only fires when a real ID is set. -->
+    <script>
+      (function (c, l, a, r, i, t, y) {
+        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+        t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + id;
+        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+      })(window, document, 'clarity', 'script');
+    </script>
+    <!-- LL:HEAD-INJECT-END -->
+
 </head>
 
 <body>
-
-    <!-- ==================== PRELOADER ==================== -->
-    <div class="preloader" id="preloader">
-        <div class="preloader-inner">
-            <img src="/images/Icon.png" alt="" class="preloader-logo" />
-            <div class="preloader-bar">
-                <div class="preloader-bar-fill"></div>
-            </div>
-        </div>
-    </div>
 
     <!-- ==================== NAVIGATION ==================== -->
     <nav class="navbar scrolled" id="navbar">
@@ -482,15 +523,6 @@
                                     </div>
                                 </div>
                                 <div class="qz-question">
-                                    <label class="qz-label" for="qz-garden-plant-size">Average plant size?</label>
-                                    <select id="qz-garden-plant-size" name="garden_plant_size" class="qz-select">
-                                        <option value="">Not sure</option>
-                                        <option value="small">Small — 1 gallon pots</option>
-                                        <option value="medium">Medium — 3 to 5 gallon</option>
-                                        <option value="large">Large — Balled & burlapped / 15+ gal</option>
-                                    </select>
-                                </div>
-                                <div class="qz-question">
                                     <label class="qz-label" for="qz-garden-plant-source">Are you providing plants or
                                         should we source them?</label>
                                     <select id="qz-garden-plant-source" name="garden_plant_source" class="qz-select">
@@ -629,26 +661,6 @@
                                         <option value="no">No — building on new ground</option>
                                     </select>
                                 </div>
-                                <div class="qz-question">
-                                    <label class="qz-label" for="qz-hard-paver-drainage">Any drainage concerns?</label>
-                                    <select id="qz-hard-paver-drainage" name="hard_paver_drainage" class="qz-select">
-                                        <option value="none">None that I know of</option>
-                                        <option value="standing_water">Standing water / pooling</option>
-                                        <option value="slope">Area slopes / runs off</option>
-                                        <option value="unsure">Not sure</option>
-                                    </select>
-                                </div>
-                                <div class="qz-question">
-                                    <label class="qz-label" for="qz-hard-paver-pattern">Pattern preference?</label>
-                                    <select id="qz-hard-paver-pattern" name="hard_paver_pattern" class="qz-select">
-                                        <option value="">No preference / not sure</option>
-                                        <option value="herringbone">Herringbone</option>
-                                        <option value="running_bond">Running bond</option>
-                                        <option value="basketweave">Basketweave</option>
-                                        <option value="random">Random / natural</option>
-                                        <option value="custom">Custom — I have an idea</option>
-                                    </select>
-                                </div>
                             </div>
 
                             <!-- Retaining wall sub-options (shown when retaining walls is checked) -->
@@ -672,18 +684,6 @@
                                         <option value="20-50">20–50 feet</option>
                                         <option value="50plus">50+ feet</option>
                                         <option value="unsure">Not sure</option>
-                                    </select>
-                                </div>
-                                <div class="qz-question">
-                                    <label class="qz-label" for="qz-hard-wall-material">Wall material
-                                        preference?</label>
-                                    <select id="qz-hard-wall-material" name="hard_wall_material" class="qz-select">
-                                        <option value="">No preference / not sure</option>
-                                        <option value="concrete_block">Concrete block (Versa-Lok, Allan Block)</option>
-                                        <option value="natural_stone">Natural stone</option>
-                                        <option value="boulder">Boulder</option>
-                                        <option value="brick">Brick</option>
-                                        <option value="timber">Timber / railroad tie</option>
                                     </select>
                                 </div>
                                 <div class="qz-question">
@@ -1244,8 +1244,8 @@
                                 <span class="form-error" id="email-error">Please enter a valid email address</span>
                             </div>
                             <div class="form-group">
-                                <label for="q-phone">Phone *</label>
-                                <input type="tel" id="q-phone" name="phone" placeholder="(402) 555-1234" required
+                                <label for="q-phone">Phone <span class="label-optional">(optional, but speeds up quoting)</span></label>
+                                <input type="tel" id="q-phone" name="phone" placeholder="(402) 555-1234"
                                     inputmode="tel" maxlength="14" />
                                 <span class="form-error" id="phone-error">Please enter a valid phone number</span>
                             </div>
@@ -1345,6 +1345,9 @@
                                 Response within 24 hours
                             </div>
                         </div>
+
+                        <!-- Cloudflare Turnstile widget mounts here when LL_CONFIG.turnstile is set. -->
+                        <div class="cf-turnstile-mount" style="margin: 1rem 0;"></div>
 
                         <button type="submit" class="form-submit quote-next-btn" id="qz-submit">
                             Get My Free Quote

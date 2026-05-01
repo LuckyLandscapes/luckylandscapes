@@ -37,11 +37,11 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="MyWebSite" />
     <link rel="manifest" href="/favicon/site.webmanifest" />
-    <!-- Structured Data: LocalBusiness -->
+    <!-- Structured Data: LandscapingBusiness -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
+      "@type": "LandscapingBusiness",
       "name": "Lucky Landscapes",
       "url": "https://luckylandscapes.com",
       "logo": "https://luckylandscapes.com/images/Icon.png",
@@ -147,20 +147,60 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.css" />
+    <!-- LL:HEAD-INJECT v2 -->
+    <!-- Preconnect to critical third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.clarity.ms" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
+         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
+         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
+         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
+         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
+    <script>
+      window.LL_CONFIG = {
+        ga4:       'G-Z21C16KEMN ,
+        clarity:   'wk50251l6r',
+        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
+        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
+      };
+    </script>
+
+    <!-- GA4 loader — only fires when a real ID is set. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { anonymize_ip: true });
+      })();
+    </script>
+
+    <!-- Microsoft Clarity loader — only fires when a real ID is set. -->
+    <script>
+      (function (c, l, a, r, i, t, y) {
+        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+        t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + id;
+        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+      })(window, document, 'clarity', 'script');
+    </script>
+    <!-- LL:HEAD-INJECT-END -->
+
 </head>
 
 <body>
-
-
-    <!-- ==================== PRELOADER ==================== -->
-    <div class="preloader" id="preloader">
-        <div class="preloader-inner">
-            <img src="/images/Icon.png" alt="" class="preloader-logo" />
-            <div class="preloader-bar">
-                <div class="preloader-bar-fill"></div>
-            </div>
-        </div>
-    </div>
 
     <!-- ==================== NAVIGATION ==================== -->
     <nav class="navbar" id="navbar">
@@ -202,8 +242,8 @@
         <header class="hero" id="hero">
             <!-- Video Background -->
             <div class="hero-video-wrap">
-                <video class="hero-video" autoplay muted loop playsinline
-                    poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
+                <video class="hero-video" autoplay muted loop playsinline preload="metadata"
+                    poster="/images/banner.jpg">
                     <source src="/images/webheromain.mp4" type="video/mp4" />
                 </video>
                 <div class="hero-overlay"></div>
@@ -245,25 +285,25 @@
             </div>
         </header>
 
-        <!-- ==================== STATS BAR ==================== -->
+        <!-- ==================== TRUST BAR ==================== -->
         <section class="stats-bar">
             <div class="container">
                 <div class="stats-grid">
                     <div class="stat-item">
-                        <span class="stat-number" data-count="100">0</span><span class="stat-suffix">+</span>
-                        <span class="stat-label">Projects Completed</span>
+                        <span class="stat-number">5.0</span><span class="stat-suffix">★</span>
+                        <span class="stat-label">Google Rated</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="100">0</span><span class="stat-suffix">%</span>
-                        <span class="stat-label">Client Satisfaction</span>
+                        <span class="stat-number">24</span><span class="stat-suffix">hr</span>
+                        <span class="stat-label">Quote Turnaround</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="3">0</span><span class="stat-suffix">+</span>
-                        <span class="stat-label">Years Experience</span>
+                        <span class="stat-number">$0</span>
+                        <span class="stat-label">Free Estimates</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="8">0</span><span class="stat-suffix"></span>
-                        <span class="stat-label">Service Categories</span>
+                        <span class="stat-number">Local</span>
+                        <span class="stat-label">Lincoln, NE Crew</span>
                     </div>
                 </div>
             </div>
@@ -817,6 +857,9 @@
                         <label for="message">Message</label>
                         <textarea id="message" name="message" placeholder="Tell us about your project..."></textarea>
                     </div>
+
+                    <!-- Cloudflare Turnstile widget mounts here when LL_CONFIG.turnstile is set. -->
+                    <div class="cf-turnstile-mount" style="margin: 0.5rem 0;"></div>
 
                     <button type="submit" class="form-submit">
                         Send My Message
