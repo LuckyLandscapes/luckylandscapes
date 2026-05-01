@@ -412,28 +412,113 @@ const SERVICE_LABELS = {
 };
 
 function areaSchema(area) {
+    const areaName = area.h1.replace(/<[^>]+>/g, '').trim();
+    const url = `https://luckylandscapes.com/areas/${area.slug}.html`;
+    const offers = (area.services || []).map(s => ({
+        '@type': 'Offer',
+        itemOffered: {
+            '@type': 'Service',
+            name: SERVICE_LABELS[s].title,
+            url: `https://luckylandscapes.com/services/${s}.html`,
+        },
+    }));
+    const faqs = (area.faqs || []).map(f => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+    }));
     return {
         '@context': 'https://schema.org',
-        '@type': 'LandscapingBusiness',
-        name: 'Lucky Landscapes',
-        url: `https://luckylandscapes.com/areas/${area.slug}.html`,
-        telephone: '+1-402-405-5475',
-        areaServed: { '@type': 'Place', name: area.h1.replace(/<[^>]+>/g, '').trim() },
-        address: { '@type': 'PostalAddress', addressLocality: 'Lincoln', addressRegion: 'NE', addressCountry: 'US' },
+        '@graph': [
+            {
+                '@type': ['LocalBusiness', 'LandscapingBusiness'],
+                '@id': `${url}#business`,
+                name: `Lucky Landscapes — ${areaName}`,
+                parentOrganization: { '@id': 'https://luckylandscapes.com/#business' },
+                url,
+                telephone: '+1-402-405-5475',
+                email: 'rileykopf@luckylandscapes.com',
+                priceRange: '$$',
+                image: 'https://luckylandscapes.com/images/og-card.png',
+                logo: 'https://luckylandscapes.com/images/Icon.png',
+                description: area.description,
+                address: {
+                    '@type': 'PostalAddress',
+                    streetAddress: '109 South Canopy Street',
+                    addressLocality: 'Lincoln',
+                    addressRegion: 'NE',
+                    postalCode: '68508',
+                    addressCountry: 'US',
+                },
+                geo: { '@type': 'GeoCoordinates', latitude: 40.8136, longitude: -96.7026 },
+                hasMap: 'https://www.google.com/maps?cid=2884806323034838689',
+                areaServed: [
+                    { '@type': 'Place', name: areaName },
+                    ...(area.zips || []).map(zip => ({ '@type': 'PostalCodeRange', name: `ZIP ${zip}`, postalCode: zip })),
+                ],
+                openingHoursSpecification: [
+                    { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday','Tuesday','Wednesday','Thursday','Friday'], opens: '07:00', closes: '19:00' },
+                    { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '08:00', closes: '17:00' },
+                ],
+                hasOfferCatalog: {
+                    '@type': 'OfferCatalog',
+                    name: `Landscaping Services in ${areaName}`,
+                    itemListElement: offers,
+                },
+                aggregateRating: { '@type': 'AggregateRating', ratingValue: '5.0', reviewCount: '3', bestRating: '5' },
+                sameAs: [
+                    'https://www.google.com/maps?cid=2884806323034838689',
+                    'https://www.facebook.com/luckylandscapes',
+                    'https://www.instagram.com/lucky.landscapes/',
+                ],
+            },
+            {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://luckylandscapes.com/' },
+                    { '@type': 'ListItem', position: 2, name: 'Service Areas', item: 'https://luckylandscapes.com/#service-areas' },
+                    { '@type': 'ListItem', position: 3, name: areaName, item: url },
+                ],
+            },
+            ...(faqs.length ? [{ '@type': 'FAQPage', mainEntity: faqs }] : []),
+        ],
     };
 }
 
 function postSchema(post) {
+    const url = `https://luckylandscapes.com/blog/${post.slug}.html`;
     return {
         '@context': 'https://schema.org',
-        '@type': 'BlogPosting',
-        headline: post.title.replace(' — Lucky Landscapes', ''),
-        datePublished: post.date,
-        dateModified: post.date,
-        author: { '@type': 'Organization', name: 'Lucky Landscapes' },
-        publisher: { '@type': 'Organization', name: 'Lucky Landscapes', logo: { '@type': 'ImageObject', url: 'https://luckylandscapes.com/images/Icon.png' } },
-        description: post.description,
-        mainEntityOfPage: `https://luckylandscapes.com/blog/${post.slug}.html`,
+        '@graph': [
+            {
+                '@type': 'BlogPosting',
+                '@id': `${url}#post`,
+                headline: post.title.replace(' — Lucky Landscapes', ''),
+                datePublished: post.date,
+                dateModified: post.date,
+                author: { '@type': 'Organization', '@id': 'https://luckylandscapes.com/#organization', name: 'Lucky Landscapes' },
+                publisher: {
+                    '@type': 'Organization',
+                    name: 'Lucky Landscapes',
+                    logo: { '@type': 'ImageObject', url: 'https://luckylandscapes.com/images/Icon.png' },
+                },
+                description: post.description,
+                image: 'https://luckylandscapes.com/images/og-card.png',
+                articleSection: post.category,
+                inLanguage: 'en-US',
+                mainEntityOfPage: { '@type': 'WebPage', '@id': url },
+                isPartOf: { '@id': 'https://luckylandscapes.com/blog/#blog' },
+                about: { '@id': 'https://luckylandscapes.com/#business' },
+            },
+            {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://luckylandscapes.com/' },
+                    { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://luckylandscapes.com/blog/' },
+                    { '@type': 'ListItem', position: 3, name: post.title.replace(' — Lucky Landscapes', ''), item: url },
+                ],
+            },
+        ],
     };
 }
 
@@ -620,7 +705,33 @@ const blogIndex = `${head({
     title: 'Lucky Landscapes Blog — Lincoln, NE Landscaping Tips & Pricing',
     description: 'Practical landscaping, lawn care, and hardscape advice for Lincoln, Nebraska homeowners. Real local pricing, seasonal guides, and contractor honesty.',
     canonical: 'https://luckylandscapes.com/blog/',
-    schema: { '@context': 'https://schema.org', '@type': 'Blog', name: 'Lucky Landscapes Blog', url: 'https://luckylandscapes.com/blog/' },
+    schema: {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': 'Blog',
+                '@id': 'https://luckylandscapes.com/blog/#blog',
+                name: 'Lucky Landscapes Blog',
+                description: 'Practical landscaping, lawn care, and hardscape advice for Lincoln, Nebraska homeowners.',
+                url: 'https://luckylandscapes.com/blog/',
+                publisher: { '@id': 'https://luckylandscapes.com/#organization' },
+                blogPost: POSTS.map(p => ({
+                    '@type': 'BlogPosting',
+                    headline: p.title.replace(' — Lucky Landscapes', ''),
+                    url: `https://luckylandscapes.com/blog/${p.slug}.html`,
+                    datePublished: p.date,
+                    description: p.description,
+                })),
+            },
+            {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://luckylandscapes.com/' },
+                    { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://luckylandscapes.com/blog/' },
+                ],
+            },
+        ],
+    },
 })}
 
         <section class="svc-hero">

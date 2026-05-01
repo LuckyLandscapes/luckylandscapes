@@ -29,17 +29,57 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Service",
-      "name": "Garden Beds & Mulch Services",
-      "description": "Garden bed installation, mulching, edging, and planting services in Lincoln, Nebraska.",
-      "provider": {
-        "@type": "LandscapingBusiness",
-        "name": "Lucky Landscapes",
-        "telephone": "+1-402-405-5475",
-        "url": "https://luckylandscapes.com"
-      },
-      "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" },
-      "url": "https://luckylandscapes.com/services/garden-beds.html"
+      "@graph": [
+        {
+          "@type": "Service",
+          "@id": "https://luckylandscapes.com/services/garden-beds.html#service",
+          "name": "Garden Beds & Mulch Services in Lincoln, NE",
+          "serviceType": "Garden Bed Installation & Mulching",
+          "category": "Landscaping",
+          "description": "Garden bed installation, mulching, edging, weed barrier, plant transplants, and seasonal mulch refresh in Lincoln, Nebraska. We design beds that match your home and the local climate.",
+          "url": "https://luckylandscapes.com/services/garden-beds.html",
+          "provider": { "@id": "https://luckylandscapes.com/#business" },
+          "areaServed": [
+            { "@type": "City", "name": "Lincoln", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Waverly", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Beatrice", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Hickman", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "AdministrativeArea", "name": "Lancaster County, Nebraska" }
+          ],
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock",
+            "url": "https://luckylandscapes.com/quote.html?category=garden"
+          },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Garden Bed Services",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "New Garden Bed Installation" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Mulch Refresh" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Bed Edging" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Plant Transplanting" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Weeding & Weed Barrier" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Rock & Decorative Stone Beds" } }
+            ]
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "3",
+            "bestRating": "5"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://luckylandscapes.com/" },
+            { "@type": "ListItem", "position": 2, "name": "Services", "item": "https://luckylandscapes.com/#services" },
+            { "@type": "ListItem", "position": 3, "name": "Garden Beds & Mulch", "item": "https://luckylandscapes.com/services/garden-beds.html" }
+          ]
+        }
+      ]
     }
     </script>
     <link rel="stylesheet" href="/styles.css" />

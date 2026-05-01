@@ -29,17 +29,86 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Service",
-      "name": "Lawn Care Services",
-      "description": "Professional lawn care in Lincoln, NE including weekly mowing, seasonal cleanups, leaf removal, and year-round maintenance packages.",
-      "provider": {
-        "@type": "LandscapingBusiness",
-        "name": "Lucky Landscapes",
-        "telephone": "+1-402-405-5475",
-        "url": "https://luckylandscapes.com"
-      },
-      "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" },
-      "url": "https://luckylandscapes.com/services/lawn-care.html"
+      "@graph": [
+        {
+          "@type": "Service",
+          "@id": "https://luckylandscapes.com/services/lawn-care.html#service",
+          "name": "Lawn Care Services in Lincoln, NE",
+          "serviceType": "Lawn Care",
+          "category": "Landscaping",
+          "description": "Professional lawn care in Lincoln, NE including weekly mowing, seasonal cleanups, leaf removal, edging, and year-round maintenance packages. Cool-season grass specialists for Kentucky bluegrass, fine fescue, and tall fescue blends.",
+          "url": "https://luckylandscapes.com/services/lawn-care.html",
+          "image": "https://luckylandscapes.com/images/lawncare/1.webp",
+          "provider": { "@id": "https://luckylandscapes.com/#business" },
+          "areaServed": [
+            { "@type": "City", "name": "Lincoln", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Waverly", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Hickman", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Roca", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Bennet", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "AdministrativeArea", "name": "Lancaster County, Nebraska" }
+          ],
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "USD",
+            "priceSpecification": {
+              "@type": "PriceSpecification",
+              "priceCurrency": "USD",
+              "minPrice": "35",
+              "maxPrice": "75",
+              "unitText": "per visit"
+            },
+            "availability": "https://schema.org/InStock",
+            "url": "https://luckylandscapes.com/quote.html?category=lawn"
+          },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Lawn Care Services",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Weekly Lawn Mowing" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Bi-Weekly Lawn Mowing" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Spring Cleanup" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Fall Cleanup" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Leaf Removal" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Edging & Trimming" } }
+            ]
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "3",
+            "bestRating": "5"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://luckylandscapes.com/" },
+            { "@type": "ListItem", "position": 2, "name": "Services", "item": "https://luckylandscapes.com/#services" },
+            { "@type": "ListItem", "position": 3, "name": "Lawn Care", "item": "https://luckylandscapes.com/services/lawn-care.html" }
+          ]
+        },
+        {
+          "@type": "FAQPage",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "How often should my lawn be mowed in Lincoln, NE?",
+              "acceptedAnswer": { "@type": "Answer", "text": "During the growing season (April–October), we recommend weekly mowing for most lawns in Lincoln. Cool-season grasses like bluegrass and fescue grow quickly in spring and fall. We adjust our schedule based on conditions so your lawn always looks its best." }
+            },
+            {
+              "@type": "Question",
+              "name": "Is lawn care available year-round?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. During winter we offer seasonal cleanups, snow-related yard prep, and early-spring services. Our complete care packages run year-round." }
+            },
+            {
+              "@type": "Question",
+              "name": "How much does lawn mowing cost in Lincoln, NE?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Pricing depends on lawn size and services needed. Most residential lawns in Lincoln run $35–$75 per visit. We offer discounts for recurring weekly or bi-weekly plans." }
+            }
+          ]
+        }
+      ]
     }
     </script>
     <link rel="stylesheet" href="/styles.css" />

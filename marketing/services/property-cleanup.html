@@ -29,17 +29,58 @@
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Service",
-      "name": "Property Cleanup & Junk Removal",
-      "description": "Professional property cleanup, junk removal, debris hauling, and overgrown yard restoration in Lincoln, Nebraska.",
-      "provider": {
-        "@type": "LandscapingBusiness",
-        "name": "Lucky Landscapes",
-        "telephone": "+1-402-405-5475",
-        "url": "https://luckylandscapes.com"
-      },
-      "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" },
-      "url": "https://luckylandscapes.com/services/property-cleanup.html"
+      "@graph": [
+        {
+          "@type": "Service",
+          "@id": "https://luckylandscapes.com/services/property-cleanup.html#service",
+          "name": "Property Cleanup & Junk Removal in Lincoln, NE",
+          "serviceType": "Property Cleanup",
+          "category": "Landscaping",
+          "description": "Property cleanup, junk removal, debris hauling, brush clearing, and overgrown yard restoration in Lincoln, Nebraska. Same-week scheduling for most jobs.",
+          "url": "https://luckylandscapes.com/services/property-cleanup.html",
+          "provider": { "@id": "https://luckylandscapes.com/#business" },
+          "areaServed": [
+            { "@type": "City", "name": "Lincoln", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Waverly", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Hickman", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Roca", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Bennet", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "AdministrativeArea", "name": "Lancaster County, Nebraska" }
+          ],
+          "offers": {
+            "@type": "Offer",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock",
+            "url": "https://luckylandscapes.com/quote.html?category=cleanup"
+          },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Cleanup Services",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Spring Cleanup" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Fall Leaf Removal" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Junk & Debris Hauling" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Brush Clearing" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Overgrown Yard Restoration" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Storm Damage Cleanup" } }
+            ]
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "3",
+            "bestRating": "5"
+          }
+        },
+        {
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://luckylandscapes.com/" },
+            { "@type": "ListItem", "position": 2, "name": "Services", "item": "https://luckylandscapes.com/#services" },
+            { "@type": "ListItem", "position": 3, "name": "Property Cleanup", "item": "https://luckylandscapes.com/services/property-cleanup.html" }
+          ]
+        }
+      ]
     }
     </script>
     <link rel="stylesheet" href="/styles.css" />
