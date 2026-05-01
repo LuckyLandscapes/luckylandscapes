@@ -21,21 +21,44 @@ window.scrollTo(0, 0);
 // ============================================
 // LENIS SMOOTH SCROLL
 // ============================================
-const lenis = new Lenis({
-    duration: 1.2,
-    easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-    smoothWheel: true,
-    touchMultiplier: 2,
-});
+// Touch devices get native scroll — Lenis interferes with iOS momentum scroll
+// and pull-to-refresh, and was breaking scrolling on mobile entirely. ScrollTrigger
+// works fine against the native window scroll without a Lenis sync.
+const isTouchDevice =
+    typeof window.matchMedia === 'function' &&
+    (window.matchMedia('(pointer: coarse)').matches || window.matchMedia('(hover: none)').matches);
 
-// Lenis is driven by gsap.ticker below — no manual raf loop needed
+let lenis;
+if (isTouchDevice) {
+    // Stub that mirrors the small surface used elsewhere in this file.
+    const navHeight = () => document.querySelector('.navbar')?.offsetHeight || 80;
+    lenis = {
+        stop() { document.documentElement.style.overflow = 'hidden'; document.body.style.overflow = 'hidden'; },
+        start() { document.documentElement.style.overflow = ''; document.body.style.overflow = ''; },
+        scrollTo(target, opts = {}) {
+            const el = typeof target === 'string' ? document.querySelector(target) : target;
+            if (!el) return;
+            const offset = opts.offset || 0;
+            const top = el.getBoundingClientRect().top + window.scrollY + offset;
+            window.scrollTo({ top, behavior: opts.immediate ? 'auto' : 'smooth' });
+        },
+        on() {},
+        raf() {},
+    };
+} else {
+    lenis = new Lenis({
+        duration: 1.2,
+        easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+        smoothWheel: true,
+    });
 
-// Sync Lenis with GSAP ScrollTrigger
-lenis.on('scroll', ScrollTrigger.update);
-gsap.ticker.add((time) => {
-    lenis.raf(time * 1000);
-});
-gsap.ticker.lagSmoothing(0);
+    // Sync Lenis with GSAP ScrollTrigger (driven by gsap.ticker — no manual raf)
+    lenis.on('scroll', ScrollTrigger.update);
+    gsap.ticker.add((time) => {
+        lenis.raf(time * 1000);
+    });
+    gsap.ticker.lagSmoothing(0);
+}
 
 // Preloader was removed — content shows immediately. Keep loaded class for any
 // CSS rules that key off it.

@@ -138,10 +138,11 @@ function buildNotes(body) {
 // Decode the base64-payload photos coming from the marketing form, upload
 // them to the existing `quote-media` Storage bucket, and write `quote_media`
 // rows tied to the customer (with `quote_id = NULL` — allowed since
-// migration 023). Returns the count successfully uploaded.
+// migration 023). Returns the per-photo metadata (incl. raw buffer) so
+// the caller can also attach them to the notification email.
 async function uploadLeadPhotos({ supabase, photos, orgId, customerId }) {
-  if (!Array.isArray(photos) || photos.length === 0) return 0;
-  let saved = 0;
+  if (!Array.isArray(photos) || photos.length === 0) return [];
+  const saved = [];
   for (const photo of photos.slice(0, 5)) {
     try {
       const b64 = String(photo?.data || '');
@@ -154,7 +155,8 @@ async function uploadLeadPhotos({ supabase, photos, orgId, customerId }) {
       }
       const contentType = photo?.type && /^image\//.test(photo.type) ? photo.type : 'image/jpeg';
       const ext = (contentType.split('/')[1] || 'jpg').replace(/[^a-z0-9]/gi, '') || 'jpg';
-      const filePath = `leads/${orgId}/${customerId}/${Date.now()}-${saved}.${ext}`;
+      const baseName = (photo?.name || `photo-${saved.length + 1}`).replace(/[^a-z0-9._-]/gi, '_').slice(0, 80);
+      const filePath = `leads/${orgId}/${customerId}/${Date.now()}-${saved.length}.${ext}`;
 
       const { error: upErr } = await supabase.storage
         .from('quote-media')
@@ -184,12 +186,113 @@ async function uploadLeadPhotos({ supabase, photos, orgId, customerId }) {
         await supabase.storage.from('quote-media').remove([filePath]).catch(() => {});
         continue;
       }
-      saved++;
+      saved.push({ filename: baseName, fileUrl, contentType, buffer, size: buffer.byteLength });
     } catch (err) {
       console.error('[lead intake] photo upload exception', err);
     }
   }
   return saved;
+}
+
+// Builds the styled HTML body for the team-alert email. Mirrors the layout
+// of the legacy Apps Script template (CLIENT INFORMATION / PROJECT OVERVIEW /
+// SERVICES / DESCRIPTION) so the format Riley is used to scanning carries over.
+function buildEmailHtml({ body, customerId, photos, fullName, isNew }) {
+  const appOrigin = (process.env.NEXT_PUBLIC_APP_URL || 'https://app.luckylandscapes.com').replace(/\/$/, '');
+  const customerUrl = `${appOrigin}/customers/${customerId}`;
+
+  const rowFn = (label, value) => value
+    ? `<tr><td style="padding:6px 12px 6px 0;color:#677160;font-size:14px;width:140px;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#1f2421;font-size:14px;font-weight:500;">${escapeHtml(value)}</td></tr>`
+    : '';
+
+  const sectionHeader = (title) => `<h3 style="margin:24px 0 8px;color:#2d5016;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid #e6ebe1;padding-bottom:6px;font-family:Georgia,serif;">${escapeHtml(title)}</h3>`;
+
+  const services = body.categoryLabel
+    ? `${body.categoryLabel}${body.projectType ? ` — ${body.projectType}` : ''}`
+    : 'Quote request submitted';
+  const checkedServices = Object.entries(body)
+    .filter(([k, v]) => v === 'yes' && SERVICE_LABELS[k])
+    .map(([k]) => SERVICE_LABELS[k])
+    .join(', ');
+  const detailRows = Object.entries(DETAIL_LABELS)
+    .filter(([k]) => body[k])
+    .map(([k, label]) => rowFn(label, pretty(k, body[k])))
+    .join('');
+
+  const photoBlock = photos.length
+    ? `${sectionHeader(`Photos (${photos.length} attached)`)}
+       <p style="color:#677160;font-size:13px;margin:0 0 12px;">Photos are attached to this email and also live in the customer's media gallery in luckyapp.</p>
+       <table cellpadding="0" cellspacing="0" border="0" style="margin:0;"><tr>
+         ${photos.map(p => `<td style="padding:0 8px 8px 0;"><a href="${escapeHtml(p.fileUrl)}"><img src="${escapeHtml(p.fileUrl)}" alt="lead photo" width="120" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid #e6ebe1;display:block;" /></a></td>`).join('')}
+       </tr></table>`
+    : `${sectionHeader('Photos')}<p style="color:#677160;font-size:14px;margin:0;">No photos attached.</p>`;
+
+  return `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f7f8f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f7f8f5;padding:24px 12px;">
+    <tr><td align="center">
+      <table cellpadding="0" cellspacing="0" border="0" width="640" style="max-width:640px;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.04);">
+
+        <!-- Header bar -->
+        <tr><td style="background:linear-gradient(135deg,#2d5016 0%,#41a100 100%);padding:24px 32px;color:#fff;">
+          <div style="font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;opacity:.85;">🍀 ${isNew ? 'New Quote Request' : 'Repeat Inquiry'}</div>
+          <div style="font-size:24px;font-weight:700;font-family:Georgia,serif;margin-top:4px;">${escapeHtml(services)} — ${escapeHtml(fullName || 'Unknown')}</div>
+        </td></tr>
+
+        <!-- Body -->
+        <tr><td style="padding:24px 32px 32px;">
+
+          ${sectionHeader('Client Information')}
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${rowFn('Name',        fullName)}
+            ${rowFn('Email',       body.email)}
+            ${rowFn('Phone',       body.phone)}
+            ${rowFn('Address',     body.address)}
+            ${rowFn('Best contact', body.contactMethod && body.contactMethod !== 'any' ? pretty('contactMethod', body.contactMethod) : null)}
+            ${rowFn('Best time',   body.bestTime && body.bestTime !== 'anytime' ? pretty('bestTime', body.bestTime) : null)}
+          </table>
+
+          ${sectionHeader('Project Overview')}
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${rowFn('Category',  body.categoryLabel)}
+            ${rowFn('Type',      body.projectType)}
+            ${rowFn('Size',      body.project_size ? pretty('project_size', body.project_size) : null)}
+            ${rowFn('Timeline',  body.project_timeline ? pretty('project_timeline', body.project_timeline) : null)}
+          </table>
+
+          ${checkedServices ? `${sectionHeader('Services Requested')}<p style="margin:0;color:#1f2421;font-size:14px;">${escapeHtml(checkedServices)}</p>` : ''}
+
+          ${detailRows ? `${sectionHeader('Details')}<table cellpadding="0" cellspacing="0" border="0" width="100%">${detailRows}</table>` : ''}
+
+          ${body.project_description ? `${sectionHeader('Project Description')}<p style="margin:0;color:#1f2421;font-size:14px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(String(body.project_description))}</p>` : ''}
+
+          ${photoBlock}
+
+          <!-- CTA -->
+          <table cellpadding="0" cellspacing="0" border="0" style="margin:28px 0 0;">
+            <tr><td style="background:#41a100;border-radius:6px;">
+              <a href="${customerUrl}" style="display:inline-block;padding:12px 22px;color:#ffffff;font-weight:700;font-size:14px;text-decoration:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">Open customer in luckyapp →</a>
+            </td></tr>
+          </table>
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="padding:14px 32px;border-top:1px solid #e6ebe1;color:#9aa399;font-size:12px;">
+          Submitted via luckylandscapes.com quote form · ${new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'medium', timeStyle: 'short' })} CT
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 async function resolveOrgId(supabase) {
@@ -291,15 +394,17 @@ export async function POST(request) {
   }
 
   // Upload any photos to Supabase Storage tied to this customer.
-  const photoCount = await uploadLeadPhotos({
+  // Also retains the raw buffers so we can attach them to the email.
+  const uploadedPhotos = await uploadLeadPhotos({
     supabase,
     photos: body.photos,
     orgId,
     customerId,
   });
+  const photoCount = uploadedPhotos.length;
 
   const fullName = [firstName, lastName].filter(Boolean).join(' ');
-  const title = isNew
+  const inAppTitle = isNew
     ? `New website lead: ${fullName}`
     : `Repeat website inquiry: ${fullName}`;
   const description = body.categoryLabel
@@ -310,33 +415,49 @@ export async function POST(request) {
     org_id: orgId,
     customer_id: customerId,
     type: 'lead_created',
-    title,
+    title: inAppTitle,
     description,
   });
   if (actErr) console.error('[lead intake] activity insert failed', actErr);
 
-  // In-app notification + Resend email + web push to owners/admins.
-  const notifBodyLines = [
+  // Short body — used for the in-app feed item and the web-push card. The
+  // *email* gets a much richer styled template (see buildEmailHtml).
+  const inAppBody = [
     description,
     address ? `📍 ${address}` : null,
     phone ? `📞 ${phone}` : null,
-    email ? `✉️ ${email}` : null,
     body.project_size ? `Size: ${pretty('project_size', body.project_size)}` : null,
-    body.project_timeline ? `Timeline: ${pretty('project_timeline', body.project_timeline)}` : null,
-    body.contactMethod && body.contactMethod !== 'any'
-      ? `Prefers: ${pretty('contactMethod', body.contactMethod)}${body.bestTime && body.bestTime !== 'anytime' ? `, ${pretty('bestTime', body.bestTime)}` : ''}`
-      : null,
-    photoCount ? `📸 ${photoCount} photo${photoCount > 1 ? 's' : ''} attached` : null,
-    body.project_description ? `\n"${String(body.project_description).slice(0, 240)}${body.project_description.length > 240 ? '…' : ''}"` : null,
-  ].filter(Boolean);
+    photoCount ? `📸 ${photoCount} photo${photoCount > 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join('\n');
+
+  // Email-specific overrides: legacy-style subject, full HTML template,
+  // photos as attachments, reply-to set to the lead so Riley can hit Reply.
+  const emailSubject = `🍀 ${isNew ? 'New Quote Request' : 'Repeat Inquiry'} — ${body.categoryLabel || 'General'} — ${fullName || 'Unknown'}`;
+  const emailHtml = buildEmailHtml({
+    body: { ...body, email, phone, address },
+    customerId,
+    photos: uploadedPhotos,
+    fullName,
+    isNew,
+  });
+  const attachments = uploadedPhotos.map(p => ({
+    filename: p.filename,
+    content: p.buffer,
+  }));
 
   await notifyOrg({
     orgId,
     type: 'lead_created',
-    title,
-    body: notifBodyLines.join('\n'),
+    title: inAppTitle,
+    body: inAppBody,
     link: `/customers/${customerId}`,
     data: { customer_id: customerId, isNew, source: 'website', photoCount },
+    attachments,
+    email: {
+      subject: emailSubject,
+      html: emailHtml,
+      replyTo: email || undefined,
+    },
   }).catch(err => console.error('[lead intake] notifyOrg failed', err));
 
   return NextResponse.json({ ok: true, customerId, isNew, photoCount }, { headers: CORS_HEADERS });
