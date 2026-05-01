@@ -3,9 +3,11 @@
 // Inline month-grid date picker that bakes capacity into each cell.
 // Two modes:
 //   - 'single' (default): emits onChange(dateStr)
-//   - 'range': emits onChange({ start, end }). Click 1 sets both start &
-//     end to clicked. Click 2 extends the range; clicking before the
-//     current start swaps. Click 3 (after a complete range) starts over.
+//   - 'multi':  emits onChange(string[]). Click toggles a day in/out of the
+//     selection. Shift-click fills the gap from the last-clicked day to
+//     the current click (mouse only — touch users just tap each day).
+//     This handles every shape: 1 day, contiguous run, "Fri + Mon split",
+//     "Mon-Fri but skip Wed", whatever.
 
 import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -38,24 +40,30 @@ function getMonthGrid(year, month) {
 }
 
 export default function MiniMonthPicker({
-  value,                  // 'YYYY-MM-DD' (single) OR { start, end } (range)
+  value,                  // 'YYYY-MM-DD' (single) OR string[] (multi)
   onChange,
-  mode = 'single',        // 'single' | 'range'
+  mode = 'single',        // 'single' | 'multi'
   eventsByDate = {},
   neededHours = 0,
   minDate = null,
   className = '',
 }) {
-  const isRange = mode === 'range';
+  const isMulti = mode === 'multi';
 
-  // Normalize value so internal logic always sees { start, end }.
-  const range = isRange
-    ? (value && value.start ? { start: value.start, end: value.end || value.start } : { start: '', end: '' })
-    : { start: value || '', end: value || '' };
+  // Normalize value so internal lookup is a Set of YYYY-MM-DD strings.
+  const selectedSet = useMemo(() => {
+    if (isMulti) {
+      const arr = Array.isArray(value) ? value.filter(Boolean) : [];
+      return new Set(arr);
+    }
+    return new Set(value ? [value] : []);
+  }, [value, isMulti]);
 
-  // Anchor month for navigation.
+  // Anchor month for navigation — seed from first selected day or today.
   const initialAnchor = (() => {
-    const seed = range.start;
+    const seed = isMulti
+      ? (Array.isArray(value) && value.length > 0 ? [...value].sort()[0] : null)
+      : value;
     if (seed) {
       const [y, m] = seed.split('-').map(Number);
       if (Number.isFinite(y) && Number.isFinite(m)) return new Date(y, m - 1, 1);
@@ -65,8 +73,8 @@ export default function MiniMonthPicker({
   })();
 
   const [anchor, setAnchor] = useState(initialAnchor);
-  // 'idle' = ready to start a new range. 'extending' = next click sets end.
-  const [pickState, setPickState] = useState('idle');
+  // Last-clicked day, used as the anchor for shift-click range fill.
+  const [lastClicked, setLastClicked] = useState(null);
   const todayStr = fmt(new Date());
 
   const cells = useMemo(
@@ -81,38 +89,49 @@ export default function MiniMonthPicker({
     setAnchor(new Date(t.getFullYear(), t.getMonth(), 1));
   };
 
-  const handleClick = (dateStr) => {
-    if (!isRange) {
+  const enumerateRange = (a, b) => {
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    const out = [];
+    const cur = new Date(lo + 'T12:00:00');
+    const end = new Date(hi + 'T12:00:00');
+    while (cur <= end) {
+      out.push(fmt(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  };
+
+  const handleClick = (dateStr, ev) => {
+    if (!isMulti) {
       onChange?.(dateStr);
       return;
     }
 
-    if (pickState === 'idle' || !range.start) {
-      // Start fresh: single-day range, awaiting end click.
-      onChange?.({ start: dateStr, end: dateStr });
-      setPickState('extending');
+    const current = new Set(selectedSet);
+
+    // Shift-click: fill range from lastClicked → dateStr (additive).
+    if (ev?.shiftKey && lastClicked) {
+      enumerateRange(lastClicked, dateStr).forEach(d => current.add(d));
     } else {
-      // Extending an existing range.
-      if (dateStr >= range.start) {
-        onChange?.({ start: range.start, end: dateStr });
-      } else {
-        // Clicked before current start → make clicked the new start, old start the new end.
-        onChange?.({ start: dateStr, end: range.start });
-      }
-      setPickState('idle');
+      // Plain click: toggle the single day.
+      if (current.has(dateStr)) current.delete(dateStr);
+      else current.add(dateStr);
     }
+
+    setLastClicked(dateStr);
+    onChange?.(Array.from(current).sort());
   };
 
-  const inRange = (dateStr) => {
-    if (!isRange || !range.start || !range.end) return false;
-    return dateStr >= range.start && dateStr <= range.end;
+  const isSelected = (dateStr) => selectedSet.has(dateStr);
+
+  const handleClearAll = () => {
+    if (!isMulti) return;
+    setLastClicked(null);
+    onChange?.([]);
   };
-  const isStart = (dateStr) => isRange && range.start && dateStr === range.start && range.end !== range.start;
-  const isEnd = (dateStr) => isRange && range.end && dateStr === range.end && range.end !== range.start;
-  const isOnlyDay = (dateStr) => isRange && range.start && range.start === range.end && dateStr === range.start;
 
   return (
-    <div className={`mini-picker ${isRange ? 'range-mode' : ''} ${className}`}>
+    <div className={`mini-picker ${isMulti ? 'multi-mode' : ''} ${className}`}>
       <div className="mini-picker-header">
         <button type="button" className="mini-picker-nav" onClick={goPrev} aria-label="Previous month">
           <ChevronLeft size={16} />
@@ -124,11 +143,14 @@ export default function MiniMonthPicker({
         </button>
       </div>
 
-      {isRange && (
+      {isMulti && (
         <div className="mini-picker-hint">
-          {pickState === 'extending'
-            ? 'Click another day to set the end date (or click again for a single-day job).'
-            : 'Click a day to start. Click another to extend the range.'}
+          {selectedSet.size === 0
+            ? 'Click days to add. Shift-click fills a range.'
+            : `${selectedSet.size} day${selectedSet.size === 1 ? '' : 's'} selected · Shift-click to fill a range`}
+          {selectedSet.size > 0 && (
+            <button type="button" className="mini-picker-clear" onClick={handleClearAll}>Clear</button>
+          )}
         </div>
       )}
 
@@ -145,11 +167,7 @@ export default function MiniMonthPicker({
           const wouldOverbook = neededHours > 0 && (load.hours + neededHours) > DAILY_CAPACITY_HOURS + 0.001;
           const disabled = isPast;
 
-          const selected = !isRange
-            ? dateStr === value
-            : (isOnlyDay(dateStr) || isStart(dateStr) || isEnd(dateStr));
-
-          const inside = !selected && inRange(dateStr);
+          const selected = isSelected(dateStr);
 
           return (
             <button
@@ -158,15 +176,12 @@ export default function MiniMonthPicker({
               className={`mini-picker-day
                 ${c.currentMonth ? '' : 'out'}
                 ${selected ? 'selected' : ''}
-                ${inside ? 'in-range' : ''}
-                ${isStart(dateStr) ? 'range-start' : ''}
-                ${isEnd(dateStr) ? 'range-end' : ''}
                 ${dateStr === todayStr ? 'today' : ''}
-                ${wouldOverbook ? 'no-fit' : ''}
+                ${wouldOverbook && !selected ? 'no-fit' : ''}
                 ${disabled ? 'disabled' : ''}
               `}
               data-status={load.status}
-              onClick={() => !disabled && handleClick(dateStr)}
+              onClick={(ev) => !disabled && handleClick(dateStr, ev)}
               disabled={disabled}
               title={
                 load.count === 0

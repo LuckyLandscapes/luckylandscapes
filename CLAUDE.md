@@ -78,7 +78,7 @@ Pure business logic (P&L, AR aging, job profitability) lives in [`src/lib/financ
 SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/supabase/migrations/) and **must be run in order** in the Supabase SQL editor. Notes from [`migrations/README.md`](luckyapp/supabase/migrations/README.md):
 - 001 and 002 overlap; 001 uses `CREATE TABLE IF NOT EXISTS` so running 001 then 002 is safe.
 - Four prefixes are duplicated — `006_` (`break_minutes` + `job_media`), `007_` (`invoices` + `job_priority`), `023_` (`contracts` + `quote_media_nullable_quote_id`), and `024_` (`contracts_pdf_and_storage` + `time_segments`). Treat the numeric prefix as a sort key, not a uniqueness guarantee — when adding a new migration, check what's already present and run duplicates in alphabetical order within the prefix.
-- Latest migration on disk is `027_catalog_enhancements.sql`. The next one you add should be `028_…`.
+- Latest migration on disk is `029_job_workday_set.sql` (multi-day jobs as a `scheduled_dates JSONB` workday set). `028` was deliberately skipped — an earlier multi-day-range model was superseded before deploy. Next one should be `030_…`.
 - `FULL_REBUILD.sql` is **deprecated** — it only covers 001–013 and is missing 14 newer tables (payments, contracts, time_segments, contractors, etc.). Always run the numbered files in order; do not use the rebuild script.
 
 ### Public payment links

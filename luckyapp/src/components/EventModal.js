@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
-import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours, buildEventsByDate, workdaysBetween } from '@/lib/capacity';
+import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours, buildEventsByDate, summarizeWorkdays } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
@@ -93,20 +93,22 @@ export default function EventModal({ event, defaultDate, onClose }) {
     return 4;
   })();
 
-  // Pre-fill end-date when editing an event whose linked job is multi-day.
-  const initialEndDate = (() => {
+  // Pre-fill the workday set when editing an event whose linked job is multi-day.
+  const initialScheduledDates = (() => {
     if (event?.jobId) {
       const job = jobs.find(j => j.id === event.jobId);
-      if (job?.scheduledEndDate) return job.scheduledEndDate;
+      if (Array.isArray(job?.scheduledDates) && job.scheduledDates.length > 0) {
+        return [...job.scheduledDates];
+      }
     }
-    return event?.date || defaultDate || new Date().toISOString().split('T')[0];
+    return [event?.date || defaultDate || new Date().toISOString().split('T')[0]];
   })();
 
   const [form, setForm] = useState({
     title: event?.title || '',
     type: event?.type || 'other',
     date: event?.date || defaultDate || new Date().toISOString().split('T')[0],
-    endDate: initialEndDate,
+    scheduledDates: initialScheduledDates,
     startTime: event?.startTime || '09:00',
     endTime: event?.endTime || addHoursToTime(event?.startTime || '09:00', initialHours),
     estimatedHours: initialHours,
@@ -230,18 +232,16 @@ export default function EventModal({ event, defaultDate, onClose }) {
 
   // Multi-day breakdown (job type only).
   const isJobTypeRange = form.type === 'job';
-  const workdays = useMemo(
-    () => isJobTypeRange ? workdaysBetween(form.date, form.endDate || form.date) : 1,
-    [form.date, form.endDate, isJobTypeRange],
-  );
+  const workdays = isJobTypeRange ? form.scheduledDates.length : 1;
   const totalHours = Number(form.estimatedHours) || 0;
   const perDayHours = workdays > 0 ? totalHours / workdays : totalHours;
 
   const handleFindOpenSlot = () => {
     const needed = isJobTypeRange ? perDayHours : (Number(form.estimatedHours) || 4);
-    const slot = findNextOpenSlot(eventsByDate, form.date || new Date().toISOString().split('T')[0], needed || 4);
+    const seed = form.date || new Date().toISOString().split('T')[0];
+    const slot = findNextOpenSlot(eventsByDate, seed, needed || 4);
     if (slot) {
-      setForm(prev => ({ ...prev, date: slot, endDate: slot }));
+      setForm(prev => ({ ...prev, date: slot, scheduledDates: [slot] }));
     }
   };
 
@@ -286,10 +286,12 @@ export default function EventModal({ event, defaultDate, onClose }) {
     try {
       if (form.type === 'job') {
         // Schedule job from accepted quote
+        const dates = form.scheduledDates.length > 0 ? form.scheduledDates : [form.date];
+        const anchor = [...dates].sort()[0];
         const job = await convertQuoteToJob({
           quoteId: form.selectedQuoteId,
-          scheduledDate: form.date,
-          scheduledEndDate: form.endDate && form.endDate !== form.date ? form.endDate : null,
+          scheduledDate: anchor,
+          scheduledDates: dates,
           scheduledTime: form.allDay ? null : form.startTime,
           estimatedHours: form.allDay ? null : Number(form.estimatedHours) || null,
           crewNotes: form.notes || '',
@@ -497,18 +499,17 @@ export default function EventModal({ event, defaultDate, onClose }) {
             </div>
           )}
 
-          {/* Date — inline mini calendar with capacity per day. Range mode for jobs. */}
+          {/* Date — inline mini calendar with capacity per day. Multi-select for jobs. */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
               <span>
                 <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                {isJobTypeRange ? 'Job Dates' : 'Date'} <span className="required">*</span>
-                {form.date && (
+                {isJobTypeRange ? 'Workdays' : 'Date'} <span className="required">*</span>
+                {(isJobTypeRange ? form.scheduledDates.length > 0 : form.date) && (
                   <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                    {new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                    {isJobTypeRange && form.endDate && form.endDate !== form.date && (
-                      <> – {new Date(form.endDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</>
-                    )}
+                    {isJobTypeRange
+                      ? summarizeWorkdays(form.scheduledDates)
+                      : new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                   </span>
                 )}
               </span>
@@ -535,16 +536,26 @@ export default function EventModal({ event, defaultDate, onClose }) {
             </label>
             {isJobTypeRange ? (
               <MiniMonthPicker
-                mode="range"
-                value={{ start: form.date, end: form.endDate || form.date }}
-                onChange={(r) => setForm(prev => ({ ...prev, date: r.start, endDate: r.end }))}
+                mode="multi"
+                value={form.scheduledDates}
+                onChange={(dates) => {
+                  const sorted = [...dates].sort();
+                  setForm(prev => ({
+                    ...prev,
+                    scheduledDates: sorted,
+                    // Anchor stays in sync with the earliest selected day so
+                    // start_time, calendar_event row, and capacity preview
+                    // all reference the right date.
+                    date: sorted[0] || prev.date,
+                  }));
+                }}
                 eventsByDate={eventsByDate}
                 neededHours={form.allDay ? 0 : perDayHours}
               />
             ) : (
               <MiniMonthPicker
                 value={form.date}
-                onChange={(d) => setForm(prev => ({ ...prev, date: d, endDate: d }))}
+                onChange={(d) => setForm(prev => ({ ...prev, date: d, scheduledDates: [d] }))}
                 eventsByDate={eventsByDate}
                 neededHours={form.allDay ? 0 : (Number(form.estimatedHours) || 0)}
               />
@@ -560,7 +571,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
                 <span className="multiday-summary-pill highlight">
                   ~<strong>{perDayHours.toFixed(1)}h</strong>/day
                 </span>
-                <span className="multiday-summary-note">Sundays skipped. Hours auto-distributed evenly.</span>
+                <span className="multiday-summary-note">Hours split evenly across selected days.</span>
               </div>
             )}
           </div>

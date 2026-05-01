@@ -9390,40 +9390,38 @@ body {
   .mini-picker-legend { font-size: 0.6rem; gap: 6px; }
 }
 
-/* Range mode visuals */
+/* Multi-select mode visuals — every clicked day gets the .selected
+   treatment; gaps between selected days are deliberately NOT filled in
+   (that's the whole point of multi-select vs. range). */
 .mini-picker-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 0.7rem;
   color: var(--text-tertiary);
   text-align: center;
   margin-bottom: 6px;
-  padding: 4px 6px;
+  padding: 5px 8px;
   background: rgba(107,142,78,0.08);
   border-radius: 4px;
 }
-
-.mini-picker-day.in-range {
-  background: rgba(107,142,78,0.18);
-  border-color: rgba(107,142,78,0.30);
+.mini-picker-clear {
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
-.mini-picker-day.in-range .mini-picker-day-num { color: var(--text-primary); }
-
-.mini-picker-day.range-start,
-.mini-picker-day.range-end {
-  background: var(--lucky-green);
-  border-color: var(--lucky-green);
-  color: white;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lucky-green) 40%, transparent);
+.mini-picker-clear:hover {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.30);
+  color: #f87171;
 }
-.mini-picker-day.range-start .mini-picker-day-num,
-.mini-picker-day.range-end .mini-picker-day-num,
-.mini-picker-day.range-start .mini-picker-day-count,
-.mini-picker-day.range-end .mini-picker-day-count {
-  color: white;
-}
-.mini-picker-day.range-start .mini-picker-day-bar,
-.mini-picker-day.range-end .mini-picker-day-bar { background: rgba(255,255,255,0.25); }
-.mini-picker-day.range-start .mini-picker-day-bar-fill,
-.mini-picker-day.range-end .mini-picker-day-bar-fill { background: white; }
 
 /* Multi-day breakdown summary (under the range picker) */
 .multiday-summary {

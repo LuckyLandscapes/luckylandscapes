@@ -111,38 +111,33 @@ function pad(n) { return String(n).padStart(2, '0'); }
 function ymd(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
 // Returns [{date, hours, dayIndex, totalDays}, ...] — one entry per workday
-// the job touches. Single-day jobs (no scheduledEndDate) get one entry.
-// Sundays are skipped by default to match the rest of the scheduling logic.
-export function expandJobToWorkdays(job, opts = {}) {
-  const { skipSunday = true } = opts;
-  if (!job?.scheduledDate) return [];
-
-  const start = new Date(job.scheduledDate + 'T12:00:00');
-  if (Number.isNaN(start.getTime())) return [];
-
-  const endStr = job.scheduledEndDate || job.scheduledDate;
-  const end = new Date(endStr + 'T12:00:00');
-  if (Number.isNaN(end.getTime()) || end < start) return [{ date: job.scheduledDate, hours: parseDurationHours(job.estimatedDuration, 4), dayIndex: 0, totalDays: 1 }];
-
-  const days = [];
-  const cur = new Date(start);
-  while (cur <= end) {
-    if (!skipSunday || cur.getDay() !== 0) {
-      days.push(ymd(cur));
-    }
-    cur.setDate(cur.getDate() + 1);
+// the job touches.
+//
+// Resolution order:
+//   1. If `scheduledDates` is a non-empty array, use it verbatim. The user
+//      picked these days explicitly (multi-select) and their gaps are
+//      intentional ("Fri + Mon, skip the weekend"). No automatic skipping.
+//   2. Otherwise fall back to a single day at `scheduledDate` (legacy rows).
+export function expandJobToWorkdays(job) {
+  if (!job?.scheduledDate && (!Array.isArray(job?.scheduledDates) || job.scheduledDates.length === 0)) {
+    return [];
   }
-  // If the whole range happened to be Sundays, anchor the job to its start.
-  if (days.length === 0) days.push(job.scheduledDate);
+
+  let dates = Array.isArray(job?.scheduledDates) ? job.scheduledDates.filter(Boolean) : [];
+  if (dates.length === 0 && job?.scheduledDate) dates = [job.scheduledDate];
+  if (dates.length === 0) return [];
+
+  // De-duplicate + sort lexicographically (YYYY-MM-DD strings sort naturally).
+  dates = Array.from(new Set(dates)).sort();
 
   const totalHours = parseDurationHours(job.estimatedDuration, 4);
-  const perDay = totalHours / days.length;
+  const perDay = totalHours / dates.length;
 
-  return days.map((date, i) => ({
+  return dates.map((date, i) => ({
     date,
     hours: perDay,
     dayIndex: i,
-    totalDays: days.length,
+    totalDays: dates.length,
   }));
 }
 
@@ -229,18 +224,25 @@ export function buildEventsByDate({ calendarEvents = [], jobs = [], excludeEvent
   return map;
 }
 
-// Count workdays (skip Sunday) between two ISO date strings, inclusive.
-export function workdaysBetween(startStr, endStr, opts = {}) {
-  const { skipSunday = true } = opts;
-  if (!startStr) return 0;
-  const start = new Date(startStr + 'T12:00:00');
-  const end = new Date((endStr || startStr) + 'T12:00:00');
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
-  let count = 0;
-  const cur = new Date(start);
-  while (cur <= end) {
-    if (!skipSunday || cur.getDay() !== 0) count++;
-    cur.setDate(cur.getDate() + 1);
+// Convenience: format a sorted scheduled-dates array for a label like
+// "Fri May 1, Mon May 4" (or "Mon May 4 – Wed May 6" when contiguous).
+export function summarizeWorkdays(dates = []) {
+  const arr = Array.isArray(dates) ? dates.filter(Boolean) : [];
+  if (arr.length === 0) return '';
+  const sorted = Array.from(new Set(arr)).sort();
+  const fmt = (s) => new Date(s + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  // Contiguous?
+  let contiguous = true;
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = new Date(sorted[i - 1] + 'T12:00:00');
+    const cur = new Date(sorted[i] + 'T12:00:00');
+    const diff = (cur - prev) / 86400000;
+    if (diff !== 1) { contiguous = false; break; }
   }
-  return count;
+
+  if (sorted.length === 1) return fmt(sorted[0]);
+  if (contiguous) return `${fmt(sorted[0])} – ${fmt(sorted[sorted.length - 1])}`;
+  if (sorted.length <= 4) return sorted.map(fmt).join(', ');
+  return `${fmt(sorted[0])} … ${fmt(sorted[sorted.length - 1])} (${sorted.length} days)`;
 }

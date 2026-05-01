@@ -654,7 +654,7 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   // ─── Convert Quote → Job ───────────────────────────────
-  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledEndDate, scheduledTime, estimatedHours, crewNotes, assignedTo }) => {
+  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledDates, scheduledTime, estimatedHours, crewNotes, assignedTo }) => {
     const quote = getQuote(quoteId);
     if (!quote) return null;
     const customer = quote.customerId ? getCustomer(quote.customerId) : null;
@@ -663,8 +663,13 @@ export function DataProvider({ children }) {
       ? Number(estimatedHours)
       : 4;
 
-    // Single-day jobs leave end_date null. Treat end == start as single-day too.
-    const endDate = (scheduledEndDate && scheduledEndDate !== scheduledDate) ? scheduledEndDate : null;
+    // scheduledDates is the canonical workday set. scheduledDate is the
+    // start (= min) — kept denormalized so existing single-day queries
+    // (idx_jobs_scheduled_date, ordering, dashboard "next job") still work.
+    let dates = Array.isArray(scheduledDates) ? scheduledDates.filter(Boolean) : [];
+    if (dates.length === 0 && scheduledDate) dates = [scheduledDate];
+    dates = Array.from(new Set(dates)).sort();
+    const anchorDate = dates[0] || scheduledDate || null;
 
     const jobData = {
       quoteId,
@@ -674,8 +679,8 @@ export function DataProvider({ children }) {
       address: customer?.address
         ? `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim()
         : '',
-      scheduledDate,
-      scheduledEndDate: endDate,
+      scheduledDate: anchorDate,
+      scheduledDates: dates,
       scheduledTime: scheduledTime || null,
       estimatedDuration: `${hours} hours`,
       assignedTo: assignedTo || [],

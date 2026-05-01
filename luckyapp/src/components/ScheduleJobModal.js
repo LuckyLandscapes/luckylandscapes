@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
-import { dayLoad, findNextOpenSlot, buildEventsByDate, workdaysBetween } from '@/lib/capacity';
+import { dayLoad, findNextOpenSlot, buildEventsByDate, summarizeWorkdays } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
@@ -25,13 +25,14 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
   const customer = quote ? getCustomer(quote.customerId) : null;
 
   const [form, setForm] = useState({
-    scheduledDate: '',
-    scheduledEndDate: '',
+    scheduledDates: [],          // string[] — explicit set of workdays
     scheduledTime: '08:00',
     estimatedHours: 4,
     crewNotes: '',
     assignedTo: [],
   });
+
+  const anchorDate = form.scheduledDates[0] || '';
 
   const eventsByDate = useMemo(
     () => buildEventsByDate({ calendarEvents, jobs }),
@@ -39,15 +40,11 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
   );
 
   const dateLoad = useMemo(
-    () => form.scheduledDate ? dayLoad(eventsByDate[form.scheduledDate] || []) : null,
-    [eventsByDate, form.scheduledDate],
+    () => anchorDate ? dayLoad(eventsByDate[anchorDate] || []) : null,
+    [eventsByDate, anchorDate],
   );
 
-  // Workday count + per-day hours for the multi-day breakdown summary.
-  const workdays = useMemo(
-    () => workdaysBetween(form.scheduledDate, form.scheduledEndDate || form.scheduledDate),
-    [form.scheduledDate, form.scheduledEndDate],
-  );
+  const workdays = form.scheduledDates.length;
   const totalHours = Number(form.estimatedHours) || 0;
   const perDayHours = workdays > 0 ? totalHours / workdays : totalHours;
 
@@ -56,9 +53,9 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
 
   const handleFindOpenSlot = () => {
     const needed = perDayHours || 4;
-    const seed = form.scheduledDate || new Date().toISOString().split('T')[0];
+    const seed = anchorDate || new Date().toISOString().split('T')[0];
     const slot = findNextOpenSlot(eventsByDate, seed, needed);
-    if (slot) setForm(prev => ({ ...prev, scheduledDate: slot, scheduledEndDate: slot }));
+    if (slot) setForm(prev => ({ ...prev, scheduledDates: [slot] }));
   };
 
   const [saving, setSaving] = useState(false);
@@ -76,15 +73,15 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
   };
 
   const handleSchedule = async () => {
-    if (!form.scheduledDate) return;
+    if (form.scheduledDates.length === 0) return;
     setSaving(true);
     setError(null);
 
     try {
       const job = await convertQuoteToJob({
         quoteId,
-        scheduledDate: form.scheduledDate,
-        scheduledEndDate: form.scheduledEndDate || null,
+        scheduledDate: anchorDate,
+        scheduledDates: form.scheduledDates,
         scheduledTime: form.scheduledTime,
         estimatedHours: Number(form.estimatedHours) || null,
         crewNotes: form.crewNotes,
@@ -103,7 +100,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               title: job.title,
-              date: form.scheduledDate,
+              date: anchorDate,
               startTime: form.scheduledTime || '08:00',
               description: `${form.crewNotes || ''}\n\nQuote #${quote?.quoteNumber}`,
               location: customer?.address ? `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim() : '',
@@ -145,7 +142,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
               <h3>Job Scheduled!</h3>
               <p style={{ marginBottom: 'var(--space-lg)' }}>
                 {quote?.category} job has been scheduled for{' '}
-                {new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {summarizeWorkdays(form.scheduledDates)}
               </p>
               <a href={`/jobs/${createdJobId}`} className="btn btn-primary">
                 View Job Details
@@ -180,12 +177,9 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                   <span>
                     <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
                     Job Dates <span className="required">*</span>
-                    {form.scheduledDate && (
+                    {form.scheduledDates.length > 0 && (
                       <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
-                        {new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        {form.scheduledEndDate && form.scheduledEndDate !== form.scheduledDate && (
-                          <> – {new Date(form.scheduledEndDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</>
-                        )}
+                        {summarizeWorkdays(form.scheduledDates)}
                       </span>
                     )}
                   </span>
@@ -200,9 +194,9 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                   </button>
                 </label>
                 <MiniMonthPicker
-                  mode="range"
-                  value={{ start: form.scheduledDate, end: form.scheduledEndDate || form.scheduledDate }}
-                  onChange={(r) => setForm(prev => ({ ...prev, scheduledDate: r.start, scheduledEndDate: r.end }))}
+                  mode="multi"
+                  value={form.scheduledDates}
+                  onChange={(dates) => setForm(prev => ({ ...prev, scheduledDates: dates }))}
                   eventsByDate={eventsByDate}
                   neededHours={neededPerDay}
                 />
@@ -217,7 +211,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                     <span className="multiday-summary-pill highlight">
                       ~<strong>{perDayHours.toFixed(1)}h</strong>/day
                     </span>
-                    <span className="multiday-summary-note">Sundays skipped. Hours auto-distributed evenly.</span>
+                    <span className="multiday-summary-note">Hours split evenly across selected days.</span>
                   </div>
                 )}
                 {dateLoad && (
@@ -329,7 +323,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
             <button
               className="btn btn-primary"
               onClick={handleSchedule}
-              disabled={saving || !form.scheduledDate}
+              disabled={saving || form.scheduledDates.length === 0}
             >
               {saving ? (
                 <><Loader2 size={16} className="spin" /> Scheduling...</>
