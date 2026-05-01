@@ -1,11 +1,30 @@
 -- ============================================================================
--- 🍀 LUCKY LANDSCAPES — COMPLETE DATABASE REBUILD
+-- ⚠️  DEPRECATED — DO NOT USE FOR NEW DATABASES
 -- ============================================================================
--- Run this ONCE in your Supabase SQL Editor:
---   Dashboard → SQL Editor → New Query → Paste entire file → Run (Ctrl+Enter)
+-- This file was a consolidated rebuild of migrations 001–013 only.
+-- It is OUT OF DATE and missing every migration from 014 onward, including:
+--   - 014_online_payments_and_sending.sql  (payments + invoice public_token)
+--   - 015_fix_public_token_url_safe.sql
+--   - 016_customer_measurements.sql
+--   - 017_quote_public_links.sql
+--   - 018_catalog_stock.sql / 018_notifications.sql
+--   - 019_receipts_and_dunning.sql
+--   - 020/021/022_quote_media*.sql
+--   - 023_contracts.sql / 023_quote_media_nullable_quote_id.sql
+--   - 024_contracts_pdf_and_storage.sql / 024_time_segments.sql
+--   - 025_mileage.sql
+--   - 026_contractors.sql
+--   - add_catalog_enhancements.sql (un-numbered)
 --
--- This is a consolidated script from all 12 migrations.
--- It creates everything your app needs from scratch.
+-- Bootstrapping a new database from this file alone will produce a broken
+-- app: no payments, no public payment links, no contracts, no time segments,
+-- no contractors / 1099 support, no mileage log.
+--
+-- ➜ TO BOOTSTRAP A NEW SUPABASE PROJECT, run migrations 001 through 026 in
+--   order in the SQL Editor. See ./README.md.
+--
+-- This file is preserved only for historical reference. It will be removed
+-- in a future cleanup.
 -- ============================================================================
 
 

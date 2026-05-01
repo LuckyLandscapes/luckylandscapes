@@ -1,21 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export async function POST(request) {
   try {
-    const { memberId, fullName, email, password, orgId } = await request.json();
+    // ── Auth gate: only admins/owners can mutate other team members ──
+    const auth = await authenticateRequest(request, { requireRole: 'admin' });
+    if (!auth.ok) return auth.response;
 
-    if (!memberId || !orgId) {
+    const { memberId, fullName, email, password } = await request.json();
+
+    if (!memberId) {
       return NextResponse.json(
-        { error: 'Missing required fields: memberId, orgId' },
+        { error: 'Missing required field: memberId' },
         { status: 400 }
-      );
-    }
-
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return NextResponse.json(
-        { error: 'Server configuration error: service role key is missing.' },
-        { status: 500 }
       );
     }
 
@@ -25,12 +23,13 @@ export async function POST(request) {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // Get the team member to find their user_id
+    // Look up the target member, scoped to the caller's verified org.
+    // This is the authorization check: caller can only touch their own org's members.
     const { data: member, error: fetchErr } = await supabaseAdmin
       .from('team_members')
-      .select('id, user_id, email, full_name')
+      .select('id, user_id, email, full_name, org_id')
       .eq('id', memberId)
-      .eq('org_id', orgId)
+      .eq('org_id', auth.orgId)
       .single();
 
     if (fetchErr || !member) {
@@ -40,7 +39,6 @@ export async function POST(request) {
       );
     }
 
-    // Update team_members table
     const teamUpdate = {};
     if (fullName) teamUpdate.full_name = fullName;
     if (email) teamUpdate.email = email;
@@ -52,15 +50,14 @@ export async function POST(request) {
         .eq('id', memberId);
 
       if (updateErr) {
-        console.error('Team member update error:', updateErr);
+        console.error('[update-member] team_members update failed');
         return NextResponse.json(
-          { error: `Failed to update team member: ${updateErr.message}` },
+          { error: 'Failed to update team member' },
           { status: 500 }
         );
       }
     }
 
-    // Update auth user (email, password, metadata)
     if (member.user_id) {
       const authUpdate = {};
       if (email) authUpdate.email = email;
@@ -84,9 +81,9 @@ export async function POST(request) {
         );
 
         if (authErr) {
-          console.error('Auth user update error:', authErr);
+          console.error('[update-member] auth update failed');
           return NextResponse.json(
-            { error: `Failed to update auth credentials: ${authErr.message}` },
+            { error: 'Failed to update auth credentials' },
             { status: 500 }
           );
         }
@@ -98,9 +95,9 @@ export async function POST(request) {
       message: 'Team member updated successfully',
     });
   } catch (err) {
-    console.error('Update member error:', err);
+    console.error('[update-member] handler error');
     return NextResponse.json(
-      { error: err.message || 'Internal server error' },
+      { error: 'Internal server error' },
       { status: 500 }
     );
   }

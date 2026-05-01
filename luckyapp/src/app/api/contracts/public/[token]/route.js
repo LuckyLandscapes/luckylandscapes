@@ -2,11 +2,14 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/stripeServer';
 import { buildContractPdfBytes } from '@/lib/generateContractPdf';
 import { notifyOrg } from '@/lib/notify';
+import { isValidTokenShape } from '@/lib/publicToken';
 
 // ─── GET — fetch the contract by public token and mark as viewed ──────────────
 export async function GET(_request, { params }) {
   const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+  if (!isValidTokenShape(token)) {
+    return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  }
 
   const supabase = getServiceSupabase();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
@@ -42,7 +45,9 @@ export async function GET(_request, { params }) {
 //   { action: 'decline', reason: 'Want to swap pavers for stamped concrete' }
 export async function POST(request, { params }) {
   const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+  if (!isValidTokenShape(token)) {
+    return NextResponse.json({ error: 'Contract not found' }, { status: 404 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const action = (body.action || '').toString();

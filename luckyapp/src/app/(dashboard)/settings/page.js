@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import { Save, Building2, DollarSign, Users, X, Mail, Loader2, CheckCircle, AlertCircle, UserPlus } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -48,16 +49,13 @@ export default function SettingsPage() {
     setInviteState({ loading: true, success: false, error: null });
 
     try {
-      const res = await fetch('/api/invite-member', {
+      const res = await apiFetch('/api/invite-member', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email: inviteEmail,
           fullName: inviteName || inviteEmail.split('@')[0],
           role: inviteRole,
-          orgId: user?.orgId,
           orgName: user?.orgName,
-          invitedBy: user?.fullName,
         }),
       });
 

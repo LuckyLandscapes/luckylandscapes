@@ -69,7 +69,7 @@ export default function AddressAutocomplete({
     });
     autocompleteRef.current = autocomplete;
 
-    autocomplete.addListener('place_changed', () => {
+    const listener = autocomplete.addListener('place_changed', () => {
       const place = autocomplete.getPlace();
       if (!place.address_components) return;
 
@@ -94,6 +94,16 @@ export default function AddressAutocomplete({
         onPlaceSelect({ address, city, state, zip });
       }
     });
+
+    return () => {
+      if (listener && window.google?.maps?.event) {
+        window.google.maps.event.removeListener(listener);
+      }
+      if (autocompleteRef.current && window.google?.maps?.event) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
+      autocompleteRef.current = null;
+    };
   }, [loaded, onPlaceSelect]);
 
   return (

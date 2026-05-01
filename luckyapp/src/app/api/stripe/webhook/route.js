@@ -18,17 +18,21 @@ export async function POST(request) {
   const sig = request.headers.get('stripe-signature');
   const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+  // Hard-fail without a webhook secret. Accepting unsigned events lets anyone
+  // forge payment_succeeded and mark invoices paid — never acceptable.
+  if (!whSecret) {
+    console.error('[stripe webhook] STRIPE_WEBHOOK_SECRET is not set; refusing all events');
+    return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 });
+  }
+  if (!sig) {
+    return NextResponse.json({ error: 'Missing stripe-signature header' }, { status: 400 });
+  }
+
   let event;
   const rawBody = await request.text();
 
   try {
-    if (whSecret && sig) {
-      event = stripe.webhooks.constructEvent(rawBody, sig, whSecret);
-    } else {
-      // No webhook secret configured — accept the event as-is (dev only).
-      event = JSON.parse(rawBody);
-      console.warn('[stripe webhook] STRIPE_WEBHOOK_SECRET not set — verification skipped');
-    }
+    event = stripe.webhooks.constructEvent(rawBody, sig, whSecret);
   } catch (err) {
     console.error('[stripe webhook] verify failed:', err.message);
     return new Response(`Webhook Error: ${err.message}`, { status: 400 });
@@ -195,14 +199,24 @@ export async function POST(request) {
         paid_at: new Date(intent.created * 1000).toISOString(),
         notes: `Online payment via ${method === 'ach' ? 'bank transfer' : 'card'}`,
       });
-      if (payErr) console.error('[stripe webhook] failed to insert payment:', payErr);
+      if (payErr) {
+        // Don't update the invoice if we failed to record the payment — return
+        // a 5xx so Stripe retries the webhook. The idempotency check above
+        // prevents a double-insert on the retry.
+        console.error('[stripe webhook] failed to insert payment:', payErr);
+        return NextResponse.json({ error: 'payment insert failed' }, { status: 500 });
+      }
 
       // Update invoice totals — also pull items so the receipt email can show them
-      const { data: inv } = await supabase
+      const { data: inv, error: invFetchErr } = await supabase
         .from('invoices')
         .select('total, amount_paid, invoice_number, customer_id, items')
         .eq('id', invoiceId)
         .single();
+      if (invFetchErr) {
+        console.error('[stripe webhook] invoice fetch failed:', invFetchErr);
+        return NextResponse.json({ error: 'invoice fetch failed' }, { status: 500 });
+      }
       let newStatus = null;
       if (inv) {
         const newPaid = Number(inv.amount_paid || 0) + amount;
@@ -213,7 +227,11 @@ export async function POST(request) {
           payment_method: method,
         };
         if (newStatus === 'paid') updates.paid_date = new Date().toISOString().split('T')[0];
-        await supabase.from('invoices').update(updates).eq('id', invoiceId);
+        const { error: invUpdateErr } = await supabase.from('invoices').update(updates).eq('id', invoiceId);
+        if (invUpdateErr) {
+          console.error('[stripe webhook] invoice update failed:', invUpdateErr);
+          return NextResponse.json({ error: 'invoice update failed' }, { status: 500 });
+        }
       }
 
       // Notify the team — only when the invoice is fully paid.

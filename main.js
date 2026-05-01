@@ -144,6 +144,20 @@ mobileLinks.forEach(link => {
 // Handle both #hash and /#hash links (the latter is used in nav links)
 const isHomePage = window.location.pathname === '/' || window.location.pathname === '/index.html';
 
+// If a sub-page link like "/#about" or "/services/lawn-care.html#contact" lands
+// here with a hash in the URL, browsers usually jump there but Lenis prevents
+// the native scroll from sticking. Smooth-scroll to the target after layout.
+if (window.location.hash) {
+    const hashTarget = document.querySelector(window.location.hash);
+    if (hashTarget) {
+        // Wait one frame so Lenis is initialized and layout is settled.
+        requestAnimationFrame(() => {
+            const navH = document.querySelector('.navbar')?.offsetHeight || 80;
+            lenis.scrollTo(hashTarget, { offset: -navH - 10, duration: 1.0, immediate: false });
+        });
+    }
+}
+
 document.querySelectorAll('a[href^="#"], a[href^="/#"]').forEach(anchor => {
     anchor.addEventListener('click', function (e) {
         const href = this.getAttribute('href');
@@ -1393,14 +1407,35 @@ if (qzCategoryBtns.length > 0) {
 
         photoInput.addEventListener('change', () => {
             const newFiles = Array.from(photoInput.files);
-            // Limit to 5 total, max 10MB each
+            // Limit: 5 photos total, 10MB each, 30MB combined, image/* only.
+            const MAX_PER_FILE = 10 * 1024 * 1024;
+            const MAX_TOTAL = 30 * 1024 * 1024;
+            const skipped = [];
+            let totalBytes = selectedPhotos.reduce((s, f) => s + f.size, 0);
             for (const file of newFiles) {
-                if (selectedPhotos.length >= 5) break;
-                if (file.size > 10 * 1024 * 1024) continue; // Skip files > 10MB
-                if (!file.type.startsWith('image/')) continue;
+                if (selectedPhotos.length >= 5) {
+                    skipped.push(`${file.name} (max 5 photos)`);
+                    continue;
+                }
+                if (!file.type.startsWith('image/')) {
+                    skipped.push(`${file.name} (not an image)`);
+                    continue;
+                }
+                if (file.size > MAX_PER_FILE) {
+                    skipped.push(`${file.name} (over 10 MB)`);
+                    continue;
+                }
+                if (totalBytes + file.size > MAX_TOTAL) {
+                    skipped.push(`${file.name} (combined size limit)`);
+                    continue;
+                }
                 selectedPhotos.push(file);
+                totalBytes += file.size;
             }
-            photoInput.value = ''; // Reset so same file can be re-selected
+            photoInput.value = '';
+            if (skipped.length > 0) {
+                alert(`Skipped:\n• ${skipped.join('\n• ')}`);
+            }
             renderPhotoPreview();
         });
     }
@@ -1525,9 +1560,8 @@ if (qzCategoryBtns.length > 0) {
                     body: JSON.stringify(leadPayload),
                 })
                     .then(async r => {
-                        const txt = await r.text().catch(() => '');
-                        if (!r.ok) console.error('Lead intake failed', r.status, txt);
-                        else console.log('Lead intake ok', txt);
+                        // Don't log the response body — it may echo customer data.
+                        if (!r.ok) console.error('Lead intake failed', r.status);
                     })
                     .catch(err => console.error('Lead intake error:', err))
             );

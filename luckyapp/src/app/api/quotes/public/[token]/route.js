@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { getServiceSupabase } from '@/lib/stripeServer';
+import { isValidTokenShape } from '@/lib/publicToken';
 
 // ─── GET — fetch the quote by token and mark as viewed ────────────────────────
 export async function GET(_request, { params }) {
   const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+  if (!isValidTokenShape(token)) {
+    return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+  }
 
   const supabase = getServiceSupabase();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
@@ -36,7 +39,9 @@ export async function GET(_request, { params }) {
 // ─── POST — customer requests changes / declines the quote ────────────────────
 export async function POST(request, { params }) {
   const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+  if (!isValidTokenShape(token)) {
+    return NextResponse.json({ error: 'Quote not found' }, { status: 404 });
+  }
 
   const body = await request.json().catch(() => ({}));
   const reason = (body.reason || '').toString().trim();

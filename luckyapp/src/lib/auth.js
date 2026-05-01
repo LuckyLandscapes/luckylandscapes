@@ -191,7 +191,9 @@ export function AuthProvider({ children }) {
             }
           } else {
             // No profile, no invite — auto-create org (first-time owner setup)
-            console.log('No team profile found. Auto-creating org...');
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('No team profile found. Auto-creating org...');
+            }
             const created = await autoCreateOrg(authUser);
             if (created) {
               setAndCacheUser(created);

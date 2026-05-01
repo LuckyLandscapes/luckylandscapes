@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
@@ -125,9 +126,8 @@ export default function TeamPage() {
       if (editPassword) authPayload.password = editPassword;
 
       if (authPayload.fullName || authPayload.email || authPayload.password) {
-        const res = await fetch('/api/update-member', {
+        const res = await apiFetch('/api/update-member', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(authPayload),
         });
         const data = await res.json();
@@ -158,17 +158,15 @@ export default function TeamPage() {
     }
     setInviteState({ loading:true, success:false, error:null });
     try {
-      const res = await fetch('/api/invite-member', {
-        method:'POST', headers:{'Content-Type':'application/json'},
+      const res = await apiFetch('/api/invite-member', {
+        method:'POST',
         body: JSON.stringify({
           email: inviteEmail,
           password: invitePassword,
           fullName: inviteName || inviteEmail.split('@')[0],
           role: inviteRole,
           hourlyRate: parseFloat(inviteRate) || 15,
-          orgId: user?.orgId,
           orgName: user?.orgName,
-          invitedBy: user?.fullName,
         }),
       });
       const data = await res.json();

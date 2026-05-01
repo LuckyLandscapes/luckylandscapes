@@ -7,14 +7,24 @@ import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, bui
 
 const DataContext = createContext(null);
 
-// URL-safe random token (hex) for public invoice payment links
+// URL-safe random token (hex) for public invoice payment links.
+// Fail closed: refuse to generate a token if a CSPRNG is unavailable rather
+// than silently fall back to Math.random (which only has ~53 bits of entropy
+// and would weaken every payment link).
 function makeUrlSafeToken(bytes = 18) {
+  // Browser path
   if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
     const arr = new Uint8Array(bytes);
     window.crypto.getRandomValues(arr);
     return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
   }
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  // Server path (Node/edge runtime)
+  if (typeof globalThis !== 'undefined' && globalThis.crypto?.getRandomValues) {
+    const arr = new Uint8Array(bytes);
+    globalThis.crypto.getRandomValues(arr);
+    return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+  throw new Error('No CSPRNG available — cannot mint public token securely');
 }
 
 // ─── Snake ↔ Camel helpers ───────────────────────────────────
@@ -998,6 +1008,14 @@ export function DataProvider({ children }) {
       setTeamMembers(prev => [...prev, m]);
       return m;
     }
+    // Demo / localStorage path
+    const m = { ...data, id: crypto.randomUUID(), orgId, isActive: true, createdAt: new Date().toISOString() };
+    setTeamMembers(prev => {
+      const next = [...prev, m];
+      saveLocal('team_members', next);
+      return next;
+    });
+    return m;
   }, [connected, orgId]);
 
   const updateTeamMember = useCallback(async (id, data) => {

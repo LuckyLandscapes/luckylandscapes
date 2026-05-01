@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/stripeServer';
+import { isValidTokenShape } from '@/lib/publicToken';
 
 export async function GET(_request, { params }) {
   const { token } = await params;
-  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+  // Reject malformed tokens with the same 404 as a not-found token so we don't
+  // leak information about which inputs are well-formed vs which are wrong.
+  if (!isValidTokenShape(token)) {
+    return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });
+  }
 
   const supabase = getServiceSupabase();
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
