@@ -55,7 +55,7 @@ Landscaping is brutally seasonal. Spell out the year:
 | Equipment rental | Sub (we are both under 21, can rent through them) | TODO | TODO |
 
 ## Software stack (operational)
-- **Quote intake:** Google Apps Script → Google Sheet + Google Drive (photos) + Gmail. Setup details in [`scripts/SETUP-INSTRUCTIONS.md`](../scripts/SETUP-INSTRUCTIONS.md).
+- **Quote intake:** Google Apps Script → Google Sheet + Google Drive (photos) + Gmail. Setup details in [`marketing/scripts/SETUP-INSTRUCTIONS.md`](../marketing/scripts/SETUP-INSTRUCTIONS.md).
 - **Job / customer / invoice / time tracking:** luckyapp (Next.js app on Vercel, Supabase backend).
 - **Payments:** Stripe (via luckyapp).
 - **Email to customers:** Resend (via luckyapp).

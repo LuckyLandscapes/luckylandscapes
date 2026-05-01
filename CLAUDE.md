@@ -16,14 +16,22 @@ If a section is still `TODO:`, treat it as unknown — don't invent. Ask the use
 
 ## Repository layout — two distinct apps
 
-This repo contains **two separate applications** with their own dependencies, build tools, and runtimes. Always confirm which one you are touching before editing.
+This repo contains **two separate applications** with their own dependencies, build tools, and runtimes. Each lives in its own top-level folder; the repo root holds only this file, [`docs/`](docs/), and the two app directories. Always confirm which one you are touching before editing.
 
-### 1. Root (`/`) — Public marketing site
+```
+/
+├── CLAUDE.md
+├── docs/                    # business context (company, pricing, finances, ops, strategy)
+├── marketing/               # Vite + vanilla JS public marketing site → luckylandscapes.com
+└── luckyapp/                # Next.js + Supabase internal business app → Vercel
+```
+
+### 1. [`marketing/`](marketing/) — Public marketing site
 - **Stack:** Vite 7 + vanilla JS + multiple static HTML entry points. No framework.
-- **Animation:** GSAP (with ScrollTrigger) + Lenis smooth scroll, wired together via `gsap.ticker` in `main.js`.
-- **Entry points** (declared in `vite.config.js`): `index.html`, `team.html`, `careers.html`, `gallery.html`, `quote.html`, `privacy.html`, `terms.html`, plus five service pages under `services/`.
-- **Quote form backend:** Google Apps Script. The deployed Web App URL is pasted into a `QUOTES_SCRIPT_URL` constant in `main.js`. See `scripts/SETUP-INSTRUCTIONS.md` for redeployment steps. Photos go to a Drive folder, submissions to a Google Sheet, and notifications via Gmail — all owned by the script's executing Google account.
-- **Hosting:** **Cloudflare Pages**, project connected to GitHub `LuckyLandscapes/luckylandscapes`. Production branch: `main` → `https://luckylandscapes.com`. Any non-`main` branch automatically gets a preview deployment at `https://<branch>.<project>.pages.dev`. Build command (configured in CF Pages dashboard): `npm run build`. Build output directory: `dist/`. `public/_redirects` enforces non-www canonical — CF Pages reads it natively (Netlify-compatible syntax). `public/_headers` sets security headers + image cache. Rollback: CF Pages dashboard retains every prior deployment; one-click rollback. Domain DNS is also on Cloudflare.
+- **Animation:** GSAP (with ScrollTrigger) + Lenis smooth scroll, wired together via `gsap.ticker` in [`marketing/main.js`](marketing/main.js).
+- **Entry points** (declared in [`marketing/vite.config.js`](marketing/vite.config.js)): `index.html`, `team.html`, `careers.html`, `gallery.html`, `quote.html`, `privacy.html`, `terms.html`, plus five service pages under [`marketing/services/`](marketing/services/).
+- **Quote form backend:** Google Apps Script. The deployed Web App URL is pasted into a `QUOTES_SCRIPT_URL` constant in `main.js`. See [`marketing/scripts/SETUP-INSTRUCTIONS.md`](marketing/scripts/SETUP-INSTRUCTIONS.md) for redeployment steps. Photos go to a Drive folder, submissions to a Google Sheet, and notifications via Gmail — all owned by the script's executing Google account.
+- **Hosting:** **Cloudflare Pages**, project connected to GitHub `LuckyLandscapes/luckylandscapes`. Production branch: `main` → `https://luckylandscapes.com`. Any non-`main` branch automatically gets a preview deployment at `https://<branch>.<project>.pages.dev`. CF Pages dashboard settings: **Root directory: `marketing`**, build command: `npm run build`, build output directory: `dist`. [`marketing/public/_redirects`](marketing/public/_redirects) enforces non-www canonical — CF Pages reads it natively (Netlify-compatible syntax). [`marketing/public/_headers`](marketing/public/_headers) sets security headers + image cache. Rollback: CF Pages dashboard retains every prior deployment; one-click rollback. Domain DNS is also on Cloudflare.
 
 ### 2. `luckyapp/` — Internal business app (separate Next.js project)
 - **Stack:** Next.js 16 + React 19 (App Router), Supabase (Postgres + Auth + Storage + Realtime), Stripe (payments), Resend (transactional email), Google Calendar API, jsPDF (PDF generation).
@@ -33,10 +41,11 @@ This repo contains **two separate applications** with their own dependencies, bu
 
 ## Common commands
 
-### Root marketing site (run from repo root)
+### Marketing site (run from `marketing/`)
 ```bash
+cd marketing
 npm run dev       # Vite dev server on http://localhost:3000 (auto-opens)
-npm run build     # Build to dist/
+npm run build     # Build to marketing/dist/
 npm run preview   # Preview the built dist/
 ```
 
