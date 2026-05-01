@@ -9165,3 +9165,227 @@ body {
   .cal-week-v2-body { height: 540px; }
   .cal-day-v2-card { grid-template-columns: 80px 1fr; }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   MiniMonthPicker — inline date picker with per-day capacity
+   Replaces <input type="date"> in scheduling modals so users
+   can SEE which days are open before clicking.
+   ───────────────────────────────────────────────────────────── */
+
+.mini-picker {
+  --status-open:        #475569;
+  --status-light:       #6B8E4E;
+  --status-busy:        #d4a93e;
+  --status-full:        #f97316;
+  --status-overbooked:  #ef4444;
+
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  user-select: none;
+}
+
+.mini-picker-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.mini-picker-title {
+  flex: 1;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  text-align: center;
+}
+.mini-picker-nav {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--transition-fast);
+}
+.mini-picker-nav:hover {
+  background: var(--overlay-hover);
+  color: var(--text-primary);
+}
+.mini-picker-today {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid var(--border-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.mini-picker-today:hover {
+  background: var(--overlay-hover);
+  color: var(--text-primary);
+}
+
+.mini-picker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+  padding: 0 2px;
+}
+.mini-picker-weekdays > div {
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+}
+
+.mini-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mini-picker-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 2px;
+  padding: 4px 2px 5px;
+  min-height: 46px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-fast);
+}
+.mini-picker-day:hover:not(.disabled) {
+  background: var(--overlay-hover);
+  border-color: var(--border-secondary, var(--lucky-green));
+  transform: translateY(-1px);
+}
+.mini-picker-day.out {
+  opacity: 0.35;
+}
+.mini-picker-day.today {
+  border-color: var(--lucky-green);
+  box-shadow: 0 0 0 1px var(--lucky-green) inset;
+}
+.mini-picker-day.selected {
+  background: var(--lucky-green);
+  border-color: var(--lucky-green);
+  color: white;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lucky-green) 40%, transparent);
+}
+.mini-picker-day.selected .mini-picker-day-num,
+.mini-picker-day.selected .mini-picker-day-count {
+  color: white;
+}
+.mini-picker-day.disabled {
+  opacity: 0.30;
+  cursor: not-allowed;
+}
+.mini-picker-day.no-fit:not(.selected) {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--bg-card),
+    var(--bg-card) 4px,
+    rgba(239,68,68,0.08) 4px,
+    rgba(239,68,68,0.08) 8px
+  );
+  border-color: rgba(239,68,68,0.30);
+}
+
+/* Per-status background tint */
+.mini-picker-day[data-status="light"]:not(.selected)      { background-color: rgba(107,142,78,0.10); }
+.mini-picker-day[data-status="busy"]:not(.selected)       { background-color: rgba(212,169,62,0.12); }
+.mini-picker-day[data-status="full"]:not(.selected)       { background-color: rgba(249,115,22,0.14); }
+.mini-picker-day[data-status="overbooked"]:not(.selected) {
+  background-color: rgba(239,68,68,0.16);
+  border-color: rgba(239,68,68,0.40);
+}
+
+.mini-picker-day-num {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+}
+.mini-picker-day.out .mini-picker-day-num {
+  color: var(--text-tertiary);
+}
+
+.mini-picker-day-count {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.mini-picker-day-bar {
+  width: 80%;
+  height: 3px;
+  background: var(--bg-elevated);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-top: auto;
+}
+.mini-picker-day[data-status="light"] .mini-picker-day-bar-fill      { background: var(--status-light); }
+.mini-picker-day[data-status="busy"] .mini-picker-day-bar-fill       { background: var(--status-busy); }
+.mini-picker-day[data-status="full"] .mini-picker-day-bar-fill       { background: var(--status-full); }
+.mini-picker-day[data-status="overbooked"] .mini-picker-day-bar-fill { background: var(--status-overbooked); }
+.mini-picker-day-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+.mini-picker-day.selected .mini-picker-day-bar { background: rgba(255,255,255,0.25); }
+.mini-picker-day.selected .mini-picker-day-bar-fill { background: white; }
+
+.mini-picker-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-primary);
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+}
+.mini-picker-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mini-picker-legend-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.mini-picker-legend-swatch[data-status="open"]       { background: var(--status-open); }
+.mini-picker-legend-swatch[data-status="light"]      { background: var(--status-light); }
+.mini-picker-legend-swatch[data-status="busy"]       { background: var(--status-busy); }
+.mini-picker-legend-swatch[data-status="full"]       { background: var(--status-full); }
+.mini-picker-legend-swatch[data-status="overbooked"] { background: var(--status-overbooked); }
+
+@media (max-width: 540px) {
+  .mini-picker-day { min-height: 40px; padding: 3px 1px 4px; }
+  .mini-picker-day-num { font-size: 0.74rem; }
+  .mini-picker-day-count { font-size: 0.5rem; }
+  .mini-picker-legend { font-size: 0.6rem; gap: 6px; }
+}

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
+import MiniMonthPicker from '@/components/MiniMonthPicker';
 import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours } from '@/lib/capacity';
 import {
   X,
@@ -503,14 +504,28 @@ export default function EventModal({ event, defaultDate, onClose }) {
             </div>
           )}
 
-          {/* Date & Time */}
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
-                <span>
-                  <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                  Date <span className="required">*</span>
-                </span>
+          {/* Date — inline mini calendar with capacity per day */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
+              <span>
+                <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                Date <span className="required">*</span>
+                {form.date && (
+                  <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                    {new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.72rem', color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.allDay}
+                    onChange={e => updateField('allDay', e.target.checked)}
+                    style={{ accentColor: 'var(--lucky-green)' }}
+                  />
+                  All day
+                </label>
                 <button
                   type="button"
                   className="btn btn-ghost btn-xs"
@@ -520,30 +535,14 @@ export default function EventModal({ event, defaultDate, onClose }) {
                 >
                   <Zap size={11} /> Next open slot
                 </button>
-              </label>
-              <input
-                className="form-input"
-                type="date"
-                value={form.date}
-                onChange={e => updateField('date', e.target.value)}
-              />
-              {form.date && (
-                <div style={{ marginTop: 6 }}>
-                  <DayLoadBar load={dateLoad} compact />
-                </div>
-              )}
-            </div>
-            <div className="form-group">
-              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-sm)' }}>
-                <input
-                  type="checkbox"
-                  checked={form.allDay}
-                  onChange={e => updateField('allDay', e.target.checked)}
-                  style={{ accentColor: 'var(--lucky-green)' }}
-                />
-                All Day
-              </label>
-            </div>
+              </span>
+            </label>
+            <MiniMonthPicker
+              value={form.date}
+              onChange={(d) => updateField('date', d)}
+              eventsByDate={eventsByDate}
+              neededHours={form.allDay ? 0 : (Number(form.estimatedHours) || 0)}
+            />
           </div>
 
           {!form.allDay && (

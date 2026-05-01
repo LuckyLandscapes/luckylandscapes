@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import { DayLoadBar } from '@/components/DaySchedulePreview';
+import MiniMonthPicker from '@/components/MiniMonthPicker';
 import { dayLoad, findNextOpenSlot } from '@/lib/capacity';
 import {
   X,
@@ -178,36 +179,43 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                 </div>
               </div>
 
-              {/* Date & Time */}
+              {/* Date — inline mini calendar with capacity per day */}
+              <div className="form-group">
+                <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
+                  <span>
+                    <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
+                    Scheduled Date <span className="required">*</span>
+                    {form.scheduledDate && (
+                      <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
+                        {new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-xs"
+                    onClick={handleFindOpenSlot}
+                    title="Jump to the next day with enough headroom"
+                    style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <Zap size={11} /> Next open slot
+                  </button>
+                </label>
+                <MiniMonthPicker
+                  value={form.scheduledDate}
+                  onChange={(d) => setForm(prev => ({ ...prev, scheduledDate: d }))}
+                  eventsByDate={eventsByDate}
+                  neededHours={Number(form.estimatedHours) || 0}
+                />
+                {dateLoad && (
+                  <div style={{ marginTop: 8 }}>
+                    <DayLoadBar load={dateLoad} />
+                  </div>
+                )}
+              </div>
+
+              {/* Time + Duration */}
               <div className="form-row">
-                <div className="form-group">
-                  <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
-                    <span>
-                      <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                      Scheduled Date <span className="required">*</span>
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-ghost btn-xs"
-                      onClick={handleFindOpenSlot}
-                      title="Jump to the next day with enough headroom"
-                      style={{ padding: '2px 8px', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                    >
-                      <Zap size={11} /> Next open slot
-                    </button>
-                  </label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.scheduledDate}
-                    onChange={e => setForm(prev => ({ ...prev, scheduledDate: e.target.value }))}
-                  />
-                  {dateLoad && (
-                    <div style={{ marginTop: 6 }}>
-                      <DayLoadBar load={dateLoad} compact />
-                    </div>
-                  )}
-                </div>
                 <div className="form-group">
                   <label className="form-label">
                     <Clock size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
@@ -223,7 +231,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                 <div className="form-group">
                   <label className="form-label">
                     <Timer size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                    Est. Hours
+                    Estimated Hours
                   </label>
                   <input
                     className="form-input"
