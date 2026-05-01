@@ -4253,6 +4253,74 @@ body.promo-active .mobile-menu {
     margin-right: auto;
 }
 
+/* Compact category-chip grid — used by the single-page quote form. */
+.qz-grid--compact {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: .65rem;
+}
+
+.qz-grid--compact .qz-option-card {
+    padding: .9rem .75rem;
+    flex-direction: row;
+    justify-content: center;
+    gap: .5rem;
+    font-size: .95rem;
+}
+
+.qz-grid--compact .qz-option-icon {
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+/* Chip selected state — single-select category UI on the quote form. */
+.qz-option-card.selected {
+    background: rgba(107, 142, 78, .14);
+    border-color: var(--clover);
+    box-shadow: 0 4px 14px rgba(107, 142, 78, .2);
+}
+
+/* Required-field asterisk — small, brand-tinted instead of harsh red. */
+.form-required {
+    color: var(--clover-dark);
+    font-weight: 700;
+    margin-left: 1px;
+}
+
+/* Section divider inside the quote form — separates "About your project" from "Contact". */
+.quote-section-divider {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1.75rem 0 1rem;
+    color: var(--gray-500);
+    font-family: var(--font-heading);
+    font-size: .9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+
+.quote-section-divider::before,
+.quote-section-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--gray-200);
+}
+
+/* form-error: only visible when field-group has-error or .visible is set. */
+.form-error {
+    display: none;
+    color: #c0392b;
+    font-size: .85rem;
+    margin-top: .35rem;
+}
+
+.form-group.has-error .form-error,
+.form-error.visible {
+    display: block;
+}
+
 .qz-option-card {
     display: flex;
     flex-direction: column;

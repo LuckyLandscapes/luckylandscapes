@@ -1177,253 +1177,48 @@ const QUOTES_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwB-7peAjT_cY
 // Set to '' to disable; e.g. 'https://app.luckylandscapes.com/api/leads/public'.
 const LEADS_INTAKE_URL = 'https://app.luckylandscapes.com/api/leads/public';
 
-const qzCategoryBtns = document.querySelectorAll('#qz-categories .qz-option-card, .qz-notsure-btn[data-category]');
+// LL:QUOTE-FORM-V2 — single-page form handler
+const qzCategoryBtns = document.querySelectorAll('#qz-categories .qz-option-card');
 if (qzCategoryBtns.length > 0) {
-    // --- STATE ---
-    let qzCategory = null;
-    let qzProjectType = null;
-
     // --- DOM refs ---
-    const allSteps = [
-        document.getElementById('quote-step-1'),
-        document.getElementById('quote-step-2a'),
-        document.getElementById('quote-step-2b'),
-        document.getElementById('quote-step-3'),
-        document.getElementById('quote-step-4'),
-    ];
-    const progressFill = document.getElementById('quote-progress-fill');
-    const stepDots = document.querySelectorAll('.quote-step-dot');
-    const heroTitle = document.getElementById('quote-hero-title');
-    const heroSub = document.getElementById('quote-hero-sub');
-
-    const questionGroups = {
-        lawn: document.getElementById('qz-lawn'),
-        garden: document.getElementById('qz-garden'),
-        hardscape: document.getElementById('qz-hardscape'),
-        cleanup: document.getElementById('qz-cleanup'),
-        design: document.getElementById('qz-design'),
-        custom: document.getElementById('qz-custom'),
-        notsure: document.getElementById('qz-notsure'),
-    };
+    const formCard = document.getElementById('quote-form-card');
+    const confirmCard = document.getElementById('quote-confirmation');
+    const quoteForm = document.getElementById('quote-form');
+    const categoryInput = document.getElementById('q-category');
+    const categoryLabelInput = document.getElementById('q-categoryLabel');
+    const categoryError = document.getElementById('category-error');
 
     const categoryLabels = {
-        lawn: { title: 'Lawn Care', icon: '🌿' },
-        garden: { title: 'Garden & Beds', icon: '🌺' },
-        hardscape: { title: 'Hardscaping', icon: '🧱' },
-        cleanup: { title: 'Property Cleanup', icon: '🧹' },
-        design: { title: 'Landscape Design', icon: '🎨' },
-        custom: { title: 'Custom Project', icon: '🔧' },
-        notsure: { title: 'Free Consultation', icon: '🤔' },
+        lawn:      'Lawn Care',
+        garden:    'Garden & Beds',
+        hardscape: 'Hardscaping',
+        cleanup:   'Property Cleanup',
+        design:    'Design & Build',
+        other:     'Something Else',
     };
 
-    // Categories that show the New vs Repair step
-    const needsProjectType = ['lawn', 'garden', 'hardscape'];
-
-    // --- Step navigation ---
-    function setProgress(step) {
-        const pct = step === 1 ? 25 : step === 2 ? 50 : step === 3 ? 75 : 100;
-        if (progressFill) progressFill.style.width = pct + '%';
-        stepDots.forEach(dot => {
-            const ds = parseInt(dot.dataset.step, 10);
-            dot.classList.remove('active', 'completed');
-            if (ds === step) dot.classList.add('active');
-            else if (ds < step) dot.classList.add('completed');
-        });
+    // --- Category chip selection (single-select) ---
+    function selectCategory(cat) {
+        if (!cat) return;
+        categoryInput.value = cat;
+        if (categoryLabelInput) categoryLabelInput.value = categoryLabels[cat] || cat;
+        qzCategoryBtns.forEach(b => b.classList.toggle('selected', b.dataset.category === cat));
+        if (categoryError) categoryError.classList.remove('visible');
+        trackEvent('quote_category_select', { category: cat });
     }
 
-    function showStep(stepEl) {
-        allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
-        if (stepEl) {
-            stepEl.classList.remove('quote-step-hidden');
-            stepEl.style.animation = 'none';
-            stepEl.offsetHeight; // reflow
-            stepEl.style.animation = '';
-        }
-        const qs = document.getElementById('quote-section');
-        if (qs) {
-            const navH = navbar ? navbar.offsetHeight : 80;
-            lenis.scrollTo(qs, { offset: -navH - 20, duration: 0.8 });
-        }
-    }
-
-    function showQuestionGroup(category) {
-        Object.values(questionGroups).forEach(g => { if (g) g.style.display = 'none'; });
-        if (questionGroups[category]) questionGroups[category].style.display = '';
-        // Show description wrap
-        const descWrap = document.getElementById('qz-description-wrap');
-        if (descWrap) descWrap.style.display = '';
-        // Show continue button and back button
-        const nextBtn = document.getElementById('qz-next-to-contact');
-        const backBtn = document.getElementById('back-to-step2a');
-        if (nextBtn) nextBtn.style.display = '';
-        if (backBtn) backBtn.style.display = needsProjectType.includes(category) ? '' : 'none';
-        // Show lawn condition for repair
-        const condWrap = document.getElementById('qz-lawn-condition-wrap');
-        if (condWrap) condWrap.style.display = (category === 'lawn' && qzProjectType === 'repair') ? '' : 'none';
-    }
-
-    function updateHero(category) {
-        const info = categoryLabels[category];
-        if (!info || !heroTitle) return;
-        heroTitle.innerHTML = `Your <em class="highlight">${info.title}</em><br/>Quote Starts Here`;
-        if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you.';
-    }
-
-    // --- Step 1: Category selection ---
     qzCategoryBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            qzCategory = btn.dataset.category;
-            qzProjectType = null;
-            updateHero(qzCategory);
-
-            trackEvent('quote_step_complete', { step: 1, category: qzCategory });
-
-            if (needsProjectType.includes(qzCategory)) {
-                // Show New vs Repair step
-                const t = document.getElementById('step2a-title');
-                const s = document.getElementById('step2a-sub');
-                const info = categoryLabels[qzCategory];
-                if (t) t.textContent = `Is Your ${info.title} Project New or Repair?`;
-                if (s) s.textContent = 'This helps us understand the scope and give you a better quote.';
-                setProgress(2);
-                showStep(allSteps[1]); // step 2a
-            } else {
-                // Skip to questions directly
-                showQuestionGroup(qzCategory);
-                setProgress(2);
-                showStep(allSteps[2]); // step 2b
-            }
-        });
+        btn.addEventListener('click', () => selectCategory(btn.dataset.category));
     });
 
-    // --- Step 2a: Project type selection ---
-    const projectTypeBtns = document.querySelectorAll('#qz-project-type .qz-option-card, #quote-step-2a .qz-notsure-btn[data-projecttype]');
-    projectTypeBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            qzProjectType = btn.dataset.projecttype;
-            showQuestionGroup(qzCategory);
-            setProgress(2);
-            showStep(allSteps[2]); // step 2b
-        });
-    });
-
-    // --- Back buttons ---
-    const backToStep1 = document.getElementById('back-to-step1');
-    if (backToStep1) {
-        backToStep1.addEventListener('click', () => {
-            qzCategory = null;
-            qzProjectType = null;
-            if (heroTitle) heroTitle.innerHTML = 'Let\'s Build Your<br/><em class="highlight">Dream Yard</em> Together';
-            if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you. It only takes 2 minutes.';
-            setProgress(1);
-            showStep(allSteps[0]);
-        });
-    }
-
-    const backToStep2a = document.getElementById('back-to-step2a');
-    if (backToStep2a) {
-        backToStep2a.addEventListener('click', () => {
-            if (needsProjectType.includes(qzCategory)) {
-                setProgress(2);
-                showStep(allSteps[1]); // step 2a
-            } else {
-                setProgress(1);
-                showStep(allSteps[0]); // step 1
-            }
-        });
-    }
-
-    const backToStep2b = document.getElementById('back-to-step2b');
-    if (backToStep2b) {
-        backToStep2b.addEventListener('click', () => {
-            setProgress(2);
-            showStep(allSteps[2]); // step 2b
-        });
-    }
+    // --- URL ?category=xxx pre-select ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselect = urlParams.get('category');
+    if (preselect && categoryLabels[preselect]) selectCategory(preselect);
 
     // ============================================
-    // DYNAMIC QUESTION TOGGLING — Show/hide conditional sections based on checkbox state
+    // PHOTO UPLOAD
     // ============================================
-
-    // --- Lawn Care: show add-ons when mowing or complete is checked ---
-    const lawnMow = document.querySelector('input[name="lawn_mowing"]');
-    const lawnComplete = document.querySelector('input[name="lawn_complete"]');
-    const lawnAddonsWrap = document.getElementById('qz-lawn-addons');
-    const lawnFreqWrap = document.getElementById('qz-lawn-frequency-wrap');
-
-    function updateLawnAddons() {
-        if (!lawnAddonsWrap) return;
-        const show = (lawnMow?.checked || lawnComplete?.checked);
-        lawnAddonsWrap.classList.toggle('visible', show);
-        // Show frequency selector when mowing is checked
-        if (lawnFreqWrap) lawnFreqWrap.style.display = (lawnMow?.checked || lawnComplete?.checked) ? '' : 'none';
-    }
-    if (lawnMow) lawnMow.addEventListener('change', updateLawnAddons);
-    if (lawnComplete) lawnComplete.addEventListener('change', updateLawnAddons);
-
-    // --- Garden & Beds: show edging material when edging is checked ---
-    const gardenEdging = document.querySelector('input[name="garden_edging"]');
-    const gardenEdgingMaterialWrap = document.getElementById('qz-garden-edging-material-wrap');
-
-    function updateGardenEdging() {
-        if (!gardenEdgingMaterialWrap) return;
-        gardenEdgingMaterialWrap.style.display = gardenEdging?.checked ? '' : 'none';
-    }
-    if (gardenEdging) gardenEdging.addEventListener('change', updateGardenEdging);
-
-    // --- Garden & Beds: show plant details when planting is checked ---
-    const gardenPlanting = document.querySelector('input[name="garden_planting"]');
-    const gardenPlantWrap = document.getElementById('qz-garden-plant-wrap');
-
-    function updateGardenPlanting() {
-        if (!gardenPlantWrap) return;
-        gardenPlantWrap.style.display = gardenPlanting?.checked ? '' : 'none';
-    }
-    if (gardenPlanting) gardenPlanting.addEventListener('change', updateGardenPlanting);
-
-    // --- Garden & Beds: show mulch details when garden beds is checked ---
-    const gardenBeds = document.querySelector('input[name="garden_beds"]');
-    const gardenMulchWrap = document.getElementById('qz-garden-mulch-wrap');
-
-    function updateGardenMulch() {
-        if (!gardenMulchWrap) return;
-        gardenMulchWrap.style.display = gardenBeds?.checked ? '' : 'none';
-    }
-    if (gardenBeds) gardenBeds.addEventListener('change', updateGardenMulch);
-
-    // --- Hardscaping: show paver sub-options when pavers is checked ---
-    const hardPavers = document.querySelector('input[name="hard_pavers"]');
-    const hardPaverTypeWrap = document.getElementById('qz-hard-paver-type-wrap');
-
-    function updateHardPavers() {
-        if (!hardPaverTypeWrap) return;
-        hardPaverTypeWrap.style.display = hardPavers?.checked ? '' : 'none';
-    }
-    if (hardPavers) hardPavers.addEventListener('change', updateHardPavers);
-    // Init
-    if (hardPaverTypeWrap) hardPaverTypeWrap.style.display = 'none';
-
-    // --- Hardscaping: show wall details when retaining walls is checked ---
-    const hardRetaining = document.querySelector('input[name="hard_retaining"]');
-    const hardWallWrap = document.getElementById('qz-hard-wall-wrap');
-
-    function updateHardRetaining() {
-        if (!hardWallWrap) return;
-        hardWallWrap.style.display = hardRetaining?.checked ? '' : 'none';
-    }
-    if (hardRetaining) hardRetaining.addEventListener('change', updateHardRetaining);
-
-    // --- Hardscaping: show outdoor living features when outdoor is checked ---
-    const hardOutdoor = document.querySelector('input[name="hard_outdoor"]');
-    const hardOutdoorWrap = document.getElementById('qz-hard-outdoor-wrap');
-
-    function updateHardOutdoor() {
-        if (!hardOutdoorWrap) return;
-        hardOutdoorWrap.style.display = hardOutdoor?.checked ? '' : 'none';
-    }
-    if (hardOutdoor) hardOutdoor.addEventListener('change', updateHardOutdoor);
-
-    // --- Photo upload handling ---
     const photoInput = document.getElementById('q-photos');
     const uploadTrigger = document.getElementById('qz-upload-trigger');
     const uploadPreview = document.getElementById('qz-upload-preview');
@@ -1431,38 +1226,22 @@ if (qzCategoryBtns.length > 0) {
 
     if (uploadTrigger && photoInput) {
         uploadTrigger.addEventListener('click', () => photoInput.click());
-
         photoInput.addEventListener('change', () => {
             const newFiles = Array.from(photoInput.files);
-            // Limit: 5 photos total, 10MB each, 30MB combined, image/* only.
             const MAX_PER_FILE = 10 * 1024 * 1024;
             const MAX_TOTAL = 30 * 1024 * 1024;
             const skipped = [];
             let totalBytes = selectedPhotos.reduce((s, f) => s + f.size, 0);
             for (const file of newFiles) {
-                if (selectedPhotos.length >= 5) {
-                    skipped.push(`${file.name} (max 5 photos)`);
-                    continue;
-                }
-                if (!file.type.startsWith('image/')) {
-                    skipped.push(`${file.name} (not an image)`);
-                    continue;
-                }
-                if (file.size > MAX_PER_FILE) {
-                    skipped.push(`${file.name} (over 10 MB)`);
-                    continue;
-                }
-                if (totalBytes + file.size > MAX_TOTAL) {
-                    skipped.push(`${file.name} (combined size limit)`);
-                    continue;
-                }
+                if (selectedPhotos.length >= 5) { skipped.push(`${file.name} (max 5 photos)`); continue; }
+                if (!file.type.startsWith('image/')) { skipped.push(`${file.name} (not an image)`); continue; }
+                if (file.size > MAX_PER_FILE) { skipped.push(`${file.name} (over 10 MB)`); continue; }
+                if (totalBytes + file.size > MAX_TOTAL) { skipped.push(`${file.name} (combined size limit)`); continue; }
                 selectedPhotos.push(file);
                 totalBytes += file.size;
             }
             photoInput.value = '';
-            if (skipped.length > 0) {
-                alert(`Skipped:\n• ${skipped.join('\n• ')}`);
-            }
+            if (skipped.length > 0) alert(`Skipped:\n• ${skipped.join('\n• ')}`);
             renderPhotoPreview();
         });
     }
@@ -1490,95 +1269,35 @@ if (qzCategoryBtns.length > 0) {
         });
     }
 
-    // --- Continue to contact ---
-    const nextToContact = document.getElementById('qz-next-to-contact');
-    if (nextToContact) {
-        nextToContact.addEventListener('click', () => {
-            trackEvent('quote_step_complete', { step: 2, category: qzCategory });
-            setProgress(3);
-            showStep(allSteps[3]); // step 3
-        });
-    }
-
-    // --- Collect all questionnaire data ---
-    function collectData() {
-        const data = {};
-        data.category = qzCategory || '';
-        data.categoryLabel = categoryLabels[qzCategory]?.title || qzCategory || '';
-        data.projectType = qzProjectType || '';
-
-        // Collect all checkboxes and selects from the active question group
-        const group = questionGroups[qzCategory];
-        if (group) {
-            group.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-                data[cb.name] = cb.value;
-            });
-            group.querySelectorAll('select').forEach(sel => {
-                if (sel.value) data[sel.name] = sel.value;
-            });
-        }
-
-        // Description
-        const desc = document.getElementById('qz-description');
-        if (desc && desc.value.trim()) data.project_description = desc.value.trim();
-
-        // Contact form fields
-        const form = document.getElementById('quote-form');
-        if (form) {
-            const fd = new FormData(form);
-            for (const [k, v] of fd.entries()) {
-                if (v && k !== 'photos') data[k] = v;
-            }
-        }
-
-        // Photo file names (for the spreadsheet)
-        if (selectedPhotos.length > 0) {
-            data.photoCount = selectedPhotos.length;
-            data.photoNames = selectedPhotos.map(f => f.name).join(', ');
-        }
-
-        return data;
-    }
-
-    // Convert photos to base64 for sending to Google Drive
     async function getPhotoData() {
-        const photoData = [];
+        const out = [];
         for (const file of selectedPhotos) {
             const reader = new FileReader();
             const b64 = await new Promise((resolve) => {
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.readAsDataURL(file);
             });
-            photoData.push({ name: file.name, type: file.type, data: b64 });
+            out.push({ name: file.name, type: file.type, data: b64 });
         }
-        return photoData;
+        return out;
     }
 
-    // --- Submit to Google Sheets + luckyapp lead intake ---
+    // ============================================
+    // SUBMISSION (Apps Script + luckyapp lead intake)
+    // ============================================
     async function submitQuestionnaire(data) {
         const payload = { ...data };
-        if (selectedPhotos.length > 0) {
-            payload.photos = await getPhotoData();
-        }
-
+        if (selectedPhotos.length > 0) payload.photos = await getPhotoData();
         const tasks = [];
-
-        // 1. Google Apps Script (Sheets/Drive/Gmail) — keeps existing flow intact.
         if (QUOTES_SCRIPT_URL) {
             tasks.push(
                 fetch(QUOTES_SCRIPT_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
+                    method: 'POST', mode: 'no-cors',
                     headers: { 'Content-Type': 'text/plain' },
                     body: JSON.stringify(payload),
                 }).catch(err => console.error('Apps Script submission error:', err))
             );
-        } else {
-            console.warn('QUOTES_SCRIPT_URL not set — skipping Sheets submission');
         }
-
-        // 2. luckyapp lead intake — creates the customer record. Photos are not sent
-        //    here (Drive/Sheets is the canonical photo store); only the count is sent.
         if (LEADS_INTAKE_URL) {
             const { photos, ...leadPayload } = payload;
             tasks.push(
@@ -1586,19 +1305,16 @@ if (qzCategoryBtns.length > 0) {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(leadPayload),
-                })
-                    .then(async r => {
-                        // Don't log the response body — it may echo customer data.
-                        if (!r.ok) console.error('Lead intake failed', r.status);
-                    })
-                    .catch(err => console.error('Lead intake error:', err))
+                }).then(r => { if (!r.ok) console.error('Lead intake failed', r.status); })
+                  .catch(err => console.error('Lead intake error:', err))
             );
         }
-
         await Promise.allSettled(tasks);
     }
 
-    // --- Confetti ---
+    // ============================================
+    // CONFETTI (kept from old version — visual reward on submit)
+    // ============================================
     function spawnConfetti() {
         const container = document.getElementById('confetti-container');
         if (!container) return;
@@ -1619,79 +1335,12 @@ if (qzCategoryBtns.length > 0) {
         }
     }
 
-    // --- Form submission ---
-    const quoteForm = document.getElementById('quote-form');
-    if (quoteForm) {
-        quoteForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const firstName = document.getElementById('q-firstName').value.trim();
-            const lastName = document.getElementById('q-lastName').value.trim();
-            const email = document.getElementById('q-email').value.trim();
-            const phone = document.getElementById('q-phone').value.trim();
-
-            if (!firstName || !lastName || !email) {
-                quoteForm.reportValidity();
-                return;
-            }
-
-            // Phone is optional, but if provided it must be a real US-style number.
-            if (phone) {
-                const digits = phone.replace(/\D/g, '');
-                if (digits.length < 10) {
-                    const pg = document.getElementById('q-phone').closest('.form-group');
-                    if (pg) pg.classList.add('has-error');
-                    document.getElementById('q-phone').focus();
-                    return;
-                }
-            }
-
-            // Email validation
-            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-            if (!emailRegex.test(email)) {
-                const eg = document.getElementById('q-email').closest('.form-group');
-                if (eg) eg.classList.add('has-error');
-                document.getElementById('q-email').focus();
-                return;
-            }
-
-            const btn = document.getElementById('qz-submit');
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<span class="spinner"></span> Submitting...';
-            btn.disabled = true;
-
-            const data = collectData();
-            await submitQuestionnaire(data);
-
-            // Successful submission — clear the autosave so next visit is fresh.
-            clearAutosave();
-
-            // Conversion tracking — primary lead event.
-            trackEvent('quote_submit', {
-                category: data.category || 'unknown',
-                project_type: data.projectType || 'unknown',
-                has_address: !!data.address,
-                has_photos: !!data.photoCount,
-            });
-            // GA4 also has a built-in 'generate_lead' event that goes into the standard conversion reports.
-            trackEvent('generate_lead', { value: 1, currency: 'USD' });
-
-            setProgress(4);
-            showStep(allSteps[4]); // step 4
-            spawnConfetti();
-
-            btn.innerHTML = originalHTML;
-            btn.disabled = false;
-        });
-    }
-
     // ============================================
-    // QUOTE FORM AUTOSAVE — keep partial leads alive across tab close
+    // AUTOSAVE (localStorage) — keeps partial leads alive
     // ============================================
-    // Saves contact fields as the user types so a bounced visitor coming back
-    // doesn't lose their progress. Cleared on successful submit.
     const AUTOSAVE_KEY = 'lucky_quote_partial';
     const AUTOSAVE_TTL_DAYS = 7;
+    const AUTOSAVE_FIELDS = ['q-firstName', 'q-lastName', 'q-email', 'q-phone', 'q-address', 'q-description'];
 
     function loadAutosave() {
         try {
@@ -1699,8 +1348,7 @@ if (qzCategoryBtns.length > 0) {
             if (!raw) return null;
             const data = JSON.parse(raw);
             if (!data || !data.savedAt) return null;
-            const ageDays = (Date.now() - data.savedAt) / 86400000;
-            if (ageDays > AUTOSAVE_TTL_DAYS) {
+            if ((Date.now() - data.savedAt) / 86400000 > AUTOSAVE_TTL_DAYS) {
                 localStorage.removeItem(AUTOSAVE_KEY);
                 return null;
             }
@@ -1710,85 +1358,162 @@ if (qzCategoryBtns.length > 0) {
 
     function saveAutosave() {
         try {
-            const fields = ['q-firstName', 'q-lastName', 'q-email', 'q-phone', 'q-address', 'q-notes'];
             const payload = { savedAt: Date.now() };
-            fields.forEach(id => {
+            AUTOSAVE_FIELDS.forEach(id => {
                 const el = document.getElementById(id);
                 if (el && el.value.trim()) payload[el.name] = el.value;
             });
-            // Don't write an empty record.
+            if (categoryInput && categoryInput.value) payload.category = categoryInput.value;
             if (Object.keys(payload).length <= 1) return;
             localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(payload));
-        } catch (_) { /* localStorage may be disabled — silently noop */ }
+        } catch (_) {}
     }
 
     function clearAutosave() {
         try { localStorage.removeItem(AUTOSAVE_KEY); } catch (_) {}
     }
 
-    // Restore saved contact info if present.
     (function restoreAutosave() {
         const data = loadAutosave();
         if (!data) return;
-        const map = { firstName: 'q-firstName', lastName: 'q-lastName', email: 'q-email', phone: 'q-phone', address: 'q-address', notes: 'q-notes' };
-        Object.entries(map).forEach(([key, id]) => {
+        const map = { firstName: 'q-firstName', lastName: 'q-lastName', email: 'q-email', phone: 'q-phone', address: 'q-address', project_description: 'q-description' };
+        Object.entries(map).forEach(([k, id]) => {
             const el = document.getElementById(id);
-            if (el && data[key] && !el.value) el.value = data[key];
+            if (el && data[k] && !el.value) el.value = data[k];
         });
+        if (data.category && categoryLabels[data.category]) selectCategory(data.category);
         trackEvent('quote_autosave_restored');
     })();
 
-    // Save on input across the whole form.
-    ['q-firstName', 'q-lastName', 'q-email', 'q-phone', 'q-address', 'q-notes'].forEach(id => {
+    AUTOSAVE_FIELDS.forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener('input', () => saveAutosave());
+        if (el) el.addEventListener('input', saveAutosave);
     });
 
-    // --- Phone auto-format ---
+    // ============================================
+    // PHONE auto-format + EMAIL validation
+    // ============================================
     const phoneInput = document.getElementById('q-phone');
     if (phoneInput) {
         phoneInput.addEventListener('input', (e) => {
-            let val = e.target.value.replace(/\D/g, '');
-            if (val.length > 10) val = val.slice(0, 10);
-            let formatted = '';
-            if (val.length > 0) formatted += '(' + val.slice(0, 3);
-            if (val.length >= 3) formatted += ') ';
-            if (val.length > 3) formatted += val.slice(3, 6);
-            if (val.length >= 6) formatted += '-';
-            if (val.length > 6) formatted += val.slice(6, 10);
-            e.target.value = formatted;
+            let val = e.target.value.replace(/\D/g, '').slice(0, 10);
+            let f = '';
+            if (val.length > 0) f += '(' + val.slice(0, 3);
+            if (val.length >= 3) f += ') ';
+            if (val.length > 3) f += val.slice(3, 6);
+            if (val.length >= 6) f += '-';
+            if (val.length > 6) f += val.slice(6, 10);
+            e.target.value = f;
             const group = phoneInput.closest('.form-group');
-            if (val.length === 10) group.classList.remove('has-error');
+            if (val.length === 10 && group) group.classList.remove('has-error');
         });
         phoneInput.addEventListener('blur', () => {
             const digits = phoneInput.value.replace(/\D/g, '');
             const group = phoneInput.closest('.form-group');
-            if (digits.length > 0 && digits.length < 10) group.classList.add('has-error');
-            else group.classList.remove('has-error');
+            if (group) group.classList.toggle('has-error', digits.length > 0 && digits.length < 10);
         });
     }
 
-    // --- Email validation ---
     const emailInput = document.getElementById('q-email');
     if (emailInput) {
         const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
         emailInput.addEventListener('blur', () => {
-            const val = emailInput.value.trim();
+            const v = emailInput.value.trim();
             const group = emailInput.closest('.form-group');
-            if (val.length > 0 && !emailRegex.test(val)) group.classList.add('has-error');
-            else group.classList.remove('has-error');
+            if (group) group.classList.toggle('has-error', v.length > 0 && !emailRegex.test(v));
         });
         emailInput.addEventListener('input', () => {
-            const val = emailInput.value.trim();
             const group = emailInput.closest('.form-group');
-            if (emailRegex.test(val)) group.classList.remove('has-error');
+            if (group && emailRegex.test(emailInput.value.trim())) group.classList.remove('has-error');
         });
     }
 
-    // --- Address autocomplete + Mini Map ---
-    // Uses Geoapify when LL_CONFIG.geoapify is set (free 3k req/day, sane usage policy);
-    // falls back to OpenStreetMap Nominatim otherwise. Leaflet is lazy-loaded the first
-    // time the user focuses the input so it doesn't block the quote page's first paint.
+    // ============================================
+    // SUBMIT
+    // ============================================
+    if (quoteForm) {
+        quoteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const firstName = document.getElementById('q-firstName').value.trim();
+            const lastName  = document.getElementById('q-lastName').value.trim();
+            const email     = document.getElementById('q-email').value.trim();
+            const phone     = document.getElementById('q-phone').value.trim();
+            const description = document.getElementById('q-description').value.trim();
+            const category  = categoryInput.value;
+
+            // Required: category + first/last name + email + description.
+            if (!category) {
+                if (categoryError) categoryError.classList.add('visible');
+                document.getElementById('qz-categories').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
+            }
+            if (!firstName || !lastName || !email || !description) {
+                quoteForm.reportValidity();
+                return;
+            }
+            const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            if (!emailRegex.test(email)) {
+                document.getElementById('q-email').closest('.form-group').classList.add('has-error');
+                document.getElementById('q-email').focus();
+                return;
+            }
+            if (phone) {
+                const digits = phone.replace(/\D/g, '');
+                if (digits.length < 10) {
+                    document.getElementById('q-phone').closest('.form-group').classList.add('has-error');
+                    document.getElementById('q-phone').focus();
+                    return;
+                }
+            }
+
+            const btn = document.getElementById('qz-submit');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<span class="spinner"></span> Submitting...';
+            btn.disabled = true;
+
+            const fd = new FormData(quoteForm);
+            const data = {};
+            for (const [k, v] of fd.entries()) {
+                if (v && k !== 'photos') data[k] = v;
+            }
+            if (selectedPhotos.length > 0) {
+                data.photoCount = selectedPhotos.length;
+                data.photoNames = selectedPhotos.map(f => f.name).join(', ');
+            }
+
+            // If Turnstile is configured, include the token so the backend can verify.
+            const turnstileResp = quoteForm.querySelector('[name="cf-turnstile-response"]');
+            if (turnstileResp && turnstileResp.value) data.turnstile_token = turnstileResp.value;
+
+            await submitQuestionnaire(data);
+            clearAutosave();
+
+            trackEvent('quote_submit', {
+                category,
+                budget: data.project_budget || 'unspecified',
+                timeline: data.project_timeline || 'unspecified',
+                has_address: !!data.address,
+                has_photos: !!data.photoCount,
+            });
+            trackEvent('generate_lead', { value: 1, currency: 'USD' });
+
+            // Swap form card for confirmation card.
+            if (formCard) formCard.classList.add('quote-step-hidden');
+            if (confirmCard) {
+                confirmCard.classList.remove('quote-step-hidden');
+                spawnConfetti();
+                confirmCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
+        });
+    }
+
+    // ============================================
+    // ADDRESS AUTOCOMPLETE + lazy Leaflet (preserved from prior version)
+    // ============================================
     const addressInput = document.getElementById('q-address');
     const suggestionsEl = document.getElementById('address-suggestions');
     const mapWrap = document.getElementById('address-map-wrap');
@@ -1797,228 +1522,116 @@ if (qzCategoryBtns.length > 0) {
 
     let leafletLoaded = false;
     function loadLeaflet() {
-        if (leafletLoaded || typeof L !== 'undefined') {
-            leafletLoaded = true;
-            return Promise.resolve();
-        }
+        if (leafletLoaded || typeof L !== 'undefined') { leafletLoaded = true; return Promise.resolve(); }
         return new Promise((resolve) => {
             const css = document.createElement('link');
             css.rel = 'stylesheet';
             css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
             css.crossOrigin = '';
             document.head.appendChild(css);
-
             const js = document.createElement('script');
             js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
             js.crossOrigin = '';
             js.onload = () => { leafletLoaded = true; resolve(); };
-            js.onerror = () => resolve(); // fail open — autocomplete still works without the map
+            js.onerror = () => resolve();
             document.head.appendChild(js);
         });
     }
 
     if (addressInput) {
-        // Lazy-load Leaflet on first focus or first keystroke, whichever comes first.
-        const triggerLeafletLoad = () => {
-            loadLeaflet();
-            addressInput.removeEventListener('focus', triggerLeafletLoad);
-            addressInput.removeEventListener('input', triggerLeafletLoad);
-        };
+        const triggerLeafletLoad = () => { loadLeaflet(); addressInput.removeEventListener('focus', triggerLeafletLoad); addressInput.removeEventListener('input', triggerLeafletLoad); };
         addressInput.addEventListener('focus', triggerLeafletLoad, { once: true });
         addressInput.addEventListener('input', triggerLeafletLoad, { once: true });
     }
 
     if (addressInput && suggestionsEl) {
-        let debounceTimer = null;
-        let focusedIdx = -1;
-        let currentResults = [];
-        let miniMap = null;
-        let miniMapMarker = null;
+        let debounceTimer = null, focusedIdx = -1, currentResults = [], miniMap = null, miniMapMarker = null;
 
-        // Custom green lucky clover pin SVG
-        const luckyPinSvg = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">
-            <defs>
-                <filter id="pinShadow" x="-20%" y="-10%" width="140%" height="130%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/>
-                </filter>
-            </defs>
-            <path d="M20 51 C20 51 3 31 3 18 A17 17 0 0 1 37 18 C37 31 20 51 20 51Z" fill="#4a7c34" filter="url(#pinShadow)"/>
-            <path d="M20 49 C20 49 5 30 5 18.5 A15 15 0 0 1 35 18.5 C35 30 20 49 20 49Z" fill="#6B8E4E"/>
-            <circle cx="20" cy="18" r="11" fill="rgba(255,255,255,0.2)"/>
-            <!-- Four-leaf clover -->
-            <g transform="translate(20,18)" fill="#fff">
-                <ellipse cx="0" cy="-4" rx="3.2" ry="4" opacity="0.95"/>
-                <ellipse cx="0" cy="4" rx="3.2" ry="4" opacity="0.95"/>
-                <ellipse cx="-4" cy="0" rx="4" ry="3.2" opacity="0.95"/>
-                <ellipse cx="4" cy="0" rx="4" ry="3.2" opacity="0.95"/>
-                <circle cx="0" cy="0" r="2" fill="#6B8E4E"/>
-            </g>
-        </svg>`;
-
-        function makeLuckyPinIcon() {
-            if (typeof L === 'undefined') return null;
-            return L.icon({
-                iconUrl: 'data:image/svg+xml;base64,' + btoa(luckyPinSvg),
-                iconSize: [40, 52],
-                iconAnchor: [20, 52],
-                popupAnchor: [0, -52],
-            });
-        }
+        const luckyPinSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><defs><filter id="pinShadow" x="-20%" y="-10%" width="140%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.3"/></filter></defs><path d="M20 51 C20 51 3 31 3 18 A17 17 0 0 1 37 18 C37 31 20 51 20 51Z" fill="#4a7c34" filter="url(#pinShadow)"/><path d="M20 49 C20 49 5 30 5 18.5 A15 15 0 0 1 35 18.5 C35 30 20 49 20 49Z" fill="#6B8E4E"/><circle cx="20" cy="18" r="11" fill="rgba(255,255,255,0.2)"/><g transform="translate(20,18)" fill="#fff"><ellipse cx="0" cy="-4" rx="3.2" ry="4" opacity="0.95"/><ellipse cx="0" cy="4" rx="3.2" ry="4" opacity="0.95"/><ellipse cx="-4" cy="0" rx="4" ry="3.2" opacity="0.95"/><ellipse cx="4" cy="0" rx="4" ry="3.2" opacity="0.95"/><circle cx="0" cy="0" r="2" fill="#6B8E4E"/></g></svg>`;
 
         async function initMiniMap(lat, lon) {
             if (!mapEl) return;
-            // Make sure Leaflet is loaded before we try to use it.
             if (typeof L === 'undefined') await loadLeaflet();
-            if (typeof L === 'undefined') return; // load failed — silently skip the map
-            const luckyPinIcon = makeLuckyPinIcon();
-
+            if (typeof L === 'undefined') return;
             mapWrap.style.display = '';
-            // Trigger reflow for animation
-            requestAnimationFrame(() => {
-                mapWrap.classList.add('visible');
-            });
-
+            requestAnimationFrame(() => mapWrap.classList.add('visible'));
+            const luckyPinIcon = L.icon({ iconUrl: 'data:image/svg+xml;base64,' + btoa(luckyPinSvg), iconSize: [40, 52], iconAnchor: [20, 52], popupAnchor: [0, -52] });
             if (!miniMap) {
-                miniMap = L.map(mapEl, {
-                    zoomControl: false,
-                    attributionControl: false,
-                    dragging: false,
-                    scrollWheelZoom: false,
-                    doubleClickZoom: false,
-                    touchZoom: false,
-                    boxZoom: false,
-                    keyboard: false
-                }).setView([lat, lon], 16);
-
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                }).addTo(miniMap);
-
-                // Subtle attribution
-                L.control.attribution({ prefix: false, position: 'bottomright' })
-                    .addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>')
-                    .addTo(miniMap);
-
+                miniMap = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false, touchZoom: false, boxZoom: false, keyboard: false }).setView([lat, lon], 16);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(miniMap);
+                L.control.attribution({ prefix: false, position: 'bottomright' }).addAttribution('© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>').addTo(miniMap);
                 miniMapMarker = L.marker([lat, lon], { icon: luckyPinIcon }).addTo(miniMap);
             } else {
                 miniMap.setView([lat, lon], 16);
                 miniMapMarker.setLatLng([lat, lon]);
             }
-
-            // Force map to recalculate size after reveal animation
-            setTimeout(() => {
-                miniMap.invalidateSize();
-            }, 350);
+            setTimeout(() => miniMap.invalidateSize(), 350);
         }
 
         function hideMiniMap() {
             if (mapWrap) {
                 mapWrap.classList.remove('visible');
-                setTimeout(() => {
-                    mapWrap.style.display = 'none';
-                }, 300);
+                setTimeout(() => mapWrap.style.display = 'none', 300);
             }
         }
 
-        function formatAddress(result) {
-            const addr = result.address || {};
+        function formatAddress(r) {
+            const a = r.address || {};
             const parts = [];
-            // Street
-            const house = addr.house_number || '';
-            const road = addr.road || '';
-            if (road) parts.push((house ? house + ' ' : '') + road);
-            // City
-            const city = addr.city || addr.town || addr.village || addr.hamlet || '';
+            const road = a.road || '';
+            if (road) parts.push((a.house_number ? a.house_number + ' ' : '') + road);
+            const city = a.city || a.town || a.village || '';
             if (city) parts.push(city);
-            // State abbreviated
-            const state = addr.state || '';
-            const zip = addr.postcode || '';
-            if (state || zip) parts.push((state ? state : '') + (zip ? ' ' + zip : ''));
-            return parts.join(', ') || result.display_name;
+            if (a.state || a.postcode) parts.push((a.state || '') + (a.postcode ? ' ' + a.postcode : ''));
+            return parts.join(', ') || r.display_name;
         }
 
         function renderSuggestions(results) {
-            currentResults = results;
-            focusedIdx = -1;
+            currentResults = results; focusedIdx = -1;
             if (results.length === 0) {
-                suggestionsEl.classList.remove('visible');
-                suggestionsEl.innerHTML = '<div class="addr-no-results"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg> No addresses found — try a more specific search</div>';
+                suggestionsEl.innerHTML = '<div class="addr-no-results">No addresses found — try a more specific search</div>';
                 suggestionsEl.classList.add('visible');
-                setTimeout(() => {
-                    suggestionsEl.classList.remove('visible');
-                }, 3000);
+                setTimeout(() => suggestionsEl.classList.remove('visible'), 3000);
                 return;
             }
             suggestionsEl.innerHTML = results.map((r, i) => {
-                const addr = r.address || {};
-                const house = addr.house_number || '';
-                const road = addr.road || '';
-                const main = road ? (house ? house + ' ' : '') + road : r.display_name.split(',')[0];
-                const city = addr.city || addr.town || addr.village || '';
-                const state = addr.state || '';
-                const sub = [city, state].filter(Boolean).join(', ');
-                return `<div class="address-suggestion-item" data-idx="${i}">
-                    <span class="addr-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                    </span>
-                    <div class="addr-text"><strong>${main}</strong><span>${sub}</span></div>
-                </div>`;
+                const a = r.address || {};
+                const main = a.road ? (a.house_number ? a.house_number + ' ' : '') + a.road : (r.display_name || '').split(',')[0];
+                const sub = [a.city || a.town || a.village || '', a.state || ''].filter(Boolean).join(', ');
+                return `<div class="address-suggestion-item" data-idx="${i}"><div class="addr-text"><strong>${main}</strong><span>${sub}</span></div></div>`;
             }).join('');
             suggestionsEl.classList.add('visible');
             suggestionsEl.querySelectorAll('.address-suggestion-item').forEach(item => {
-                item.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    selectAddress(currentResults[parseInt(item.dataset.idx, 10)]);
-                });
+                item.addEventListener('mousedown', (e) => { e.preventDefault(); selectAddress(currentResults[parseInt(item.dataset.idx, 10)]); });
             });
         }
 
-        function selectAddress(result) {
-            const formatted = formatAddress(result);
-            addressInput.value = formatted;
+        function selectAddress(r) {
+            const f = formatAddress(r);
+            addressInput.value = f;
+            saveAutosave();
             suggestionsEl.classList.remove('visible');
-            suggestionsEl.innerHTML = '';
-            currentResults = [];
-
-            // Show minimap
-            const lat = parseFloat(result.lat);
-            const lon = parseFloat(result.lon);
+            const lat = parseFloat(r.lat), lon = parseFloat(r.lon);
             if (!isNaN(lat) && !isNaN(lon)) {
                 initMiniMap(lat, lon);
-                if (mapLabel) {
-                    mapLabel.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${formatted}`;
-                }
+                if (mapLabel) mapLabel.textContent = f;
             }
-
-            // Pulse the input green briefly
             addressInput.classList.add('addr-confirmed');
             setTimeout(() => addressInput.classList.remove('addr-confirmed'), 1500);
         }
 
         let currentAbort = null;
-
         async function searchAddress(query) {
-            if (query.length < 3) {
-                suggestionsEl.classList.remove('visible');
-                return;
-            }
-
-            // Abort any in-flight request
+            if (query.length < 3) { suggestionsEl.classList.remove('visible'); return; }
             if (currentAbort) currentAbort.abort();
             currentAbort = new AbortController();
             const signal = currentAbort.signal;
-
             suggestionsEl.innerHTML = '<div class="addr-loading"><span class="addr-loading-spinner"></span> Searching addresses...</div>';
             suggestionsEl.classList.add('visible');
-
             try {
                 const geoapifyKey = (window.LL_CONFIG && window.LL_CONFIG.geoapify) || '';
                 let merged = [];
-
                 if (geoapifyKey) {
-                    // Geoapify Autocomplete — preferred path, free 3k req/day, no usage-policy
-                    // restriction on autocomplete use. Bias to Lincoln, NE.
                     const url = `https://api.geoapify.com/v1/geocode/autocomplete?text=${encodeURIComponent(query)}&filter=countrycode:us&bias=proximity:-96.7026,40.8136&limit=6&apiKey=${geoapifyKey}`;
                     const res = await fetch(url, { signal });
                     if (signal.aborted) return;
@@ -2026,144 +1639,44 @@ if (qzCategoryBtns.length > 0) {
                         const json = await res.json();
                         merged = (json.features || []).map(f => {
                             const p = f.properties || {};
-                            return {
-                                display_name: p.formatted,
-                                lat: p.lat,
-                                lon: p.lon,
-                                importance: (p.rank && p.rank.confidence) || 0.5,
-                                address: {
-                                    house_number: p.housenumber,
-                                    road: p.street,
-                                    city: p.city || p.town || p.village,
-                                    state: p.state,
-                                    postcode: p.postcode,
-                                },
-                            };
+                            return { display_name: p.formatted, lat: p.lat, lon: p.lon, address: { house_number: p.housenumber, road: p.street, city: p.city || p.town || p.village, state: p.state, postcode: p.postcode } };
                         });
                     }
                 } else {
-                    // OSM Nominatim fallback. OSM's usage policy frowns on autocomplete at scale —
-                    // set window.LL_CONFIG.geoapify in production once you've got more than a few
-                    // dozen lookups per day.
-                    const neUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=7&countrycodes=us&viewbox=-104.1,43.0,-95.3,40.0&bounded=1&q=${encodeURIComponent(query)}`;
-                    const usUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=5&countrycodes=us&q=${encodeURIComponent(query)}`;
-                    const [neRes, usRes] = await Promise.allSettled([
-                        fetch(neUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
-                        fetch(usUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } }),
-                    ]);
+                    const neUrl = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=us&viewbox=-104.1,43.0,-95.3,40.0&bounded=1&q=${encodeURIComponent(query)}`;
+                    const res = await fetch(neUrl, { signal, headers: { 'Accept-Language': 'en-US,en' } });
                     if (signal.aborted) return;
-                    let neData = [], usData = [];
-                    if (neRes.status === 'fulfilled' && neRes.value.ok) neData = await neRes.value.json();
-                    if (usRes.status === 'fulfilled' && usRes.value.ok) usData = await usRes.value.json();
-                    if (signal.aborted) return;
-                    const seen = new Set();
-                    for (const r of neData) {
-                        const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
-                        if (!seen.has(key)) { seen.add(key); r._fromNE = true; merged.push(r); }
-                    }
-                    for (const r of usData) {
-                        const key = `${parseFloat(r.lat).toFixed(4)},${parseFloat(r.lon).toFixed(4)}`;
-                        if (!seen.has(key)) { seen.add(key); merged.push(r); }
-                    }
-                    merged.sort((a, b) => {
-                        const aIsNE = (a.address?.state || '').toLowerCase().includes('nebraska');
-                        const bIsNE = (b.address?.state || '').toLowerCase().includes('nebraska');
-                        if (aIsNE && !bIsNE) return -1;
-                        if (!aIsNE && bIsNE) return 1;
-                        return (parseFloat(b.importance) || 0) - (parseFloat(a.importance) || 0);
-                    });
+                    if (res.ok) merged = await res.json();
                 }
-
                 renderSuggestions(merged.slice(0, 6));
             } catch (e) {
                 if (e.name === 'AbortError') return;
-                suggestionsEl.innerHTML = '<div class="addr-loading addr-error"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Unable to search — type your full address</div>';
+                suggestionsEl.innerHTML = '<div class="addr-loading addr-error">Unable to search — type your full address</div>';
                 setTimeout(() => suggestionsEl.classList.remove('visible'), 3000);
             }
         }
 
         addressInput.addEventListener('input', () => {
             clearTimeout(debounceTimer);
-            const val = addressInput.value.trim();
-            if (val.length < 3) {
+            const v = addressInput.value.trim();
+            if (v.length < 3) {
                 suggestionsEl.classList.remove('visible');
                 if (currentAbort) currentAbort.abort();
+                if (v.length === 0) hideMiniMap();
                 return;
             }
-            debounceTimer = setTimeout(() => searchAddress(val), 250);
+            debounceTimer = setTimeout(() => searchAddress(v), 250);
         });
 
         addressInput.addEventListener('keydown', (e) => {
             const items = suggestionsEl.querySelectorAll('.address-suggestion-item');
             if (!items.length) return;
-            if (e.key === 'ArrowDown') {
-                e.preventDefault();
-                focusedIdx = Math.min(focusedIdx + 1, items.length - 1);
-                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
-                items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
-            } else if (e.key === 'ArrowUp') {
-                e.preventDefault();
-                focusedIdx = Math.max(focusedIdx - 1, 0);
-                items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx));
-                items[focusedIdx]?.scrollIntoView({ block: 'nearest' });
-            } else if (e.key === 'Enter' && focusedIdx >= 0) {
-                e.preventDefault();
-                selectAddress(currentResults[focusedIdx]);
-            } else if (e.key === 'Escape') {
-                suggestionsEl.classList.remove('visible');
-            }
+            if (e.key === 'ArrowDown') { e.preventDefault(); focusedIdx = Math.min(focusedIdx + 1, items.length - 1); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); focusedIdx = Math.max(focusedIdx - 1, 0); items.forEach((it, i) => it.classList.toggle('focused', i === focusedIdx)); }
+            else if (e.key === 'Enter' && focusedIdx >= 0) { e.preventDefault(); selectAddress(currentResults[focusedIdx]); }
+            else if (e.key === 'Escape') suggestionsEl.classList.remove('visible');
         });
 
-        addressInput.addEventListener('blur', () => {
-            setTimeout(() => suggestionsEl.classList.remove('visible'), 200);
-        });
-
-        // Clear map if address is deleted
-        addressInput.addEventListener('input', () => {
-            if (addressInput.value.trim().length === 0) {
-                hideMiniMap();
-            }
-        });
-    }
-
-    // --- Clickable step dots ---
-    stepDots.forEach(dot => {
-        dot.addEventListener('click', () => {
-            const clickedStep = parseInt(dot.dataset.step, 10);
-            if (!dot.classList.contains('completed')) return;
-            if (clickedStep === 1) {
-                if (heroTitle) heroTitle.innerHTML = 'Let\'s Build Your<br/><em class="highlight">Dream Yard</em> Together';
-                if (heroSub) heroSub.textContent = 'Answer a few quick questions and we\'ll craft a personalized quote just for you. It only takes 2 minutes.';
-                setProgress(1);
-                showStep(allSteps[0]);
-            } else if (clickedStep === 2) {
-                setProgress(2);
-                showStep(allSteps[2]); // step 2b (questions)
-            } else if (clickedStep === 3) {
-                setProgress(3);
-                showStep(allSteps[3]);
-            }
-        });
-    });
-
-    // --- URL param auto-select ---
-    const urlParams = new URLSearchParams(window.location.search);
-    const preselectedCat = urlParams.get('category');
-    if (preselectedCat && categoryLabels[preselectedCat]) {
-        qzCategory = preselectedCat;
-        updateHero(qzCategory);
-        if (needsProjectType.includes(qzCategory)) {
-            const t = document.getElementById('step2a-title');
-            const info = categoryLabels[qzCategory];
-            if (t) t.textContent = `Is Your ${info.title} Project New or Repair?`;
-            setProgress(2);
-            allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
-            allSteps[1].classList.remove('quote-step-hidden');
-        } else {
-            showQuestionGroup(qzCategory);
-            setProgress(2);
-            allSteps.forEach(s => { if (s) s.classList.add('quote-step-hidden'); });
-            allSteps[2].classList.remove('quote-step-hidden');
-        }
+        addressInput.addEventListener('blur', () => setTimeout(() => suggestionsEl.classList.remove('visible'), 200));
     }
 }

@@ -1,177 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
+#!/usr/bin/env node
+// One-shot: replace the old multi-step wizard in quote.html with the new
+// single-page contact-first form. Run once; safe to re-run (idempotent — looks
+// for the start marker).
 
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+import { readFile, writeFile } from 'node:fs/promises';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-    <!-- SEO -->
-    <title>Get Your Free Landscaping Quote in Lincoln, NE — Lucky Landscapes</title>
-    <meta name="description"
-        content="Get a free, no-obligation landscaping quote from Lucky Landscapes in Lincoln, Nebraska. Lawn care, garden beds, pavers, retaining walls, landscape design & more. Takes just 2 minutes!" />
-    <link rel="canonical" href="https://luckylandscapes.com/quote.html" />
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const TARGET = join(__dirname, '..', 'quote.html');
 
-    <!-- Open Graph -->
-    <meta property="og:title" content="Get Your Free Landscaping Quote — Lucky Landscapes" />
-    <meta property="og:description"
-        content="Answer a few quick questions and get a personalized landscaping quote for your Lincoln, NE project. 100% free, no obligation." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://luckylandscapes.com/quote.html" />
-    <meta property="og:image" content="https://luckylandscapes.com/images/og-card.png" />
-    <meta property="og:site_name" content="Lucky Landscapes" />
+const START = '<!-- ==================== QUESTIONNAIRE WIZARD ==================== -->';
+const END_AFTER = '        </section>\n\n    </main>';
+// New marker we'll leave in-place so we know the rewrite happened.
+const NEW_MARKER = '<!-- ==================== QUOTE FORM (single-page) ==================== -->';
 
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Get Your Free Landscaping Quote — Lucky Landscapes" />
-    <meta name="twitter:description"
-        content="Free landscaping quotes for Lincoln, NE homeowners. Takes just 2 minutes!" />
-    <meta name="twitter:image" content="https://luckylandscapes.com/images/og-card.png" />
-
-    <!-- Favicon -->
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="MyWebSite" />
-    <link rel="manifest" href="/favicon/site.webmanifest" />
-
-    <!-- Structured Data: Service -->
-    <script type="application/ld+json">
-    {
-      "@context": "https://schema.org",
-      "@type": "WebPage",
-      "name": "Get Your Free Landscaping Quote",
-      "description": "Request a free, personalized landscaping quote from Lucky Landscapes in Lincoln, NE.",
-      "url": "https://luckylandscapes.com/quote.html",
-      "provider": {
-        "@type": "LandscapingBusiness",
-        "name": "Lucky Landscapes",
-        "telephone": "+1-402-405-5475",
-        "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" }
-      },
-      "potentialAction": {
-        "@type": "QuoteAction",
-        "target": "https://luckylandscapes.com/quote.html",
-        "name": "Request a Free Quote"
-      }
-    }
-    </script>
-
-    <!-- Leaflet (for the address mini-map) is loaded lazily by main.js the first
-         time the address input is focused — keeps it off the critical render path. -->
-
-    <link rel="stylesheet" href="/styles.css" />
-    <link rel="dns-prefetch" href="https://unpkg.com" />
-    <link rel="dns-prefetch" href="https://tile.openstreetmap.org" />
-    <link rel="dns-prefetch" href="https://api.geoapify.com" />
-    <!-- LL:HEAD-INJECT v2 -->
-    <!-- Preconnect to critical third parties -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://www.googletagmanager.com" />
-    <link rel="preconnect" href="https://www.clarity.ms" />
-    <link rel="dns-prefetch" href="https://script.google.com" />
-    <link rel="dns-prefetch" href="https://api.geoapify.com" />
-
-    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
-         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
-         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
-         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
-         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
-    <script>
-      window.LL_CONFIG = {
-        ga4:       'G-Z21C16KEMN',
-        clarity:   'wk50251l6r',
-        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
-        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
-      };
-    </script>
-
-    <!-- GA4 loader — only fires when a real ID is set. -->
-    <script>
-      (function () {
-        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
-        if (!id || id.indexOf('XXXX') !== -1) return;
-        var s = document.createElement('script');
-        s.async = true;
-        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
-        document.head.appendChild(s);
-        window.dataLayer = window.dataLayer || [];
-        window.gtag = function () { window.dataLayer.push(arguments); };
-        window.gtag('js', new Date());
-        window.gtag('config', id, { anonymize_ip: true });
-      })();
-    </script>
-
-    <!-- Microsoft Clarity loader — only fires when a real ID is set. -->
-    <script>
-      (function (c, l, a, r, i, t, y) {
-        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
-        if (!id || id.indexOf('XXXX') !== -1) return;
-        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
-        t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + id;
-        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
-      })(window, document, 'clarity', 'script');
-    </script>
-    <!-- LL:HEAD-INJECT-END -->
-
-</head>
-
-<body>
-
-    <!-- ==================== NAVIGATION ==================== -->
-    <nav class="navbar scrolled" id="navbar">
-        <div class="container">
-            <a href="/" class="nav-logo">
-                <img src="/images/Icon.png" alt="Lucky Landscapes Clover" />
-                <span class="nav-logo-text">Lucky <span>Landscapes</span></span>
-            </a>
-
-            <div class="nav-links">
-                <a href="/#about" class="nav-link">About</a>
-                <a href="/#services" class="nav-link">Services</a>
-                <a href="/gallery.html" class="nav-link">Gallery</a>
-                <a href="/team.html" class="nav-link">Our Team</a>
-                <a href="/#contact" class="nav-link">Contact</a>
-                <a href="/quote.html" class="btn btn-primary nav-cta">Get a Quote</a>
-            </div>
-
-            <button class="nav-toggle" id="nav-toggle" aria-label="Open menu">
-                <span></span><span></span><span></span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- Mobile Menu -->
-    <div class="mobile-menu-overlay" id="mobile-overlay"></div>
-    <div class="mobile-menu" id="mobile-menu">
-        <a href="/#about" class="mobile-link">About</a>
-        <a href="/#services" class="mobile-link">Services</a>
-        <a href="/gallery.html" class="mobile-link">Gallery</a>
-        <a href="/team.html" class="mobile-link">Our Team</a>
-        <a href="/#contact" class="mobile-link">Contact</a>
-        <a href="/quote.html" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
-    </div>
-
-    <main>
-
-        <!-- ==================== QUOTE HERO ==================== -->
-        <section class="quote-hero">
-            <div class="quote-hero-bg"></div>
-            <div class="container">
-                <div class="quote-hero-content">
-                    <div class="hero-badge">
-                        <img src="/images/Icon.png" alt="" />
-                        <span>Free Quote — No Obligation</span>
-                    </div>
-                    <h1 id="quote-hero-title">Let's Build Your<br /><em class="highlight">Dream Yard</em> Together</h1>
-                    <p class="hero-sub" id="quote-hero-sub">Answer a few quick questions and we'll craft a personalized
-                        quote just for you. It only takes 2 minutes.</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- ==================== QUOTE FORM (single-page) ==================== -->
+const NEW_BLOCK = `${NEW_MARKER}
         <section class="quote-section" id="quote-section">
             <div class="container">
 
@@ -300,7 +144,7 @@
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="q-email">Email <span class="form-required">*</span></label>
-                                <input type="email" id="q-email" name="email" placeholder="john@example.com" autocomplete="email" required pattern="[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$" />
+                                <input type="email" id="q-email" name="email" placeholder="john@example.com" autocomplete="email" required pattern="[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$" />
                                 <span class="form-error" id="email-error">Please enter a valid email address</span>
                             </div>
                             <div class="form-group">
@@ -412,95 +256,32 @@
                 </div>
 
             </div>
-        </section>
+        </section>`;
 
-    </main>
+const html = await readFile(TARGET, 'utf8');
 
-    <!-- ==================== FOOTER ==================== -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-top">
-                <div class="footer-brand">
-                    <a href="/" class="footer-logo">
-                        <img src="/images/Icon.png" alt="Lucky Landscapes" />
-                        <span class="footer-logo-text">Lucky <span>Landscapes</span></span>
-                    </a>
-                    <p class="footer-tagline">Creating outdoor spaces you'll feel lucky to have.</p>
-                </div>
+if (html.includes(NEW_MARKER)) {
+    console.log('Already migrated — quote.html has the new form. Skipping.');
+    process.exit(0);
+}
 
-                <div class="footer-nav">
-                    <h4>Quick Links</h4>
-                    <a href="/#about">About</a>
-                    <a href="/#services">Services</a>
-                    <a href="/gallery.html">Gallery</a>
-                    <a href="/team.html">Our Team</a>
-                    <a href="/#contact">Contact</a>
-                </div>
+const startIdx = html.indexOf(START);
+const endMarker = '        </section>\n\n    </main>';
+const endIdx = html.indexOf(endMarker, startIdx);
 
-                <div class="footer-nav">
-                    <h4>Services</h4>
-                    <a href="/services/lawn-care.html">Lawn Care</a>
-                    <a href="/services/garden-beds.html">Garden &amp; Beds</a>
-                    <a href="/services/hardscaping.html">Hardscaping</a>
-                    <a href="/services/property-cleanup.html">Property Cleanup</a>
-                    <a href="/services/landscape-design.html">Landscape Design</a>
-                </div>
+if (startIdx < 0 || endIdx < 0) {
+    console.error('Could not find section boundaries.');
+    console.error('startIdx:', startIdx, 'endIdx:', endIdx);
+    process.exit(1);
+}
 
-                <div class="footer-contact">
-                    <h4>Contact</h4>
-                    <p>(402) 405-5475</p>
-                    <p>rileykopf@luckylandscapes.com</p>
-                    <p>Lincoln, NE &amp; Surrounding Areas</p>
-                    <div class="footer-social">
-                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                            </svg>
-                        </a>
-                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                                <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-                            </svg>
-                        </a>
-                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-                            </svg>
-                        </a>
-                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path
-                                    d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" />
-                                <polygon points="10 15 16 12 10 9 10 15" />
-                            </svg>
-                        </a>
-                    </div>
-                </div>
-            </div>
+const before = html.substring(0, startIdx);
+const after = html.substring(endIdx); // keeps "        </section>\n\n    </main>" onward
 
-            <div class="footer-bottom">
-                <p>&copy; 2026 Lucky Landscapes. All rights reserved.</p>
-                <div class="footer-bottom-links">
-                    <a href="/privacy.html">Privacy Policy</a>
-                    <a href="/terms.html">Terms of Service</a>
-                </div>
-            </div>
-        </div>
-    </footer>
+const newHtml = before + NEW_BLOCK + '\n\n    </main>' + after.substring('        </section>\n\n    </main>'.length);
 
-    <!-- Entry Point -->
-    <script type="module" src="/main.js"></script>
+await writeFile(TARGET, newHtml);
 
-</body>
-
-</html>
+const oldLines = html.split('\n').length;
+const newLines = newHtml.split('\n').length;
+console.log(`Rewrote quote.html: ${oldLines} → ${newLines} lines (${Math.round((1 - newLines / oldLines) * 100)}% smaller)`);
