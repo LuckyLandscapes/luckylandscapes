@@ -53,8 +53,13 @@ export default function EasterEgg() {
         trigger();
       }
     }
+    function onCustom() { trigger(); }
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('lucky:egg', onCustom);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('lucky:egg', onCustom);
+    };
   }, [trigger]);
 
   return (

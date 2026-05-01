@@ -324,6 +324,11 @@ h4 {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sidebar-brand-mark img {
@@ -8488,11 +8493,54 @@ body {
   text-align: center;
 }
 
-@media (max-width: 540px) {
-  .swipe-deck { height: 620px; }
-  .plant-card { height: 540px; }
-  .plant-emoji { flex-basis: 200px; font-size: 110px; }
-  .plant-name { font-size: 1.25rem; }
-  .swipe-title { font-size: 1.7rem; }
+@media (max-width: 768px) {
+  .swipe-page {
+    padding: var(--space-md) var(--space-md) calc(var(--space-md) + 80px);
+  }
+  .swipe-header { margin-bottom: var(--space-md); }
+  .swipe-title { font-size: 1.5rem; margin-bottom: 4px; }
+  .swipe-subtitle { display: none; }
+  .swipe-eyebrow { font-size: 0.65rem; padding: 3px 8px; }
+  .swipe-progress { margin-top: var(--space-sm); }
+
+  /* Use dynamic viewport units so the deck always fits between header
+     and the controls — no off-screen pass/love button. */
+  .swipe-deck {
+    height: calc(100dvh - 280px);
+    min-height: 420px;
+    max-height: 560px;
+    overscroll-behavior: contain;
+  }
+  .plant-card {
+    height: calc(100% - 84px);
+    max-height: 480px;
+  }
+  .plant-emoji {
+    flex: 0 0 36%;
+    font-size: clamp(72px, 18vw, 110px);
+  }
+  .plant-card-body {
+    padding: 14px 16px 16px;
+    gap: 8px;
+  }
+  .plant-name { font-size: 1.2rem; }
+  .plant-sci { font-size: 0.78rem; }
+  .plant-bio { font-size: 0.82rem; }
+  .plant-pitch { font-size: 0.78rem; padding: 6px 8px; }
+  .plant-stat { font-size: 0.7rem; padding: 4px 8px; }
+  .plant-stamp { font-size: 1.2rem; padding: 6px 12px; border-width: 3px; top: 18px; }
+
+  .swipe-controls {
+    bottom: 8px;
+    gap: var(--space-md);
+  }
+  .swipe-btn { width: 56px; height: 56px; }
+  .swipe-hint { display: none; }
+
+  .swipe-moodboard { padding: var(--space-md); }
+  .swipe-moodboard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-sm);
+  }
 }
 
