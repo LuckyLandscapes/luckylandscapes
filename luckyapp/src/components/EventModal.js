@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
-import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours } from '@/lib/capacity';
+import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours, buildEventsByDate, workdaysBetween } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
@@ -93,10 +93,20 @@ export default function EventModal({ event, defaultDate, onClose }) {
     return 4;
   })();
 
+  // Pre-fill end-date when editing an event whose linked job is multi-day.
+  const initialEndDate = (() => {
+    if (event?.jobId) {
+      const job = jobs.find(j => j.id === event.jobId);
+      if (job?.scheduledEndDate) return job.scheduledEndDate;
+    }
+    return event?.date || defaultDate || new Date().toISOString().split('T')[0];
+  })();
+
   const [form, setForm] = useState({
     title: event?.title || '',
     type: event?.type || 'other',
     date: event?.date || defaultDate || new Date().toISOString().split('T')[0],
+    endDate: initialEndDate,
     startTime: event?.startTime || '09:00',
     endTime: event?.endTime || addHoursToTime(event?.startTime || '09:00', initialHours),
     estimatedHours: initialHours,
@@ -116,41 +126,12 @@ export default function EventModal({ event, defaultDate, onClose }) {
   const selectedCustomer = form.customerId ? customers.find(c => c.id === form.customerId) : null;
   const selectedQuote = form.selectedQuoteId ? quotes.find(q => q.id === form.selectedQuoteId) : null;
 
-  // Build a date→events index for capacity lookups + the open-slot finder.
-  // Hot path: only re-runs when calendarEvents/jobs change, not on form edits.
-  const eventsByDate = useMemo(() => {
-    const map = {};
-    calendarEvents.forEach(e => {
-      if (!e.date) return;
-      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
-      const enriched = {
-        ...e,
-        color: e.color || TYPE_FALLBACK_COLORS[e.type] || '#64748b',
-        estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration,
-      };
-      if (!map[e.date]) map[e.date] = [];
-      map[e.date].push(enriched);
-    });
-    jobs.forEach(j => {
-      if (!j.scheduledDate) return;
-      if (calendarEvents.some(e => e.jobId === j.id)) return;
-      if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
-      map[j.scheduledDate].push({
-        id: `job-${j.id}`,
-        jobId: j.id,
-        title: j.title,
-        type: 'job',
-        color: '#6B8E4E',
-        date: j.scheduledDate,
-        startTime: j.scheduledTime,
-        endTime: null,
-        allDay: false,
-        assignedTo: j.assignedTo || [],
-        estimatedDuration: j.estimatedDuration,
-      });
-    });
-    return map;
-  }, [calendarEvents, jobs]);
+  // Single source of truth. Excludes the event being edited so it doesn't
+  // count against itself.
+  const eventsByDate = useMemo(
+    () => buildEventsByDate({ calendarEvents, jobs, excludeEventId: event?.id }),
+    [calendarEvents, jobs, event?.id],
+  );
 
   // Existing bookings on the chosen date, excluding the one being edited.
   const dayEvents = useMemo(() => {
@@ -247,10 +228,21 @@ export default function EventModal({ event, defaultDate, onClose }) {
 
   const dateLoad = useMemo(() => dayLoad(dayEvents), [dayEvents]);
 
+  // Multi-day breakdown (job type only).
+  const isJobTypeRange = form.type === 'job';
+  const workdays = useMemo(
+    () => isJobTypeRange ? workdaysBetween(form.date, form.endDate || form.date) : 1,
+    [form.date, form.endDate, isJobTypeRange],
+  );
+  const totalHours = Number(form.estimatedHours) || 0;
+  const perDayHours = workdays > 0 ? totalHours / workdays : totalHours;
+
   const handleFindOpenSlot = () => {
-    const needed = Number(form.estimatedHours) || 4;
-    const slot = findNextOpenSlot(eventsByDate, form.date || new Date().toISOString().split('T')[0], needed);
-    if (slot) updateField('date', slot);
+    const needed = isJobTypeRange ? perDayHours : (Number(form.estimatedHours) || 4);
+    const slot = findNextOpenSlot(eventsByDate, form.date || new Date().toISOString().split('T')[0], needed || 4);
+    if (slot) {
+      setForm(prev => ({ ...prev, date: slot, endDate: slot }));
+    }
   };
 
   const handleTypeChange = (type) => {
@@ -297,6 +289,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
         const job = await convertQuoteToJob({
           quoteId: form.selectedQuoteId,
           scheduledDate: form.date,
+          scheduledEndDate: form.endDate && form.endDate !== form.date ? form.endDate : null,
           scheduledTime: form.allDay ? null : form.startTime,
           estimatedHours: form.allDay ? null : Number(form.estimatedHours) || null,
           crewNotes: form.notes || '',
@@ -504,15 +497,18 @@ export default function EventModal({ event, defaultDate, onClose }) {
             </div>
           )}
 
-          {/* Date — inline mini calendar with capacity per day */}
+          {/* Date — inline mini calendar with capacity per day. Range mode for jobs. */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
               <span>
                 <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                Date <span className="required">*</span>
+                {isJobTypeRange ? 'Job Dates' : 'Date'} <span className="required">*</span>
                 {form.date && (
                   <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
                     {new Date(form.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    {isJobTypeRange && form.endDate && form.endDate !== form.date && (
+                      <> – {new Date(form.endDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</>
+                    )}
                   </span>
                 )}
               </span>
@@ -537,12 +533,36 @@ export default function EventModal({ event, defaultDate, onClose }) {
                 </button>
               </span>
             </label>
-            <MiniMonthPicker
-              value={form.date}
-              onChange={(d) => updateField('date', d)}
-              eventsByDate={eventsByDate}
-              neededHours={form.allDay ? 0 : (Number(form.estimatedHours) || 0)}
-            />
+            {isJobTypeRange ? (
+              <MiniMonthPicker
+                mode="range"
+                value={{ start: form.date, end: form.endDate || form.date }}
+                onChange={(r) => setForm(prev => ({ ...prev, date: r.start, endDate: r.end }))}
+                eventsByDate={eventsByDate}
+                neededHours={form.allDay ? 0 : perDayHours}
+              />
+            ) : (
+              <MiniMonthPicker
+                value={form.date}
+                onChange={(d) => setForm(prev => ({ ...prev, date: d, endDate: d }))}
+                eventsByDate={eventsByDate}
+                neededHours={form.allDay ? 0 : (Number(form.estimatedHours) || 0)}
+              />
+            )}
+            {isJobTypeRange && workdays > 1 && totalHours > 0 && (
+              <div className="multiday-summary">
+                <span className="multiday-summary-pill">
+                  <strong>{workdays}</strong> workdays
+                </span>
+                <span className="multiday-summary-pill">
+                  <strong>{totalHours}h</strong> total
+                </span>
+                <span className="multiday-summary-pill highlight">
+                  ~<strong>{perDayHours.toFixed(1)}h</strong>/day
+                </span>
+                <span className="multiday-summary-note">Sundays skipped. Hours auto-distributed evenly.</span>
+              </div>
+            )}
           </div>
 
           {!form.allDay && (

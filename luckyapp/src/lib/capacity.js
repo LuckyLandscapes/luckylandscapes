@@ -101,3 +101,146 @@ export const STATUS_LABELS = {
   full: 'Full',
   overbooked: 'Overbooked',
 };
+
+// ─── Multi-day jobs ────────────────────────────────────────
+// A job may span scheduledDate → scheduledEndDate. We auto-distribute
+// `estimated_duration` evenly across the workdays in that range so each
+// touched day reports a realistic per-day load against capacity.
+
+function pad(n) { return String(n).padStart(2, '0'); }
+function ymd(d) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
+
+// Returns [{date, hours, dayIndex, totalDays}, ...] — one entry per workday
+// the job touches. Single-day jobs (no scheduledEndDate) get one entry.
+// Sundays are skipped by default to match the rest of the scheduling logic.
+export function expandJobToWorkdays(job, opts = {}) {
+  const { skipSunday = true } = opts;
+  if (!job?.scheduledDate) return [];
+
+  const start = new Date(job.scheduledDate + 'T12:00:00');
+  if (Number.isNaN(start.getTime())) return [];
+
+  const endStr = job.scheduledEndDate || job.scheduledDate;
+  const end = new Date(endStr + 'T12:00:00');
+  if (Number.isNaN(end.getTime()) || end < start) return [{ date: job.scheduledDate, hours: parseDurationHours(job.estimatedDuration, 4), dayIndex: 0, totalDays: 1 }];
+
+  const days = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (!skipSunday || cur.getDay() !== 0) {
+      days.push(ymd(cur));
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+  // If the whole range happened to be Sundays, anchor the job to its start.
+  if (days.length === 0) days.push(job.scheduledDate);
+
+  const totalHours = parseDurationHours(job.estimatedDuration, 4);
+  const perDay = totalHours / days.length;
+
+  return days.map((date, i) => ({
+    date,
+    hours: perDay,
+    dayIndex: i,
+    totalDays: days.length,
+  }));
+}
+
+// Per-day share for a specific date.
+export function jobDayHours(job, dateStr) {
+  const days = expandJobToWorkdays(job);
+  const day = days.find(d => d.date === dateStr);
+  return day?.hours ?? parseDurationHours(job?.estimatedDuration, 4);
+}
+
+// Single source of truth: turn (calendarEvents, jobs) into a date-keyed
+// map of enriched events used by the calendar, EventModal, and
+// ScheduleJobModal. Multi-day jobs are expanded onto every workday in
+// their range. calendar_events linked to a multi-day job have their
+// per-day capacity rebased to the day's share (so a 20h job's day-1
+// event doesn't claim the full 20h).
+export function buildEventsByDate({ calendarEvents = [], jobs = [], excludeEventId = null } = {}) {
+  const map = {};
+  const TYPE_FALLBACK = {
+    job: '#6B8E4E',
+    quote_appointment: '#3b82f6',
+    meeting: '#d4a93e',
+    other: '#64748b',
+  };
+
+  // 1) Calendar events first, rebasing job-linked events to per-day share.
+  calendarEvents.forEach(e => {
+    if (!e.date) return;
+    if (excludeEventId && e.id === excludeEventId) return;
+    const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
+    const perDay = linkedJob ? jobDayHours(linkedJob, e.date) : null;
+    const wd = linkedJob ? expandJobToWorkdays(linkedJob).find(d => d.date === e.date) : null;
+    if (!map[e.date]) map[e.date] = [];
+    map[e.date].push({
+      ...e,
+      source: 'event',
+      color: e.color || TYPE_FALLBACK[e.type] || '#64748b',
+      // For job-linked events without an explicit endTime, use the
+      // per-day share so capacity reflects reality on multi-day jobs.
+      estimatedDuration: e.endTime ? null : (perDay != null ? `${perDay} hours` : null),
+      jobStatus: linkedJob?.status,
+      multiDayInfo: (wd && wd.totalDays > 1)
+        ? { dayIndex: wd.dayIndex + 1, totalDays: wd.totalDays }
+        : null,
+    });
+  });
+
+  // 2) Synthesize entries for jobs on each workday they touch where no
+  //    calendar_event already covers that day.
+  jobs.forEach(j => {
+    if (!j.scheduledDate) return;
+    const days = expandJobToWorkdays(j);
+    days.forEach(d => {
+      const covered = calendarEvents.some(e => e.jobId === j.id && e.date === d.date);
+      if (covered) return;
+      if (!map[d.date]) map[d.date] = [];
+      map[d.date].push({
+        id: `job-${j.id}-${d.dayIndex}`,
+        jobId: j.id,
+        title: j.title,
+        type: 'job',
+        date: d.date,
+        startTime: d.dayIndex === 0 ? j.scheduledTime : null,
+        endTime: null,
+        allDay: false,
+        color: '#6B8E4E',
+        customerId: j.customerId,
+        assignedTo: j.assignedTo || [],
+        source: 'job',
+        estimatedDuration: `${d.hours} hours`,
+        jobStatus: j.status,
+        multiDayInfo: d.totalDays > 1 ? { dayIndex: d.dayIndex + 1, totalDays: d.totalDays } : null,
+      });
+    });
+  });
+
+  // 3) Stable sort within each day by start time.
+  Object.values(map).forEach(arr => arr.sort((a, b) => {
+    const aa = a.allDay ? '' : (a.startTime || '99:99');
+    const bb = b.allDay ? '' : (b.startTime || '99:99');
+    return String(aa).localeCompare(String(bb));
+  }));
+
+  return map;
+}
+
+// Count workdays (skip Sunday) between two ISO date strings, inclusive.
+export function workdaysBetween(startStr, endStr, opts = {}) {
+  const { skipSunday = true } = opts;
+  if (!startStr) return 0;
+  const start = new Date(startStr + 'T12:00:00');
+  const end = new Date((endStr || startStr) + 'T12:00:00');
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) return 0;
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= end) {
+    if (!skipSunday || cur.getDay() !== 0) count++;
+    cur.setDate(cur.getDate() + 1);
+  }
+  return count;
+}

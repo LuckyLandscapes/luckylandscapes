@@ -9389,3 +9389,107 @@ body {
   .mini-picker-day-count { font-size: 0.5rem; }
   .mini-picker-legend { font-size: 0.6rem; gap: 6px; }
 }
+
+/* Range mode visuals */
+.mini-picker-hint {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  margin-bottom: 6px;
+  padding: 4px 6px;
+  background: rgba(107,142,78,0.08);
+  border-radius: 4px;
+}
+
+.mini-picker-day.in-range {
+  background: rgba(107,142,78,0.18);
+  border-color: rgba(107,142,78,0.30);
+}
+.mini-picker-day.in-range .mini-picker-day-num { color: var(--text-primary); }
+
+.mini-picker-day.range-start,
+.mini-picker-day.range-end {
+  background: var(--lucky-green);
+  border-color: var(--lucky-green);
+  color: white;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lucky-green) 40%, transparent);
+}
+.mini-picker-day.range-start .mini-picker-day-num,
+.mini-picker-day.range-end .mini-picker-day-num,
+.mini-picker-day.range-start .mini-picker-day-count,
+.mini-picker-day.range-end .mini-picker-day-count {
+  color: white;
+}
+.mini-picker-day.range-start .mini-picker-day-bar,
+.mini-picker-day.range-end .mini-picker-day-bar { background: rgba(255,255,255,0.25); }
+.mini-picker-day.range-start .mini-picker-day-bar-fill,
+.mini-picker-day.range-end .mini-picker-day-bar-fill { background: white; }
+
+/* Multi-day breakdown summary (under the range picker) */
+.multiday-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(107,142,78,0.10);
+  border: 1px solid rgba(107,142,78,0.30);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.multiday-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-variant-numeric: tabular-nums;
+}
+.multiday-summary-pill strong {
+  color: var(--text-primary);
+  margin-right: 2px;
+}
+.multiday-summary-pill.highlight {
+  background: var(--lucky-green);
+  color: white;
+}
+.multiday-summary-pill.highlight strong { color: white; }
+.multiday-summary-note {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  font-size: 0.7rem;
+}
+
+/* Multi-day badge — shown on event titles in lists/cards */
+.multi-day-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  border-radius: 999px;
+  background: rgba(59,130,246,0.16);
+  color: #93c5fd;
+  border: 1px solid rgba(59,130,246,0.30);
+  vertical-align: middle;
+}
+
+/* Day-of-N suffix on compact pills */
+.cal-event-pill-day {
+  margin-left: 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+.cal-event-pill.multi-day {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--event-color) 22%, transparent) 0%,
+    color-mix(in srgb, var(--event-color) 22%, transparent) 70%,
+    color-mix(in srgb, var(--event-color) 38%, transparent) 100%
+  );
+  border-left: 2px solid var(--event-color);
+}

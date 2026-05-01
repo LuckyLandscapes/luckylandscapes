@@ -654,7 +654,7 @@ export function DataProvider({ children }) {
   }, [connected]);
 
   // ─── Convert Quote → Job ───────────────────────────────
-  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledTime, estimatedHours, crewNotes, assignedTo }) => {
+  const convertQuoteToJob = useCallback(async ({ quoteId, scheduledDate, scheduledEndDate, scheduledTime, estimatedHours, crewNotes, assignedTo }) => {
     const quote = getQuote(quoteId);
     if (!quote) return null;
     const customer = quote.customerId ? getCustomer(quote.customerId) : null;
@@ -662,6 +662,9 @@ export function DataProvider({ children }) {
     const hours = Number.isFinite(Number(estimatedHours)) && Number(estimatedHours) > 0
       ? Number(estimatedHours)
       : 4;
+
+    // Single-day jobs leave end_date null. Treat end == start as single-day too.
+    const endDate = (scheduledEndDate && scheduledEndDate !== scheduledDate) ? scheduledEndDate : null;
 
     const jobData = {
       quoteId,
@@ -672,6 +675,7 @@ export function DataProvider({ children }) {
         ? `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim()
         : '',
       scheduledDate,
+      scheduledEndDate: endDate,
       scheduledTime: scheduledTime || null,
       estimatedDuration: `${hours} hours`,
       assignedTo: assignedTo || [],

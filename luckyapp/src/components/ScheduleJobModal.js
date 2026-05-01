@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
-import { dayLoad, findNextOpenSlot } from '@/lib/capacity';
+import { dayLoad, findNextOpenSlot, buildEventsByDate, workdaysBetween } from '@/lib/capacity';
 import {
   X,
   CalendarDays,
@@ -26,45 +26,39 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
 
   const [form, setForm] = useState({
     scheduledDate: '',
+    scheduledEndDate: '',
     scheduledTime: '08:00',
     estimatedHours: 4,
     crewNotes: '',
     assignedTo: [],
   });
 
-  // Index by date so we can show capacity for the picked day + find open slots.
-  const eventsByDate = useMemo(() => {
-    const map = {};
-    calendarEvents.forEach(e => {
-      if (!e.date) return;
-      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
-      if (!map[e.date]) map[e.date] = [];
-      map[e.date].push({ ...e, estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration });
-    });
-    jobs.forEach(j => {
-      if (!j.scheduledDate) return;
-      if (calendarEvents.some(e => e.jobId === j.id)) return;
-      if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
-      map[j.scheduledDate].push({
-        id: `job-${j.id}`,
-        type: 'job',
-        startTime: j.scheduledTime,
-        estimatedDuration: j.estimatedDuration,
-      });
-    });
-    return map;
-  }, [calendarEvents, jobs]);
+  const eventsByDate = useMemo(
+    () => buildEventsByDate({ calendarEvents, jobs }),
+    [calendarEvents, jobs],
+  );
 
   const dateLoad = useMemo(
     () => form.scheduledDate ? dayLoad(eventsByDate[form.scheduledDate] || []) : null,
     [eventsByDate, form.scheduledDate],
   );
 
+  // Workday count + per-day hours for the multi-day breakdown summary.
+  const workdays = useMemo(
+    () => workdaysBetween(form.scheduledDate, form.scheduledEndDate || form.scheduledDate),
+    [form.scheduledDate, form.scheduledEndDate],
+  );
+  const totalHours = Number(form.estimatedHours) || 0;
+  const perDayHours = workdays > 0 ? totalHours / workdays : totalHours;
+
+  // For the per-day "would overbook" hatching on the picker.
+  const neededPerDay = workdays > 0 ? perDayHours : totalHours;
+
   const handleFindOpenSlot = () => {
-    const needed = Number(form.estimatedHours) || 4;
+    const needed = perDayHours || 4;
     const seed = form.scheduledDate || new Date().toISOString().split('T')[0];
     const slot = findNextOpenSlot(eventsByDate, seed, needed);
-    if (slot) setForm(prev => ({ ...prev, scheduledDate: slot }));
+    if (slot) setForm(prev => ({ ...prev, scheduledDate: slot, scheduledEndDate: slot }));
   };
 
   const [saving, setSaving] = useState(false);
@@ -90,6 +84,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
       const job = await convertQuoteToJob({
         quoteId,
         scheduledDate: form.scheduledDate,
+        scheduledEndDate: form.scheduledEndDate || null,
         scheduledTime: form.scheduledTime,
         estimatedHours: Number(form.estimatedHours) || null,
         crewNotes: form.crewNotes,
@@ -179,15 +174,18 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                 </div>
               </div>
 
-              {/* Date — inline mini calendar with capacity per day */}
+              {/* Date range — inline mini calendar with capacity per day */}
               <div className="form-group">
                 <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-sm)' }}>
                   <span>
                     <CalendarDays size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} />
-                    Scheduled Date <span className="required">*</span>
+                    Job Dates <span className="required">*</span>
                     {form.scheduledDate && (
                       <span style={{ marginLeft: 8, color: 'var(--text-tertiary)', fontWeight: 500 }}>
                         {new Date(form.scheduledDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        {form.scheduledEndDate && form.scheduledEndDate !== form.scheduledDate && (
+                          <> – {new Date(form.scheduledEndDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</>
+                        )}
                       </span>
                     )}
                   </span>
@@ -202,11 +200,26 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
                   </button>
                 </label>
                 <MiniMonthPicker
-                  value={form.scheduledDate}
-                  onChange={(d) => setForm(prev => ({ ...prev, scheduledDate: d }))}
+                  mode="range"
+                  value={{ start: form.scheduledDate, end: form.scheduledEndDate || form.scheduledDate }}
+                  onChange={(r) => setForm(prev => ({ ...prev, scheduledDate: r.start, scheduledEndDate: r.end }))}
                   eventsByDate={eventsByDate}
-                  neededHours={Number(form.estimatedHours) || 0}
+                  neededHours={neededPerDay}
                 />
+                {workdays > 1 && totalHours > 0 && (
+                  <div className="multiday-summary">
+                    <span className="multiday-summary-pill">
+                      <strong>{workdays}</strong> workdays
+                    </span>
+                    <span className="multiday-summary-pill">
+                      <strong>{totalHours}h</strong> total
+                    </span>
+                    <span className="multiday-summary-pill highlight">
+                      ~<strong>{perDayHours.toFixed(1)}h</strong>/day
+                    </span>
+                    <span className="multiday-summary-note">Sundays skipped. Hours auto-distributed evenly.</span>
+                  </div>
+                )}
                 {dateLoad && (
                   <div style={{ marginTop: 8 }}>
                     <DayLoadBar load={dateLoad} />

@@ -5,7 +5,7 @@ import { useData } from '@/lib/data';
 import Link from 'next/link';
 import EventModal from '@/components/EventModal';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
-import { dayLoad, eventDurationHours, STATUS_LABELS } from '@/lib/capacity';
+import { dayLoad, eventDurationHours, STATUS_LABELS, buildEventsByDate } from '@/lib/capacity';
 import {
   ChevronLeft,
   ChevronRight,
@@ -108,54 +108,12 @@ export default function CalendarPage() {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  // Build a date-keyed index of events. Synthesize entries for jobs that
-  // don't have a calendar_event row, and attach estimatedDuration so the
-  // capacity model has a reasonable hours estimate even when end_time is null.
-  const eventsByDate = useMemo(() => {
-    const map = {};
-
-    calendarEvents.forEach(e => {
-      if (!e.date) return;
-      const linkedJob = e.jobId ? jobs.find(j => j.id === e.jobId) : null;
-      if (!map[e.date]) map[e.date] = [];
-      map[e.date].push({
-        ...e,
-        source: 'event',
-        estimatedDuration: e.endTime ? null : linkedJob?.estimatedDuration,
-        jobStatus: linkedJob?.status,
-      });
-    });
-
-    jobs.forEach(j => {
-      if (!j.scheduledDate) return;
-      const hasEvent = calendarEvents.some(e => e.jobId === j.id);
-      if (!hasEvent) {
-        if (!map[j.scheduledDate]) map[j.scheduledDate] = [];
-        map[j.scheduledDate].push({
-          id: `job-${j.id}`,
-          jobId: j.id,
-          title: j.title,
-          type: 'job',
-          date: j.scheduledDate,
-          startTime: j.scheduledTime,
-          color: '#6B8E4E',
-          customerId: j.customerId,
-          source: 'job',
-          estimatedDuration: j.estimatedDuration,
-          jobStatus: j.status,
-        });
-      }
-    });
-
-    // Sort each day by start time so timeline blocks render in order.
-    Object.values(map).forEach(arr => arr.sort((a, b) => {
-      const aa = a.allDay ? '' : (a.startTime || '99:99');
-      const bb = b.allDay ? '' : (b.startTime || '99:99');
-      return String(aa).localeCompare(String(bb));
-    }));
-
-    return map;
-  }, [calendarEvents, jobs]);
+  // Single source of truth — multi-day jobs are expanded across each
+  // workday in their range with proper per-day capacity attribution.
+  const eventsByDate = useMemo(
+    () => buildEventsByDate({ calendarEvents, jobs }),
+    [calendarEvents, jobs],
+  );
 
   const navigate = (dir) => {
     const d = new Date(currentDate);
@@ -368,7 +326,12 @@ export default function CalendarPage() {
                   >
                     <div className="cal-sidebar-event-dot" style={{ background: e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }} />
                     <div className="cal-sidebar-event-content">
-                      <div className="cal-sidebar-event-title">{e.title}</div>
+                      <div className="cal-sidebar-event-title">
+                        {e.title}
+                        {e.multiDayInfo && (
+                          <span className="multi-day-badge">Day {e.multiDayInfo.dayIndex} of {e.multiDayInfo.totalDays}</span>
+                        )}
+                      </div>
                       <div className="cal-sidebar-event-meta">
                         {e.startTime && <span><Clock size={11} /> {formatTime12(e.startTime)}{e.endTime ? ` – ${formatTime12(e.endTime)}` : ` (${hours.toFixed(1)}h est)`}</span>}
                         {e.allDay && <span>All day</span>}
@@ -502,15 +465,18 @@ function MonthView({ year, month, todayStr, selectedDate, eventsByDate, onDayCli
                     {events.slice(0, 3).map((e) => (
                       <div
                         key={e.id}
-                        className="cal-event-pill"
+                        className={`cal-event-pill ${e.multiDayInfo ? 'multi-day' : ''}`}
                         style={{ '--event-color': e.color || EVENT_TYPE_COLORS[e.type] || '#64748b' }}
                         onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
-                        title={`${e.title}${e.startTime ? ` — ${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}` : ''}`}
+                        title={`${e.title}${e.startTime ? ` — ${formatTime12(e.startTime)}${e.endTime ? ' – ' + formatTime12(e.endTime) : ''}` : ''}${e.multiDayInfo ? ` (Day ${e.multiDayInfo.dayIndex} of ${e.multiDayInfo.totalDays})` : ''}`}
                       >
                         <span className="cal-event-pill-dot" />
                         <span className="cal-event-pill-text">
                           {e.startTime && <strong style={{ marginRight: 4, fontWeight: 700 }}>{formatTime12(e.startTime).replace(':00', '')}</strong>}
                           {e.title}
+                          {e.multiDayInfo && (
+                            <span className="cal-event-pill-day"> · {e.multiDayInfo.dayIndex}/{e.multiDayInfo.totalDays}</span>
+                          )}
                         </span>
                       </div>
                     ))}
@@ -652,7 +618,12 @@ function WeekView({ currentDate, todayStr, selectedDate, eventsByDate, onDayClic
                   onClick={(ev) => { ev.stopPropagation(); onEventClick(e); }}
                   title={`${e.title}${e.startTime ? ` — ${formatTime12(e.startTime)}` : ''}`}
                 >
-                  <div className="cal-week-v2-block-title">{e.title}</div>
+                  <div className="cal-week-v2-block-title">
+                    {e.title}
+                    {e.multiDayInfo && (
+                      <span className="cal-event-pill-day"> · {e.multiDayInfo.dayIndex}/{e.multiDayInfo.totalDays}</span>
+                    )}
+                  </div>
                   {e.startTime && (
                     <div className="cal-week-v2-block-time">
                       {formatTime12(e.startTime)}
@@ -710,7 +681,12 @@ function DayView({ currentDate, eventsByDate, onEventClick, getCustomer }) {
                     </>
                   )}
                 </div>
-                <div className="cal-day-v2-card-title">{e.title}</div>
+                <div className="cal-day-v2-card-title">
+                  {e.title}
+                  {e.multiDayInfo && (
+                    <span className="multi-day-badge">Day {e.multiDayInfo.dayIndex} of {e.multiDayInfo.totalDays}</span>
+                  )}
+                </div>
                 <div className="cal-day-v2-card-meta">
                   <span className={`cal-type-badge cal-type-${e.type}`}>{EVENT_TYPE_LABELS[e.type] || 'Event'}</span>
                   {customer && (
