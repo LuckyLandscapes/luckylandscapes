@@ -228,30 +228,18 @@ document.querySelectorAll('a[href^="#"], a[href^="/#"]').forEach(anchor => {
     });
 });
 
-// ============================================
-// SCROLL REVEAL (IntersectionObserver)
-// ============================================
-const revealEls = document.querySelectorAll(
-    '.reveal, .reveal-left, .reveal-right, .reveal-scale, .stagger-children'
-);
-
-const revealObs = new IntersectionObserver(
-    (entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('revealed');
-                revealObs.unobserve(entry.target);
-            }
-        });
-    },
-    { threshold: 0.12, rootMargin: '0px 0px -40px 0px' }
-);
-
-revealEls.forEach(el => revealObs.observe(el));
+// Scroll-reveal hiding has been moved to a pure-CSS one-shot keyframe in
+// styles.css (see "SCROLL REVEAL ANIMATIONS"). The IntersectionObserver and
+// the per-section gsap.from() animations were removed because if any of them
+// failed to fire (slow JS, refresh mid-page, ScrollTrigger measurement bug),
+// content stayed permanently invisible. CSS keyframes always fire.
 
 // ============================================
 // GSAP — HERO PARALLAX
 // ============================================
+// Safe to keep: gsap.to() — element starts at its natural position. If
+// ScrollTrigger never fires, the video just sits still (no parallax) but is
+// fully visible.
 const heroVideoWrap = document.querySelector('.hero-video-wrap');
 if (heroVideoWrap) {
     gsap.to(heroVideoWrap, {
@@ -263,71 +251,6 @@ if (heroVideoWrap) {
             end: 'bottom top',
             scrub: true,
         },
-    });
-}
-
-// ============================================
-// GSAP — STATS COUNTER ANIMATION
-// ============================================
-const statNumbers = document.querySelectorAll('.stat-number[data-count]');
-
-statNumbers.forEach(el => {
-    const target = parseInt(el.dataset.count, 10);
-
-    ScrollTrigger.create({
-        trigger: el,
-        start: 'top 85%',
-        once: true,
-        onEnter: () => {
-            gsap.to(el, {
-                duration: 2,
-                ease: 'power2.out',
-                onUpdate: function () {
-                    el.textContent = Math.ceil(this.progress() * target);
-                },
-            });
-        },
-    });
-});
-
-// ============================================
-// GSAP — SERVICE CARDS PARALLAX
-// ============================================
-const serviceCards = document.querySelectorAll('.service-card');
-if (serviceCards.length > 0) {
-    serviceCards.forEach((card, i) => {
-        gsap.from(card, {
-            y: 40 + (i % 4) * 15,
-            duration: 0.8,
-            ease: 'power2.out',
-            scrollTrigger: {
-                trigger: card,
-                start: 'top 88%',
-                toggleActions: 'play none none none',
-            },
-        });
-    });
-}
-
-// (GSAP gallery item animations are initialized after buildGalleryGrid below)
-
-// ============================================
-// GSAP — ABOUT CARDS
-// ============================================
-const aboutCards = document.querySelectorAll('.about-card');
-if (aboutCards.length > 0) {
-    aboutCards.forEach((card, i) => {
-        gsap.from(card, {
-            y: 50,
-            duration: 0.7,
-            delay: i * 0.15,
-            ease: 'power2.out',
-            scrollTrigger: {
-                trigger: card,
-                start: 'top 88%',
-                toggleActions: 'play none none none',
-            },
-        });
     });
 }
 

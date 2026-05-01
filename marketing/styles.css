@@ -1874,120 +1874,44 @@ textarea {
 
 /* ============================================
    SCROLL REVEAL ANIMATIONS
-   ============================================ */
-.reveal {
-    opacity: 0;
-    transform: translateY(40px);
-    transition: all .8s var(--ease-out);
-}
-
-.reveal.revealed {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.reveal-left {
-    opacity: 0;
-    transform: translateX(-40px);
-    transition: all .8s var(--ease-out);
-}
-
-.reveal-left.revealed {
-    opacity: 1;
-    transform: translateX(0);
-}
-
-.reveal-right {
-    opacity: 0;
-    transform: translateX(40px);
-    transition: all .8s var(--ease-out);
-}
-
-.reveal-right.revealed {
-    opacity: 1;
-    transform: translateX(0);
-}
-
+   ============================================
+   Pure-CSS one-shot fade-in. Runs once on first paint regardless of JS state,
+   so content is *never* permanently hidden if main.js is slow, errors, or
+   IntersectionObserver/ScrollTrigger fails to fire. The .revealed class is
+   still added by JS but is now redundant — kept as a no-op for safety.
+   prefers-reduced-motion gets static visible content with no animation. */
+.reveal,
+.reveal-left,
+.reveal-right,
 .reveal-scale {
-    opacity: 0;
-    transform: scale(.9);
-    transition: all .8s var(--ease-out);
+    animation: revealFadeUp .8s var(--ease-out) both;
 }
 
-.reveal-scale.revealed {
-    opacity: 1;
-    transform: scale(1);
-}
-
-/* Stagger children */
 .stagger-children>* {
-    opacity: 0;
-    transform: translateY(30px);
-    transition: all .6s var(--ease-out);
+    animation: revealFadeUp .6s var(--ease-out) both;
 }
 
-.stagger-children.revealed>*:nth-child(1) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: 0s;
+.stagger-children>*:nth-child(2) { animation-delay: .08s; }
+.stagger-children>*:nth-child(3) { animation-delay: .16s; }
+.stagger-children>*:nth-child(4) { animation-delay: .24s; }
+.stagger-children>*:nth-child(5) { animation-delay: .30s; }
+.stagger-children>*:nth-child(6) { animation-delay: .36s; }
+.stagger-children>*:nth-child(7) { animation-delay: .42s; }
+.stagger-children>*:nth-child(8) { animation-delay: .48s; }
+
+@keyframes revealFadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
-.stagger-children.revealed>*:nth-child(2) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .08s;
-}
-
-.stagger-children.revealed>*:nth-child(3) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .16s;
-}
-
-.stagger-children.revealed>*:nth-child(4) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .24s;
-}
-
-.stagger-children.revealed>*:nth-child(5) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .30s;
-}
-
-.stagger-children.revealed>*:nth-child(6) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .36s;
-}
-
-.stagger-children.revealed>*:nth-child(7) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .42s;
-}
-
-.stagger-children.revealed>*:nth-child(8) {
-    opacity: 1;
-    transform: translateY(0);
-    transition-delay: .48s;
-}
-
-/* Touch devices: skip JS-gated reveal hiding so content is visible immediately
-   even before main.js parses. Without this, slow phones see only section
-   backgrounds (sometimes for many seconds) until IntersectionObserver fires.
-   The animations are a desktop-only enhancement. */
-@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
-
+/* Reduced motion: skip the animation, content is just visible. */
+@media (prefers-reduced-motion: reduce) {
     .reveal,
     .reveal-left,
     .reveal-right,
     .reveal-scale,
     .stagger-children>* {
-        opacity: 1 !important;
-        transform: none !important;
-        transition: none !important;
+        animation: none !important;
     }
 }
 
