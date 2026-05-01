@@ -38,7 +38,7 @@
 - **Outstanding debt / equipment loans:** $1,200
 
 ## Banking & financial accounts
-- **Operating bank:** Pinaccle Bank (*Personal Account*)
+- **Operating bank:** Pinnacle Bank (*Personal Account*)
 - **Payment processor:** Stripe (luckyapp integration)
 - **Books / accounting:** None Yet, but will hopefully integrate into the luckyapp in the near future.
 - **Tax preparer / CPA:** Need to figure this out ASAP, we are not LEGALLY COVERED for anything, have LLC AND EIN and have no clue what to do, We have not been paying ourselves.

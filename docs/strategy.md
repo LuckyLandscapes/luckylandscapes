@@ -7,26 +7,26 @@ Where does Lucky Landscapes want to be in 3 years?
 TODO: e.g. revenue target, crew count, service mix, geographic reach, life-of-owner reality (hours, role).
 
 ## This-year goals
-- **Revenue target:** TODO
-- **Top 3 outcomes by EOY:** TODO
-- **What "winning the year" looks like:** TODO
-
+- **Revenue target:**  500k+
+- **Top 3 outcomes by EOY:** having no debt, owning a fleet, owing a house/shop.
+- **What "winning the year" looks like:** not failing in our first year, not being broke in our personal lives, growing. 
+- Macoy wants to do snow removal in the winter to keep cash flowing, but riley isn't a fan of it, hates the cold. (pussy)
 ## This-quarter / this-season focus
-- **What I'm actively pushing on right now:** TODO
-- **What I'm explicitly NOT working on (so it doesn't sneak in):** TODO
+- **What I'm actively pushing on right now:** website, our own app, marketing.
+- **What I'm explicitly NOT working on (so it doesn't sneak in):** doing projects for friends and family for free, taking on work that we can't handle, not charging what we're worth.
 
 ## Constraints (the real ones)
 Be honest — this is what shapes every "right move."
-- **Time:** TODO (how many hours/week is the owner actually available for non-field work?)
-- **Cash:** TODO (can we float a $X investment? what's the comfort threshold?)
-- **People:** TODO (can we hire? is there a labor pool? do we lose people in winter?)
-- **Skills the team doesn't have yet:** TODO
-- **Personal / life constraints:** TODO
+- **Time:** Macoy can work 80+ hours a week, but doesn't do field work, riley works maybe 45 hours a week.
+- **Cash:** we have no savings, 2k in the bank, 5k in line of credit, we have no assets. willing to go into debt further for assets like a truck or trailer.
+- **People:** we can hire lots of highschoolers want to work for us.
+- **Skills the team doesn't have yet:** we are not good at irrigation or lighting.
+- **Personal / life constraints:** Riley has church on Saturdays.
 
 ## Competitive landscape
-- **Who we lose to and why:** TODO
-- **Who we beat and why:** TODO
-- **What's changing in the local market:** TODO
+- **Who we lose to and why:** Seo wise Luxuary Landscapes seems to be the best. We tend to lose to Large Companies, but we undercut as we have less overhead for now.
+- **Who we beat and why:** We beat other small companies in price and speed. We are better at communication than most companies, 
+- **What's changing in the local market:** People are wanting irrigation and lighting, wanting more modern designs.
 
 ## Open strategic questions
 List the questions you'd actually want a strategic advisor to help with. Examples:

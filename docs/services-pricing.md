@@ -52,10 +52,13 @@ lawn care, garden beds, hardscaping, property cleanup, landscape design, firepla
 $150 an hour per ton in labor
 
 ## Pricing principles
-- **Hourly labor rate (loaded):** $60 an hour per person
-- **Material markup:** Cost x 0.0725
+- **Hourly labor rate (loaded):** $60/hr per person
+- **Quote formula:** `(labor + materials) × 1.30 + dump fees + delivery fees`
+  - **30% profit margin** is applied to **labor + materials only**.
+  - **Dump fees** ($100) and **delivery fees** ($2.50/mi, $50 minimum) are passthrough — **no margin** added.
+  - Materials are billed at **cost** before margin is applied. The 30% is the markup.
 - **Equipment / overhead allocation:** TODO
-- **Minimum job size:** none for Lincoln, $1000 for Beatrice, $1000 for Seward, $1000 for Fairbury. $500 for Waverly. No mowing in Beatrice, Seward, Fairbury.
+- **Minimum job size:** none for Lincoln, $1000 for Beatrice / Seward / Fairbury, $500 for Waverly. No mowing in Beatrice, Seward, or Fairbury.
 - **When we walk away from a quote:** TODO
 
 ## Bundles & packages
@@ -70,7 +73,4 @@ TODO: any pre-built service bundles (e.g. "spring opening + monthly mow + fall c
 - **Close rate (rough):** TODO
 - **Most common reason we lose a quote:** TODO
 - **Most common reason we win:** TODO
-
-
-hourly labor rate + material + materials markup % + dump fees($100) + delivery fees (2.5 a mile with minum of $50) + 30% profit margin. only charge profit margin on labor and materials. not dump fees or delivery fees. 
 

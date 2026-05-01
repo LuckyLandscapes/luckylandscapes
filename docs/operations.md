@@ -41,18 +41,18 @@ Landscaping is brutally seasonal. Spell out the year:
 
 ## Equipment
 - **Owned trucks / trailers:** Own 2004 Ram 1500 2x4 shortbox, small utility trailer,12k lb 6x12 dump trailer 3ft walls (purchased brand new in 2026)
-- **Major equipment (mowers, skid steer, etc.):** Echo 14'' demolition saw, one zero turn mower(toro timecutter 52" deck), Stihl commercial blowers, stihl trimmers, Stihl edger, Stihl hedge trimmers, 
+- **Major equipment (mowers, skid steer, etc.):** Echo 14'' demolition saw, one zero turn mower(toro timecutter 52" deck), Stihl commercial blowers, stihl trimmers, Stihl edger, Stihl hedge trimmers, 3 snowblowers.
 - **Maintenance approach:** in house 
 - **Recent / planned capex:** Buying a new truck in the near future, Enclosed Trailer
 
 ## Vendors & suppliers
 | Category | Vendor | Account / contact | Notes |
 |---|---|---|---|
-| Mulch / soil / stone | Outdoor Solutions | TODO | TODO |
-| Plants / nursery | Outdoor Solutions | TODO | TODO |
-| Hardscape materials | Menards, Home Depot | TODO | TODO |
-| Fuel | Any Gas Station | TODO | TODO |
-| Equipment rental | (as we are both under 21 we have a sub who we can rent from.) | TODO | TODO |
+| Mulch / soil / stone / rock | Outdoor Solutions | TODO | Primary for all bulk landscape material |
+| Plants / nursery | Outdoor Solutions | TODO | OS has a nursery — same vendor |
+| Brick / pavers / hardscape | Menards (first), Home Depot (backup) | TODO | Default to Menards; check HD only if pricing is materially better on a given run |
+| Fuel | Any gas station | TODO | TODO |
+| Equipment rental | Sub (we are both under 21, can rent through them) | TODO | TODO |
 
 ## Software stack (operational)
 - **Quote intake:** Google Apps Script → Google Sheet + Google Drive (photos) + Gmail. Setup details in [`scripts/SETUP-INSTRUCTIONS.md`](../scripts/SETUP-INSTRUCTIONS.md).
@@ -61,7 +61,7 @@ Landscaping is brutally seasonal. Spell out the year:
 - **Email to customers:** Resend (via luckyapp).
 - **Calendar sync:** Google Calendar (via luckyapp).
 - **Accounting / books:** Nothing as of now but hoping the luckyapp will have something in the near future.
-- **Payroll:** Luckyapp
+- **Payroll:** we can track hours in luckyapp.
 - **Insurance / certs:** WE HAVE TO GET THIS FIGURED OUT, NOT LEGALLY COVERED FOR ANYTHING, have LLC AND EIN
 
 ## Customer lifecycle

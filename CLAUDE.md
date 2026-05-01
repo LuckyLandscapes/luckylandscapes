@@ -23,12 +23,12 @@ This repo contains **two separate applications** with their own dependencies, bu
 - **Animation:** GSAP (with ScrollTrigger) + Lenis smooth scroll, wired together via `gsap.ticker` in `main.js`.
 - **Entry points** (declared in `vite.config.js`): `index.html`, `team.html`, `careers.html`, `gallery.html`, `quote.html`, `privacy.html`, `terms.html`, plus five service pages under `services/`.
 - **Quote form backend:** Google Apps Script. The deployed Web App URL is pasted into a `QUOTES_SCRIPT_URL` constant in `main.js`. See `scripts/SETUP-INSTRUCTIONS.md` for redeployment steps. Photos go to a Drive folder, submissions to a Google Sheet, and notifications via Gmail — all owned by the script's executing Google account.
-- **Hosting:** static deploy via `dist/`. `public/_redirects` enforces the non-www canonical domain.
+- **Hosting:** **Cloudflare Pages**, project connected to GitHub `LuckyLandscapes/luckylandscapes`. Production branch: `main` → `https://luckylandscapes.com`. Any non-`main` branch automatically gets a preview deployment at `https://<branch>.<project>.pages.dev`. Build command (configured in CF Pages dashboard): `npm run build`. Build output directory: `dist/`. `public/_redirects` enforces non-www canonical — CF Pages reads it natively (Netlify-compatible syntax). `public/_headers` sets security headers + image cache. Rollback: CF Pages dashboard retains every prior deployment; one-click rollback. Domain DNS is also on Cloudflare.
 
 ### 2. `luckyapp/` — Internal business app (separate Next.js project)
 - **Stack:** Next.js 16 + React 19 (App Router), Supabase (Postgres + Auth + Storage + Realtime), Stripe (payments), Resend (transactional email), Google Calendar API, jsPDF (PDF generation).
 - **Read [`luckyapp/AGENTS.md`](luckyapp/AGENTS.md) before editing.** Next.js 16 has breaking changes from prior versions; consult `luckyapp/node_modules/next/dist/docs/` rather than relying on prior knowledge.
-- **Routing:** App Router, with the authenticated UI grouped under [`src/app/(dashboard)/`](luckyapp/src/app/(dashboard)/) (calendar, catalog, crew-dashboard, crew-schedule, customers, dashboard, finance, invoices, jobs, measure, quotes, reports, settings, team). Public surfaces: `login`, `auth`, `pay`, `offline`. Server endpoints live under [`src/app/api/`](luckyapp/src/app/api/).
+- **Routing:** App Router, with the authenticated UI grouped under [`src/app/(dashboard)/`](luckyapp/src/app/(dashboard)/) (calendar, catalog, contractors, contracts, crew-dashboard, crew-schedule, customers, dashboard, finance, invoices, jobs, measure, mileage, quotes, reports, settings, tax, team). Public surfaces: `login`, `auth`, `pay`, `quote`, `sign`, `offline`. Server endpoints live under [`src/app/api/`](luckyapp/src/app/api/).
 - **Deploy:** Vercel (`luckyapp/vercel.json`). The `/sw.js` service worker is explicitly set to `no-store` so updates ship immediately.
 
 ## Common commands
@@ -62,10 +62,11 @@ Auth state comes from [`src/lib/auth.js`](luckyapp/src/lib/auth.js); every Supab
 Pure business logic (P&L, AR aging, job profitability) lives in [`src/lib/finance.js`](luckyapp/src/lib/finance.js) and is imported into `data.js`. PDF generation lives in [`src/lib/generateQuotePdf.js`](luckyapp/src/lib/generateQuotePdf.js). Google Calendar sync is in [`src/lib/googleCalendar.js`](luckyapp/src/lib/googleCalendar.js). Stripe **server-side** logic is in [`src/lib/stripeServer.js`](luckyapp/src/lib/stripeServer.js) — never import this from a `'use client'` file.
 
 ### Database migrations
-SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/supabase/migrations/) and **must be run in order** in the Supabase SQL editor. Two notes from `migrations/README.md`:
+SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/supabase/migrations/) and **must be run in order** in the Supabase SQL editor. Notes from [`migrations/README.md`](luckyapp/supabase/migrations/README.md):
 - 001 and 002 overlap; 001 uses `CREATE TABLE IF NOT EXISTS` so running 001 then 002 is safe.
-- Two files share the `006_` prefix (`006_break_minutes.sql` and `006_job_media.sql`) and two share `007_` (`007_invoices.sql` and `007_job_priority.sql`). Treat the numeric prefix as a sort key, not a uniqueness guarantee — when adding a new migration, check what's already present.
-- `FULL_REBUILD.sql` is a from-scratch rebuild; do not run it against a populated database.
+- Four prefixes are duplicated — `006_` (`break_minutes` + `job_media`), `007_` (`invoices` + `job_priority`), `023_` (`contracts` + `quote_media_nullable_quote_id`), and `024_` (`contracts_pdf_and_storage` + `time_segments`). Treat the numeric prefix as a sort key, not a uniqueness guarantee — when adding a new migration, check what's already present and run duplicates in alphabetical order within the prefix.
+- Latest migration on disk is `027_catalog_enhancements.sql`. The next one you add should be `028_…`.
+- `FULL_REBUILD.sql` is **deprecated** — it only covers 001–013 and is missing 14 newer tables (payments, contracts, time_segments, contractors, etc.). Always run the numbered files in order; do not use the rebuild script.
 
 ### Public payment links
 Invoice public-pay tokens are URL-safe hex generated via `window.crypto.getRandomValues` (with a Math.random fallback) — see `makeUrlSafeToken` in `data.js`. Migration `015_fix_public_token_url_safe.sql` exists because earlier tokens were not URL-safe; preserve the URL-safe property when changing token logic.
