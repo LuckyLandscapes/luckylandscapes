@@ -1172,9 +1172,12 @@ if (galleryGrid) {
 // ============================================
 // GUIDED QUESTIONNAIRE WIZARD
 // ============================================
-const QUOTES_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwB-7peAjT_cYSONjylBKFMKPMax95KK0ZWtOY0_DfDAX64_L80XV76hBmtmjL07Svd/exec'; // ← Paste your deployed Apps Script URL here
-// luckyapp public lead-intake endpoint — creates a customer (tagged "lead", source "website").
-// Set to '' to disable; e.g. 'https://app.luckylandscapes.com/api/leads/public'.
+// Apps Script intake retired 2026-05-01 — luckyapp now handles photos + email
+// notifications + in-app feed. Leave blank to keep it disabled. If you ever
+// need to dual-write again (e.g. Vercel outage), paste the deployment URL here.
+const QUOTES_SCRIPT_URL = '';
+// luckyapp public lead-intake endpoint — creates a customer (tagged "lead", source "website"),
+// uploads photos to Supabase Storage, and pings owners via Resend + web push.
 const LEADS_INTAKE_URL = 'https://app.luckylandscapes.com/api/leads/public';
 
 // LL:QUOTE-FORM-V2 — single-page form handler
@@ -1269,11 +1272,34 @@ if (qzCategoryBtns.length > 0) {
         });
     }
 
+    // Downscale + JPEG-recompress to ~200–400KB before base64-encoding.
+    // Vercel serverless POST bodies cap at 4.5MB; 5 raw phone photos blow past
+    // that easily. Mirrors luckyapp's `compressImage` helper.
+    async function compressForUpload(file) {
+        if (!file || !file.type || !file.type.startsWith('image/')) return file;
+        if (file.size < 200_000) return file;
+        let bitmap;
+        try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+        catch { return file; }
+        const MAX = 1600;
+        const ratio = Math.min(1, MAX / Math.max(bitmap.width, bitmap.height));
+        const w = Math.round(bitmap.width * ratio);
+        const h = Math.round(bitmap.height * ratio);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+        bitmap.close?.();
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+        if (!blob || blob.size >= file.size) return file;
+        return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+
     async function getPhotoData() {
         const out = [];
-        for (const file of selectedPhotos) {
-            const reader = new FileReader();
+        for (const original of selectedPhotos) {
+            const file = await compressForUpload(original);
             const b64 = await new Promise((resolve) => {
+                const reader = new FileReader();
                 reader.onload = () => resolve(reader.result.split(',')[1]);
                 reader.readAsDataURL(file);
             });
@@ -1299,12 +1325,11 @@ if (qzCategoryBtns.length > 0) {
             );
         }
         if (LEADS_INTAKE_URL) {
-            const { photos, ...leadPayload } = payload;
             tasks.push(
                 fetch(LEADS_INTAKE_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(leadPayload),
+                    body: JSON.stringify(payload),
                 }).then(r => { if (!r.ok) console.error('Lead intake failed', r.status); })
                   .catch(err => console.error('Lead intake error:', err))
             );
@@ -1491,7 +1516,7 @@ if (qzCategoryBtns.length > 0) {
 
             trackEvent('quote_submit', {
                 category,
-                budget: data.project_budget || 'unspecified',
+                project_size: data.project_size || 'unspecified',
                 timeline: data.project_timeline || 'unspecified',
                 has_address: !!data.address,
                 has_photos: !!data.photoCount,

@@ -2735,6 +2735,67 @@ body.promo-active .mobile-menu {
     padding: 2.5rem;
     box-shadow: var(--shadow-xl);
     animation: quoteCardIn .5s var(--ease-out);
+    border: 1px solid var(--gray-100);
+}
+
+/* Make sure the form card stays centered relative to the page. */
+.quote-section .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.quote-section .quote-card { width: 100%; }
+
+/* Confirmation card uses a softer, branded tint to feel like a "thank you" page. */
+.quote-card--confirmation {
+    background: linear-gradient(180deg, var(--white) 0%, rgba(107, 142, 78, .04) 100%);
+    text-align: center;
+}
+
+/* Polish the form inputs inside the quote form for a more refined look. */
+#quote-form .form-group { margin-bottom: 1.25rem; }
+
+#quote-form .form-group input,
+#quote-form .form-group select,
+#quote-form .form-group textarea {
+    padding: .85rem 1rem;
+    background: var(--white);
+    border: 1.5px solid var(--gray-200);
+    border-radius: var(--radius-md);
+    font-size: .95rem;
+    font-family: inherit;
+}
+
+#quote-form .form-group input:hover:not(:focus),
+#quote-form .form-group select:hover:not(:focus),
+#quote-form .form-group textarea:hover:not(:focus) {
+    border-color: var(--gray-300);
+}
+
+#quote-form .form-group input::placeholder,
+#quote-form .form-group textarea::placeholder {
+    color: var(--gray-400);
+}
+
+#quote-form .form-group label {
+    font-size: .88rem;
+    margin-bottom: .5rem;
+}
+
+#quote-form .form-row {
+    gap: 1rem;
+    margin-bottom: 0;
+}
+
+/* Use a chevron caret on selects so they don't look like raw browser dropdowns. */
+#quote-form select {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23677160' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;
 }
 
 @keyframes quoteCardIn {
@@ -2755,17 +2816,24 @@ body.promo-active .mobile-menu {
 
 .quote-card-header {
     text-align: center;
-    margin-bottom: 2rem;
+    margin-bottom: 2.25rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--gray-100);
 }
 
 .quote-card-header h2 {
-    font-size: 1.6rem;
+    font-size: 1.75rem;
     margin-bottom: .5rem;
+    color: var(--forest);
+    line-height: 1.25;
 }
 
 .quote-card-header p {
     color: var(--gray-500);
     font-size: .95rem;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.55;
 }
 
 /* --- Form Hint --- */
@@ -2907,7 +2975,15 @@ body.promo-active .mobile-menu {
 
 /* --- Quote Next Button --- */
 .quote-next-btn {
-    margin-top: .5rem;
+    margin-top: 1rem;
+    padding: 1.1rem 1.5rem;
+    font-size: 1.05rem;
+    border-radius: var(--radius-md);
+    box-shadow: 0 6px 20px rgba(107, 142, 78, .35);
+}
+
+.quote-next-btn:hover {
+    box-shadow: 0 8px 28px rgba(107, 142, 78, .45);
 }
 
 /* --- Quote Result (Step 2) --- */
@@ -3134,123 +3210,189 @@ body.promo-active .mobile-menu {
     text-align: center;
     position: relative;
     overflow: hidden;
-    padding: 1rem 0;
+    padding: 1.25rem 0 .5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
-.celebration-icon {
-    font-size: 3.5rem;
-    margin-bottom: 1rem;
-    animation: celebrationBounce .6s var(--ease-spring);
+/* Branded check icon replaces the bare emoji for a cleaner, designed feel. */
+.celebration-icon-wrap {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: celebrationBounce .65s var(--ease-spring);
+}
+
+.celebration-icon-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--sage-light), var(--clover));
+    box-shadow:
+        0 12px 32px rgba(107, 142, 78, .35),
+        0 0 0 8px rgba(107, 142, 78, .10),
+        0 0 0 16px rgba(107, 142, 78, .05);
+}
+
+.celebration-icon-check {
+    position: relative;
+    color: var(--white);
+    z-index: 1;
 }
 
 @keyframes celebrationBounce {
-    0% {
-        transform: scale(0);
-    }
-
-    60% {
-        transform: scale(1.3);
-    }
-
-    100% {
-        transform: scale(1);
-    }
+    0% { transform: scale(0); opacity: 0; }
+    60% { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
 .quote-celebration h2 {
-    font-size: 2rem;
+    font-size: 2.1rem;
     margin-bottom: .75rem;
     color: var(--forest);
+    line-height: 1.2;
 }
 
 .celebration-sub {
     font-size: 1.05rem;
     color: var(--gray-600);
-    max-width: 440px;
+    max-width: 460px;
     margin: 0 auto 2rem;
     line-height: 1.6;
 }
+
+.celebration-sub strong { color: var(--forest); }
 
 .celebration-phone-card {
     background: linear-gradient(135deg, var(--forest-deep), var(--forest));
     color: var(--white);
     border-radius: var(--radius-lg);
     padding: 1.5rem 2rem;
-    margin: 0 auto 2rem;
-    max-width: 380px;
+    margin: 0 auto 2.25rem;
+    max-width: 420px;
+    width: 100%;
+    box-shadow: 0 8px 24px rgba(45, 80, 22, .25);
+    text-align: center;
 }
 
 .phone-label {
-    font-size: .9rem;
-    color: rgba(255, 255, 255, .7);
-    margin-bottom: .75rem;
+    font-size: .85rem;
+    color: rgba(255, 255, 255, .75);
+    margin-bottom: .65rem;
+    letter-spacing: .02em;
 }
 
 .phone-number {
     display: inline-flex;
     align-items: center;
-    gap: .5rem;
+    gap: .6rem;
     font-family: var(--font-heading);
     font-weight: 800;
-    font-size: 1.5rem;
+    font-size: 1.55rem;
     color: var(--sage-light);
-    transition: color var(--t-fast);
+    transition: color var(--t-fast), transform var(--t-fast);
 }
 
 .phone-number:hover {
     color: var(--white);
+    transform: translateY(-1px);
 }
 
 /* Next Steps */
 .celebration-next-steps {
     text-align: left;
-    max-width: 420px;
+    max-width: 460px;
+    width: 100%;
     margin: 0 auto 2rem;
+    padding: 1.5rem;
+    background: var(--white);
+    border: 1px solid var(--gray-100);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .03);
 }
 
 .celebration-next-steps h3 {
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
+    font-size: 1.05rem;
+    margin-bottom: 1.25rem;
     text-align: center;
+    color: var(--forest);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 700;
 }
 
 .next-steps-list {
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 1.1rem;
 }
 
 .next-step {
     display: flex;
     gap: 1rem;
     align-items: flex-start;
+    text-align: left;
 }
 
 .next-step-num {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
+    width: 34px;
+    height: 34px;
+    min-width: 34px;
     border-radius: 50%;
     background: linear-gradient(135deg, var(--sage-light), var(--clover));
     color: var(--white);
     font-family: var(--font-heading);
     font-weight: 700;
-    font-size: .85rem;
+    font-size: .9rem;
     display: flex;
     align-items: center;
     justify-content: center;
+    box-shadow: 0 2px 6px rgba(107, 142, 78, .25);
 }
+
+.next-step-body { flex: 1; }
 
 .next-step strong {
     display: block;
-    font-size: .95rem;
-    margin-bottom: .15rem;
+    font-size: .98rem;
+    margin-bottom: .2rem;
+    color: var(--charcoal);
 }
 
 .next-step p {
-    font-size: .85rem;
+    font-size: .87rem;
     color: var(--gray-500);
-    line-height: 1.4;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* Action buttons under the next-steps panel. */
+.celebration-actions {
+    display: flex;
+    gap: .75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-top: .5rem;
+    width: 100%;
+}
+
+/* Ghost button — readable on light backgrounds (the default .btn-outline is white-on-white). */
+.btn-ghost {
+    background: transparent;
+    color: var(--forest);
+    border: 2px solid var(--gray-200);
+}
+
+.btn-ghost:hover {
+    background: var(--gray-50);
+    border-color: var(--clover);
+    color: var(--clover);
+    transform: translateY(-2px);
 }
 
 /* Confetti */
@@ -3357,6 +3499,9 @@ body.promo-active .mobile-menu {
         margin: 0 auto 2rem;
     }
 
+    .quote-card-header h2 { font-size: 1.4rem; }
+    .quote-card-header { margin-bottom: 1.5rem; padding-bottom: 1rem; }
+
     .service-toggle {
         grid-template-columns: 1fr;
     }
@@ -3375,13 +3520,24 @@ body.promo-active .mobile-menu {
         gap: .5rem;
     }
 
+    .celebration-icon-wrap { width: 80px; height: 80px; margin-bottom: 1.25rem; }
+    .celebration-icon-check { width: 36px; height: 36px; }
+    .quote-celebration h2 { font-size: 1.7rem; }
+    .celebration-sub { font-size: .98rem; }
+
     .celebration-phone-card {
         padding: 1.25rem 1.5rem;
+        max-width: 100%;
     }
 
     .phone-number {
-        font-size: 1.25rem;
+        font-size: 1.35rem;
     }
+
+    .celebration-next-steps { padding: 1.25rem; }
+
+    .celebration-actions { flex-direction: column; align-items: stretch; }
+    .celebration-actions .btn { width: 100%; }
 
     .quote-steps-indicator {
         gap: .5rem;

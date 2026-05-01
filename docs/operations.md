@@ -55,7 +55,7 @@ Landscaping is brutally seasonal. Spell out the year:
 | Equipment rental | Sub (we are both under 21, can rent through them) | TODO | TODO |
 
 ## Software stack (operational)
-- **Quote intake:** Google Apps Script → Google Sheet + Google Drive (photos) + Gmail. Setup details in [`marketing/scripts/SETUP-INSTRUCTIONS.md`](../marketing/scripts/SETUP-INSTRUCTIONS.md).
+- **Quote intake:** Marketing site quote form → luckyapp `POST /api/leads/public` → creates a `customers` row tagged `'lead'` with `source = 'website'`, uploads any photos to the `quote-media` Storage bucket tied to that customer, writes an `activity` row, and dispatches `notifyOrg()` (in-app feed + Resend email + web push to owners/admins). The legacy Google Apps Script path was retired 2026-05-01 — the deployment URL constant in `marketing/main.js` is intentionally blank but the variable is preserved as a kill switch in case we ever need to dual-write again.
 - **Job / customer / invoice / time tracking:** luckyapp (Next.js app on Vercel, Supabase backend).
 - **Payments:** Stripe (via luckyapp).
 - **Email to customers:** Resend (via luckyapp).
