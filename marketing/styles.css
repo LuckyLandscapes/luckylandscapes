@@ -1873,6 +1873,22 @@ textarea {
 }
 
 /* ============================================
+   MOBILE: kill all backdrop-filter blurs
+   ============================================
+   iOS Safari handles backdrop-filter very poorly when many elements use it —
+   it drops off-screen layers from the GPU compositor and re-composites them
+   slowly when scrolled to, which looks like content "not loading until 7
+   seconds later" and sometimes shows blurry artifacts during the transition.
+   The frosted-glass effect is purely cosmetic; on touch devices we fall back
+   to a flat semi-transparent background. */
+@media (hover: none), (pointer: coarse) {
+    * {
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+}
+
+/* ============================================
    SCROLL REVEAL ANIMATIONS
    ============================================
    Pure-CSS one-shot fade-in. Runs once on first paint regardless of JS state,
