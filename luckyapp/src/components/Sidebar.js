@@ -32,8 +32,11 @@ import {
   Car,
   ScrollText,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
+
+const LEAF_TAP_COUNT = 5;
+const LEAF_TAP_WINDOW_MS = 2000;
 
 // Owner/Admin navigation
 const ownerNavItems = [
@@ -89,6 +92,16 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const leafTapsRef = useRef([]);
+
+  const handleLeafTap = () => {
+    const now = Date.now();
+    leafTapsRef.current = [...leafTapsRef.current, now].filter(t => now - t < LEAF_TAP_WINDOW_MS);
+    if (leafTapsRef.current.length >= LEAF_TAP_COUNT) {
+      leafTapsRef.current = [];
+      window.dispatchEvent(new CustomEvent('lucky:egg'));
+    }
+  };
 
   const sidebarActions = {
     logReceipt: () => { setReceiptOpen(true); setMobileOpen(false); },
@@ -135,7 +148,13 @@ export default function Sidebar() {
       <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         {/* Brand */}
         <div className="sidebar-header">
-          <div className="sidebar-brand-mark">
+          <button
+            type="button"
+            className="sidebar-brand-mark"
+            onClick={handleLeafTap}
+            aria-label="Lucky Landscapes"
+            title="Lucky Landscapes"
+          >
             <Image
               src="/lucky-leaf.png"
               alt="Lucky Landscapes"
@@ -143,7 +162,7 @@ export default function Sidebar() {
               height={36}
               priority
             />
-          </div>
+          </button>
           <div className="sidebar-brand">
             <span className="sidebar-brand-name">Lucky App</span>
             <span className="sidebar-brand-sub">{user?.orgName || 'Business Platform'}</span>

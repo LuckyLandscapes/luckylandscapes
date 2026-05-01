@@ -324,6 +324,11 @@ h4 {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .sidebar-brand-mark img {
@@ -4465,6 +4470,166 @@ body {
 }
 
 /* ============================================
+   Day Schedule Preview (EventModal)
+   ============================================ */
+.day-schedule {
+  margin-top: var(--space-xs);
+}
+
+.day-schedule-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin-bottom: var(--space-xs);
+}
+
+.day-schedule-summary-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  font-weight: 600;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.day-schedule-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  height: 320px;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-card);
+}
+
+.day-schedule-hours {
+  position: relative;
+  border-right: 1px solid var(--border-primary);
+  background: var(--bg-elevated);
+}
+
+.day-schedule-hour {
+  position: absolute;
+  right: 6px;
+  transform: translateY(-50%);
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.day-schedule-hour-label {
+  background: var(--bg-elevated);
+  padding: 0 2px;
+}
+
+.day-schedule-events {
+  position: relative;
+  overflow: hidden;
+}
+
+.day-schedule-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-primary);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.day-schedule-block {
+  position: absolute;
+  background: color-mix(in srgb, var(--event-color) 22%, transparent);
+  border-left: 3px solid var(--event-color);
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 0.68rem;
+  overflow: hidden;
+  min-height: 18px;
+  z-index: 1;
+}
+
+.day-schedule-block.tentative {
+  background: color-mix(in srgb, var(--event-color) 14%, transparent);
+  border: 1px dashed var(--event-color);
+  border-left: 3px dashed var(--event-color);
+  left: 4px;
+  right: 4px;
+  z-index: 2;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--event-color) 15%, transparent);
+}
+
+.day-schedule-block-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+
+.day-schedule-block-time {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.day-schedule-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-style: italic;
+}
+
+/* Conflict banners (EventModal) */
+.cal-conflict-banner {
+  background: color-mix(in srgb, var(--status-warning, #d4a93e) 12%, transparent);
+  border-left: 3px solid var(--status-warning, #d4a93e);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  font-size: 0.8rem;
+  color: var(--text-primary);
+}
+
+.cal-conflict-banner.danger {
+  background: color-mix(in srgb, var(--status-error, #e26554) 12%, transparent);
+  border-left-color: var(--status-error, #e26554);
+}
+
+.cal-conflict-banner-title {
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  color: var(--text-primary);
+}
+
+.cal-conflict-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+}
+
+.cal-conflict-list li {
+  margin-bottom: 2px;
+}
+
+/* ============================================
    Customer Preview (EventModal)
    ============================================ */
 .customer-preview {
@@ -8126,5 +8291,416 @@ body {
   font-size: 0.72rem;
   font-weight: 800;
   flex-shrink: 0;
+}
+
+/* ============================================
+   🍀 EASTER EGG — clover rain + reveal toast
+   ============================================ */
+.lucky-clover-rain {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+.lucky-clover-piece {
+  position: absolute;
+  top: -10vh;
+  user-select: none;
+  animation-name: lucky-clover-fall;
+  animation-timing-function: cubic-bezier(.4, .1, .6, 1);
+  animation-fill-mode: forwards;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.25));
+}
+@keyframes lucky-clover-fall {
+  0%   { transform: translate(0, -10vh) rotate(0deg); opacity: 0; }
+  10%  { opacity: 1; }
+  100% { transform: translate(var(--drift), 110vh) rotate(var(--rotate)); opacity: 0.9; }
+}
+.lucky-egg-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, var(--clover) 0%, var(--clover-dark) 100%);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  max-width: 460px;
+  width: calc(100vw - 32px);
+  animation: lucky-egg-toast-in 360ms cubic-bezier(.2,.9,.3,1.4) both;
+}
+@keyframes lucky-egg-toast-in {
+  from { opacity: 0; transform: translate(-50%, 30px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.lucky-egg-toast-emoji {
+  font-size: 32px;
+  line-height: 1;
+  animation: lucky-egg-spin 1.6s ease-in-out infinite;
+}
+@keyframes lucky-egg-spin {
+  0%, 100% { transform: rotate(-8deg); }
+  50%      { transform: rotate(8deg); }
+}
+.lucky-egg-toast-body { flex: 1; min-width: 0; }
+.lucky-egg-toast-title { font-weight: 800; font-size: 0.95rem; }
+.lucky-egg-toast-sub   { font-size: 0.8rem; opacity: 0.85; margin-top: 2px; }
+.lucky-egg-toast-cta {
+  background: rgba(255,255,255,0.18);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+.lucky-egg-toast-cta:hover { background: rgba(255,255,255,0.28); }
+@media (max-width: 540px) {
+  .lucky-egg-toast { flex-wrap: wrap; }
+  .lucky-egg-toast-cta { width: 100%; text-align: center; }
+}
+
+/* ============================================
+   🌱 PLANTSWIPE — tinder for plants
+   ============================================ */
+.swipe-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-lg);
+}
+.swipe-header { margin-bottom: var(--space-xl); }
+.swipe-eyebrow {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--clover-light);
+  background: var(--clover-soft);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-sm);
+}
+.swipe-title {
+  font-family: var(--font-heading);
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+.swipe-subtitle {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0;
+}
+.swipe-progress {
+  margin-top: var(--space-md);
+  display: flex; align-items: center; gap: var(--space-md);
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+.swipe-progress-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+.swipe-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--clover), var(--clover-light));
+  transition: width 280ms ease;
+}
+
+/* ── Swipe deck ───────────────────────────── */
+.swipe-deck {
+  position: relative;
+  height: 580px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+.plant-card {
+  position: absolute;
+  inset: 0 auto auto auto;
+  top: 0;
+  width: 100%;
+  max-width: 420px;
+  height: 520px;
+  border-radius: 24px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.08) inset;
+  overflow: hidden;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  will-change: transform;
+}
+.plant-card-top {
+  cursor: grab;
+}
+.plant-card-top:active { cursor: grabbing; }
+.plant-emoji {
+  flex: 0 0 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 130px;
+  line-height: 1;
+  filter: drop-shadow(0 8px 18px rgba(0,0,0,0.35));
+  background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.25) 0%, transparent 65%);
+}
+.plant-card-body {
+  flex: 1;
+  padding: 18px 22px 22px;
+  background: linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 60%, transparent 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.plant-name-row {
+  display: flex; align-items: baseline; gap: 10px; justify-content: space-between;
+}
+.plant-name {
+  font-family: var(--font-heading);
+  font-size: 1.45rem;
+  font-weight: 800;
+  margin: 0;
+  line-height: 1.15;
+}
+.plant-zone {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: rgba(0,0,0,0.35);
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+}
+.plant-sci {
+  font-style: italic;
+  font-size: 0.82rem;
+  opacity: 0.8;
+}
+.plant-bio {
+  font-size: 0.88rem;
+  line-height: 1.45;
+  margin: 0;
+  opacity: 0.95;
+}
+.plant-pitch {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.82rem;
+  font-weight: 600;
+  background: rgba(0,0,0,0.28);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border-left: 3px solid rgba(255,255,255,0.6);
+}
+.plant-pitch svg { flex-shrink: 0; margin-top: 2px; }
+.plant-stats {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 4px;
+}
+.plant-stat {
+  display: flex; align-items: center; gap: 5px;
+  background: rgba(0,0,0,0.32);
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+/* Verdict stamps */
+.plant-stamp {
+  position: absolute;
+  top: 28px;
+  font-family: var(--font-heading);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 10px 18px;
+  border: 4px solid;
+  border-radius: 10px;
+  text-transform: uppercase;
+  z-index: 2;
+  pointer-events: none;
+}
+.plant-stamp-love {
+  right: 20px;
+  color: #6EE7A1;
+  border-color: #6EE7A1;
+  transform: rotate(14deg);
+}
+.plant-stamp-pass {
+  left: 20px;
+  color: #F87171;
+  border-color: #F87171;
+  transform: rotate(-14deg);
+}
+
+/* Controls below deck */
+.swipe-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-lg);
+}
+.swipe-btn {
+  width: 60px; height: 60px;
+  border-radius: 50%;
+  border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.swipe-btn:hover:not(:disabled) { transform: translateY(-2px); }
+.swipe-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.swipe-btn-pass {
+  background: var(--bg-card);
+  color: var(--status-danger);
+  border: 1px solid var(--border-secondary);
+}
+.swipe-btn-love {
+  background: linear-gradient(135deg, #ff6b8a 0%, #c91e4d 100%);
+  color: #fff;
+}
+.swipe-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* ── Moodboard ───────────────────────────── */
+.swipe-moodboard {
+  background: var(--bg-card);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
+}
+.swipe-moodboard-header {
+  display: flex; flex-direction: column; gap: 8px;
+  margin-bottom: var(--space-lg);
+}
+.swipe-moodboard-header h2 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.swipe-moodboard-header p {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+.swipe-btn-reset {
+  align-self: flex-start;
+  margin-top: var(--space-sm);
+  display: flex; align-items: center; gap: 6px;
+  background: var(--clover);
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.swipe-btn-reset:hover { background: var(--clover-dark); }
+
+.swipe-moodboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+.moodboard-tile {
+  border-radius: var(--radius-lg);
+  padding: var(--space-md);
+  color: #fff;
+  display: flex; flex-direction: column; gap: 8px;
+  min-height: 140px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+.moodboard-tile-emoji { font-size: 38px; line-height: 1; }
+.moodboard-tile-name { font-weight: 800; font-size: 0.95rem; }
+.moodboard-tile-meta { font-size: 0.72rem; opacity: 0.85; }
+
+.swipe-moodboard-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: var(--space-xl);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .swipe-page {
+    padding: var(--space-md) var(--space-md) calc(var(--space-md) + 80px);
+  }
+  .swipe-header { margin-bottom: var(--space-md); }
+  .swipe-title { font-size: 1.5rem; margin-bottom: 4px; }
+  .swipe-subtitle { display: none; }
+  .swipe-eyebrow { font-size: 0.65rem; padding: 3px 8px; }
+  .swipe-progress { margin-top: var(--space-sm); }
+
+  /* Use dynamic viewport units so the deck always fits between header
+     and the controls — no off-screen pass/love button. */
+  .swipe-deck {
+    height: calc(100dvh - 280px);
+    min-height: 420px;
+    max-height: 560px;
+    overscroll-behavior: contain;
+  }
+  .plant-card {
+    height: calc(100% - 84px);
+    max-height: 480px;
+  }
+  .plant-emoji {
+    flex: 0 0 36%;
+    font-size: clamp(72px, 18vw, 110px);
+  }
+  .plant-card-body {
+    padding: 14px 16px 16px;
+    gap: 8px;
+  }
+  .plant-name { font-size: 1.2rem; }
+  .plant-sci { font-size: 0.78rem; }
+  .plant-bio { font-size: 0.82rem; }
+  .plant-pitch { font-size: 0.78rem; padding: 6px 8px; }
+  .plant-stat { font-size: 0.7rem; padding: 4px 8px; }
+  .plant-stamp { font-size: 1.2rem; padding: 6px 12px; border-width: 3px; top: 18px; }
+
+  .swipe-controls {
+    bottom: 8px;
+    gap: var(--space-md);
+  }
+  .swipe-btn { width: 56px; height: 56px; }
+  .swipe-hint { display: none; }
+
+  .swipe-moodboard { padding: var(--space-md); }
+  .swipe-moodboard-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: var(--space-sm);
+  }
 }
 

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "optimize-images": "node scripts/optimize-images.js"
   },
   "repository": {
     "type": "git",
@@ -21,6 +22,7 @@
   },
   "homepage": "https://github.com/LuckyLandscapes/luckylandscapes#readme",
   "devDependencies": {
+    "sharp": "^0.34.5",
     "vite": "^7.3.1"
   },
   "dependencies": {

@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth';
 import { DataProvider } from '@/lib/data';
 import Sidebar from '@/components/Sidebar';
 import PushNotificationsManager from '@/components/PushNotificationsManager';
+import EasterEgg from '@/components/EasterEgg';
 
 // Pages that workers are allowed to access
 const WORKER_ALLOWED = ['/crew-dashboard', '/crew-schedule', '/jobs'];
@@ -61,6 +62,7 @@ function DashboardGuard({ children }) {
   return (
     <DataProvider>
       <PushNotificationsManager />
+      <EasterEgg />
       <div className="app-layout">
         <Sidebar />
         <main className="main-content">

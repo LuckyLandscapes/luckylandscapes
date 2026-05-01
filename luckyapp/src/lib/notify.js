@@ -31,7 +31,8 @@ function getAppOrigin() {
  * @param {object} args
  * @param {string} args.orgId
  * @param {string} args.type        - machine-readable, e.g. 'quote_accepted'
- * @param {string} args.title       - short headline
+ * @param {string} args.title       - short headline (used for in-app feed + push;
+ *                                    also default email subject)
  * @param {string} args.body        - short body (1–2 lines)
  * @param {string} [args.link]      - in-app path, e.g. '/quotes/<id>'
  * @param {object} [args.data]      - extra json payload stored with the notification
@@ -39,8 +40,15 @@ function getAppOrigin() {
  * @param {Array<{filename:string, content:Uint8Array|Buffer}>} [args.attachments]
  *        - Optional email attachments. Each `content` is base64-encoded
  *          before handing to Resend.
+ * @param {object} [args.email]     - Per-email overrides. Lets the email be a
+ *                                    richer template than the in-app/push surface.
+ * @param {string} [args.email.subject] - override the email subject (defaults to `title`)
+ * @param {string} [args.email.html]    - override the email HTML body (defaults to a
+ *                                        plain `<p>${body}</p>` + open-in-app link)
+ * @param {string} [args.email.text]    - override the plain-text fallback
+ * @param {string} [args.email.replyTo] - reply-to header (e.g. the lead's email)
  */
-export async function notifyOrg({ orgId, type, title, body, link, data = {}, roles = ['owner', 'admin'], attachments }) {
+export async function notifyOrg({ orgId, type, title, body, link, data = {}, roles = ['owner', 'admin'], attachments, email = {} }) {
   if (!orgId || !type || !title) {
     console.warn('[notify] missing required fields', { orgId, type, title });
     return;
@@ -84,35 +92,36 @@ export async function notifyOrg({ orgId, type, title, body, link, data = {}, rol
   const emails = members.map(m => m.email).filter(Boolean);
 
   // 3. Email via Resend (best-effort; one email to all recipients)
-  await sendEmail({ emails, title, body, link, attachments });
+  await sendEmail({ emails, title, body, link, attachments, ...email });
 
   // 4. Web Push (best-effort; per subscription)
   await sendWebPush({ supabase, userIds, title, body, link, data, type });
 }
 
-async function sendEmail({ emails, title, body, link, attachments }) {
+async function sendEmail({ emails, title, body, link, attachments, subject, html, text, replyTo }) {
   if (!process.env.RESEND_API_KEY) return;
   if (!emails || emails.length === 0) return;
   try {
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'Lucky Landscapes <onboarding@resend.dev>';
     const fullLink = link ? `${getAppOrigin()}${link.startsWith('/') ? '' : '/'}${link}` : null;
-    const text = [
+    const computedText = [
       body || '',
       '',
       fullLink ? `Open in luckyapp: ${fullLink}` : null,
     ].filter(Boolean).join('\n');
-    const html = [
+    const computedHtml = [
       body ? `<p>${escapeHtml(body)}</p>` : '',
       fullLink ? `<p><a href="${fullLink}" style="color:#41a100;font-weight:600;">Open in luckyapp →</a></p>` : '',
     ].filter(Boolean).join('');
     const sendArgs = {
       from: fromAddress,
       to: emails,
-      subject: title,
-      text,
-      html,
+      subject: subject || title,
+      text: text || computedText,
+      html: html || computedHtml,
     };
+    if (replyTo) sendArgs.reply_to = replyTo;
     if (Array.isArray(attachments) && attachments.length) {
       sendArgs.attachments = attachments.map(a => ({
         filename: a.filename,

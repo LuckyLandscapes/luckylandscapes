@@ -37,61 +37,205 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="MyWebSite" />
     <link rel="manifest" href="/favicon/site.webmanifest" />
-    <!-- Structured Data: LocalBusiness -->
+    <!-- Structured Data: LocalBusiness graph (LandscapingBusiness + WebSite + Organization).
+         A single @graph keeps these entities tied via @id, which Google uses to build the
+         knowledge panel and the local-pack candidate set. NAP (name/address/phone) here MUST
+         match the Google Business Profile exactly — any drift hurts local ranking. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      "name": "Lucky Landscapes",
-      "url": "https://luckylandscapes.com",
-      "logo": "https://luckylandscapes.com/images/Icon.png",
-      "image": "https://luckylandscapes.com/images/og-card.png",
-      "description": "Lucky Landscapes is Lincoln, Nebraska's trusted landscaping company offering lawn care, paver patios, retaining walls, garden beds, landscape design, property cleanup, and more.",
-      "telephone": "+1-402-405-5475",
-      "email": "rileykopf@luckylandscapes.com",
-      "areaServed": {
-        "@type": "City",
-        "name": "Lincoln",
-        "addressRegion": "NE",
-        "addressCountry": "US"
-      },
-      "address": {
-        "@type": "PostalAddress",
-        "addressLocality": "Lincoln",
-        "addressRegion": "NE",
-        "addressCountry": "US",
-        "streetAddress": "109 South Canopy ST",
-        "postalCode": "68508"
-      },
-      "geo": {
-        "@type": "GeoCoordinates",
-        "latitude": 40.8136,
-        "longitude": -96.7026
-      },
-      "priceRange": "$$",
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "5.0",
-        "reviewCount": "3",
-        "bestRating": "5"
-      },
-      "sameAs": [
-        "https://www.facebook.com/luckylandscapes",
-        "https://www.instagram.com/lucky.landscapes/",
-        "https://www.tiktok.com/@lucky.landscapes",
-        "https://www.youtube.com/@luckylandscapes"
-      ],
-      "hasOfferCatalog": {
-        "@type": "OfferCatalog",
-        "name": "Landscaping Services",
-        "itemListElement": [
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal" } },
-          { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build" } }
-        ]
-      }
+      "@graph": [
+        {
+          "@type": ["LocalBusiness", "LandscapingBusiness", "HomeAndConstructionBusiness"],
+          "@id": "https://luckylandscapes.com/#business",
+          "name": "Lucky Landscapes",
+          "legalName": "Lucky Landscapes LLC",
+          "alternateName": ["Lucky Landscapes Lincoln NE", "Lucky Landscapes LLC"],
+          "url": "https://luckylandscapes.com/",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://luckylandscapes.com/images/Icon.png",
+            "width": 512,
+            "height": 512
+          },
+          "image": [
+            "https://luckylandscapes.com/images/og-card.png",
+            "https://luckylandscapes.com/images/banner.jpg"
+          ],
+          "description": "Lincoln, Nebraska's full-service residential and commercial landscaping and hardscaping company. Paver patios, retaining walls, lawn care, garden beds, full landscape design and build, and property cleanups across Lincoln, Waverly, Beatrice, and surrounding Lancaster County.",
+          "slogan": "Creating outdoor spaces you'll feel lucky to have.",
+          "foundingDate": "2026-03-01",
+          "founder": [
+            { "@type": "Person", "name": "Riley Kopf" },
+            { "@type": "Person", "name": "Macoy Wollenburg" }
+          ],
+          "telephone": "+1-402-405-5475",
+          "email": "rileykopf@luckylandscapes.com",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "109 South Canopy Street",
+            "addressLocality": "Lincoln",
+            "addressRegion": "NE",
+            "postalCode": "68508",
+            "addressCountry": "US"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 40.8136,
+            "longitude": -96.7026
+          },
+          "hasMap": "https://www.google.com/maps?cid=2884806323034838689",
+          "identifier": [
+            { "@type": "PropertyValue", "propertyID": "Google Place ID", "value": "ChIJg8Qj3PfGY4cRodZKAhHkCCg" },
+            { "@type": "PropertyValue", "propertyID": "Google Maps CID", "value": "2884806323034838689" }
+          ],
+          "areaServed": [
+            { "@type": "City", "name": "Lincoln", "@id": "https://en.wikipedia.org/wiki/Lincoln,_Nebraska", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Waverly", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Beatrice", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Seward", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Fairbury", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Davey", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Hickman", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Roca", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Bennet", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "AdministrativeArea", "name": "Lancaster County, Nebraska" }
+          ],
+          "serviceArea": {
+            "@type": "GeoCircle",
+            "geoMidpoint": { "@type": "GeoCoordinates", "latitude": 40.8136, "longitude": -96.7026 },
+            "geoRadius": "60000"
+          },
+          "priceRange": "$$",
+          "currenciesAccepted": "USD",
+          "paymentAccepted": "Cash, Check, Credit Card, Debit Card, ACH, Apple Pay, Google Pay",
+          "openingHoursSpecification": [
+            { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "07:00", "closes": "19:00" },
+            { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "08:00", "closes": "17:00" }
+          ],
+          "knowsAbout": [
+            "Landscaping",
+            "Lawn Care",
+            "Lawn Mowing",
+            "Seasonal Cleanup",
+            "Leaf Removal",
+            "Paver Patios",
+            "Retaining Walls",
+            "Hardscaping",
+            "Garden Bed Installation",
+            "Mulching",
+            "Landscape Design",
+            "Outdoor Living Spaces",
+            "Fire Pits",
+            "Walkways",
+            "Property Cleanup",
+            "Brush Removal",
+            "Junk Removal",
+            "Overseeding",
+            "Aeration",
+            "Sod Installation"
+          ],
+          "makesOffer": [
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "@id": "https://luckylandscapes.com/services/lawn-care.html#service", "name": "Lawn Care", "url": "https://luckylandscapes.com/services/lawn-care.html" } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "@id": "https://luckylandscapes.com/services/garden-beds.html#service", "name": "Garden Beds & Mulch", "url": "https://luckylandscapes.com/services/garden-beds.html" } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "@id": "https://luckylandscapes.com/services/hardscaping.html#service", "name": "Hardscaping — Paver Patios & Retaining Walls", "url": "https://luckylandscapes.com/services/hardscaping.html" } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "@id": "https://luckylandscapes.com/services/property-cleanup.html#service", "name": "Property Cleanup & Junk Removal", "url": "https://luckylandscapes.com/services/property-cleanup.html" } },
+            { "@type": "Offer", "itemOffered": { "@type": "Service", "@id": "https://luckylandscapes.com/services/landscape-design.html#service", "name": "Full Landscape Design & Build", "url": "https://luckylandscapes.com/services/landscape-design.html" } }
+          ],
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Landscaping Services",
+            "itemListElement": [
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Lawn Care", "url": "https://luckylandscapes.com/services/lawn-care.html" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Garden Beds & Mulch", "url": "https://luckylandscapes.com/services/garden-beds.html" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Hardscaping — Pavers & Retaining Walls", "url": "https://luckylandscapes.com/services/hardscaping.html" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Property Cleanup & Junk Removal", "url": "https://luckylandscapes.com/services/property-cleanup.html" } },
+              { "@type": "Offer", "itemOffered": { "@type": "Service", "name": "Full Landscape Design & Build", "url": "https://luckylandscapes.com/services/landscape-design.html" } }
+            ]
+          },
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "3",
+            "bestRating": "5",
+            "worstRating": "5"
+          },
+          "review": [
+            {
+              "@type": "Review",
+              "author": { "@type": "Person", "name": "Burdette Schoen" },
+              "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+              "reviewBody": "Lucky Landscapes helped me overseed my lawn last fall that was in terrible condition. It looked great last fall and currently it is looking better everyday. They also did a lot of landscaping for me last year and were wonderful to work with. They advise but also listen to what you want. Great guys and reasonable priced."
+            },
+            {
+              "@type": "Review",
+              "author": { "@type": "Person", "name": "Trent Jenkins" },
+              "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+              "reviewBody": "Hard workers who get the job done. Fair price for good work."
+            },
+            {
+              "@type": "Review",
+              "author": { "@type": "Person", "name": "Than Aye" },
+              "reviewRating": { "@type": "Rating", "ratingValue": "5", "bestRating": "5" },
+              "reviewBody": "I was looking through a couple of landscapers, and these guys gave a pretty good price! They did my mulch for me in my backyard and the results were great as expected!"
+            }
+          ],
+          "potentialAction": {
+            "@type": "ReserveAction",
+            "name": "Get a Free Estimate",
+            "target": "https://luckylandscapes.com/quote.html"
+          },
+          "sameAs": [
+            "https://www.google.com/maps?cid=2884806323034838689",
+            "https://www.facebook.com/luckylandscapes",
+            "https://www.instagram.com/lucky.landscapes/",
+            "https://www.tiktok.com/@lucky.landscapes",
+            "https://www.youtube.com/@luckylandscapes"
+          ]
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://luckylandscapes.com/#website",
+          "url": "https://luckylandscapes.com/",
+          "name": "Lucky Landscapes",
+          "description": "Lincoln, Nebraska's trusted landscaping & hardscaping company.",
+          "publisher": { "@id": "https://luckylandscapes.com/#business" },
+          "inLanguage": "en-US",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://luckylandscapes.com/blog/?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://luckylandscapes.com/#organization",
+          "name": "Lucky Landscapes",
+          "legalName": "Lucky Landscapes LLC",
+          "url": "https://luckylandscapes.com/",
+          "logo": "https://luckylandscapes.com/images/Icon.png",
+          "sameAs": [
+            "https://www.google.com/maps?cid=2884806323034838689",
+            "https://www.facebook.com/luckylandscapes",
+            "https://www.instagram.com/lucky.landscapes/",
+            "https://www.tiktok.com/@lucky.landscapes",
+            "https://www.youtube.com/@luckylandscapes"
+          ]
+        },
+        {
+          "@type": "WebPage",
+          "@id": "https://luckylandscapes.com/#webpage",
+          "url": "https://luckylandscapes.com/",
+          "name": "Lucky Landscapes | #1 Landscaping & Lawn Care in Lincoln, NE",
+          "isPartOf": { "@id": "https://luckylandscapes.com/#website" },
+          "about": { "@id": "https://luckylandscapes.com/#business" },
+          "primaryImageOfPage": "https://luckylandscapes.com/images/og-card.png",
+          "speakable": {
+            "@type": "SpeakableSpecification",
+            "cssSelector": [".hero-title", ".hero-sub", ".faq-question", ".faq-answer"]
+          }
+        }
+      ]
     }
     </script>
 
@@ -147,20 +291,64 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.css" />
+    <!-- LL:HEAD-INJECT v3 -->
+    <!-- Preconnect to critical third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.clarity.ms" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- Google Fonts — loaded as <link> (not CSS @import) so it runs in parallel with styles.css.
+         display=swap shows fallback text immediately while the woff2 files arrive. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" />
+
+    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
+         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
+         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
+         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
+         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
+    <script>
+      window.LL_CONFIG = {
+        ga4:       'G-Z21C16KEMN',
+        clarity:   'wk50251l6r',
+        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
+        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
+      };
+    </script>
+
+    <!-- GA4 loader — only fires when a real ID is set. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { anonymize_ip: true });
+      })();
+    </script>
+
+    <!-- Microsoft Clarity loader — only fires when a real ID is set. -->
+    <script>
+      (function (c, l, a, r, i, t, y) {
+        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        c[a] = c[a] || function () { (c[a].q = c[a].q || []).push(arguments); };
+        t = l.createElement(r); t.async = 1; t.src = 'https://www.clarity.ms/tag/' + id;
+        y = l.getElementsByTagName(r)[0]; y.parentNode.insertBefore(t, y);
+      })(window, document, 'clarity', 'script');
+    </script>
+    <!-- LL:HEAD-INJECT-END -->
+
 </head>
 
 <body>
-
-
-    <!-- ==================== PRELOADER ==================== -->
-    <div class="preloader" id="preloader">
-        <div class="preloader-inner">
-            <img src="/images/Icon.png" alt="" class="preloader-logo" />
-            <div class="preloader-bar">
-                <div class="preloader-bar-fill"></div>
-            </div>
-        </div>
-    </div>
 
     <!-- ==================== NAVIGATION ==================== -->
     <nav class="navbar" id="navbar">
@@ -202,8 +390,8 @@
         <header class="hero" id="hero">
             <!-- Video Background -->
             <div class="hero-video-wrap">
-                <video class="hero-video" autoplay muted loop playsinline
-                    poster="https://images.unsplash.com/photo-1558904541-efa843a96f01?auto=format&fit=crop&q=80&w=1920">
+                <video class="hero-video" autoplay muted loop playsinline preload="metadata"
+                    poster="/images/banner.jpg">
                     <source src="/images/webheromain.mp4" type="video/mp4" />
                 </video>
                 <div class="hero-overlay"></div>
@@ -245,25 +433,25 @@
             </div>
         </header>
 
-        <!-- ==================== STATS BAR ==================== -->
+        <!-- ==================== TRUST BAR ==================== -->
         <section class="stats-bar">
             <div class="container">
                 <div class="stats-grid">
                     <div class="stat-item">
-                        <span class="stat-number" data-count="100">0</span><span class="stat-suffix">+</span>
-                        <span class="stat-label">Projects Completed</span>
+                        <span class="stat-number">5.0</span><span class="stat-suffix">★</span>
+                        <span class="stat-label">Google Rated</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="100">0</span><span class="stat-suffix">%</span>
-                        <span class="stat-label">Client Satisfaction</span>
+                        <span class="stat-number">24</span><span class="stat-suffix">hr</span>
+                        <span class="stat-label">Quote Turnaround</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="3">0</span><span class="stat-suffix">+</span>
-                        <span class="stat-label">Years Experience</span>
+                        <span class="stat-number">$0</span>
+                        <span class="stat-label">Free Estimates</span>
                     </div>
                     <div class="stat-item">
-                        <span class="stat-number" data-count="8">0</span><span class="stat-suffix"></span>
-                        <span class="stat-label">Service Categories</span>
+                        <span class="stat-number">Local</span>
+                        <span class="stat-label">Lincoln, NE Crew</span>
                     </div>
                 </div>
             </div>
@@ -474,7 +662,17 @@
                     </div>
                 </div>
 
-                <div class="reviews-cta reveal" style="text-align:center; margin-top: 2.5rem;">
+                <div class="reviews-cta reveal" style="text-align:center; margin-top: 2.5rem; display:flex; gap: 0.75rem; justify-content:center; flex-wrap:wrap;">
+                    <!-- One-click "Leave a Review" — direct to Google's writereview form via Place ID. -->
+                    <a href="https://search.google.com/local/writereview?placeid=ChIJg8Qj3PfGY4cRodZKAhHkCCg"
+                        target="_blank" rel="noopener" class="btn btn-primary">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
+                            fill="currentColor">
+                            <path
+                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                        </svg>
+                        Leave Us a Google Review
+                    </a>
                     <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank" rel="noopener"
                         class="btn btn-secondary">
                         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24">
@@ -491,7 +689,7 @@
                                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                                 fill="#EA4335" />
                         </svg>
-                        See All Reviews on Google
+                        See All Reviews
                     </a>
                 </div>
             </div>
@@ -673,6 +871,22 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Embedded Google Map: aligns the website with the Google Business Profile.
+                             A working iframe pointed at our exact GBP CID is one of the strongest
+                             "this website belongs to that listing" signals for the local pack. -->
+                        <div class="contact-map" style="margin-top: 1.75rem; border-radius: 1rem; overflow: hidden; border: 1px solid var(--gray-200, rgba(255,255,255,0.15));">
+                            <iframe
+                                title="Lucky Landscapes on Google Maps — Lincoln, NE"
+                                src="https://www.google.com/maps?cid=2884806323034838689&output=embed"
+                                width="100%"
+                                height="260"
+                                style="border:0; display:block;"
+                                allowfullscreen=""
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade">
+                            </iframe>
+                        </div>
                     </div>
 
                     <!-- Right — Instant Quote CTA -->
@@ -817,6 +1031,9 @@
                         <label for="message">Message</label>
                         <textarea id="message" name="message" placeholder="Tell us about your project..."></textarea>
                     </div>
+
+                    <!-- Cloudflare Turnstile widget mounts here when LL_CONFIG.turnstile is set. -->
+                    <div class="cf-turnstile-mount" style="margin: 0.5rem 0;"></div>
 
                     <button type="submit" class="form-submit">
                         Send My Message
@@ -980,8 +1197,18 @@
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery.html">Gallery</a>
+                    <a href="/blog/">Blog</a>
                     <a href="/team.html">Our Team</a>
                     <a href="/#contact">Contact</a>
+                </div>
+
+                <div class="footer-nav">
+                    <h4>Service Areas</h4>
+                    <a href="/areas/east-lincoln.html">East Lincoln</a>
+                    <a href="/areas/pine-lake.html">Pine Lake / Stevens Creek</a>
+                    <a href="/areas/south-lincoln.html">South Lincoln</a>
+                    <a href="/areas/waverly.html">Waverly</a>
+                    <a href="/areas/beatrice.html">Beatrice</a>
                 </div>
 
                 <div class="footer-nav">
