@@ -366,6 +366,21 @@ export default function CatalogPage() {
               {refreshBatchRunning ? <><Loader2 size={16} className="spin" /> Refreshing…</> : <><RefreshCw size={16} /> Refresh prices</>}
             </button>
           )}
+          {/* Clear-all hidden until items exist; visible only internally so a
+              customer presentation can't accidentally trigger it. After clear,
+              the per-supplier "Import …" buttons reappear automatically — the
+              demo flow Riley shows other landscapers. */}
+          {!isCustomerView && materials.length > 0 && (
+            <button
+              className="btn btn-secondary"
+              onClick={() => setConfirmClear(true)}
+              disabled={clearing || refreshBatchRunning}
+              title="Delete every material in the catalog (keeps suppliers). Re-import buttons return after clearing."
+              style={{ color: 'var(--status-danger)' }}
+            >
+              {clearing ? <><Loader2 size={16} className="spin" /> Clearing…</> : <><Trash2 size={16} /> Clear all</>}
+            </button>
+          )}
           <button className="btn btn-secondary" onClick={() => startPresentation(0)} disabled={filtered.length === 0}>
             <Maximize2 size={16} /> Present
           </button>
@@ -933,8 +948,9 @@ export default function CatalogPage() {
         </div>
       )}
 
-      {/* Clear catalog — confirm. Only kept for the "I want a clean slate"
-          workflow when migrating from old data. */}
+      {/* Clear catalog — confirm. Doubles as a demo-reset (after clear, the
+          per-supplier "Import …" buttons reappear, so Riley can rerun the
+          starter-pack flow when showing the app to other landscapers). */}
       {confirmClear && (
         <div className="modal-overlay" onClick={() => setConfirmClear(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 480 }}>
@@ -948,7 +964,7 @@ export default function CatalogPage() {
                 <div>
                   <div style={{ fontWeight: 600, marginBottom: 4 }}>This deletes all {materials.length} materials</div>
                   <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                    Suppliers stay. Use this before re-importing a fresh CSV.
+                    Suppliers stay. After clearing, the <strong>Import Outdoor Solutions / Menards / Home Depot</strong> buttons reappear in the header — handy for re-running the starter-pack import or showing the demo flow to other landscapers.
                   </div>
                 </div>
               </div>
