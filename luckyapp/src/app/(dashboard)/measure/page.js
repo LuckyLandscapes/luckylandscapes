@@ -6,7 +6,7 @@ import { useData } from '@/lib/data';
 import {
   Ruler, Search, Trash2, Copy, MapPin, CheckCircle, Layers, X, SquareIcon,
   Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp,
-  Eye, EyeOff, Save, FolderOpen, User, Spline, PersonStanding, LandPlot, Footprints,
+  Eye, EyeOff, Save, FolderOpen, User, Spline, PersonStanding, LandPlot, Footprints, Crosshair,
 } from 'lucide-react';
 import { lookupParcel } from '@/lib/parcelLookup';
 
@@ -1050,6 +1050,8 @@ export default function MeasurePage() {
           strokeWeight: 2,
           strokeOpacity: 0.95,
           clickable: true,
+          editable: true,   // OSM building polygons drift from Google's imagery — let user
+          draggable: true,  // tweak vertices and reposition before accepting as exclusion.
           zIndex: 5,
           map,
         });
@@ -1141,12 +1143,11 @@ export default function MeasurePage() {
     }
   }, [acceptCandidate, showToast]);
 
-  // ---- WebXR perimeter-walk handoff ----
-  // /measure/walk writes its result to sessionStorage and routes back here.
-  // We pick it up after the map is ready, drop a draggable purple candidate
-  // polygon at the current map centre, and let the user position it over the
-  // satellite imagery. Walks have no compass heading so the rotation is
-  // arbitrary — the user drags / edits vertices to align.
+  // ---- Walk-result handoff ----
+  // Handles results from BOTH /measure/walk (WebXR — `points: [{x,z}]` in
+  // local-floor metres, no GPS so drops at map centre with arbitrary rotation)
+  // and /measure/walk-gps (GPS — `geoPoints: [{lat,lng}]`, drops at the actual
+  // walked location).
   useEffect(() => {
     if (!mapsLoaded || !mapInstanceRef.current) return;
     let raw;
@@ -1155,13 +1156,27 @@ export default function MeasurePage() {
     let result;
     try { result = JSON.parse(raw); } catch { sessionStorage.removeItem(WALK_RESULT_KEY); return; }
     sessionStorage.removeItem(WALK_RESULT_KEY);
-    if (!Array.isArray(result?.points) || result.points.length < 3) return;
 
     const map = mapInstanceRef.current;
     const g = window.google.maps;
-    const center = map.getCenter();
-    if (!center) return;
-    const path = walkPointsToLatLng(result.points, { lat: center.lat(), lng: center.lng() });
+
+    let path = null;
+    let isDraggable = true;
+    let labelMode = 'AR walk';
+
+    if (Array.isArray(result?.geoPoints) && result.geoPoints.length >= 3) {
+      // GPS walk — already in lat/lng, drop at the real coordinates.
+      path = result.geoPoints.map(p => ({ lat: p.lat, lng: p.lng }));
+      isDraggable = false; // user can still vertex-edit; no need to drag the whole thing
+      labelMode = 'GPS walk';
+    } else if (Array.isArray(result?.points) && result.points.length >= 3) {
+      // WebXR walk — local-floor metres, no GPS. Project around current map centre.
+      const center = map.getCenter();
+      if (!center) return;
+      path = walkPointsToLatLng(result.points, { lat: center.lat(), lng: center.lng() });
+    } else {
+      return;
+    }
 
     const overlay = new g.Polygon({
       paths: path,
@@ -1171,20 +1186,22 @@ export default function MeasurePage() {
       strokeWeight: 3,
       strokeOpacity: 0.95,
       clickable: true,
-      draggable: true, // user drags the schematic over the satellite imagery
+      editable: true,
+      draggable: isDraggable,
       zIndex: 7,
       map,
     });
     const sqft = result.sqft || Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
     const cid = `walk-${Date.now()}`;
     candidateOverlaysRef.current.set(cid, overlay);
-    setCandidates([{ id: cid, sqft, kind: 'walk', tag: 'walk', label: 'AR walk' }]);
+    setCandidates([{ id: cid, sqft, kind: 'walk', tag: 'walk', label: labelMode }]);
     overlay.addListener('click', () => acceptCandidate(cid));
 
     const bounds = new g.LatLngBounds();
     path.forEach(p => bounds.extend(p));
     map.fitBounds(bounds, 96);
-    showToast(`AR walk loaded (${sqft.toLocaleString()} sqft). Drag to align with the property.`, 'success');
+    const hint = isDraggable ? 'Drag to align with the property.' : 'Edit vertices to refine.';
+    showToast(`${labelMode} loaded (${sqft.toLocaleString()} sqft). ${hint}`, 'success');
   }, [mapsLoaded, acceptCandidate, showToast]);
 
   // ---- Per-customer save / load ----
@@ -1220,37 +1237,45 @@ export default function MeasurePage() {
   const handleSelectCustomer = useCallback((customer) => {
     setActiveCustomerId(customer.id);
     setShowCustomerAddresses(false);
-    if (searchInputRef.current && customer.address) {
-      searchInputRef.current.value = `${customer.address}, ${customer.city || ''} ${customer.state || ''} ${customer.zip || ''}`.trim();
+
+    // Build a clean geocoder query — drop blank parts so we don't end up with
+    // literal "null" / "undefined" in the address string, which is what was
+    // causing the map to silently not jump on customer click.
+    const cleanQuery = [customer.address, customer.city, customer.state, customer.zip]
+      .filter(p => p && String(p).trim())
+      .join(', ')
+      .trim();
+
+    if (searchInputRef.current && cleanQuery) {
+      searchInputRef.current.value = cleanQuery;
       setHasSearchText(true);
     }
-    // If the customer has measurements, restore them. Otherwise just go to address.
+
+    const goTo = (location) => {
+      if (!mapInstanceRef.current) return;
+      mapInstanceRef.current.setCenter(location);
+      mapInstanceRef.current.setZoom(20);
+      movePanoTo(location);
+    };
+
+    const geocodeAndCenter = () => {
+      if (!cleanQuery || !mapInstanceRef.current) return;
+      const geocoder = new window.google.maps.Geocoder();
+      geocoder.geocode({ address: cleanQuery }, (results, status) => {
+        if (status === 'OK' && results[0]) goTo(results[0].geometry.location);
+      });
+    };
+
     if (customer.measurements?.shapes?.length) {
       loadFromCustomer(customer);
-      // Center to stored center if present, else geocode address
       const stored = customer.measurements;
-      if (stored.center) {
-        movePanoTo(stored.center);
-      } else if (customer.address && mapInstanceRef.current) {
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ address: `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}` }, (results, status) => {
-          if (status === 'OK' && results[0]) {
-            mapInstanceRef.current.setCenter(results[0].geometry.location);
-            mapInstanceRef.current.setZoom(20);
-            movePanoTo(results[0].geometry.location);
-          }
-        });
-      }
+      // loadFromCustomer already setCenter()s when stored.center exists, so we
+      // only need to geocode when there's no saved centre.
+      if (stored.center) movePanoTo(stored.center);
+      else geocodeAndCenter();
       showToast(`Loaded ${stored.shapes.length} saved shape${stored.shapes.length === 1 ? '' : 's'}.`, 'success');
-    } else if (customer.address && mapInstanceRef.current) {
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: `${customer.address}, ${customer.city}, ${customer.state} ${customer.zip}` }, (results, status) => {
-        if (status === 'OK' && results[0]) {
-          mapInstanceRef.current.setCenter(results[0].geometry.location);
-          mapInstanceRef.current.setZoom(20);
-          movePanoTo(results[0].geometry.location);
-        }
-      });
+    } else {
+      geocodeAndCenter();
     }
   }, [loadFromCustomer, showToast, movePanoTo]);
 
@@ -1582,10 +1607,19 @@ export default function MeasurePage() {
           <button
             className="measure-tool-btn"
             onClick={() => router.push('/measure/walk')}
-            title="Walk the perimeter on-site with AR (Android Chrome only)"
+            title="Walk the perimeter with AR (Android Chrome only)"
           >
             <Footprints size={16} />
             <span className="measure-tool-label">AR Walk</span>
+          </button>
+
+          <button
+            className="measure-tool-btn"
+            onClick={() => router.push('/measure/walk-gps')}
+            title="Walk the perimeter using GPS (works on iPhone)"
+          >
+            <Crosshair size={16} />
+            <span className="measure-tool-label">GPS Walk</span>
           </button>
 
           <button

@@ -2261,29 +2261,42 @@ body {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
-    padding: 6px;
+    padding: 4px;
+    gap: 4px;
     max-width: none;
+    /* fade indicator at the right edge so users know to scroll */
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
+            mask-image: linear-gradient(to right, black calc(100% - 24px), transparent);
   }
   .measure-toolbar::-webkit-scrollbar { display: none; }
 
   .measure-tool-btn {
     flex: 0 0 auto;
+    min-width: 44px;
     min-height: 44px;
-    padding: 8px 10px;
+    padding: 8px;
+    gap: 4px;
   }
 
+  /* On any phone-sized viewport, drop the text labels so all 10+ tool buttons
+     fit in the visible width without horizontal scroll. */
   .measure-tool-label {
-    display: inline;
+    display: none;
   }
 
+  /* Move drawing hint to the BOTTOM on mobile so it doesn't fight the
+     stacked top panels (search → toolbar → net chip → active customer).
+     Sit just above the sheet handle. */
   .measure-drawing-hint {
-    top: 116px;
+    top: auto;
+    bottom: calc(var(--measure-sheet-collapsed-h, 48px) + 76px);
     left: 8px;
     right: 8px;
     transform: none;
     font-size: 0.78rem;
-    padding: 8px 12px;
+    padding: 6px 10px;
     text-align: left;
+    z-index: 25;
   }
 
   .measure-candidates {
@@ -2293,6 +2306,7 @@ body {
     width: auto;
     max-width: none;
     transform: none;
+    z-index: 30;
   }
 
   .measure-sheet {
@@ -2418,12 +2432,10 @@ body {
     width: 100%;
   }
 
-  .measure-tool-label {
-    display: none;
-  }
+  /* .measure-tool-label is already hidden at 768px above; nothing to do here. */
 
   .measure-tool-btn {
-    padding: 8px;
+    padding: 6px;
   }
 }
 

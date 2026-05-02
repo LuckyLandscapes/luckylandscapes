@@ -14,16 +14,18 @@ import { NextResponse } from 'next/server';
 // All sources are public, free, and operated by Nebraska state / Lancaster
 // County government. No API key required.
 
+// Verified live 2026-05-01. Both endpoints are public ArcGIS REST FeatureServers
+// operated by NE government — no API key required.
 const SOURCES = [
   {
     id: 'lancaster-co',
     label: 'Lancaster County (Lincoln)',
-    url: 'https://gisext.lincoln.ne.gov/arcgis/rest/services/Assessor/Pub_Parcels/MapServer/0/query',
+    url: 'https://gis.lincoln.ne.gov/public/rest/services/Assessor/TaxParcels/FeatureServer/0/query',
   },
   {
     id: 'ne-state',
-    label: 'Nebraska statewide 2023',
-    url: 'https://giscat.ne.gov/enterprise/rest/services/TaxParcels2023/FeatureServer/0/query',
+    label: 'Nebraska statewide',
+    url: 'https://giscat.ne.gov/enterprise/rest/services/StatewideParcelsExternal/FeatureServer/0/query',
   },
 ];
 
@@ -87,13 +89,22 @@ function summarizeAttributes(raw) {
     }
     return null;
   };
+  // Field names confirmed against:
+  //   Lancaster TaxParcels: OWNERNME1, SITEADDRESS, PARCELID, GIS_AREA(sqft),
+  //                         PRPRTYDSCRP, RESYRBLT, RESFLRAREA, CNTASSDVAL
+  //   NE StatewideParcelsExternal: Parcel_ID, Situs_Address (often blank),
+  //                         Ph_Full_Address, GIS_Acres, County_ID, Subdivision
   return {
-    parcelId: pick('PARCEL_ID', 'PARCELID', 'PIN', 'PROP_ID', 'GIS_PIN'),
-    owner: pick('OWNER', 'OWNER_NAME', 'OWNER1', 'NAME'),
-    address: pick('ADDRESS', 'SITUS_ADDR', 'SITE_ADDR', 'PROP_ADDR', 'PROPERTYADDRESS'),
-    acres: pick('ACRES', 'GIS_ACRES', 'ACREAGE', 'LANDAREA'),
-    legalDesc: pick('LEGAL_DESC', 'LEGAL', 'LEGALDESC'),
-    county: pick('COUNTY', 'COUNTY_NAME', 'CO_NAME'),
+    parcelId: pick('PARCELID', 'Parcel_ID', 'PARCEL_ID', 'PIN', 'PROP_ID', 'LOWPARCELID'),
+    owner: pick('OWNERNME1', 'OWNER', 'OWNER_NAME', 'OWNER1', 'NAME'),
+    address: pick('SITEADDRESS', 'Situs_Address', 'Ph_Full_Address', 'ADDRESS', 'SITUS_ADDR', 'PROP_ADDR'),
+    acres: pick('GIS_Acres', 'ACRES', 'GIS_ACRES', 'ACREAGE', 'Acres_Deeded'),
+    legalDesc: pick('PRPRTYDSCRP', 'Legal_Description', 'LEGAL_DESC', 'LEGAL'),
+    yearBuilt: pick('RESYRBLT', 'BuildingYear', 'YEARBUILT'),
+    floorArea: pick('RESFLRAREA', 'ImpSF'),
+    assessedValue: pick('CNTASSDVAL', 'Total_Assessed_Value', 'ASSESSED_VAL'),
+    classification: pick('CLASSDSCRP', 'Property_SubClass', 'PRIMEUSE'),
+    subdivision: pick('CNVYNAME', 'Subdivision'),
   };
 }
 

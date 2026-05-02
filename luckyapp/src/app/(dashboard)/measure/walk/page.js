@@ -734,16 +734,26 @@ export default function MeasureWalkPage() {
           </div>
           <p style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem', lineHeight: 1.5 }}>
             On-site AR walk requires <strong>Android Chrome with ARCore</strong>.
-            iOS Safari is not supported. Use the satellite measure tool instead.
+            iOS Safari does not support WebXR. Use <strong>GPS Walk</strong> instead — it works on every phone, drops the polygon at the real GPS coordinates, and is accurate to ±3–10 m.
           </p>
-          <button
-            className="btn btn-primary"
-            onClick={() => router.push('/measure')}
-            style={{ width: '100%' }}
-          >
-            <ArrowLeft size={16} />
-            Back to Satellite Measure
-          </button>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-primary"
+              onClick={() => router.push('/measure/walk-gps')}
+              style={{ flex: '1 1 200px' }}
+            >
+              <Footprints size={16} />
+              Use GPS Walk
+            </button>
+            <button
+              className="btn btn-ghost"
+              onClick={() => router.push('/measure')}
+              style={{ flex: '1 1 160px' }}
+            >
+              <ArrowLeft size={16} />
+              Back to Measure
+            </button>
+          </div>
         </div>
       )}
 
