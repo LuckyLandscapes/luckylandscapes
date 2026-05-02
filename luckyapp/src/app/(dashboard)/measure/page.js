@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { useData } from '@/lib/data';
 import {
   Ruler, Search, Trash2, Copy, MapPin, CheckCircle, Layers, X, SquareIcon,
   Loader2, Pencil, Hexagon, Circle as CircleIcon, Building2, Minus, ChevronDown, ChevronUp,
-  Eye, EyeOff, Save, FolderOpen, User, Spline, PersonStanding,
+  Eye, EyeOff, Save, FolderOpen, User, Spline, PersonStanding, LandPlot, Footprints,
 } from 'lucide-react';
+import { lookupParcel } from '@/lib/parcelLookup';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 const SQM_TO_SQFT = 10.7639;
@@ -18,6 +20,27 @@ const EXCLUSION_FILL = '#dc2626';
 const EXCLUSION_STROKE = '#fca5a5';
 const CANDIDATE_FILL = '#f59e0b';
 const CANDIDATE_STROKE = '#fbbf24';
+const PARCEL_FILL = '#3b82f6';
+const PARCEL_STROKE = '#93c5fd';
+const WALK_FILL = '#a855f7';
+const WALK_STROKE = '#d8b4fe';
+
+const WALK_RESULT_KEY = 'lucky_measure_walk_result';
+
+// Convert local-floor (x,z in metres) WebXR-walk points to lat/lng around a
+// centre point. Uses a flat-earth approximation valid for <1 mile spans —
+// fine for residential yards. Orientation is arbitrary (we don't have a
+// compass heading from the walk) so the polygon drops in some rotation; the
+// user is expected to drag the polygon over the satellite imagery to align.
+function walkPointsToLatLng(points, center) {
+  const latRad = center.lat * Math.PI / 180;
+  const mPerDegLat = 111320;
+  const mPerDegLng = 111320 * Math.cos(latRad);
+  return points.map(p => ({
+    lat: center.lat + (p.z * -1) / mPerDegLat, // negate z so "forward" walks north-ish
+    lng: center.lng + p.x / mPerDegLng,
+  }));
+}
 
 const TOOLS = [
   { id: 'polygon-area',     kind: 'area',      shape: 'polygon',   label: 'Polygon',   Icon: Hexagon },
@@ -80,6 +103,7 @@ function dataToOverlay(g, map, def, kind) {
 }
 
 export default function MeasurePage() {
+  const router = useRouter();
   const { customers, updateCustomer } = useData();
 
   const mapRef = useRef(null);
@@ -111,6 +135,8 @@ export default function MeasurePage() {
   const [showCustomerAddresses, setShowCustomerAddresses] = useState(false);
   const [candidates, setCandidates] = useState([]);
   const [detecting, setDetecting] = useState(false);
+  const [pullingParcel, setPullingParcel] = useState(false);
+  const [parcelInfo, setParcelInfo] = useState(null); // {parcelId, owner, address, acres, sourceLabel}
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [toast, setToast] = useState(null);
   const [activeCustomerId, setActiveCustomerId] = useState(null);
@@ -954,13 +980,29 @@ export default function MeasurePage() {
   }, []);
 
   // ---- Auto-detect buildings via Overpass ----
+  // candidates carry a `kind` field: 'building' (subtract as exclusion),
+  // 'parcel' (accept as area, GIS-sourced), or 'walk' (accept as area, AR
+  // perimeter walk). Only 'building' becomes an exclusion shape on accept;
+  // everything else becomes an area shape with its preset label.
   const acceptCandidate = useCallback((cid) => {
     const overlay = candidateOverlaysRef.current.get(cid);
     if (!overlay) return;
+    const cand = candidates.find(c => c.id === cid);
+    const shapeKind = cand?.kind === 'building' ? 'exclusion' : 'area';
+    const presetLabel = cand?.label;
     candidateOverlaysRef.current.delete(cid);
-    addShape(overlay, 'exclusion');
+    if (shapeKind === 'area') {
+      overlay.setOptions({
+        fillColor: AREA_FILL,
+        strokeColor: AREA_STROKE,
+        fillOpacity: 0.3,
+        draggable: false,
+      });
+    }
+    addShape(overlay, shapeKind, presetLabel);
     setCandidates(prev => prev.filter(c => c.id !== cid));
-  }, [addShape]);
+    if (cand?.kind === 'parcel') setParcelInfo(null);
+  }, [addShape, candidates]);
 
   const acceptAllCandidates = useCallback(() => {
     Array.from(candidateOverlaysRef.current.keys()).forEach(acceptCandidate);
@@ -970,6 +1012,7 @@ export default function MeasurePage() {
     candidateOverlaysRef.current.forEach(o => o.setMap(null));
     candidateOverlaysRef.current.clear();
     setCandidates([]);
+    setParcelInfo(null);
   }, []);
 
   const detectBuildings = useCallback(async () => {
@@ -1014,7 +1057,7 @@ export default function MeasurePage() {
         if (sqft < 30) { overlay.setMap(null); return; }
         const cid = `cand-${el.id}`;
         candidateOverlaysRef.current.set(cid, overlay);
-        found.push({ id: cid, sqft, tag: el.tags?.building || 'building' });
+        found.push({ id: cid, sqft, tag: el.tags?.building || 'building', kind: 'building' });
         overlay.addListener('click', () => acceptCandidate(cid));
       });
       setCandidates(found);
@@ -1030,6 +1073,119 @@ export default function MeasurePage() {
       setDetecting(false);
     }
   }, [acceptCandidate, showToast]);
+
+  // ---- Pull parcel boundary from Nebraska public GIS ----
+  // Hits /api/parcel/lookup (Lancaster County → NE statewide fallback) using
+  // the current map center as the lookup point. On hit, drops the property
+  // polygon as a single blue candidate that the user can accept as an area
+  // shape. Bypasses the building candidates pattern's exclusion default by
+  // tagging the candidate kind: 'parcel'.
+  const pullParcel = useCallback(async () => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+    const center = map.getCenter();
+    if (!center) return;
+    setPullingParcel(true);
+
+    candidateOverlaysRef.current.forEach(o => o.setMap(null));
+    candidateOverlaysRef.current.clear();
+    setCandidates([]);
+    setParcelInfo(null);
+
+    try {
+      const result = await lookupParcel({ lat: center.lat(), lng: center.lng() });
+      if (!result.ok) {
+        showToast(
+          result.miss
+            ? 'No parcel found at map center. Pan to the property and try again.'
+            : (result.error || 'Parcel lookup failed.'),
+          result.miss ? 'info' : 'error',
+        );
+        return;
+      }
+      const g = window.google.maps;
+      const outerRing = result.parcel.rings?.[0];
+      if (!outerRing || outerRing.length < 3) {
+        showToast('Parcel returned no usable polygon.', 'error');
+        return;
+      }
+      const overlay = new g.Polygon({
+        paths: outerRing,
+        fillColor: PARCEL_FILL,
+        fillOpacity: 0.25,
+        strokeColor: PARCEL_STROKE,
+        strokeWeight: 3,
+        strokeOpacity: 0.95,
+        clickable: true,
+        zIndex: 6,
+        map,
+      });
+      const sqft = Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
+      const cid = `parcel-${Date.now()}`;
+      candidateOverlaysRef.current.set(cid, overlay);
+      const attrs = result.parcel.attributes || {};
+      const label = attrs.address || attrs.parcelId || 'Property';
+      setCandidates([{ id: cid, sqft, kind: 'parcel', tag: 'parcel', label }]);
+      setParcelInfo({ ...attrs, sourceLabel: result.parcel.sourceLabel, sqft });
+      overlay.addListener('click', () => acceptCandidate(cid));
+
+      const bounds = new g.LatLngBounds();
+      outerRing.forEach(p => bounds.extend(p));
+      map.fitBounds(bounds, 32);
+      showToast(`Parcel found (${sqft.toLocaleString()} sqft). Tap to accept.`, 'success');
+    } catch (err) {
+      console.error('Parcel lookup failed', err);
+      showToast('Could not look up parcel. Try again.', 'error');
+    } finally {
+      setPullingParcel(false);
+    }
+  }, [acceptCandidate, showToast]);
+
+  // ---- WebXR perimeter-walk handoff ----
+  // /measure/walk writes its result to sessionStorage and routes back here.
+  // We pick it up after the map is ready, drop a draggable purple candidate
+  // polygon at the current map centre, and let the user position it over the
+  // satellite imagery. Walks have no compass heading so the rotation is
+  // arbitrary — the user drags / edits vertices to align.
+  useEffect(() => {
+    if (!mapsLoaded || !mapInstanceRef.current) return;
+    let raw;
+    try { raw = sessionStorage.getItem(WALK_RESULT_KEY); } catch { return; }
+    if (!raw) return;
+    let result;
+    try { result = JSON.parse(raw); } catch { sessionStorage.removeItem(WALK_RESULT_KEY); return; }
+    sessionStorage.removeItem(WALK_RESULT_KEY);
+    if (!Array.isArray(result?.points) || result.points.length < 3) return;
+
+    const map = mapInstanceRef.current;
+    const g = window.google.maps;
+    const center = map.getCenter();
+    if (!center) return;
+    const path = walkPointsToLatLng(result.points, { lat: center.lat(), lng: center.lng() });
+
+    const overlay = new g.Polygon({
+      paths: path,
+      fillColor: WALK_FILL,
+      fillOpacity: 0.3,
+      strokeColor: WALK_STROKE,
+      strokeWeight: 3,
+      strokeOpacity: 0.95,
+      clickable: true,
+      draggable: true, // user drags the schematic over the satellite imagery
+      zIndex: 7,
+      map,
+    });
+    const sqft = result.sqft || Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
+    const cid = `walk-${Date.now()}`;
+    candidateOverlaysRef.current.set(cid, overlay);
+    setCandidates([{ id: cid, sqft, kind: 'walk', tag: 'walk', label: 'AR walk' }]);
+    overlay.addListener('click', () => acceptCandidate(cid));
+
+    const bounds = new g.LatLngBounds();
+    path.forEach(p => bounds.extend(p));
+    map.fitBounds(bounds, 96);
+    showToast(`AR walk loaded (${sqft.toLocaleString()} sqft). Drag to align with the property.`, 'success');
+  }, [mapsLoaded, acceptCandidate, showToast]);
 
   // ---- Per-customer save / load ----
   const loadFromCustomer = useCallback((customer) => {
@@ -1415,6 +1571,25 @@ export default function MeasurePage() {
 
           <button
             className="measure-tool-btn"
+            onClick={pullParcel}
+            disabled={pullingParcel}
+            title="Pull property line from Nebraska public GIS"
+          >
+            {pullingParcel ? <Loader2 size={16} className="spin" /> : <LandPlot size={16} />}
+            <span className="measure-tool-label">{pullingParcel ? 'Loading…' : 'Pull Parcel'}</span>
+          </button>
+
+          <button
+            className="measure-tool-btn"
+            onClick={() => router.push('/measure/walk')}
+            title="Walk the perimeter on-site with AR (Android Chrome only)"
+          >
+            <Footprints size={16} />
+            <span className="measure-tool-label">AR Walk</span>
+          </button>
+
+          <button
+            className="measure-tool-btn"
             onClick={detectBuildings}
             disabled={detecting}
             title="Auto-detect buildings in view"
@@ -1458,7 +1633,69 @@ export default function MeasurePage() {
           </div>
         )}
 
-        {candidates.length > 0 && (
+        {candidates.length > 0 && candidates.every(c => c.kind === 'parcel') && (
+          <div className="measure-candidates" style={{ borderColor: PARCEL_STROKE }}>
+            <div className="measure-candidates-head">
+              <LandPlot size={14} />
+              <strong>Property line</strong>
+              {parcelInfo?.sourceLabel && (
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.74rem' }}>
+                  · {parcelInfo.sourceLabel}
+                </span>
+              )}
+              <button className="measure-candidates-close" onClick={dismissCandidates} title="Dismiss">
+                <X size={14} />
+              </button>
+            </div>
+            {parcelInfo && (parcelInfo.owner || parcelInfo.address || parcelInfo.acres) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 8px 6px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+                {parcelInfo.address && <div>{parcelInfo.address}</div>}
+                {parcelInfo.owner && <div style={{ opacity: 0.85 }}>{parcelInfo.owner}</div>}
+                <div style={{ opacity: 0.7 }}>
+                  {parcelInfo.sqft?.toLocaleString()} sqft
+                  {parcelInfo.acres ? ` · ${Number(parcelInfo.acres).toFixed(2)} ac` : ''}
+                  {parcelInfo.parcelId ? ` · #${parcelInfo.parcelId}` : ''}
+                </div>
+              </div>
+            )}
+            <div className="measure-candidates-actions">
+              <button className="btn btn-primary btn-sm" onClick={acceptAllCandidates}>
+                <CheckCircle size={14} /> Use as area
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={dismissCandidates}>
+                Skip
+              </button>
+            </div>
+          </div>
+        )}
+
+        {candidates.length > 0 && candidates.every(c => c.kind === 'walk') && (
+          <div className="measure-candidates" style={{ borderColor: WALK_STROKE }}>
+            <div className="measure-candidates-head">
+              <Footprints size={14} />
+              <strong>AR walk</strong>
+              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.74rem' }}>
+                · {candidates[0]?.sqft?.toLocaleString()} sqft · drift ±1%
+              </span>
+              <button className="measure-candidates-close" onClick={dismissCandidates} title="Dismiss">
+                <X size={14} />
+              </button>
+            </div>
+            <div style={{ padding: '4px 8px 6px', fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
+              Drag the purple polygon over the property, then accept.
+            </div>
+            <div className="measure-candidates-actions">
+              <button className="btn btn-primary btn-sm" onClick={acceptAllCandidates}>
+                <CheckCircle size={14} /> Accept
+              </button>
+              <button className="btn btn-ghost btn-sm" onClick={dismissCandidates}>
+                Skip
+              </button>
+            </div>
+          </div>
+        )}
+
+        {candidates.length > 0 && candidates.some(c => c.kind === 'building') && (
           <div className="measure-candidates">
             <div className="measure-candidates-head">
               <Building2 size={14} />
@@ -1504,8 +1741,9 @@ export default function MeasurePage() {
                 <SquareIcon size={28} style={{ opacity: 0.4 }} />
                 <p>No shapes drawn yet.</p>
                 <p className="measure-empty-hint">
-                  Pick a tool. Use <strong>Subtract</strong> or <strong>Detect Buildings</strong> to remove
-                  driveways, houses, sheds. Pick a customer from the folder icon to load or save a yard.
+                  Pick a tool, or hit <strong>Pull Parcel</strong> to load the property line from public GIS.
+                  Use <strong>Subtract</strong> or <strong>Detect Buildings</strong> to remove driveways, houses, sheds.
+                  Pick a customer from the folder icon to load or save a yard.
                 </p>
               </div>
             ) : (

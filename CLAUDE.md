@@ -116,6 +116,16 @@ The job detail page banner at [`(dashboard)/jobs/[id]/page.js`](luckyapp/src/app
 
 When the user clicks **Complete** on a job whose margin is below 30%, a **reality-check modal** intercepts and shows the actual numbers before the status flips. It's a soft warning, not a hard block — `handleStatusChange('completed', { skipMarginCheck: true })` bypasses it. If a source quote exists, a variance row under the banner compares actual revenue + materials against quoted revenue + `quote.materialsCost`. The constant `TARGET_MARGIN_PCT = 30` is the single source of truth — change it there to retune the threshold.
 
+### Measure tool — satellite, parcel pull, building detect, AR walk
+The measure page at [`(dashboard)/measure/page.js`](luckyapp/src/app/(dashboard)/measure/page.js) is the differentiating feature for selling the app. Four input methods feed the same `shapes` model (areas + exclusions, all in sqft):
+
+1. **Manual draw** — polygon / rectangle / circle / freehand on Google Maps satellite imagery. The original mode.
+2. **Pull Parcel** — hits [`/api/parcel/lookup`](luckyapp/src/app/api/parcel/lookup/route.js) which queries free Nebraska public GIS endpoints in order: Lancaster County (Lincoln) → NE statewide TaxParcels2023 FeatureServer. Both are public, key-free ArcGIS REST services. The point-in-polygon query uses the current map centre. Returns the parcel polygon as a blue draggable candidate with owner/address/parcel-id surfaced; user accepts as an area shape.
+3. **Detect Buildings** — Overpass API (free OSM) returns all `way["building"]` polygons in the current map bounds. They become orange candidates that subtract from area on accept.
+4. **AR Walk** — `/measure/walk` ([`(dashboard)/measure/walk/page.js`](luckyapp/src/app/(dashboard)/measure/walk/page.js)) uses WebXR Hit-Test + three.js to let a salesperson stand on the property and tap to drop perimeter anchor points. Computes polygon area on the XZ ground plane via shoelace, hands the result back via `sessionStorage['lucky_measure_walk_result']` = `{ sqft, points: [{x,z}], capturedAt, source: 'webxr-walk' }`. The measure page picks it up on mount, drops a purple draggable schematic at the current map centre (no compass heading captured, so rotation is arbitrary — user drags to align), and accepts as an area shape. **Android Chrome only** — iOS Safari does not support WebXR; the walk page shows a fallback message there. Drift on WebXR's visual-inertial odometry is ~1% over distance, so the UI labels this an estimate.
+
+All four methods feed the same candidate flow: candidates get `kind: 'building' | 'parcel' | 'walk'`, and `acceptCandidate` converts to `'exclusion'` (building) or `'area'` (parcel + walk). No paid services or subscriptions — every external endpoint used is free public GIS, OSM, or browser-native WebXR.
+
 
 ## When finished with response
 Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.
