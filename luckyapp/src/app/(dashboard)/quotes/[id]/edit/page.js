@@ -4,8 +4,9 @@ import { useState, useEffect } from 'react';
 import { useData } from '@/lib/data';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Plus, Trash2, Save, X } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, X, Package } from 'lucide-react';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
+import SelectMaterialsModal from '@/components/SelectMaterialsModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -22,6 +23,8 @@ export default function EditQuotePage() {
   const [customerId, setCustomerId] = useState('');
   const [category, setCategory] = useState('');
   const [items, setItems] = useState([]);
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
+  const [showMaterialsPicker, setShowMaterialsPicker] = useState(false);
   const [notes, setNotes] = useState('');
   const [materialsCost, setMaterialsCost] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -34,6 +37,7 @@ export default function EditQuotePage() {
       setCustomerId(quote.customerId || '');
       setCategory(quote.category || '');
       setItems((quote.items || []).map((item, i) => ({ ...item, id: item.id || `li${i}` })));
+      setSelectedMaterials(quote.selectedMaterials || []);
       setNotes(quote.notes || '');
       setMaterialsCost(quote.materialsCost || 0);
       setDeliveryFee(quote.deliveryFee || 0);
@@ -114,6 +118,7 @@ export default function EditQuotePage() {
       customerId,
       category,
       items,
+      selectedMaterials,
       notes,
       status,
       total: subtotal,
@@ -327,6 +332,47 @@ export default function EditQuotePage() {
             <Plus size={16} /> Add First Item
           </button>
         </div>
+      )}
+
+      {/* Selected materials */}
+      <div className="card" style={{ marginBottom: 'var(--space-lg)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
+          <div>
+            <h4 style={{ marginBottom: 4 }}>
+              <Package size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+              Selected Materials
+            </h4>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', margin: 0 }}>
+              Customer sees photos + names + quantities. No prices.
+            </p>
+          </div>
+          <button className="btn btn-secondary" onClick={() => setShowMaterialsPicker(true)}>
+            <Plus size={14} /> {selectedMaterials.length === 0 ? 'Pick materials' : `Edit (${selectedMaterials.length})`}
+          </button>
+        </div>
+        {selectedMaterials.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+            {selectedMaterials.map((sm, i) => (
+              <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
+                  {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showMaterialsPicker && (
+        <SelectMaterialsModal
+          initialSelection={selectedMaterials}
+          onClose={() => setShowMaterialsPicker(false)}
+          onSave={setSelectedMaterials}
+        />
       )}
 
       {/* Deposit (Materials + Delivery) */}

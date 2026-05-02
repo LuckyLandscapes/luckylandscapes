@@ -19,6 +19,7 @@ export async function GET(_request, { params }) {
       id, quote_number, status, category, items, total,
       materials_cost, delivery_fee, deposit_paid_at,
       decline_reason, declined_at, notes, created_at, public_token,
+      selected_materials,
       customers ( first_name, last_name, email, phone, address, city, state, zip )
     `)
     .eq('public_token', token)

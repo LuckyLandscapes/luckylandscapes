@@ -22,6 +22,7 @@ export async function GET(_request, { params }) {
       body, customer_snapshot, public_token,
       sent_at, last_viewed_at, signed_at, declined_at,
       signature_typed_name, pdf_url, created_at,
+      selected_materials,
       customers ( first_name, last_name, email, phone, address, city, state, zip )
     `)
     .eq('public_token', token)

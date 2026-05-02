@@ -48,11 +48,13 @@ Landscaping is brutally seasonal. Spell out the year:
 ## Vendors & suppliers
 | Category | Vendor | Account / contact | Notes |
 |---|---|---|---|
-| Mulch / soil / stone / rock | Outdoor Solutions | TODO | Primary for all bulk landscape material |
-| Plants / nursery | Outdoor Solutions | TODO | OS has a nursery — same vendor |
+| Mulch / soil / stone / rock | Outdoor Solutions | 402-420-1477 · outdoorsolutions-lincoln.com | Primary for all bulk landscape material. Store is 10901 South 14th Street, Roca, NE 68430 (2 miles south of Lincoln) — confusingly the website is `outdoorsolutions-lincoln.com`. Same business. |
+| Plants / nursery | Outdoor Solutions | same as above | OS has a nursery — same vendor |
 | Brick / pavers / hardscape | Menards (first), Home Depot (backup) | TODO | Default to Menards; check HD only if pricing is materially better on a given run |
 | Fuel | Any gas station | TODO | TODO |
 | Equipment rental | Sub (we are both under 21, can rent through them) | TODO | TODO |
+
+**Suppliers are managed in the catalog system.** Inside the app: `/catalog` → "Suppliers" button (only visible in Internal view). Each supplier carries a `default_tax_rate` (Lincoln/Lancaster combined sales tax, currently 7.25%) that flows into per-material cost calcs. **Sales tax election:** assumed Option 1 (contractor pays tax at supplier; doesn't charge customer tax) until Riley confirms with an accountant. If we move to Option 2 (resale cert), the `tax_rate` columns and `getMaterialActualCost()` semantics change — see [CLAUDE.md](../CLAUDE.md#catalog-system) and [`luckyapp/src/lib/catalog.js`](../luckyapp/src/lib/catalog.js).
 
 ## Software stack (operational)
 - **Quote intake:** Marketing site quote form → luckyapp `POST /api/leads/public` → creates a `customers` row tagged `'lead'` with `source = 'website'`, uploads any photos to the `quote-media` Storage bucket tied to that customer, writes an `activity` row, and dispatches `notifyOrg()` (in-app feed + Resend email + web push to owners/admins). The legacy Google Apps Script path was retired 2026-05-01 — the deployment URL constant in `marketing/main.js` is intentionally blank but the variable is preserved as a kill switch in case we ever need to dual-write again.

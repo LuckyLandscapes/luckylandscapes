@@ -218,6 +218,36 @@ export default function QuotePage({ params }) {
               </tbody>
             </table>
 
+            {/* Selected materials gallery — visual confirmation of the
+                specific products the team will install. No prices here. */}
+            {Array.isArray(quote.selected_materials) && quote.selected_materials.length > 0 && (
+              <div style={{ marginTop: 28, marginBottom: 24 }}>
+                <h3 style={{ margin: '0 0 8px', fontSize: 18, color: '#2D4A22' }}>Materials we&apos;ll be using</h3>
+                <p style={{ margin: '0 0 16px', fontSize: 13, color: '#666' }}>These are the specific products we&apos;ve selected for your project.</p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+                  {quote.selected_materials.map((sm, i) => (
+                    <div key={`${sm.materialId || 'm'}-${i}`} style={{ background: '#F7F5F0', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                      <div style={{ aspectRatio: '4 / 3', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        {sm.imageUrl ? <img src={sm.imageUrl} alt={sm.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 28 }}>📦</span>}
+                      </div>
+                      <div style={{ padding: '10px 12px' }}>
+                        <div style={{ fontWeight: 700, fontSize: 14, color: '#222', lineHeight: 1.3 }}>{sm.name}</div>
+                        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{sm.quantity} {sm.unit}</div>
+                        {(sm.color || sm.texture) && (
+                          <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                            {[sm.color, sm.texture].filter(Boolean).join(' · ')}
+                          </div>
+                        )}
+                        {sm.notes && (
+                          <div style={{ fontSize: 11, color: '#444', marginTop: 4, fontStyle: 'italic' }}>{sm.notes}</div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div style={styles.totals}>
               <div style={styles.totalRow} className="quote-total-row"><span>Estimated Total</span><span>{formatUSD(quote.total)}</span></div>
             </div>

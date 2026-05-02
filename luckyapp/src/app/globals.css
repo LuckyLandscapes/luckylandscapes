@@ -9573,3 +9573,148 @@ body {
   );
   border-left: 2px solid var(--event-color);
 }
+
+/* ============================================================
+   Customer-facing material cards (catalog Customer view, quote
+   gallery, sign-page approval gallery, presentation slideshow)
+   ============================================================ */
+
+.customer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-md);
+}
+
+.customer-grid-item {
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+.customer-grid-item:hover { transform: translateY(-2px); }
+
+.customer-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  height: 100%;
+}
+.customer-card-image {
+  aspect-ratio: 4 / 3;
+  background: var(--bg-elevated);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.customer-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.customer-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-tertiary);
+}
+.customer-card-body {
+  padding: var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+.customer-card-name {
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.customer-card-subcat {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.customer-card-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-top: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.customer-card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.customer-card-chips .chip {
+  font-size: 0.72rem;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+.customer-card-chips .chip-color {
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border-color: rgba(99, 102, 241, 0.3);
+}
+.customer-card-chips .chip-texture {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+.customer-card-chips .chip-coverage {
+  background: rgba(58, 156, 74, 0.12);
+  color: var(--lucky-green-light);
+  border-color: rgba(58, 156, 74, 0.3);
+}
+.customer-card-qty {
+  margin-top: 8px;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--lucky-green-light);
+}
+.customer-card-lg .customer-card-image { aspect-ratio: 16 / 10; }
+.customer-card-lg .customer-card-name { font-size: 1.2rem; }
+
+/* Form hint text used by MaterialFormModal */
+.form-hint {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+/* Inline alert variants used by catalog page + import flow */
+.alert {
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+.alert-info {
+  background: rgba(58, 156, 74, 0.08);
+  border-color: rgba(58, 156, 74, 0.3);
+  color: var(--text-primary);
+}
+.alert-warn {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: var(--text-primary);
+}
+.alert-danger {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--text-primary);
+}

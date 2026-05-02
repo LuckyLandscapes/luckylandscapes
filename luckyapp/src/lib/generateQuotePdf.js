@@ -213,6 +213,105 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
 
   y = doc.lastAutoTable.finalY + 20;
 
+  // =============== SELECTED MATERIALS GALLERY ===============
+  // Customer-facing visual confirmation of the specific products that
+  // will be installed. Photos + names + quantities only — never prices.
+  // This is the same gallery rendered into the contract they sign, so
+  // they're approving exactly these products before work starts.
+  const selectedMaterials = Array.isArray(quote.selectedMaterials) ? quote.selectedMaterials : [];
+  if (selectedMaterials.length > 0) {
+    // Page break check — need ~140pt for the section header + at least one row
+    if (y + 140 > doc.internal.pageSize.getHeight() - 60) {
+      doc.addPage();
+      y = margin;
+    }
+
+    doc.setFontSize(13);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...FOREST);
+    doc.text('Materials we\'ll be using', margin, y);
+    y += 8;
+    doc.setDrawColor(...CLOVER);
+    doc.setLineWidth(1);
+    doc.line(margin, y, margin + 80, y);
+    y += 14;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    doc.text('These are the specific products selected for your project. Approving the contract approves these materials.', margin, y);
+    y += 16;
+
+    // Grid layout: 3 columns. Each card 110pt high (image 70 + caption 40).
+    const cols = 3;
+    const gutter = 12;
+    const cardW = (contentWidth - gutter * (cols - 1)) / cols;
+    const imgH = 70;
+    const cardH = imgH + 56;
+
+    // Try to load all images in parallel — failures fall back to a placeholder.
+    const imageData = await Promise.all(selectedMaterials.map(async sm => {
+      if (!sm.imageUrl) return null;
+      try { return await loadImageAsBase64(sm.imageUrl); }
+      catch { return null; }
+    }));
+
+    for (let i = 0; i < selectedMaterials.length; i++) {
+      const sm = selectedMaterials[i];
+      const col = i % cols;
+      const x = margin + col * (cardW + gutter);
+
+      if (col === 0 && i > 0) {
+        // New row — page break check
+        if (y + cardH + 20 > doc.internal.pageSize.getHeight() - 60) {
+          doc.addPage();
+          y = margin;
+        }
+      }
+
+      // Card background
+      doc.setFillColor(...LIGHT_BG);
+      doc.setDrawColor(229, 231, 235);
+      doc.roundedRect(x, y, cardW, cardH, 4, 4, 'FD');
+
+      // Image
+      const img = imageData[i];
+      if (img) {
+        try {
+          doc.addImage(img, 'PNG', x + 6, y + 6, cardW - 12, imgH);
+        } catch {
+          // jsPDF can throw on weird image formats — leave the slot blank
+        }
+      }
+
+      // Caption
+      doc.setTextColor(...CHARCOAL);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(9);
+      const nameLines = doc.splitTextToSize(sm.name || '', cardW - 12);
+      doc.text(nameLines.slice(0, 2), x + 6, y + imgH + 18);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8);
+      doc.setTextColor(...GRAY);
+      const qtyLine = `${sm.quantity || 1} ${sm.unit || ''}`.trim();
+      doc.text(qtyLine, x + 6, y + imgH + 38);
+
+      // Optional color/texture chip text
+      if (sm.color || sm.texture) {
+        const chipText = [sm.color, sm.texture].filter(Boolean).join(' · ');
+        doc.text(chipText, x + 6, y + imgH + 50, { maxWidth: cardW - 12 });
+      }
+
+      // Move y at end of each row
+      if (col === cols - 1) y += cardH + gutter;
+    }
+    // Account for partial last row
+    if ((selectedMaterials.length % cols) !== 0) y += cardH + gutter;
+
+    y += 6;
+  }
+
   // =============== TOTALS BOX ===============
   const totalsWidth = 240;
   const totalsX = pageWidth - margin - totalsWidth;

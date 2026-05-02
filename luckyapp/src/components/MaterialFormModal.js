@@ -2,41 +2,43 @@
 import { useState, useRef } from 'react';
 import { X, Upload, Loader2, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import {
+  MATERIAL_CATEGORIES, MATERIAL_UNITS, STOCK_STATUSES,
+  getEffectiveTaxRate, getMaterialActualCost, formatCurrency, formatTaxRate,
+} from '@/lib/catalog';
 
-const CATEGORIES = ['Mulch','Rock','Pavers','Retaining Wall','Soil & Amendments','Edging','Flagstone','Boulders','Sand & Gravel','Sod & Seed','Pottery','Other'];
-const SUPPLIERS = ['Outdoor Solutions','Menards','Home Depot','Other'];
-const STOCK_STATUSES = [
-  { value: 'unknown', label: 'Unknown' },
-  { value: 'in_stock', label: 'In stock' },
-  { value: 'low_stock', label: 'Low stock' },
-  { value: 'out_of_stock', label: 'Out of stock' },
-];
+const STOCK_LABELS = {
+  unknown: 'Unknown',
+  in_stock: 'In stock',
+  low_stock: 'Low stock',
+  out_of_stock: 'Out of stock',
+};
 
-export default function MaterialFormModal({ material, onClose, onSave }) {
+export default function MaterialFormModal({ material, suppliers = [], onClose, onSave }) {
   const isEdit = !!material;
   const fileRef = useRef(null);
   const [saving, setSaving] = useState(false);
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(material?.imageUrl || material?.image || '');
+  const [imagePreview, setImagePreview] = useState(material?.imageUrl || '');
   const [form, setForm] = useState({
+    supplierId: material?.supplierId || (suppliers[0]?.id ?? ''),
     name: material?.name || '',
     category: material?.category || '',
     subcategory: material?.subcategory || '',
     description: material?.description || '',
     unit: material?.unit || 'cu yd',
-    unitAlt: material?.unitAlt || '',
-    costLow: material?.costLow || '',
-    costHigh: material?.costHigh || '',
-    supplier: material?.supplier || '',
-    supplierUrl: material?.supplierUrl || '',
-    supplierUrlAlt: material?.supplierUrlAlt || '',
+    unitCost: material?.unitCost ?? '',
+    taxRate: material?.taxRate != null ? material.taxRate : '',  // empty = inherit supplier default
     sku: material?.sku || '',
     color: material?.color || '',
     texture: material?.texture || '',
     coveragePerUnit: material?.coveragePerUnit || '',
+    supplierUrl: material?.supplierUrl || '',
+    supplierUrlAlt: material?.supplierUrlAlt || '',
     notes: material?.notes || '',
-    isFavorite: material?.isFavorite || false,
-    soldOut: material?.soldOut || false,
+    isFavorite: material?.isFavorite ?? false,
+    isActive: material?.isActive ?? true,
+    isCustomerVisible: material?.isCustomerVisible ?? true,
     stockStatus: material?.stockStatus || 'unknown',
     stockQty: material?.stockQty ?? '',
     stockLastChecked: material?.stockLastChecked || null,
@@ -45,6 +47,16 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
   const [verifyMsg, setVerifyMsg] = useState('');
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const selectedSupplier = suppliers.find(s => s.id === form.supplierId) || null;
+
+  // Live preview of "what cost actually flows into a job", using the supplier's
+  // default tax rate when the per-item rate is blank.
+  const previewMaterial = {
+    unitCost: parseFloat(form.unitCost) || 0,
+    taxRate: form.taxRate === '' ? null : parseFloat(form.taxRate),
+  };
+  const effectiveRate = getEffectiveTaxRate(previewMaterial, selectedSupplier);
+  const actualCost = getMaterialActualCost(previewMaterial, selectedSupplier);
 
   const verifyNow = async () => {
     if (!form.supplierUrl) { setVerifyMsg('Add a supplier product URL first.'); return; }
@@ -59,16 +71,12 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
       if (!data.ok) { setVerifyMsg(data.error || 'Could not read live data.'); return; }
       setForm(p => ({
         ...p,
-        costLow: data.price != null ? String(data.price) : p.costLow,
-        costHigh: data.price != null ? String(data.price) : p.costHigh,
+        unitCost: data.price != null ? String(data.price) : p.unitCost,
         stockStatus: data.stockStatus || p.stockStatus,
         stockLastChecked: data.checkedAt,
-        soldOut: data.stockStatus === 'out_of_stock',
       }));
-      if (data.image && !imagePreview) {
-        setImagePreview(data.image);
-      }
-      setVerifyMsg(`Updated from supplier (${data.stockStatus.replace('_', ' ')}, $${data.price ?? '—'}).`);
+      if (data.image && !imagePreview) setImagePreview(data.image);
+      setVerifyMsg(`Updated from supplier (${(data.stockStatus || 'unknown').replace('_', ' ')}, $${data.price ?? '—'}).`);
     } catch (err) {
       setVerifyMsg('Lookup failed: ' + (err.message || err));
     } finally {
@@ -84,13 +92,10 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.name || !form.category) return;
+    if (!form.name || !form.category || !form.supplierId) return;
     setSaving(true);
     try {
-      // Priority: a freshly uploaded file > whatever is currently in the
-      // preview (which Verify-live may have set to a supplier-hosted URL) >
-      // the saved material's existing image.
-      let imageUrl = material?.imageUrl || material?.image || '';
+      let imageUrl = material?.imageUrl || '';
       if (imagePreview && imagePreview.startsWith('http')) imageUrl = imagePreview;
       if (imageFile && supabase) {
         const ext = imageFile.name.split('.').pop();
@@ -102,10 +107,9 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
       }
       await onSave({
         ...form,
-        image: imageUrl,
-        imageUrl: imageUrl,
-        costLow: parseFloat(form.costLow) || 0,
-        costHigh: parseFloat(form.costHigh) || 0,
+        imageUrl,
+        unitCost: parseFloat(form.unitCost) || 0,
+        taxRate: form.taxRate === '' ? null : parseFloat(form.taxRate),
         stockQty: form.stockQty === '' ? null : parseInt(form.stockQty, 10) || 0,
         lastPriceCheck: new Date().toISOString(),
       });
@@ -118,6 +122,8 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
     }
   };
 
+  const noSuppliers = suppliers.length === 0;
+
   return (
     <div className="modal-overlay" onClick={() => !saving && onClose()}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640, maxHeight: '90vh', overflow: 'auto' }}>
@@ -126,6 +132,12 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
           <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="modal-body">
+          {noSuppliers && (
+            <div className="alert alert-warn" style={{ marginBottom: 'var(--space-md)' }}>
+              You don&apos;t have any suppliers yet. Add a supplier first (Outdoor Solutions, Menards, Home Depot) — every material has to be linked to one.
+            </div>
+          )}
+
           {/* Image Upload */}
           <div className="form-group full-width" style={{ marginBottom: 'var(--space-md)' }}>
             <label className="form-label">Photo</label>
@@ -147,6 +159,19 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
           </div>
 
           <div className="material-form-grid">
+            {/* Supplier comes first now — it's the gating choice */}
+            <div className="form-group full-width">
+              <label className="form-label">Supplier <span className="required">*</span></label>
+              <select className="form-select" value={form.supplierId} onChange={e => set('supplierId', e.target.value)} disabled={noSuppliers}>
+                <option value="">Select supplier...</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}{s.defaultTaxRate != null ? ` (default tax ${formatTaxRate(s.defaultTaxRate)})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <div className="form-group full-width">
               <label className="form-label">Name <span className="required">*</span></label>
               <input className="form-input" value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Crimson Red Mulch" />
@@ -155,7 +180,7 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
               <label className="form-label">Category <span className="required">*</span></label>
               <select className="form-select" value={form.category} onChange={e => set('category', e.target.value)}>
                 <option value="">Select...</option>
-                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                {MATERIAL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -163,37 +188,54 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
               <input className="form-input" value={form.subcategory} onChange={e => set('subcategory', e.target.value)} placeholder="e.g. Dyed" />
             </div>
             <div className="form-group full-width">
-              <label className="form-label">Description</label>
+              <label className="form-label">Description (customer-visible)</label>
               <textarea className="form-textarea" rows={2} value={form.description} onChange={e => set('description', e.target.value)} placeholder="Brief description for customers..." />
             </div>
             <div className="form-group">
               <label className="form-label">Unit</label>
               <select className="form-select" value={form.unit} onChange={e => set('unit', e.target.value)}>
-                {['cu yd','ton','sqft','each','bag','pallet','ft','face ft','load'].map(u => <option key={u} value={u}>{u}</option>)}
+                {MATERIAL_UNITS.map(u => <option key={u} value={u}>{u}</option>)}
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label">Alt Unit</label>
-              <input className="form-input" value={form.unitAlt} onChange={e => set('unitAlt', e.target.value)} placeholder="e.g. scoop" />
+              <label className="form-label">Unit Cost ($)</label>
+              <input className="form-input" type="number" step="0.01" value={form.unitCost} onChange={e => set('unitCost', e.target.value)} placeholder="35.00" />
             </div>
             <div className="form-group">
-              <label className="form-label">Cost Low ($)</label>
-              <input className="form-input" type="number" step="0.01" value={form.costLow} onChange={e => set('costLow', e.target.value)} />
+              <label className="form-label">Tax Rate (override)</label>
+              <input
+                className="form-input"
+                type="number"
+                step="0.0001"
+                min="0"
+                max="1"
+                value={form.taxRate}
+                onChange={e => set('taxRate', e.target.value)}
+                placeholder={selectedSupplier ? formatTaxRate(selectedSupplier.defaultTaxRate) + ' (supplier default)' : '0.0725'}
+              />
+              <div className="form-hint">Decimal (e.g. 0.0725 = 7.25%). Blank = use supplier default.</div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Cost High ($)</label>
-              <input className="form-input" type="number" step="0.01" value={form.costHigh} onChange={e => set('costHigh', e.target.value)} />
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
+              <div className="info-card" style={{ background: 'var(--surface-2)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-sm)' }}>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>Actual cost (incl. tax)</div>
+                <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>{formatCurrency(actualCost)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                  {formatCurrency(parseFloat(form.unitCost) || 0)} × (1 + {formatTaxRate(effectiveRate)})
+                </div>
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Supplier</label>
-              <select className="form-select" value={form.supplier} onChange={e => set('supplier', e.target.value)}>
-                <option value="">Select...</option>
-                {SUPPLIERS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
+
             <div className="form-group">
               <label className="form-label">Color</label>
               <input className="form-input" value={form.color} onChange={e => set('color', e.target.value)} placeholder="e.g. Dark Red" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Texture</label>
+              <input className="form-input" value={form.texture} onChange={e => set('texture', e.target.value)} placeholder="e.g. Coarse / Smooth" />
+            </div>
+            <div className="form-group full-width">
+              <label className="form-label">Coverage per Unit</label>
+              <input className="form-input" value={form.coveragePerUnit} onChange={e => set('coveragePerUnit', e.target.value)} placeholder='e.g. 1 cu yd ≈ 100 sqft at 3" depth' />
             </div>
             <div className="form-group full-width">
               <label className="form-label">Supplier Product URL</label>
@@ -210,7 +252,7 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
             <div className="form-group">
               <label className="form-label">Stock Status</label>
               <select className="form-select" value={form.stockStatus} onChange={e => set('stockStatus', e.target.value)}>
-                {STOCK_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                {STOCK_STATUSES.map(s => <option key={s} value={s}>{STOCK_LABELS[s]}</option>)}
               </select>
             </div>
             <div className="form-group">
@@ -237,12 +279,8 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
               </div>
             )}
             <div className="form-group full-width">
-              <label className="form-label">Coverage per Unit</label>
-              <input className="form-input" value={form.coveragePerUnit} onChange={e => set('coveragePerUnit', e.target.value)} placeholder='e.g. 1 cu yd ≈ 100 sqft at 3" depth' />
-            </div>
-            <div className="form-group full-width">
               <label className="form-label">Internal Notes</label>
-              <textarea className="form-textarea" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Notes only you see..." />
+              <textarea className="form-textarea" rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Notes only you see — never shown to customers..." />
             </div>
           </div>
 
@@ -253,14 +291,18 @@ export default function MaterialFormModal({ material, onClose, onSave }) {
               <button className={`toggle-switch ${form.isFavorite ? 'active' : ''}`} onClick={() => set('isFavorite', !form.isFavorite)} />
             </div>
             <div className="toggle-row">
-              <div><div className="toggle-row-label">🚫 Sold Out</div><div className="toggle-row-hint">Mark as unavailable</div></div>
-              <button className={`toggle-switch ${form.soldOut ? 'active' : ''}`} onClick={() => set('soldOut', !form.soldOut)} />
+              <div><div className="toggle-row-label">👁 Show in customer view</div><div className="toggle-row-hint">When off, hidden from quote galleries and customer-facing presentations</div></div>
+              <button className={`toggle-switch ${form.isCustomerVisible ? 'active' : ''}`} onClick={() => set('isCustomerVisible', !form.isCustomerVisible)} />
+            </div>
+            <div className="toggle-row">
+              <div><div className="toggle-row-label">✓ Active</div><div className="toggle-row-hint">Inactive items are hidden everywhere except the catalog admin list</div></div>
+              <button className={`toggle-switch ${form.isActive ? 'active' : ''}`} onClick={() => set('isActive', !form.isActive)} />
             </div>
           </div>
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="btn btn-primary" onClick={handleSubmit} disabled={saving || !form.name || !form.category}>
+          <button className="btn btn-primary" onClick={handleSubmit} disabled={saving || !form.name || !form.category || !form.supplierId}>
             {saving ? <><Loader2 size={16} className="spin" /> Saving...</> : isEdit ? 'Save Changes' : 'Add Material'}
           </button>
         </div>

@@ -4,8 +4,9 @@ import { useState, Suspense } from 'react';
 import { useData } from '@/lib/data';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward, Package } from 'lucide-react';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
+import SelectMaterialsModal from '@/components/SelectMaterialsModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -21,6 +22,8 @@ function NewQuoteContent() {
   const [customerId, setCustomerId] = useState(preselectedCustomer);
   const [category, setCategory] = useState('');
   const [items, setItems] = useState([]);
+  const [selectedMaterials, setSelectedMaterials] = useState([]);
+  const [showMaterialsPicker, setShowMaterialsPicker] = useState(false);
   const [notes, setNotes] = useState('');
   const [materialsCost, setMaterialsCost] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -89,6 +92,7 @@ function NewQuoteContent() {
         customerId,
         category,
         items,
+        selectedMaterials,
         notes,
         total: subtotal,
         materialsCost: parseFloat(materialsCost) || 0,
@@ -393,6 +397,41 @@ function NewQuoteContent() {
             </div>
           )}
 
+          {/* Selected materials — visual gallery the customer sees on their
+              quote and contract. No prices. Lets them approve specific
+              products by photo before the job starts. */}
+          <div className="card" style={{ marginTop: 'var(--space-lg)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-sm)' }}>
+              <div>
+                <h4 style={{ marginBottom: 4 }}>
+                  <Package size={18} style={{ verticalAlign: 'middle', marginRight: 8 }} />
+                  Selected Materials
+                </h4>
+                <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                  Customer sees photos + names + quantities (never prices) — both on the quote and on the contract they sign.
+                </p>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setShowMaterialsPicker(true)}>
+                <Plus size={14} /> {selectedMaterials.length === 0 ? 'Pick materials' : 'Edit selection'}
+              </button>
+            </div>
+            {selectedMaterials.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                {selectedMaterials.map((sm, i) => (
+                  <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                    <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
+                      {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Deposit (Materials + Delivery) — what customer pays online to lock in the job */}
           <div className="card" style={{ marginTop: 'var(--space-lg)', maxWidth: '600px' }}>
             <h4 style={{ marginBottom: 'var(--space-xs)' }}>Deposit to Schedule</h4>
@@ -464,6 +503,15 @@ function NewQuoteContent() {
         </div>
       )}
 
+      {/* Materials picker modal — opens from step 4 */}
+      {showMaterialsPicker && (
+        <SelectMaterialsModal
+          initialSelection={selectedMaterials}
+          onClose={() => setShowMaterialsPicker(false)}
+          onSave={setSelectedMaterials}
+        />
+      )}
+
       {/* Step 5: Review */}
       {step === 5 && (
         <div style={{ maxWidth: '700px' }}>
@@ -483,7 +531,7 @@ function NewQuoteContent() {
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Items</div>
-                <div style={{ fontWeight: 600 }}>{items.length} line items</div>
+                <div style={{ fontWeight: 600 }}>{items.length} line items · {selectedMaterials.length} materials</div>
               </div>
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Total</div>

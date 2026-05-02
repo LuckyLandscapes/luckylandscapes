@@ -248,6 +248,29 @@ export default function ContractDetailPage() {
           <h3 style={{ marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
             <FileSignature size={18} /> Agreement
           </h3>
+
+          {Array.isArray(contract.selectedMaterials) && contract.selectedMaterials.length > 0 && (
+            <div style={{ marginBottom: 'var(--space-lg)' }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-tertiary)', letterSpacing: '0.05em', marginBottom: 8 }}>
+                Materials approved by signing
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                {contract.selectedMaterials.map((sm, i) => (
+                  <div key={`${sm.materialId || 'm'}-${i}`} style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ aspectRatio: '4 / 3', background: 'var(--surface-1)', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      {sm.imageUrl ? <img src={sm.imageUrl} alt={sm.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 22 }}>📦</span>}
+                    </div>
+                    <div style={{ padding: '8px 10px' }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, lineHeight: 1.3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <pre style={{
             whiteSpace: 'pre-wrap',
             fontFamily: 'inherit',

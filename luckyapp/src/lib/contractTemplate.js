@@ -90,6 +90,9 @@ export function buildContractFromQuote({ quote, customer, options = {} }) {
     startDate,
     completionWindow,
     body,
+    // Snapshot the visual material gallery from the quote so signing
+    // freezes the customer's approval of these specific products.
+    selectedMaterials: Array.isArray(quote?.selectedMaterials) ? quote.selectedMaterials : [],
     customerSnapshot: {
       name: customerName,
       email: customer?.email || '',

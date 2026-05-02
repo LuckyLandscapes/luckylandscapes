@@ -127,6 +127,38 @@ export default function SignPage({ params }) {
           <SummaryCard label="Completion window" value={contract.completion_window || 'TBD'} />
         </div>
 
+        {/* Materials gallery — visual list of products approved by signing.
+            Frozen at signing time so the customer's approval is unambiguous. */}
+        {Array.isArray(contract.selected_materials) && contract.selected_materials.length > 0 && (
+          <div style={styles.detailsCard}>
+            <h2 style={{ margin: '0 0 8px', fontSize: 20, color: '#1f2937' }}>Materials Approved</h2>
+            <p style={{ color: '#666', fontSize: 13, marginTop: 0, marginBottom: 16 }}>
+              These are the specific products selected for your project. Signing confirms you approve these exact materials. {isSigned ? 'Approved.' : ''}
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14 }}>
+              {contract.selected_materials.map((sm, i) => (
+                <div key={`${sm.materialId || 'm'}-${i}`} style={{ background: '#F7F5F0', borderRadius: 8, overflow: 'hidden', border: '1px solid #e5e7eb' }}>
+                  <div style={{ aspectRatio: '4 / 3', background: '#eee', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {sm.imageUrl ? <img src={sm.imageUrl} alt={sm.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 28 }}>📦</span>}
+                  </div>
+                  <div style={{ padding: '10px 12px' }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: '#222', lineHeight: 1.3 }}>{sm.name}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{sm.quantity} {sm.unit}</div>
+                    {(sm.color || sm.texture) && (
+                      <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
+                        {[sm.color, sm.texture].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
+                    {sm.notes && (
+                      <div style={{ fontSize: 11, color: '#444', marginTop: 4, fontStyle: 'italic' }}>{sm.notes}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Agreement body */}
         <div style={styles.detailsCard}>
           <h2 style={{ margin: '0 0 16px', fontSize: 20, color: '#1f2937' }}>Full Agreement</h2>

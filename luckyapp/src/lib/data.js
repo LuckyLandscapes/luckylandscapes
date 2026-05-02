@@ -83,6 +83,7 @@ export function DataProvider({ children }) {
   const [quoteMedia, setQuoteMedia] = useState([]);
   const [jobExpenses, setJobExpenses] = useState([]);
   const [materials, setMaterials] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [services, setServices] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [companyExpenses, setCompanyExpenses] = useState([]);
@@ -132,6 +133,7 @@ export function DataProvider({ children }) {
       setQuoteMedia(loadLocal('quote_media'));
       setJobExpenses(loadLocal('job_expenses'));
       setMaterials(loadLocal('materials'));
+      setSuppliers(loadLocal('suppliers'));
       setServices(loadLocal('services'));
       setInvoices(loadLocal('invoices'));
       setCompanyExpenses(loadLocal('company_expenses'));
@@ -147,7 +149,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr, sup] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -167,6 +169,7 @@ export function DataProvider({ children }) {
         supabase.from('contracts').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('mileage_entries').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('suppliers').select('*').eq('org_id', orgId).order('sort_order', { ascending: true }).then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -188,6 +191,7 @@ export function DataProvider({ children }) {
       if (ctr?.data) setContracts(snakeToCamel(ctr.data));
       if (mile?.data) setMileageEntries(snakeToCamel(mile.data));
       if (cntr?.data) setContractors(snakeToCamel(cntr.data));
+      if (sup?.data) setSuppliers(snakeToCamel(sup.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -268,6 +272,10 @@ export function DataProvider({ children }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contractors' }, () => {
         supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true })
           .then(({ data }) => { if (data) setContractors(snakeToCamel(data)); });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'suppliers' }, () => {
+        supabase.from('suppliers').select('*').eq('org_id', orgId).order('sort_order', { ascending: true })
+          .then(({ data }) => { if (data) setSuppliers(snakeToCamel(data)); });
       })
       .subscribe();
 
@@ -1309,8 +1317,98 @@ export function DataProvider({ children }) {
     });
   }, [connected]);
 
+  // ─── Supplier CRUD ──────────────────────────────────────
+  const addSupplier = useCallback(async (data) => {
+    if (connected) {
+      const { data: row, error } = await supabase.from('suppliers')
+        .insert({ ...camelToSnake(data), org_id: orgId })
+        .select().single();
+      if (error) throw error;
+      const s = snakeToCamel(row);
+      setSuppliers(prev => [...prev, s].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
+      return s;
+    } else {
+      const s = { ...data, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setSuppliers(prev => { const next = [...prev, s]; saveLocal('suppliers', next); return next; });
+      return s;
+    }
+  }, [connected, orgId]);
+
+  const updateSupplier = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('suppliers').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setSuppliers(prev => {
+      const next = prev.map(s => s.id === id ? { ...s, ...data } : s);
+      if (!connected) saveLocal('suppliers', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteSupplier = useCallback(async (id) => {
+    // Refuse to delete a supplier that still has materials referencing it.
+    // RLS + ON DELETE RESTRICT will also reject this server-side, but a
+    // friendly error here saves a round-trip.
+    const inUse = materials.some(m => m.supplierId === id);
+    if (inUse) throw new Error('Cannot delete supplier with materials. Delete or reassign the materials first.');
+    if (connected) {
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setSuppliers(prev => {
+      const next = prev.filter(s => s.id !== id);
+      if (!connected) saveLocal('suppliers', next);
+      return next;
+    });
+  }, [connected, materials]);
+
+  // Seed the three known suppliers for Lucky Landscapes (idempotent — no-op
+  // if a supplier with that name already exists for this org).
+  const seedDefaultSuppliers = useCallback(async () => {
+    const defaults = [
+      {
+        name: 'Outdoor Solutions',
+        website: 'https://outdoorsolutions-lincoln.com',
+        defaultTaxRate: 0.0725,
+        contactPhone: '402-420-1477',
+        address: '10901 South 14th Street, Roca, Nebraska 68430',
+        notes: 'Primary supplier for bulk landscape materials (mulch, rock, soil, plants). Store is in Roca but they market under the Lincoln domain.',
+        sortOrder: 1,
+      },
+      {
+        name: 'Menards',
+        website: 'https://www.menards.com',
+        defaultTaxRate: 0.0725,
+        notes: 'First-choice for hardscape (pavers, retaining wall, edging, steps).',
+        sortOrder: 2,
+      },
+      {
+        name: 'Home Depot',
+        website: 'https://www.homedepot.com',
+        defaultTaxRate: 0.0725,
+        notes: 'Backup for hardscape, primary for bagged goods, sod, seed, fabric, accessories.',
+        sortOrder: 3,
+      },
+    ];
+    const created = [];
+    for (const def of defaults) {
+      const exists = suppliers.find(s => s.name === def.name);
+      if (exists) continue;
+      try {
+        const s = await addSupplier(def);
+        created.push(s);
+      } catch (err) {
+        // Likely UNIQUE(org_id, name) collision from a parallel call — ignore.
+        if (!String(err.message || '').includes('duplicate')) throw err;
+      }
+    }
+    return { created: created.length, skipped: defaults.length - created.length };
+  }, [suppliers, addSupplier]);
+
   // ─── Material CRUD ──────────────────────────────────────
   const addMaterial = useCallback(async (data) => {
+    if (!data.supplierId) throw new Error('Supplier is required');
     if (connected) {
       const { data: row, error } = await supabase.from('materials')
         .insert({ ...camelToSnake(data), org_id: orgId })
@@ -1364,16 +1462,14 @@ export function DataProvider({ children }) {
     return { deleted: ids.length };
   }, [connected, orgId, materials]);
 
-  // Bulk insert-or-update materials (used by the supplier catalog import).
-  // Match logic: if `matchKey(existing)` equals `matchKey(item)` AND the
-  // existing supplier matches (or is empty), update price/unit/etc. Otherwise
-  // insert a new row. Returns { inserted, updated, errors }.
+  // Bulk insert-or-update materials (used by CSV import).
+  // Match logic: `matchKey(existing)` equals `matchKey(item)` (typically
+  // `supplierId|normalizedName`) → update. Otherwise insert. Items missing a
+  // supplierId are rejected with a clear error.
   const bulkUpsertMaterials = useCallback(async (items, matchKey) => {
     let inserted = 0, updated = 0;
     const errors = [];
     const stamp = new Date().toISOString();
-    // Snapshot the current list so we don't re-match against rows we just
-    // inserted (which would force every duplicate to update the first one).
     const indexAtStart = new Map();
     materials.forEach(existing => {
       const key = matchKey(existing);
@@ -1381,10 +1477,10 @@ export function DataProvider({ children }) {
     });
     for (const item of items) {
       try {
+        if (!item.supplierId) throw new Error('supplierId required');
         const key = matchKey(item);
         const match = indexAtStart.get(key);
-        const supplierMatches = !match || !match.supplier || match.supplier === item.supplier;
-        if (match && supplierMatches) {
+        if (match) {
           const patch = { ...item, lastPriceCheck: stamp };
           if (connected) {
             const { error } = await supabase.from('materials').update(camelToSnake(patch)).eq('id', match.id);
@@ -1423,6 +1519,7 @@ export function DataProvider({ children }) {
     // State
     customers, quotes, jobs, calendarEvents, teamMembers,
     activity, timeEntries, timeSegments, jobMedia, jobExpenses, materials,
+    suppliers,
     services, invoices, companyExpenses, payments, loading,
     quoteMedia, contracts, mileageEntries, contractors,
 
@@ -1476,6 +1573,9 @@ export function DataProvider({ children }) {
 
     // Materials
     addMaterial, updateMaterial, deleteMaterial, bulkUpsertMaterials, clearAllMaterials,
+
+    // Suppliers
+    addSupplier, updateSupplier, deleteSupplier, seedDefaultSuppliers,
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,

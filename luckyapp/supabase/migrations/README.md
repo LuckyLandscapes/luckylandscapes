@@ -40,7 +40,11 @@ prefix is a sort key, not a uniqueness guarantee.
 | 024b | `024_time_segments.sql` | Real-time shift segments (job/travel/break) |
 | 025 | `025_mileage.sql` | IRS mileage log table |
 | 026 | `026_contractors.sql` | 1099 contractors + W-9 storage |
-| 027 | `027_catalog_enhancements.sql` | Catalog material attributes + media |
+| 027 | `027_catalog_enhancements.sql` | Catalog material attributes + media (superseded by 031) |
+| 029 | `029_job_workday_set.sql` | Multi-day jobs as a `scheduled_dates` JSONB workday set |
+| 030 | `030_suppliers_table.sql` | Suppliers master table (Outdoor Solutions, Menards, Home Depot) with default tax rate |
+| 031 | `031_materials_rebuild.sql` | **Drops + rebuilds materials** with supplier_id FK, single unit_cost + tax_rate, customer-visible flag, dropped image/image_emoji/cost_low/cost_high redundancy. Take a Supabase backup first. |
+| 032 | `032_selected_materials.sql` | Adds `selected_materials` JSONB to quotes + contracts (visual material approval, no prices) |
 
 > **Files 001 and 002 overlap.** Both create base tables. Run 001 first — its
 > `CREATE TABLE IF NOT EXISTS` statements prevent conflicts when 002 runs.
