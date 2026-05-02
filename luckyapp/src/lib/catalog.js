@@ -18,7 +18,7 @@ export const MATERIAL_UNITS = [
 export const MATERIAL_CATEGORIES = [
   'Mulch', 'Rock', 'Pavers', 'Retaining Wall', 'Soil & Amendments',
   'Edging', 'Flagstone', 'Boulders', 'Sand & Gravel', 'Sod & Seed',
-  'Pottery', 'Plants', 'Other',
+  'Fire Pits', 'Pottery', 'Plants', 'Other',
 ];
 
 export const STOCK_STATUSES = ['in_stock', 'low_stock', 'out_of_stock', 'unknown'];

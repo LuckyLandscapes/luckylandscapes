@@ -54,8 +54,9 @@ function normalizeName(name) {
   return String(name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-// Drop these source categories — Lucky's quotes don't include them. The
-// owner can still add specific items by hand if they ever do.
+// Drop these source categories — Lucky's quotes don't include them. Fire
+// pits and fire pit burners ARE included (Lucky installs them); pond
+// installs are excluded.
 const DROP_SOURCE_CATEGORIES = new Set([
   'pond-supplies',
   'pond-pond-category',
@@ -70,13 +71,21 @@ const DROP_SOURCE_CATEGORIES = new Set([
   'pond-pond-skimmers',
   'pond-pond-linerunderlayment',
   'pond-eco-blox',
-  'fire-pit-burners',
-  'fire-pits',
   // top-level category landing pages (no actual product)
   'mulches', 'topsoils', 'construction-materials', 'landscape-rock',
   'cobblestoneandminiboulders', 'boulders', 'flagstone', 'pavers',
   'edging', 'steps', 'drystack-walls', 'retaining-walls', 'accessories',
   'landscape-fabric', 'grass-seed-by-miller-seed-co-straw-blanket',
+]);
+
+// Source categories whose items are infrastructure customers don't pick
+// (substrate sand, adhesives, fabric, gas-plumbing for fire pits). We
+// still import them — the salesperson uses them for cost — but flag
+// is_customer_visible=false so they stay out of quote galleries.
+const INTERNAL_SOURCE_CATEGORIES = new Set([
+  'landscape-fabric',
+  'accessories',
+  'fire-pit-burners',  // burner kits, vent kits, propane conversion — plumbing
 ]);
 
 // We keep the source-category list as a denylist for top-level pages, but the
@@ -108,8 +117,14 @@ function parsePriceText(text) {
   m = t.match(/^\$([\d.]+)\s*\/\s*sq\s*ft$/i);
   if (m) return { cost: parseFloat(m[1]), unit: 'sqft' };
 
-  // "$X Each"
+  // "$X Each" or "$X.YZ Each"
   m = t.match(/^\$([\d.]+)\s*Each$/i);
+  if (m) return { cost: parseFloat(m[1]), unit: 'each' };
+
+  // Fallback: items with multi-price strings ("$35 Solid Colors/ $50
+  // Reflective Each", "$100 pair Each"). Take the first $-amount and
+  // call it 'each'. Better to import with an approximate price than skip.
+  m = t.match(/\$([\d.]+)/);
   if (m) return { cost: parseFloat(m[1]), unit: 'each' };
 
   return null;
@@ -153,9 +168,9 @@ let skippedSoldOut = 0;
 
 for (const [key, p] of Object.entries(PRODUCTS)) {
   if (isCategoryIndex(p)) { skippedCategoryIndex++; continue; }
+  // Drop pond categories — Lucky doesn't install ponds.
+  if (/^pond-/.test(p.sourceCategory || '')) { skippedPond++; continue; }
   if (DROP_SOURCE_CATEGORIES.has(p.sourceCategory) && !p.priceText) { skippedPond++; continue; }
-  // Drop anything pond/fire-pit even if it has a price
-  if (/^pond-|^fire-pit/.test(p.sourceCategory || '')) { skippedPond++; continue; }
 
   const parsed = parsePriceText(p.priceText);
   if (!parsed) { skippedNoPrice++; continue; }
@@ -164,15 +179,28 @@ for (const [key, p] of Object.entries(PRODUCTS)) {
   const legacy = legacyByKey.get(key) || legacyByKey.get(normalizeName(nameFromKey(key, p))) || null;
   if (legacy?.soldOut) { skippedSoldOut++; continue; }
 
+  // Re-categorize items the OS scrape lumped into 'Other' that are actually
+  // their own thing on Lucky's quote sheet.
+  let category = p.category || 'Other';
+  if (p.sourceCategory === 'fire-pits') category = 'Fire Pits';
+  // Fireglass + Tumbled Lava Stones are decorative fill the customer picks
+  // by color; promote them out of 'Other' into 'Fire Pits' too.
+  if (p.sourceCategory === 'fire-pit-burners' && /fireglass|lava\s*stone/i.test(key)) {
+    category = 'Fire Pits';
+  }
+
   const name = legacy?.name || nameFromKey(key, p);
+  const isInternal = INTERNAL_SOURCE_CATEGORIES.has(p.sourceCategory) && category !== 'Fire Pits';
+
   const item = {
     name,
-    category: p.category || 'Other',
+    category,
     unit: parsed.unit,
     unitCost: parsed.cost,
     imageUrl: p.image || null,
     supplierUrl: p.url || null,
   };
+  if (isInternal) item.isCustomerVisible = false;
   if (legacy?.subcategory) item.subcategory = legacy.subcategory;
   if (legacy?.color) item.color = legacy.color;
   if (legacy?.texture) item.texture = legacy.texture;
@@ -193,7 +221,7 @@ const deduped = out.filter(item => {
 });
 
 // Sort: by category, then favorite-ish (mulches first), then alphabetical
-const CATEGORY_ORDER = ['Mulch', 'Soil & Amendments', 'Sand & Gravel', 'Rock', 'Boulders', 'Flagstone', 'Pavers', 'Edging', 'Retaining Wall', 'Sod & Seed', 'Other'];
+const CATEGORY_ORDER = ['Mulch', 'Soil & Amendments', 'Sand & Gravel', 'Rock', 'Boulders', 'Flagstone', 'Pavers', 'Edging', 'Retaining Wall', 'Sod & Seed', 'Fire Pits', 'Other'];
 deduped.sort((a, b) => {
   const ca = CATEGORY_ORDER.indexOf(a.category); const cb = CATEGORY_ORDER.indexOf(b.category);
   if (ca !== cb) return (ca === -1 ? 99 : ca) - (cb === -1 ? 99 : cb);

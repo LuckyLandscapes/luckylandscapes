@@ -798,6 +798,14 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "supplierUrl": "https://outdoorsolutions-lincoln.com/anchor-30-column-cap/"
   },
   {
+    "name": "Belgard Weston 3pc",
+    "category": "Retaining Wall",
+    "unit": "each",
+    "unitCost": 11.75,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/weston-3pc3-1.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/belgard-weston-3pc/"
+  },
+  {
     "name": "Belgard Weston Universal",
     "category": "Retaining Wall",
     "unit": "each",
@@ -1119,6 +1127,22 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "supplierUrl": "https://outdoorsolutions-lincoln.com/sawn-cut-foxglove-steps-4/"
   },
   {
+    "name": "Highland Freestanding",
+    "category": "Retaining Wall",
+    "unit": "each",
+    "unitCost": 12.05,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/anchor-block4-1.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/anchor-highland-freestanding/"
+  },
+  {
+    "name": "Highland Retaining Wall",
+    "category": "Retaining Wall",
+    "unit": "each",
+    "unitCost": 11.85,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/SRA_FONTANA_RES_BEL2015_Walls_HighlandWall_002_preview.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/highland-retaining-wall/"
+  },
+  {
     "name": "Highland XL Cap",
     "category": "Retaining Wall",
     "unit": "each",
@@ -1157,6 +1181,22 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unitCost": 7.95,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/torpedo_001.jpg",
     "supplierUrl": "https://outdoorsolutions-lincoln.com/anchor-torpedo-base-block/"
+  },
+  {
+    "name": "Versa Lok Caps",
+    "category": "Retaining Wall",
+    "unit": "each",
+    "unitCost": 7.7,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/PRUD_387_1482-1.png",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/versa-lok-caps/"
+  },
+  {
+    "name": "Versa Lok Standard",
+    "category": "Retaining Wall",
+    "unit": "each",
+    "unitCost": 9.85,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/rosecreek-standard.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/versa-lok-standard/"
   },
   {
     "name": "Versa-Lifter",
@@ -1255,12 +1295,61 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "supplierUrl": "https://outdoorsolutions-lincoln.com/straw-blanket/"
   },
   {
+    "name": "Belgard 4pc Firepit Cap",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 470,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/NFD_MN_SEPT2020_AnchorWallCap_003-e1739568188519.webp",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/belgard-4pc-firepit-cap/"
+  },
+  {
+    "name": "Belgard Weston Firepit",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 495,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/NFD_MN_BEL_SEPT2020_WestonFirePit_001-e1739567910530.avif",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/belgard-weston-firepit/"
+  },
+  {
+    "name": "Fireglass",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 35,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/firepit-burners4.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/fireglass/"
+  },
+  {
+    "name": "Rochester 8 pc Firepit Cap",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 410,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/fire-ring-cap-swatch-indiana-limestone.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/rochester-8-pc-firepit-cap/"
+  },
+  {
+    "name": "Rochester Grand Firepit",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 650,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/grand-fire-ring-540x515.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/rochester-grand-firepit/"
+  },
+  {
+    "name": "Tumbled Lava Stones",
+    "category": "Fire Pits",
+    "unit": "each",
+    "unitCost": 110,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/rolled_lava_stone-750x498.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/tumbled-lava-stones/"
+  },
+  {
     "name": "10 oz. Retaining Wall Block Adhesive",
     "category": "Other",
     "unit": "each",
     "unitCost": 7,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric21.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/10-oz-retaining-wall-block-adhesive/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/10-oz-retaining-wall-block-adhesive/",
+    "isCustomerVisible": false
   },
   {
     "name": "12.5′x54′ Soil Separation Fabric",
@@ -1268,7 +1357,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 127,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric20.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/12-5x54-soil-separation-fabric/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/12-5x54-soil-separation-fabric/",
+    "isCustomerVisible": false
   },
   {
     "name": "28 oz. Retaining Wall Block Adhesive",
@@ -1276,7 +1366,17 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 13,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric21.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/28-oz-retaining-wall-block-adhesive/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/28-oz-retaining-wall-block-adhesive/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "33″ x 10″ H Burner Kit",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 310,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/H-Kit-480w.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/33-x-10-h-burner-kit/",
+    "isCustomerVisible": false
   },
   {
     "name": "3x100 3 Oz",
@@ -1284,7 +1384,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 36,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric8.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x100-3-oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x100-3-oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "3x100 4oz",
@@ -1292,7 +1393,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 54,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x100-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x100-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "3x50 3 Oz",
@@ -1300,7 +1402,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 18,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric8.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x50-3-oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x50-3-oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "3x50 4oz",
@@ -1308,7 +1411,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 27,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x50-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/3x50-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4′x50′ Soil Separation Fabric",
@@ -1316,7 +1420,17 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 42,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric20.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-soil-separation-fabric/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-soil-separation-fabric/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "45″ x 10″ H Burner Kit",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 345,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/H-Kit-480w.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/48-h-burner-kit/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x100 3 Oz",
@@ -1324,7 +1438,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 48,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric8.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x100-3-oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x100-3-oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x100 4oz",
@@ -1332,7 +1447,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 76,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x100-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x100-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x250 4oz",
@@ -1340,7 +1456,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 150,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x250-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x250-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x50 3 Oz",
@@ -1348,7 +1465,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 24,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric8.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-3-oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-3-oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x50 4oz",
@@ -1356,7 +1474,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 38,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "4x50 Ls3",
@@ -1364,7 +1483,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 25,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/LS3-Rolls-and-Fabric-Texture-e1738774118652.webp",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-ls3/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/4x50-ls3/",
+    "isCustomerVisible": false
   },
   {
     "name": "6x100 3 Oz",
@@ -1372,7 +1492,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 67,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric8.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x100-3-oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x100-3-oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "6x100 4oz",
@@ -1380,7 +1501,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 98,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x100-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x100-4oz/",
+    "isCustomerVisible": false
   },
   {
     "name": "6x250 4oz",
@@ -1388,7 +1510,19 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 225,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/Pro_Premium_5oz__4d4b48baed120.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x250-4oz/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/6x250-4oz/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Black Lava Rock",
+    "category": "Other",
+    "unit": "ton",
+    "unitCost": 300,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/IMG_4113-e1455900796169.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/black-lava-rock/",
+    "isCustomerVisible": false,
+    "color": "Black",
+    "notes": "Also sold per bag at $10."
   },
   {
     "name": "Fabric Staples 50ct Package",
@@ -1396,7 +1530,46 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 7,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric6.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/fabric-staples-50ct-package/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/fabric-staples-50ct-package/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Firegear 22″ Burning Spur Kit",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 320,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/burning-spur-450x450-1.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/firegear-22-burning-spur-kit/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Firegear 31″ Burning Spur Kit",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 350,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/burning-spur-450x450-1.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/firegear-31-burning-spur-kit/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Firepit Vent Kit 4″",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 100,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/vent-4-3.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/firepit-vent-kit/",
+    "isCustomerVisible": false,
+    "description": "Sold per pair."
+  },
+  {
+    "name": "Firepit Vent Kit 6″",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 110,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/vent-6-3.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/firepit-vent-kit-6/",
+    "isCustomerVisible": false,
+    "description": "Sold per pair."
   },
   {
     "name": "Geo-Grid Bidirectional",
@@ -1404,7 +1577,17 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 83,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/landscapefabric16.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/geo-grid-bidirectional/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/geo-grid-bidirectional/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Lume Smokeless Firepit Insert",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 420,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/LUme.webp",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/lume-smokeless-firepit-insert/",
+    "isCustomerVisible": false
   },
   {
     "name": "PaveEdge Paver Restraint",
@@ -1412,7 +1595,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 20,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/pave-edge-flex.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/paveedge-paver-restraint/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/paveedge-paver-restraint/",
+    "isCustomerVisible": false
   },
   {
     "name": "Paver Edging Stakes",
@@ -1420,7 +1604,17 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 0.9,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/edging-stakes.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/paver-stakes/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/paver-stakes/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Propane Conversion Kit",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 60,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/firegear-universal-propane-conversion-kit-for-all-size-fire-rings-fg-sb-f-19.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/propane-conversion-kit/",
+    "isCustomerVisible": false
   },
   {
     "name": "SRW Hexabase",
@@ -1428,7 +1622,35 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 8.75,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/HexaBase-e1748963991354.webp",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/srw-hexabase/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/srw-hexabase/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Srw Pavermatez3",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 28,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/SRW-PavermateZ3_2017bag_RGB_SHADOW-e1738783385494.png",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/srw-pavermatez3/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Srw X Treme",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 32,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/SRW-Xtreme_2015bag_RGB_SHADOW-1-e1469808921130.jpg",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/srw-x-treme/",
+    "isCustomerVisible": false
+  },
+  {
+    "name": "Steel Edging Spikes",
+    "category": "Other",
+    "unit": "each",
+    "unitCost": 0.98,
+    "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/8__spikes_thru_12__spikes___1_-removebg-preview-e1709916602569.webp",
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/steel-edging-spikes/",
+    "isCustomerVisible": false
   },
   {
     "name": "Techniseal EdgeBond",
@@ -1436,7 +1658,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 28,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/70975209-edge-bond-nextgel-fortified-concrete-hardscape-edging_2.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-edgebond/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-edgebond/",
+    "isCustomerVisible": false
   },
   {
     "name": "Techniseal HD Paver Prep – Efflo Cleaner",
@@ -1444,7 +1667,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 42,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/techniseal-hd-paver-prep-1gal-60105008-2.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/hd-paver-prep-efflo-cleaner/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/hd-paver-prep-efflo-cleaner/",
+    "isCustomerVisible": false
   },
   {
     "name": "Techniseal iN Paver Sealer – Natural Look",
@@ -1452,7 +1676,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 110,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/in_plastic_4l_us_1.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-in-paver-sealer-natural-look/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-in-paver-sealer-natural-look/",
+    "isCustomerVisible": false
   },
   {
     "name": "Techniseal NextBase",
@@ -1460,7 +1685,8 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 22,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/nextbase_bundle.jpg",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-nextbase/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-nextbase/",
+    "isCustomerVisible": false
   },
   {
     "name": "Techniseal WL-87 3-in-1 Sealer",
@@ -1468,9 +1694,10 @@ export const OUTDOOR_SOLUTIONS_STARTER_CATALOG =
     "unit": "each",
     "unitCost": 80,
     "imageUrl": "https://outdoorsolutions-lincoln.com/wp-content/uploads/60300364_wetlook_wl-87_3.78_l_can_copy_1_1.png",
-    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-wl-87-3-in-1-joint-stabilizing-sealer-wet-look/"
+    "supplierUrl": "https://outdoorsolutions-lincoln.com/techniseal-wl-87-3-in-1-joint-stabilizing-sealer-wet-look/",
+    "isCustomerVisible": false
   }
 ]
 ;
 
-export const STARTER_CATALOG_COUNT = 179;
+export const STARTER_CATALOG_COUNT = 202;

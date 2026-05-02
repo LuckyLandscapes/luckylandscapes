@@ -16,6 +16,32 @@ import {
   formatCurrency, formatTaxRate, normalizeName,
 } from '@/lib/catalog';
 import { OUTDOOR_SOLUTIONS_STARTER_CATALOG, STARTER_CATALOG_COUNT } from '@/lib/outdoorSolutionsStarterCatalog';
+import { MENARDS_STARTER_CATALOG, MENARDS_STARTER_CATALOG_COUNT } from '@/lib/menardsStarterCatalog';
+import { HOME_DEPOT_STARTER_CATALOG, HOME_DEPOT_STARTER_CATALOG_COUNT } from '@/lib/homeDepotStarterCatalog';
+
+// Mapping from a starter-catalog identifier to the items, expected supplier
+// name pattern, and a label for the UI button. The handler picks the right
+// one based on which button the user pressed.
+const STARTER_CATALOGS = {
+  outdoor_solutions: {
+    items: OUTDOOR_SOLUTIONS_STARTER_CATALOG,
+    count: STARTER_CATALOG_COUNT,
+    supplierPattern: /outdoor.solutions/i,
+    supplierLabel: 'Outdoor Solutions',
+  },
+  menards: {
+    items: MENARDS_STARTER_CATALOG,
+    count: MENARDS_STARTER_CATALOG_COUNT,
+    supplierPattern: /menards/i,
+    supplierLabel: 'Menards',
+  },
+  home_depot: {
+    items: HOME_DEPOT_STARTER_CATALOG,
+    count: HOME_DEPOT_STARTER_CATALOG_COUNT,
+    supplierPattern: /home.depot/i,
+    supplierLabel: 'Home Depot',
+  },
+};
 
 const STOCK_LABEL = {
   in_stock: 'In stock',
@@ -81,7 +107,10 @@ export default function CatalogPage() {
   const [showRefreshBatch, setShowRefreshBatch] = useState(false);
   const [refreshBatchRunning, setRefreshBatchRunning] = useState(false);
   const [refreshBatchResult, setRefreshBatchResult] = useState(null);
-  const [showStarterImport, setShowStarterImport] = useState(false);
+  // The starter-import flow now supports three suppliers. `showStarterImport`
+  // holds the catalog key (`'outdoor_solutions'` etc.) so the modal knows
+  // which one to confirm. `starterResult` is keyed alongside.
+  const [showStarterImport, setShowStarterImport] = useState(null);
   const [starterImporting, setStarterImporting] = useState(false);
   const [starterResult, setStarterResult] = useState(null);
 
@@ -94,18 +123,32 @@ export default function CatalogPage() {
 
   const isCustomerView = viewMode === 'customer';
 
-  // Filters: customer view only sees customer-visible + active items.
-  const filtered = useMemo(() => {
+  // The filter pipeline runs in two stages so chip counts can cross-filter
+  // correctly. `baseFiltered` applies search + customer-visibility but NOT
+  // the category or supplier chip selections. Then we layer the category and
+  // supplier filters on top for the final `filtered` view, AND use the base
+  // pool to count chips: a category-chip count respects the active supplier
+  // (and vice versa), so clicking "Rock" updates "Outdoor Solutions" to show
+  // "rocks from OS" instead of the full OS count.
+  const baseFiltered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return materials
-      .filter(m => {
-        if (isCustomerView) {
-          if (m.isCustomerVisible === false) return false;
-          if (m.isActive === false) return false;
-        }
+    return materials.filter(m => {
+      if (isCustomerView) {
+        if (m.isCustomerVisible === false) return false;
+        if (m.isActive === false) return false;
+      }
+      if (term) {
         const sup = supplierById.get(m.supplierId);
         const haystack = `${m.name} ${m.description || ''} ${sup?.name || ''} ${m.color || ''} ${m.texture || ''} ${(m.tags || []).join(' ')}`.toLowerCase();
-        if (term && !haystack.includes(term)) return false;
+        if (!haystack.includes(term)) return false;
+      }
+      return true;
+    });
+  }, [materials, search, isCustomerView, supplierById]);
+
+  const filtered = useMemo(() => {
+    return baseFiltered
+      .filter(m => {
         if (activeCategory !== 'all' && m.category !== activeCategory) return false;
         if (activeSupplierId !== 'all' && m.supplierId !== activeSupplierId) return false;
         return true;
@@ -115,7 +158,18 @@ export default function CatalogPage() {
         if (!a.isFavorite && b.isFavorite) return 1;
         return (a.sortOrder || 0) - (b.sortOrder || 0);
       });
-  }, [materials, search, activeCategory, activeSupplierId, isCustomerView, supplierById]);
+  }, [baseFiltered, activeCategory, activeSupplierId]);
+
+  // Chip-count helpers. Each axis ignores its own filter when counting (so
+  // the "All" chip in that axis equals total) but applies the OTHER axis.
+  const countForCategory = (cat) => baseFiltered.filter(m =>
+    (cat === 'all' || m.category === cat) &&
+    (activeSupplierId === 'all' || m.supplierId === activeSupplierId)
+  ).length;
+  const countForSupplier = (supId) => baseFiltered.filter(m =>
+    (supId === 'all' || m.supplierId === supId) &&
+    (activeCategory === 'all' || m.category === activeCategory)
+  ).length;
 
   const categories = useMemo(() => ['all', ...new Set(materials.map(m => m.category).filter(Boolean))], [materials]);
 
@@ -159,31 +213,30 @@ export default function CatalogPage() {
     finally { setClearing(false); }
   };
 
-  // One-click import of the curated Outdoor Solutions catalog (179 items
-   // covering mulch, rock, boulders, retaining wall, pavers, etc.). Pulls
-   // from outdoorSolutionsStarterCatalog.js — a snapshot of the OS website
-   // generated by scripts/build-os-starter-catalog.cjs.
-  const handleStarterImport = async () => {
-    const osSupplier = suppliers.find(s => /outdoor.solutions/i.test(s.name));
-    if (!osSupplier) {
-      setStarterResult({ inserted: 0, updated: 0, errors: [{ item: 'starter', error: 'Add the Outdoor Solutions supplier first.' }] });
+  // One-click import of a curated starter catalog — works for OS, Menards,
+  // or Home Depot depending on the key passed. Each is a snapshot we ship
+  // in the repo (see luckyapp/src/lib/*StarterCatalog.js).
+  const handleStarterImport = async (key) => {
+    const config = STARTER_CATALOGS[key];
+    if (!config) return;
+    const supplier = suppliers.find(s => config.supplierPattern.test(s.name));
+    if (!supplier) {
+      setStarterResult({ inserted: 0, updated: 0, errors: [{ item: 'starter', error: `Add the ${config.supplierLabel} supplier first.` }] });
       return;
     }
     setStarterImporting(true);
     setStarterResult(null);
     try {
-      const items = OUTDOOR_SOLUTIONS_STARTER_CATALOG.map(it => ({
+      const items = config.items.map(it => ({
         ...it,
-        supplierId: osSupplier.id,
-        // Mark as imported from the starter pack so the user can find/filter
-        // them later if they want to bulk-edit.
-        tags: ['starter-import'],
+        supplierId: supplier.id,
+        tags: ['starter-import', key],
       }));
       const result = await bulkUpsertMaterials(
         items,
         m => `${m.supplierId}|${normalizeName(m.name)}`,
       );
-      setStarterResult(result);
+      setStarterResult({ ...result, supplierLabel: config.supplierLabel });
     } catch (err) {
       setStarterResult({ inserted: 0, updated: 0, errors: [{ item: 'starter', error: err.message || String(err) }] });
     } finally {
@@ -273,19 +326,26 @@ export default function CatalogPage() {
               <Truck size={16} /> Suppliers ({suppliers.length})
             </button>
           )}
-          {!isCustomerView && (() => {
-            const hasOS = suppliers.some(s => /outdoor.solutions/i.test(s.name));
-            return hasOS && materials.length === 0 ? (
+          {!isCustomerView && Object.entries(STARTER_CATALOGS).map(([key, config]) => {
+            const supplier = suppliers.find(s => config.supplierPattern.test(s.name));
+            if (!supplier) return null;  // supplier doesn't exist; nothing to import to
+            // Don't crowd the header once the user has items from this supplier.
+            const hasItems = materials.some(m => m.supplierId === supplier.id);
+            if (hasItems) return null;
+            return (
               <button
+                key={key}
                 className="btn btn-primary"
-                onClick={() => setShowStarterImport(true)}
+                onClick={() => setShowStarterImport(key)}
                 disabled={starterImporting}
-                title={`One-click import: ${STARTER_CATALOG_COUNT} curated Outdoor Solutions items (mulch, rock, pavers, walls, etc.)`}
+                title={`One-click import: ${config.count} curated ${config.supplierLabel} items`}
               >
-                {starterImporting ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Sparkles size={16} /> Import OS catalog ({STARTER_CATALOG_COUNT} items)</>}
+                {starterImporting && showStarterImport === key
+                  ? <><Loader2 size={16} className="spin" /> Importing…</>
+                  : <><Sparkles size={16} /> Import {config.supplierLabel} ({config.count})</>}
               </button>
-            ) : null;
-          })()}
+            );
+          })}
           {!isCustomerView && (
             <button
               className="btn btn-secondary"
@@ -349,37 +409,31 @@ export default function CatalogPage() {
         )}
       </div>
 
-      {/* Category Chips */}
+      {/* Category Chips — counts respect the active supplier filter */}
       <div className="catalog-filters">
-        {categories.map(cat => {
-          const count = cat === 'all' ? materials.length : materials.filter(m => m.category === cat).length;
-          return (
-            <button key={cat} className={`catalog-filter-chip ${activeCategory === cat ? 'active' : ''}`} onClick={() => setActiveCategory(cat)}>
-              {cat === 'all' ? 'All' : cat}
-              <span className="chip-count">{count}</span>
-            </button>
-          );
-        })}
+        {categories.map(cat => (
+          <button key={cat} className={`catalog-filter-chip ${activeCategory === cat ? 'active' : ''}`} onClick={() => setActiveCategory(cat)}>
+            {cat === 'all' ? 'All' : cat}
+            <span className="chip-count">{countForCategory(cat)}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Supplier Chips — internal view only */}
+      {/* Supplier Chips — counts respect the active category filter */}
       {!isCustomerView && suppliers.length > 0 && (
         <div className="catalog-filters" style={{ marginTop: '-var(--space-sm)' }}>
           <button className={`catalog-filter-chip ${activeSupplierId === 'all' ? 'active' : ''}`} onClick={() => setActiveSupplierId('all')}>
-            All Suppliers <span className="chip-count">{materials.length}</span>
+            All Suppliers <span className="chip-count">{countForSupplier('all')}</span>
           </button>
-          {suppliers.map(s => {
-            const count = materials.filter(m => m.supplierId === s.id).length;
-            return (
-              <button
-                key={s.id}
-                className={`catalog-filter-chip ${activeSupplierId === s.id ? 'active' : ''}`}
-                onClick={() => setActiveSupplierId(s.id)}
-              >
-                {s.name} <span className="chip-count">{count}</span>
-              </button>
-            );
-          })}
+          {suppliers.map(s => (
+            <button
+              key={s.id}
+              className={`catalog-filter-chip ${activeSupplierId === s.id ? 'active' : ''}`}
+              onClick={() => setActiveSupplierId(s.id)}
+            >
+              {s.name} <span className="chip-count">{countForSupplier(s.id)}</span>
+            </button>
+          ))}
         </div>
       )}
 
@@ -734,42 +788,62 @@ export default function CatalogPage() {
         <ImportMaterialsModal onClose={() => setShowImport(false)} />
       )}
 
-      {/* Starter catalog import — confirmation */}
-      {showStarterImport && !starterResult && (
-        <div className="modal-overlay" onClick={() => !starterImporting && setShowStarterImport(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
-            <div className="modal-header">
-              <h2>Import Outdoor Solutions starter catalog</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowStarterImport(false)} disabled={starterImporting}><X size={20} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-                Adds <strong>{STARTER_CATALOG_COUNT} items</strong> from outdoorsolutions-lincoln.com — mulch, rock, boulders, retaining wall, pavers, edging, flagstone, soil, sand &amp; gravel, sod &amp; seed, and accessories.
-              </p>
-              <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
-                Each item includes a photo and product URL. After import, click <strong>Refresh prices</strong> to fetch current prices and stock straight from the OS site (works reliably for OS).
-              </p>
-              <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
-                Pond, fountain, and fire-pit items are intentionally excluded since Lucky doesn&apos;t install those — add by hand if needed.
-              </p>
-            </div>
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowStarterImport(false)} disabled={starterImporting}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleStarterImport} disabled={starterImporting}>
-                {starterImporting ? <><Loader2 size={14} className="spin" /> Importing…</> : <><Sparkles size={14} /> Import {STARTER_CATALOG_COUNT} items</>}
-              </button>
+      {/* Starter catalog import — confirmation. The body copy adapts to the
+          supplier so the OS modal reads differently from Menards/HD (only OS
+          has working live-price refresh). */}
+      {showStarterImport && !starterResult && (() => {
+        const config = STARTER_CATALOGS[showStarterImport];
+        if (!config) return null;
+        const isOS = showStarterImport === 'outdoor_solutions';
+        return (
+          <div className="modal-overlay" onClick={() => !starterImporting && setShowStarterImport(null)}>
+            <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
+              <div className="modal-header">
+                <h2>Import {config.supplierLabel} starter catalog</h2>
+                <button className="btn btn-icon btn-ghost" onClick={() => setShowStarterImport(null)} disabled={starterImporting}><X size={20} /></button>
+              </div>
+              <div className="modal-body">
+                <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  Adds <strong>{config.count} items</strong> from {config.supplierLabel} covering the products Lucky most often pulls from this supplier.
+                </p>
+                {isOS ? (
+                  <>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+                      Each item includes a photo and product URL. After import, click <strong>Refresh prices</strong> to fetch current prices and stock straight from the OS site (works reliably for OS).
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+                      Pond and fountain items are excluded — add by hand if needed.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+                      Prices are 2026-05 typical retail in Lincoln; verify and adjust as needed. Supplier URLs are search links rather than product pages — {config.supplierLabel} bot-blocks scraping, so the &quot;Refresh prices&quot; button won&apos;t update these. Use the chip in the catalog detail panel to look up current pricing manually when you shop.
+                    </p>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-sm)' }}>
+                      Substrate sand, polymeric joint sand, fabric, and adhesive are flagged internal-only — they won&apos;t show in customer-facing quote galleries.
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary" onClick={() => setShowStarterImport(null)} disabled={starterImporting}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => handleStarterImport(showStarterImport)} disabled={starterImporting}>
+                  {starterImporting ? <><Loader2 size={14} className="spin" /> Importing…</> : <><Sparkles size={14} /> Import {config.count} items</>}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Starter catalog import — result */}
       {starterResult && (
-        <div className="modal-overlay" onClick={() => { setStarterResult(null); setShowStarterImport(false); }}>
+        <div className="modal-overlay" onClick={() => { setStarterResult(null); setShowStarterImport(null); }}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
             <div className="modal-header">
-              <h2>Import complete</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => { setStarterResult(null); setShowStarterImport(false); }}><X size={20} /></button>
+              <h2>Import complete{starterResult.supplierLabel ? ` — ${starterResult.supplierLabel}` : ''}</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => { setStarterResult(null); setShowStarterImport(null); }}><X size={20} /></button>
             </div>
             <div className="modal-body">
               <div style={{ display: 'flex', gap: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
@@ -801,7 +875,7 @@ export default function CatalogPage() {
               )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-primary" onClick={() => { setStarterResult(null); setShowStarterImport(false); }}>Done</button>
+              <button className="btn btn-primary" onClick={() => { setStarterResult(null); setShowStarterImport(null); }}>Done</button>
             </div>
           </div>
         </div>
