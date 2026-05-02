@@ -2209,10 +2209,13 @@ body {
 
   /* --- Toast --- */
   .toast {
-    left: var(--space-md);
-    right: var(--space-md);
-    bottom: 80px;
-    max-width: none;
+    top: 64px; /* below 56px mobile topbar */
+    left: 50%;
+    right: auto;
+    bottom: auto;
+    padding: 0.5rem 0.8rem;
+    font-size: 0.78rem;
+    max-width: calc(100% - 16px);
   }
 
   /* --- Measure Page (mobile) --- */
@@ -2284,12 +2287,13 @@ body {
     display: none;
   }
 
-  /* Move drawing hint to the BOTTOM on mobile so it doesn't fight the
-     stacked top panels (search → toolbar → net chip → active customer).
-     Sit just above the sheet handle. */
+  /* Pin transient panels to the top (just under the toolbar) on mobile so
+     they stop fighting the bottom sheet, maptype/streetview pills, and the
+     Google attribution. They cover the net-chip / active-customer briefly,
+     which is fine since they're transient and require a tap to dismiss. */
   .measure-drawing-hint {
-    top: auto;
-    bottom: calc(var(--measure-sheet-collapsed-h, 48px) + 76px);
+    top: 108px; /* just under toolbar (top:56 + ~48 height) */
+    bottom: auto;
     left: 8px;
     right: 8px;
     transform: none;
@@ -2300,13 +2304,21 @@ body {
   }
 
   .measure-candidates {
-    bottom: calc(var(--measure-sheet-collapsed-h, 48px) + 60px);
+    top: 108px;
+    bottom: auto;
     left: 8px;
     right: 8px;
     width: auto;
     max-width: none;
     transform: none;
     z-index: 30;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .measure-candidates-head {
+    font-size: 0.78rem;
+    flex-wrap: wrap;
   }
 
   .measure-sheet {
@@ -2444,19 +2456,23 @@ body {
    ============================================ */
 .toast {
   position: fixed;
-  bottom: var(--space-xl);
-  right: var(--space-xl);
+  top: 76px; /* below 64px topbar with breathing room */
+  left: 50%;
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--radius-md);
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-pill);
   font-size: 0.85rem;
   font-weight: 600;
   z-index: 10000;
   box-shadow: var(--shadow-lg);
-  animation: toastSlideIn 0.3s ease, toastFadeOut 0.3s ease 4.7s;
-  max-width: 420px;
+  animation: toastSlideDown 0.25s ease forwards, toastFadeOut 0.3s ease 4.7s forwards;
+  width: max-content;
+  max-width: min(520px, calc(100% - 24px));
+  background: var(--bg-card);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-primary);
 }
 
 .toast-success {
@@ -2495,6 +2511,18 @@ body {
 
   to {
     transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes toastSlideDown {
+  from {
+    transform: translate(-50%, -120%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translate(-50%, 0);
     opacity: 1;
   }
 }
