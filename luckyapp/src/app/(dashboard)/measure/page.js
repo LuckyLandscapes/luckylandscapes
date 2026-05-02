@@ -1396,7 +1396,7 @@ export default function MeasurePage() {
   const customersWithMeasurements = customers.filter(c => c.measurements?.shapes?.length).length;
 
   return (
-    <div className="measure-page page animate-fade-in">
+    <div className={`measure-page page animate-fade-in ${activeCustomer ? 'has-customer' : ''}`}>
       <div className={`measure-stage ${streetViewActive ? 'split-streetview' : ''}`}>
         <div ref={mapRef} className="measure-map-canvas" />
         <div className="measure-pano-wrap">
@@ -1517,12 +1517,22 @@ export default function MeasurePage() {
           <div className="measure-active-customer">
             <User size={14} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Working on</div>
-              <div style={{ fontSize: '0.82rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div className="measure-active-customer-label">Working on</div>
+              <div className="measure-active-customer-name">
                 {activeCustomer.firstName} {activeCustomer.lastName}
               </div>
             </div>
             {isDirty && <span className="measure-dirty-dot" title="Unsaved changes" />}
+            {customers.length > 0 && (
+              <button
+                className="btn btn-ghost btn-sm measure-active-customer-switch"
+                onClick={() => setShowCustomerAddresses(s => !s)}
+                title="Switch customer"
+                style={{ padding: '4px 6px' }}
+              >
+                <FolderOpen size={14} />
+              </button>
+            )}
             <button
               className="btn btn-primary btn-sm"
               onClick={saveToCustomer}

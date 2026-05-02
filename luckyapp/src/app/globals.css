@@ -2224,11 +2224,19 @@ body {
     padding: 0;
   }
 
+  /* Header row: search OR active-customer on the left, net-chip on the right.
+     They are mutually exclusive on mobile (search hides when a customer is
+     loaded) so they share the same top:8 slot without stacking. */
   .measure-search-bar {
-    width: calc(100% - 16px);
     left: 8px;
+    right: 116px; /* leave room for net-chip + 8px gap */
     top: 8px;
+    width: auto;
     max-width: none;
+  }
+
+  .measure-page.has-customer .measure-search-bar {
+    display: none;
   }
 
   .measure-customer-dropdown {
@@ -2239,17 +2247,22 @@ body {
   }
 
   .measure-net-chip {
-    top: 116px; /* below search + toolbar */
+    top: 8px; /* sits inline with search/customer pill */
     right: 8px;
     left: auto;
     transform: none;
     padding: 6px 10px;
     border-radius: var(--radius-md);
     min-width: 0;
+    gap: 6px;
+  }
+
+  .measure-net-label {
+    display: none; /* drop "Net Area" caption — value is self-explanatory */
   }
 
   .measure-net-value {
-    font-size: 1.05rem;
+    font-size: 0.95rem;
   }
 
   .measure-net-breakdown {
@@ -2331,10 +2344,24 @@ body {
   }
 
   .measure-active-customer {
-    top: 168px;
-    right: 8px;
+    top: 8px; /* takes the search bar's slot when a customer is loaded */
     left: 8px;
+    right: 116px; /* leave room for net-chip */
+    min-width: 0;
     max-width: none;
+  }
+
+  /* Drop the "Working on" caption to fit alongside save/switch/close */
+  .measure-active-customer-label {
+    display: none;
+  }
+
+  .measure-active-customer-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .measure-maptype-btn {
@@ -2915,6 +2942,21 @@ body {
   box-shadow: 0 0 16px var(--lucky-green-glow);
   min-width: 200px;
   max-width: 280px;
+}
+
+.measure-active-customer-label {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.measure-active-customer-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .measure-dirty-dot {
