@@ -238,10 +238,15 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSe
 }
 
 // ─── P&L for a date range ───────────────────────────────────
+// Cash-basis-ish: costs are recognized when they're incurred (segment ended,
+// expense dated), not when the parent job completes. Otherwise mid-period
+// dashboards understate spend on jobs still in progress, which silently hides
+// labor and materials until completion. Revenue still recognizes on completion
+// (or on payment when basis === 'paid'); over a 30-day window the mismatch is
+// usually small for short-cycle landscaping work.
 function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, start, end, basis }) {
   // Revenue
   let revenue = 0;
-  let revenueJobs = [];
   if (basis === 'paid') {
     for (const inv of invoices) {
       if (inv.status !== 'paid') continue;
@@ -249,26 +254,39 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
       revenue += Number(inv.total || 0);
     }
   }
-  // For COGS pairing we always use completed jobs in range (matching costs to the completion event).
+  // periodJobs is the per-job drill-down list (used by /reports). Always
+  // completed jobs in range, regardless of basis.
   const periodJobs = jobs.filter(j => j.status === 'completed' && inRange(j.completedAt, start, end));
   if (basis !== 'paid') {
     for (const j of periodJobs) revenue += Number(j.revenue || j.total || 0);
-    revenueJobs = periodJobs;
   }
 
-  // COGS — direct expenses + direct labor on completed jobs in period
+  // COGS — job_expenses dated in period (any job, completed or not)
   const cogsByCat = {};
   for (const cat of COGS_CATEGORIES) cogsByCat[cat] = 0;
-  let directLabor = 0;
-
-  for (const job of periodJobs) {
-    const expenses = jobExpenses.filter(e => e.jobId === job.id);
-    for (const e of expenses) {
-      const cat = COGS_CATEGORIES.includes(e.category) ? e.category : 'other';
-      cogsByCat[cat] += Number(e.amount || 0);
-    }
-    directLabor += laborCostForJob(job.id, timeEntries, teamMembers, timeSegments);
+  for (const e of jobExpenses) {
+    if (!inRange(e.date || e.createdAt, start, end)) continue;
+    const cat = COGS_CATEGORIES.includes(e.category) ? e.category : 'other';
+    cogsByCat[cat] += Number(e.amount || 0);
   }
+
+  // Direct labor — closed job-kind segments dated in period (any job).
+  // Plus legacy entries with a jobId, clocked out, no segments.
+  let directLabor = 0;
+  for (const seg of timeSegments) {
+    if (seg.kind !== 'job' || !seg.endedAt) continue;
+    if (!inRange(seg.startedAt, start, end)) continue;
+    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+    const member = teamMembers.find(m => m.id === (entry?.teamMemberId || entry?.memberId));
+    const rate = Number(member?.hourlyRate || 0);
+    directLabor += rate * (Number(seg.durationMinutes || 0) / 60);
+  }
+  const legacyDirect = timeEntries.filter(t =>
+    t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
+    !timeSegments.some(s => s.timeEntryId === t.id)
+  );
+  directLabor += laborCostForEntries(legacyDirect, teamMembers, []);
+
   const cogs = Object.values(cogsByCat).reduce((a, b) => a + b, 0) + directLabor;
 
   // OpEx — company expenses dated in period + indirect labor.
@@ -283,7 +301,6 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
   }
 
   let indirectLabor = 0;
-  // Travel segments in the date range
   for (const seg of timeSegments) {
     if (seg.kind !== 'travel' || !seg.endedAt) continue;
     if (!inRange(seg.startedAt, start, end)) continue;
@@ -292,7 +309,6 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     const rate = Number(member?.hourlyRate || 0);
     indirectLabor += rate * (Number(seg.durationMinutes || 0) / 60);
   }
-  // Legacy entries with no jobId AND no segments
   const legacyIndirect = timeEntries.filter(t =>
     !t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
     !timeSegments.some(s => s.timeEntryId === t.id)
@@ -312,7 +328,7 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     opex, opexByCat, indirectLabor,
     netProfit, netMargin,
     periodJobs,
-    revenueJobs: revenueJobs.length ? revenueJobs : periodJobs,
+    revenueJobs: periodJobs,
   };
 }
 

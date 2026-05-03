@@ -27,7 +27,7 @@ const BASES = [
 
 export default function ReportsPage() {
   const {
-    jobs, jobExpenses, timeEntries, teamMembers, invoices,
+    jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices,
     companyExpenses, getCustomer,
   } = useData();
 
@@ -35,8 +35,8 @@ export default function ReportsPage() {
   const [basis, setBasis] = useState('completed');
 
   const pnl = useMemo(
-    () => buildPnL({ jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis }),
-    [jobs, jobExpenses, timeEntries, teamMembers, invoices, companyExpenses, period, basis]
+    () => buildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis }),
+    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis]
   );
 
   const aging = useMemo(() => buildARAging(invoices), [invoices]);
@@ -47,9 +47,9 @@ export default function ReportsPage() {
   const periodJobFinancials = useMemo(() => {
     return pnl.periodJobs.map(j => ({
       job: j,
-      ...jobFinancials(j, jobExpenses, timeEntries, teamMembers),
+      ...jobFinancials(j, jobExpenses, timeEntries, teamMembers, timeSegments),
     }));
-  }, [pnl.periodJobs, jobExpenses, timeEntries, teamMembers]);
+  }, [pnl.periodJobs, jobExpenses, timeEntries, teamMembers, timeSegments]);
 
   const topJobs = useMemo(
     () => [...periodJobFinancials].sort((a, b) => b.profit - a.profit).slice(0, 5),
