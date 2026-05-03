@@ -45,6 +45,7 @@ prefix is a sort key, not a uniqueness guarantee.
 | 030 | `030_suppliers_table.sql` | Suppliers master table (Outdoor Solutions, Menards, Home Depot) with default tax rate |
 | 031 | `031_materials_rebuild.sql` | **Drops + rebuilds materials** with supplier_id FK, single unit_cost + tax_rate, customer-visible flag, dropped image/image_emoji/cost_low/cost_high redundancy. Take a Supabase backup first. |
 | 032 | `032_selected_materials.sql` | Adds `selected_materials` JSONB to quotes + contracts (visual material approval, no prices) |
+| 033 | `033_subcontract_support.sql` | `customers.customer_type` (homeowner/business/general_contractor); `jobs.work_authorization` (contract/subcontract/verbal) + work-order proof + site contact for sub work |
 
 > **Files 001 and 002 overlap.** Both create base tables. Run 001 first — its
 > `CREATE TABLE IF NOT EXISTS` statements prevent conflicts when 002 runs.

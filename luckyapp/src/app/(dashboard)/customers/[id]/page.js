@@ -9,6 +9,7 @@ import {
   Clock, CheckCircle2, Send, Plus, Edit3, Trash2, X, AlertTriangle, Save,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import { CUSTOMER_TYPES, customerTypeMeta } from '../page';
 
 function formatPhoneNumber(value) {
   const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -64,6 +65,7 @@ export default function CustomerDetailPage() {
       zip: customer.zip || '',
       notes: customer.notes || '',
       tags: customer.tags || [],
+      customerType: customer.customerType || 'homeowner',
     });
     setShowEditModal(true);
   };
@@ -123,7 +125,16 @@ export default function CustomerDetailPage() {
           </div>
           <div>
             <h1>{customer.firstName} {customer.lastName}</h1>
-            <div style={{ display: 'flex', gap: 'var(--space-md)', marginTop: '4px' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-md)', marginTop: '4px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {customer.customerType && customer.customerType !== 'homeowner' && (() => {
+                const meta = customerTypeMeta(customer.customerType);
+                const Icon = meta.icon;
+                return (
+                  <span className={`tag ${meta.tone}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <Icon size={12} /> {meta.label}
+                  </span>
+                );
+              })()}
               {customer.tags?.map(tag => (
                 <span key={tag} className={`tag ${tag === 'vip' ? 'tag-gold' : tag === 'active' ? 'tag-green' : 'tag-blue'}`}>
                   {tag}
@@ -289,14 +300,34 @@ export default function CustomerDetailPage() {
             </div>
             <form onSubmit={handleEditSubmit}>
               <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Customer Type</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {CUSTOMER_TYPES.map(t => {
+                      const Icon = t.icon;
+                      const isActive = (editForm.customerType || 'homeowner') === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setEditForm({ ...editForm, customerType: t.value })}
+                          style={{ flex: 1, minWidth: 110, justifyContent: 'center' }}
+                        >
+                          <Icon size={14} /> {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">First Name <span className="required">*</span></label>
+                    <label className="form-label">{editForm.customerType === 'business' || editForm.customerType === 'general_contractor' ? 'Contact First Name' : 'First Name'} <span className="required">*</span></label>
                     <input className="form-input" placeholder="John" value={editForm.firstName} onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })} required />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Last Name</label>
-                    <input className="form-input" placeholder="Doe" value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} />
+                    <label className="form-label">{editForm.customerType === 'business' || editForm.customerType === 'general_contractor' ? 'Company / Last Name' : 'Last Name'}</label>
+                    <input className="form-input" placeholder={editForm.customerType === 'general_contractor' ? 'Acme Construction' : 'Doe'} value={editForm.lastName} onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })} />
                   </div>
                 </div>
                 <div className="form-group">

@@ -7,8 +7,26 @@ import { apiFetch } from '@/lib/apiClient';
 import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
-  HardHat, Truck, Coffee,
+  HardHat, Truck, Coffee, Pencil,
 } from 'lucide-react';
+
+// ─── Datetime helpers ─────────────────────────────────────
+// HTML5 <input type="datetime-local"> uses local-tz strings (no Z suffix).
+// We round-trip through Date so what you see in the input matches what's
+// stored as an ISO timestamp.
+function isoToLocalInput(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function localInputToIso(local) {
+  if (!local) return null;
+  const d = new Date(local);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+}
 
 function fmtDur(min) {
   if (!min || min <= 0) return '0h 0m';
@@ -28,7 +46,7 @@ function fmtCurrency(n) {
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, deleteTimeEntry, addTeamMemberFromApi } = useData();
+  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, updateTimeEntry, deleteTimeEntry, addTeamMemberFromApi } = useData();
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
@@ -361,7 +379,7 @@ export default function TeamPage() {
                     <td colSpan={7} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-md)', borderTop:'1px solid var(--border-subtle)' }}>
                         <h4 style={{ margin:'0 0 var(--space-sm)', fontSize:'0.85rem' }}>Time Log — {member.fullName}</h4>
-                        <TimeLog memberId={member.id} timeEntries={timeEntries} timeSegments={timeSegments} jobs={jobs} />
+                        <TimeLog memberId={member.id} timeEntries={timeEntries} timeSegments={timeSegments} jobs={jobs} updateTimeEntry={updateTimeEntry} deleteTimeEntry={deleteTimeEntry} />
                       </div>
                     </td>
                   </tr>
@@ -464,85 +482,234 @@ export default function TeamPage() {
 
 // Sub-component: Time log for a member.
 //
-// Each row is one shift (a closed time_entries row). Click to expand and see
-// the per-segment breakdown (job / travel / break) — that's the new audit
-// trail Riley uses when validating a paycheck.
-function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [] }) {
+// Each row is one shift (a closed time_entries row). Click chevron to expand
+// and see the per-segment breakdown (job / travel / break). The pencil icon
+// opens an edit modal; the trash icon prompts a delete. Both are owner-gated
+// at the page level (Team & Payroll is in the owner-only sidebar).
+function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTimeEntry, deleteTimeEntry }) {
   const [openRow, setOpenRow] = useState(null);
+  const [editing, setEditing] = useState(null); // entry being edited
+  const [editForm, setEditForm] = useState({ clockIn: '', clockOut: '', breakMinutes: 0, notes: '' });
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [deleteId, setDeleteId] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
   const entries = timeEntries
     .filter(t => t.teamMemberId === memberId && t.clockOut)
     .sort((a,b) => new Date(b.clockIn) - new Date(a.clockIn))
     .slice(0, 20);
+
+  const startEdit = (entry, hasSegs) => {
+    setEditing({ ...entry, hasSegs });
+    setEditForm({
+      clockIn: isoToLocalInput(entry.clockIn),
+      clockOut: isoToLocalInput(entry.clockOut),
+      breakMinutes: Number(entry.breakMinutes || 0),
+      notes: entry.notes || '',
+    });
+    setEditError(null);
+  };
+
+  const handleSave = async () => {
+    if (!editing) return;
+    const clockInIso = localInputToIso(editForm.clockIn);
+    const clockOutIso = localInputToIso(editForm.clockOut);
+    if (!clockInIso || !clockOutIso) {
+      setEditError('Both clock-in and clock-out times are required.');
+      return;
+    }
+    if (new Date(clockOutIso) <= new Date(clockInIso)) {
+      setEditError('Clock-out must be after clock-in.');
+      return;
+    }
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await updateTimeEntry(editing.id, {
+        clockIn: clockInIso,
+        clockOut: clockOutIso,
+        breakMinutes: Math.max(0, Number(editForm.breakMinutes) || 0),
+        notes: editForm.notes,
+      });
+      setEditing(null);
+    } catch (err) {
+      console.error('updateTimeEntry failed', err);
+      setEditError(err?.message || 'Could not save changes.');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteId) return;
+    setDeleteBusy(true);
+    try {
+      await deleteTimeEntry(deleteId);
+      setDeleteId(null);
+    } catch (err) {
+      console.error('deleteTimeEntry failed', err);
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
 
   if (entries.length === 0) {
     return <p style={{ color:'var(--text-tertiary)', fontSize:'0.82rem' }}>No time entries yet.</p>;
   }
 
   return (
-    <table style={{ width:'100%', fontSize:'0.82rem' }}>
-      <thead><tr><th></th><th>Date</th><th>In</th><th>Out</th><th>Shift</th><th>Break</th><th>Paid</th><th>Notes</th></tr></thead>
-      <tbody>
-        {entries.map(e => {
-          const segs = timeSegments.filter(s => s.timeEntryId === e.id);
-          const hasSegs = segs.length > 0;
-          const shiftMins = computeDurationMinutes(e.clockIn, e.clockOut);
-          // Prefer segment math when available
-          const breakMins = hasSegs
-            ? segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
-            : Number(e.breakMinutes || 0);
-          const paidMins = hasSegs
-            ? segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
-            : Math.max(0, shiftMins - breakMins);
-          const isOpen = openRow === e.id;
-          return [
-            <tr key={e.id} style={{ cursor: hasSegs ? 'pointer' : 'default' }} onClick={() => hasSegs && setOpenRow(isOpen ? null : e.id)}>
-              <td style={{ color:'var(--text-tertiary)', width:18 }}>
-                {hasSegs ? (isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null}
-              </td>
-              <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
-              <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
-              <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
-              <td style={{ color:'var(--text-tertiary)' }}>{fmtDur(shiftMins)}</td>
-              <td style={{ color: breakMins > 0 ? 'var(--lucky-gold)' : 'var(--text-tertiary)' }}>
-                {breakMins > 0 ? `${breakMins}m` : '—'}
-              </td>
-              <td style={{ fontWeight:600 }}>{fmtDur(paidMins)}</td>
-              <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
-            </tr>,
-            hasSegs && isOpen && (
-              <tr key={`${e.id}-segs`}>
-                <td colSpan={8} style={{ padding:'0', background:'var(--bg-card)' }}>
-                  <div style={{ padding:'8px 16px 12px 38px' }}>
-                    {segs
-                      .slice()
-                      .sort((a,b) => new Date(a.startedAt) - new Date(b.startedAt))
-                      .map(s => {
-                        const job = s.jobId ? jobs.find(j => j.id === s.jobId) : null;
-                        const Icon = s.kind === 'job' ? HardHat : s.kind === 'travel' ? Truck : Coffee;
-                        const tint = s.kind === 'break' ? 'var(--lucky-gold)' : s.kind === 'travel' ? '#63b3ff' : 'var(--lucky-green-light)';
-                        const label = s.kind === 'job' ? (job?.title || 'Job') : s.kind === 'travel' ? 'Travel / Yard' : 'Break';
-                        return (
-                          <div key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', fontSize:'0.78rem' }}>
-                            <Icon size={12} style={{ color: tint, flexShrink:0 }} />
-                            <span style={{ minWidth:140, fontWeight:600 }}>{label}</span>
-                            <span style={{ color:'var(--text-tertiary)' }}>
-                              {new Date(s.startedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
-                              {s.endedAt && <> → {new Date(s.endedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</>}
-                            </span>
-                            <span style={{ color:'var(--text-secondary)' }}>{fmtDur(Number(s.durationMinutes||0))}</span>
-                            {s.notes && (
-                              <span style={{ color:'var(--lucky-gold)', fontStyle:'italic', fontSize:'0.75rem' }}>{s.notes}</span>
-                            )}
-                          </div>
-                        );
-                      })}
+    <>
+      <table style={{ width:'100%', fontSize:'0.82rem' }}>
+        <thead><tr><th></th><th>Date</th><th>In</th><th>Out</th><th>Shift</th><th>Break</th><th>Paid</th><th>Notes</th><th style={{ width:60 }}></th></tr></thead>
+        <tbody>
+          {entries.map(e => {
+            const segs = timeSegments.filter(s => s.timeEntryId === e.id);
+            const hasSegs = segs.length > 0;
+            const shiftMins = computeDurationMinutes(e.clockIn, e.clockOut);
+            // Prefer segment math when available
+            const breakMins = hasSegs
+              ? segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
+              : Number(e.breakMinutes || 0);
+            const paidMins = hasSegs
+              ? segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
+              : Math.max(0, shiftMins - breakMins);
+            const isOpen = openRow === e.id;
+            return [
+              <tr key={e.id}>
+                <td style={{ color:'var(--text-tertiary)', width:18, cursor: hasSegs ? 'pointer' : 'default' }} onClick={() => hasSegs && setOpenRow(isOpen ? null : e.id)}>
+                  {hasSegs ? (isOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />) : null}
+                </td>
+                <td>{new Date(e.clockIn).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</td>
+                <td>{new Date(e.clockIn).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
+                <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
+                <td style={{ color:'var(--text-tertiary)' }}>{fmtDur(shiftMins)}</td>
+                <td style={{ color: breakMins > 0 ? 'var(--lucky-gold)' : 'var(--text-tertiary)' }}>
+                  {breakMins > 0 ? `${breakMins}m` : '—'}
+                </td>
+                <td style={{ fontWeight:600 }}>{fmtDur(paidMins)}</td>
+                <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
+                <td>
+                  <div style={{ display:'flex', gap:'2px', justifyContent:'flex-end' }}>
+                    <button className="btn btn-icon btn-ghost" title="Edit shift" onClick={() => startEdit(e, hasSegs)} style={{ padding:'4px' }}>
+                      <Pencil size={12} />
+                    </button>
+                    <button className="btn btn-icon btn-ghost" title="Delete shift" onClick={() => setDeleteId(e.id)} style={{ padding:'4px', color:'var(--status-danger)' }}>
+                      <Trash2 size={12} />
+                    </button>
                   </div>
                 </td>
-              </tr>
-            ),
-          ];
-        })}
-      </tbody>
-    </table>
+              </tr>,
+              hasSegs && isOpen && (
+                <tr key={`${e.id}-segs`}>
+                  <td colSpan={9} style={{ padding:'0', background:'var(--bg-card)' }}>
+                    <div style={{ padding:'8px 16px 12px 38px' }}>
+                      {segs
+                        .slice()
+                        .sort((a,b) => new Date(a.startedAt) - new Date(b.startedAt))
+                        .map(s => {
+                          const job = s.jobId ? jobs.find(j => j.id === s.jobId) : null;
+                          const Icon = s.kind === 'job' ? HardHat : s.kind === 'travel' ? Truck : Coffee;
+                          const tint = s.kind === 'break' ? 'var(--lucky-gold)' : s.kind === 'travel' ? '#63b3ff' : 'var(--lucky-green-light)';
+                          const label = s.kind === 'job' ? (job?.title || 'Job') : s.kind === 'travel' ? 'Travel / Yard' : 'Break';
+                          return (
+                            <div key={s.id} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 0', fontSize:'0.78rem' }}>
+                              <Icon size={12} style={{ color: tint, flexShrink:0 }} />
+                              <span style={{ minWidth:140, fontWeight:600 }}>{label}</span>
+                              <span style={{ color:'var(--text-tertiary)' }}>
+                                {new Date(s.startedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}
+                                {s.endedAt && <> → {new Date(s.endedAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</>}
+                              </span>
+                              <span style={{ color:'var(--text-secondary)' }}>{fmtDur(Number(s.durationMinutes||0))}</span>
+                              {s.notes && (
+                                <span style={{ color:'var(--lucky-gold)', fontStyle:'italic', fontSize:'0.75rem' }}>{s.notes}</span>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </td>
+                </tr>
+              ),
+            ];
+          })}
+        </tbody>
+      </table>
+
+      {/* Edit shift modal */}
+      {editing && (
+        <div className="modal-overlay" onClick={() => !editBusy && setEditing(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:'440px' }}>
+            <div className="modal-header">
+              <h2><Pencil size={18} style={{ marginRight:8, verticalAlign:'middle' }} />Edit Shift</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setEditing(null)} disabled={editBusy}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label className="form-label">Clock In</label>
+                <input className="form-input" type="datetime-local" value={editForm.clockIn} onChange={ev => setEditForm(f => ({ ...f, clockIn: ev.target.value }))} />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Clock Out</label>
+                <input className="form-input" type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))} />
+              </div>
+              {!editing.hasSegs && (
+                <div className="form-group">
+                  <label className="form-label">Break Minutes</label>
+                  <input className="form-input" type="number" min={0} step={5} value={editForm.breakMinutes} onChange={ev => setEditForm(f => ({ ...f, breakMinutes: ev.target.value }))} />
+                </div>
+              )}
+              {editing.hasSegs && (
+                <div style={{ display:'flex', gap:8, padding:'10px 12px', background:'var(--status-info-bg)', borderRadius:'var(--radius-md)', color:'var(--status-info)', fontSize:'0.78rem', marginBottom:'var(--space-md)' }}>
+                  <AlertCircle size={14} style={{ flexShrink:0, marginTop:2 }} />
+                  <span>This shift has detailed segments — payroll math comes from those, not the entry-level break minutes. Editing the bounds here only changes shift display, not job-cost attribution. To re-do segment math, delete and have the worker re-clock.</span>
+                </div>
+              )}
+              <div className="form-group">
+                <label className="form-label">Notes</label>
+                <textarea className="form-textarea" rows={2} value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} placeholder="e.g. forgot to clock out, fixed manually" />
+              </div>
+              {editError && (
+                <div style={{ display:'flex', gap:6, padding:'8px 12px', background:'var(--status-danger-bg)', color:'var(--status-danger)', borderRadius:'var(--radius-md)', fontSize:'0.78rem' }}>
+                  <AlertCircle size={14} /> {editError}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setEditing(null)} disabled={editBusy}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSave} disabled={editBusy}>
+                {editBusy ? <><Loader2 size={14} className="spin" /> Saving</> : <><Save size={14} /> Save</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirm */}
+      {deleteId && (
+        <div className="modal-overlay" onClick={() => !deleteBusy && setDeleteId(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:'400px' }}>
+            <div className="modal-header">
+              <h2><Trash2 size={18} style={{ marginRight:8, verticalAlign:'middle' }} />Delete Shift?</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setDeleteId(null)} disabled={deleteBusy}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize:'0.85rem', marginBottom:8 }}>
+                This permanently removes the shift and all its segments. Payroll totals will recompute.
+              </p>
+              <p style={{ fontSize:'0.78rem', color:'var(--text-tertiary)' }}>
+                You can&apos;t undo this. If you just want to fix the times, use Edit instead.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setDeleteId(null)} disabled={deleteBusy}>Cancel</button>
+              <button className="btn btn-danger" onClick={handleConfirmDelete} disabled={deleteBusy}>
+                {deleteBusy ? <><Loader2 size={14} className="spin" /> Deleting</> : <><Trash2 size={14} /> Delete</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
