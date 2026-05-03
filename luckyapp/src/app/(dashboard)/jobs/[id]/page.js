@@ -10,9 +10,26 @@ import {
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
   Edit3, Save, Search, Check, AlertTriangle, Receipt, Image as ImageIcon, AlertCircle, CheckCircle,
+  HardHat, FileSignature, MessageSquare,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
+
+// ─── Job authorization modes ───────────────────────────────
+// 'contract'    — signed customer contract required before start (default)
+// 'subcontract' — GC hired us; we need a work order/PO on file (uploaded
+//                 photo or typed notes) instead of a customer signature
+// 'verbal'      — small repeat job, informal authorization; require typed
+//                 reason so there's still a paper trail
+const WORK_AUTH_OPTIONS = [
+  { value: 'contract',    label: 'Customer contract',  short: 'Contract',     icon: FileSignature, tone: 'var(--lucky-green)',   help: 'Customer signs a contract before work begins (current default).' },
+  { value: 'subcontract', label: 'Subcontract from GC', short: 'Subcontract',  icon: HardHat,       tone: 'var(--lucky-gold)',    help: 'Authorized by a general contractor via PO, email, or work order.' },
+  { value: 'verbal',      label: 'Verbal / informal',  short: 'Verbal',       icon: MessageSquare, tone: 'var(--text-secondary)', help: 'Trusted repeat customer, small job. Needs a typed reason.' },
+];
+
+function workAuthMeta(value) {
+  return WORK_AUTH_OPTIONS.find(o => o.value === value) || WORK_AUTH_OPTIONS[0];
+}
 
 function formatTime12(time) {
   if (!time) return '';
@@ -122,22 +139,42 @@ export default function JobDetailPage({ params }) {
   const mapsUrl = fullAddress ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}` : '';
 
   // Lookup any contract tied to this job (directly or via the quote it came from).
-  // We block "Start Job" unless that contract is signed — protects us from
-  // doing work without a written agreement.
+  // We block "Start Job" unless authorization is on file — protects us from
+  // doing work without something in writing.
   const linkedContract = (contracts || []).find(c =>
     (c.jobId && c.jobId === job?.id) ||
     (job?.quoteId && c.quoteId === job.quoteId)
   ) || null;
+
+  // ─── Authorization gate ───────────────────────────────
+  // Three modes (see WORK_AUTH_OPTIONS above). The gate logic per mode:
+  //   contract    → require linked contract to be 'signed' (only when one
+  //                 is implied, i.e. job came from a quote or has a contract row)
+  //   subcontract → require either work_order_url OR work_order_notes
+  //                 (any tangible evidence that the GC authorized the work)
+  //   verbal      → require work_order_notes (typed reason — the audit trail)
+  const workAuth = job?.workAuthorization || 'contract';
   const contractRequired = !!(job?.quoteId || linkedContract);
   const contractSigned = linkedContract?.status === 'signed';
-  const blockStartForContract = contractRequired && !contractSigned;
 
+  let blockStart = false;
+  let gateMessage = '';
+  if (workAuth === 'contract') {
+    blockStart = contractRequired && !contractSigned;
+    gateMessage = linkedContract
+      ? `Contract #${linkedContract.contractNumber} hasn't been signed yet. Have the customer sign before starting.`
+      : 'No signed contract on file for this job. Generate one from the source quote first.';
+  } else if (workAuth === 'subcontract') {
+    const hasProof = !!(job?.workOrderUrl || (job?.workOrderNotes || '').trim());
+    blockStart = !hasProof;
+    gateMessage = 'Subcontract jobs need a work order on file (upload a PO/email screenshot, or type the authorization details).';
+  } else if (workAuth === 'verbal') {
+    blockStart = !((job?.workOrderNotes || '').trim());
+    gateMessage = 'Verbal jobs need a typed reason on file so there\'s still an audit trail.';
+  }
   const handleStatusChange = async (newStatus, opts = {}) => {
-    if (newStatus === 'in_progress' && blockStartForContract) {
-      showToast('error', linkedContract
-        ? `Contract #${linkedContract.contractNumber} hasn't been signed yet. Have the customer sign before starting.`
-        : 'No signed contract on file for this job. Generate one from the source quote first.'
-      );
+    if (newStatus === 'in_progress' && blockStart) {
+      showToast('error', gateMessage);
       return;
     }
 
@@ -212,6 +249,12 @@ export default function JobDetailPage({ params }) {
       crewNotes: job.crewNotes || '',
       priority: job.priority || 'normal',
       assignedTo: job.assignedTo || [],
+      workAuthorization: job.workAuthorization || 'contract',
+      workOrderUrl: job.workOrderUrl || null,
+      workOrderPath: job.workOrderPath || null,
+      workOrderNotes: job.workOrderNotes || '',
+      siteContactName: job.siteContactName || '',
+      siteContactPhone: job.siteContactPhone || '',
     });
     setCrSearch('');
     setEditError(null);
@@ -280,6 +323,15 @@ export default function JobDetailPage({ params }) {
               <statusConf.icon size={14} />
               {statusConf.label}
             </span>
+            {workAuth !== 'contract' && (() => {
+              const meta = workAuthMeta(workAuth);
+              const Icon = meta.icon;
+              return (
+                <span className="tag tag-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={meta.label}>
+                  <Icon size={11} /> {meta.short}
+                </span>
+              );
+            })()}
           </div>
         </div>
         {isOwnerOrAdmin && (
@@ -289,10 +341,10 @@ export default function JobDetailPage({ params }) {
             </button>
             {job.status === 'scheduled' && (
               <button
-                className={`btn btn-sm ${blockStartForContract ? 'btn-secondary' : 'btn-primary'}`}
+                className={`btn btn-sm ${blockStart ? 'btn-secondary' : 'btn-primary'}`}
                 onClick={() => handleStatusChange('in_progress')}
-                disabled={updating || blockStartForContract}
-                title={blockStartForContract ? 'Contract must be signed before starting this job' : 'Start the job'}
+                disabled={updating || blockStart}
+                title={blockStart ? gateMessage : 'Start the job'}
               >
                 <Play size={14} /> Start Job
               </button>
@@ -314,67 +366,95 @@ export default function JobDetailPage({ params }) {
         )}
       </div>
 
-      {/* Contract status banner — blocks start of unsigned-contract jobs */}
-      {isOwnerOrAdmin && job.status === 'scheduled' && (
-        contractRequired && !contractSigned ? (
-          <div style={{
-            background: 'rgba(239,68,68,0.08)',
-            border: '1px solid rgba(239,68,68,0.30)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-md) var(--space-lg)',
-            marginBottom: 'var(--space-lg)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--space-md)',
-            flexWrap: 'wrap',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <AlertTriangle size={20} style={{ color: 'var(--status-danger)' }} />
-              <div>
-                <div style={{ fontWeight: 700 }}>Contract not signed — job is locked</div>
-                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 2 }}>
-                  {linkedContract
-                    ? `Contract #${linkedContract.contractNumber} is ${linkedContract.status}. The customer must sign before this job can start.`
-                    : 'Generate a contract from the source quote and have the customer sign it before starting work.'}
+      {/* Authorization banner — blocks start when proof is missing.
+          Three modes (contract / subcontract / verbal); banner copy and CTA
+          differ by mode but blockStart is computed from the same gate logic. */}
+      {isOwnerOrAdmin && job.status === 'scheduled' && (() => {
+        const meta = workAuthMeta(workAuth);
+        const Icon = meta.icon;
+        const hasProof = workAuth === 'subcontract'
+          ? !!(job?.workOrderUrl || (job?.workOrderNotes || '').trim())
+          : workAuth === 'verbal'
+            ? !!(job?.workOrderNotes || '').trim()
+            : contractSigned;
+
+        if (blockStart) {
+          return (
+            <div style={{
+              background: 'rgba(239,68,68,0.08)',
+              border: '1px solid rgba(239,68,68,0.30)',
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-md) var(--space-lg)',
+              marginBottom: 'var(--space-lg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 'var(--space-md)', flexWrap: 'wrap',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <AlertTriangle size={20} style={{ color: 'var(--status-danger)' }} />
+                <div>
+                  <div style={{ fontWeight: 700 }}>
+                    {workAuth === 'contract' ? 'Contract not signed — job is locked'
+                      : workAuth === 'subcontract' ? 'Work order missing — job is locked'
+                      : 'Authorization missing — job is locked'}
+                  </div>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                    {gateMessage}
+                  </div>
                 </div>
               </div>
+              {workAuth === 'contract' && linkedContract ? (
+                <Link href={`/contracts/${linkedContract.id}`} className="btn btn-primary btn-sm">
+                  Open Contract →
+                </Link>
+              ) : workAuth === 'contract' && quote ? (
+                <Link href={`/quotes/${quote.id}`} className="btn btn-primary btn-sm">
+                  Generate Contract →
+                </Link>
+              ) : (
+                <button className="btn btn-primary btn-sm" onClick={openEditModal}>
+                  <Edit3 size={14} /> Add Authorization
+                </button>
+              )}
             </div>
-            {linkedContract ? (
-              <Link href={`/contracts/${linkedContract.id}`} className="btn btn-primary btn-sm">
-                Open Contract →
-              </Link>
-            ) : quote ? (
-              <Link href={`/quotes/${quote.id}`} className="btn btn-primary btn-sm">
-                Generate Contract →
-              </Link>
-            ) : null}
-          </div>
-        ) : contractSigned ? (
-          <div style={{
-            background: 'rgba(45,122,58,0.08)',
-            border: '1px solid rgba(45,122,58,0.25)',
-            borderRadius: 'var(--radius-md)',
-            padding: 'var(--space-sm) var(--space-md)',
-            marginBottom: 'var(--space-lg)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 'var(--space-md)',
-            fontSize: '0.9rem',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <CheckCircle2 size={16} style={{ color: 'var(--status-success)' }} />
-              <span>Contract #{linkedContract.contractNumber} signed by {linkedContract.signatureTypedName || 'customer'} — job is cleared to start.</span>
+          );
+        }
+
+        if (hasProof) {
+          return (
+            <div style={{
+              background: workAuth === 'contract' ? 'rgba(45,122,58,0.08)' : 'rgba(212,169,62,0.08)',
+              border: `1px solid ${workAuth === 'contract' ? 'rgba(45,122,58,0.25)' : 'rgba(212,169,62,0.30)'}`,
+              borderRadius: 'var(--radius-md)',
+              padding: 'var(--space-sm) var(--space-md)',
+              marginBottom: 'var(--space-lg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              gap: 'var(--space-md)', fontSize: '0.9rem',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Icon size={16} style={{ color: meta.tone }} />
+                <span>
+                  {workAuth === 'contract' && linkedContract && (
+                    <>Contract #{linkedContract.contractNumber} signed by {linkedContract.signatureTypedName || 'customer'} — job is cleared to start.</>
+                  )}
+                  {workAuth === 'subcontract' && (
+                    <>Subcontract — work order on file{customer ? `, billed to ${customer.firstName} ${customer.lastName || ''}`.trim() : ''}.</>
+                  )}
+                  {workAuth === 'verbal' && (
+                    <>Verbal authorization on file. Make sure the notes capture who authorized it and when.</>
+                  )}
+                </span>
+              </div>
+              {workAuth === 'contract' && linkedContract?.pdfUrl ? (
+                <a href={linkedContract.pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">View PDF →</a>
+              ) : workAuth === 'subcontract' && job?.workOrderUrl ? (
+                <a href={job.workOrderUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">View Work Order →</a>
+              ) : null}
             </div>
-            {linkedContract.pdfUrl && (
-              <a href={linkedContract.pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">
-                View PDF →
-              </a>
-            )}
-          </div>
-        ) : null
-      )}
+          );
+        }
+
+        return null;
+      })()}
 
       {/* Profit Summary Banner — owner/admin only (workers don't see margin).
           Banner is color-coded by margin tier (green ≥30%, gold 15-29%,
@@ -556,6 +636,39 @@ export default function JobDetailPage({ params }) {
             ) : (
               <div style={{ padding: 'var(--space-md)', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
                 No customer linked
+              </div>
+            )}
+
+            {/* Site contact — homeowner contact when working through a GC */}
+            {(job.siteContactName || job.siteContactPhone) && (
+              <div className="job-detail-row" style={{ borderTop: '1px dashed var(--border-subtle)', paddingTop: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                <HardHat size={16} />
+                <div className="job-detail-row-content">
+                  <div className="job-detail-row-label">Site Contact (Homeowner)</div>
+                  <div className="job-detail-row-value">
+                    {job.siteContactName || ''}{job.siteContactPhone && (
+                      <> · <a href={`tel:${job.siteContactPhone}`}>{job.siteContactPhone}</a></>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Work order notes — visible to crew so they know the scope agreed with the GC */}
+            {job.workOrderNotes && workAuth !== 'contract' && (
+              <div className="job-detail-row" style={{ borderTop: '1px dashed var(--border-subtle)', paddingTop: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                <FileSignature size={16} />
+                <div className="job-detail-row-content">
+                  <div className="job-detail-row-label">{workAuth === 'subcontract' ? 'Work Order Details' : 'Verbal Authorization Details'}</div>
+                  <div className="job-detail-row-value" style={{ whiteSpace: 'pre-wrap', fontSize: '0.82rem' }}>{job.workOrderNotes}</div>
+                  {job.workOrderUrl && (
+                    <a href={job.workOrderUrl} target="_blank" rel="noopener noreferrer"
+                      className="btn btn-ghost btn-sm"
+                      style={{ marginTop: '6px', padding: '4px 10px', fontSize: '0.75rem' }}>
+                      <Receipt size={12} /> View Work Order
+                    </a>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -871,6 +984,77 @@ export default function JobDetailPage({ params }) {
                 <label className="form-label"><FileText size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Crew Notes</label>
                 <textarea className="form-textarea" rows={3} value={editForm.crewNotes} onChange={e => setEditForm(prev => ({ ...prev, crewNotes: e.target.value }))} placeholder="Access instructions, materials, gate codes..." />
               </div>
+
+              {/* Work Authorization — how this job is allowed to start */}
+              <div className="form-group">
+                <label className="form-label"><FileSignature size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Work Authorization</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                  {WORK_AUTH_OPTIONS.map(opt => {
+                    const Icon = opt.icon;
+                    const isActive = (editForm.workAuthorization || 'contract') === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setEditForm(prev => ({ ...prev, workAuthorization: opt.value }))}
+                        style={{ flex: 1, minWidth: 130, justifyContent: 'center' }}
+                      >
+                        <Icon size={14} /> {opt.short}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', margin: 0 }}>
+                  {workAuthMeta(editForm.workAuthorization).help}
+                </p>
+              </div>
+
+              {/* Subcontract / verbal: work order proof + notes */}
+              {(editForm.workAuthorization === 'subcontract' || editForm.workAuthorization === 'verbal') && (
+                <>
+                  {editForm.workAuthorization === 'subcontract' && user?.orgId && (
+                    <div className="form-group">
+                      <label className="form-label">Work Order Photo (PO, email screenshot, etc.)</label>
+                      <ReceiptUpload
+                        orgId={user.orgId}
+                        scope="work-order"
+                        value={{ url: editForm.workOrderUrl, path: editForm.workOrderPath }}
+                        onChange={({ url, path }) => setEditForm(prev => ({ ...prev, workOrderUrl: url, workOrderPath: path }))}
+                      />
+                    </div>
+                  )}
+                  <div className="form-group">
+                    <label className="form-label">
+                      Authorization Details
+                      {editForm.workAuthorization === 'verbal' && <span className="required"> *</span>}
+                    </label>
+                    <textarea
+                      className="form-textarea"
+                      rows={3}
+                      value={editForm.workOrderNotes}
+                      onChange={e => setEditForm(prev => ({ ...prev, workOrderNotes: e.target.value }))}
+                      placeholder={editForm.workAuthorization === 'subcontract'
+                        ? 'GC name, scope, agreed price, contact person, PO number — anything that proves the GC asked for this work.'
+                        : 'Who authorized this verbally, when, and the agreed scope/price. This is your audit trail if the customer disputes later.'}
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Site Contact — homeowner contact info when working through a GC */}
+              {editForm.workAuthorization === 'subcontract' && (
+                <div className="form-row">
+                  <div className="form-group">
+                    <label className="form-label">Site Contact Name</label>
+                    <input className="form-input" value={editForm.siteContactName} onChange={e => setEditForm(prev => ({ ...prev, siteContactName: e.target.value }))} placeholder="Homeowner first/last name" />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Site Contact Phone</label>
+                    <input className="form-input" type="tel" value={editForm.siteContactPhone} onChange={e => setEditForm(prev => ({ ...prev, siteContactPhone: e.target.value }))} placeholder="(402) 555-1234" />
+                  </div>
+                </div>
+              )}
 
               {/* Crew Assignment */}
               {activeMembers.length > 0 && (

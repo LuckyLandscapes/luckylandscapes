@@ -48,6 +48,7 @@ const ownerNavItems = [
   { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
   { href: '/invoices', label: 'Invoices', icon: Receipt, roles: ['owner', 'admin'], badgeKey: 'unpaidInvoices' },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
+  { href: '/crew-dashboard', label: 'Time Clock', icon: Clock, roles: ['owner', 'admin'] },
   { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['owner', 'admin'] },
   { label: 'Tools', type: 'section', roles: ['owner', 'admin'] },
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },

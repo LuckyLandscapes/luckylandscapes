@@ -5,9 +5,25 @@ import { useData } from '@/lib/data';
 import Link from 'next/link';
 import {
   Plus, Search, Phone, Mail, MapPin, X, UserPlus, ArrowRight,
-  AlertCircle, CheckCircle,
+  AlertCircle, CheckCircle, Home, Briefcase, HardHat,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+
+// ─── Customer type tags ───────────────────────────────
+// 'homeowner'           — residential property owner (default)
+// 'business'            — commercial customer (HOA, business, property mgmt)
+// 'general_contractor'  — GC who hires Lucky as a sub. Subcontract jobs
+//                          attach to this customer record so billing flows
+//                          to the GC, not the end-property-owner.
+export const CUSTOMER_TYPES = [
+  { value: 'homeowner',          label: 'Homeowner',          short: 'Homeowner',  icon: Home,      tone: '' },
+  { value: 'business',           label: 'Business',           short: 'Business',   icon: Briefcase, tone: 'tag-blue' },
+  { value: 'general_contractor', label: 'General Contractor', short: 'GC',         icon: HardHat,   tone: 'tag-gold' },
+];
+
+export function customerTypeMeta(type) {
+  return CUSTOMER_TYPES.find(t => t.value === type) || CUSTOMER_TYPES[0];
+}
 
 /**
  * Format a phone number as (XXX) XXX-XXXX as the user types.
@@ -28,6 +44,7 @@ export default function CustomersPage() {
   const [filterTag, setFilterTag] = useState('all');
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '',
+    customerType: 'homeowner',
   });
   const [formError, setFormError] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -64,7 +81,7 @@ export default function CustomersPage() {
     setFormError(null);
     try {
       await addCustomer(form);
-      setForm({ firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '' });
+      setForm({ firstName: '', lastName: '', email: '', phone: '', address: '', city: 'Lincoln', state: 'NE', zip: '', notes: '', customerType: 'homeowner' });
       setShowModal(false);
       showToast('success', `Customer ${form.firstName.trim()} added`);
     } catch (err) {
@@ -141,7 +158,18 @@ export default function CustomersPage() {
                       {(c.firstName?.[0] || '') + (c.lastName?.[0] || '')}
                     </div>
                     <div>
-                      <div className="table-name">{c.firstName} {c.lastName}</div>
+                      <div className="table-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {c.firstName} {c.lastName}
+                        {c.customerType && c.customerType !== 'homeowner' && (() => {
+                          const meta = customerTypeMeta(c.customerType);
+                          const Icon = meta.icon;
+                          return (
+                            <span className={`tag ${meta.tone}`} title={meta.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.65rem', padding: '1px 6px' }}>
+                              <Icon size={10} /> {meta.short}
+                            </span>
+                          );
+                        })()}
+                      </div>
                       <div className="table-sub">Since {c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</div>
                     </div>
                   </div>
@@ -216,14 +244,39 @@ export default function CustomersPage() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
+                <div className="form-group">
+                  <label className="form-label">Customer Type</label>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {CUSTOMER_TYPES.map(t => {
+                      const Icon = t.icon;
+                      const isActive = form.customerType === t.value;
+                      return (
+                        <button
+                          key={t.value}
+                          type="button"
+                          className={`btn btn-sm ${isActive ? 'btn-primary' : 'btn-secondary'}`}
+                          onClick={() => setForm({ ...form, customerType: t.value })}
+                          style={{ flex: 1, minWidth: 110, justifyContent: 'center' }}
+                        >
+                          <Icon size={14} /> {t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {form.customerType === 'general_contractor' && (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                      Use the GC&apos;s name and billing info here. The end-property-owner gets captured per-job as a site contact.
+                    </p>
+                  )}
+                </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label className="form-label">First Name <span className="required">*</span></label>
+                    <label className="form-label">{form.customerType === 'business' || form.customerType === 'general_contractor' ? 'Contact First Name' : 'First Name'} <span className="required">*</span></label>
                     <input className="form-input" placeholder="John" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
                   </div>
                   <div className="form-group">
-                    <label className="form-label">Last Name</label>
-                    <input className="form-input" placeholder="Doe" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+                    <label className="form-label">{form.customerType === 'business' || form.customerType === 'general_contractor' ? 'Company / Last Name' : 'Last Name'}</label>
+                    <input className="form-input" placeholder={form.customerType === 'general_contractor' ? 'Acme Construction' : 'Doe'} value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
                   </div>
                 </div>
                 <div className="form-group">
