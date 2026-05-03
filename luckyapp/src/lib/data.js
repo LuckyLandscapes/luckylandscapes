@@ -958,6 +958,124 @@ export function DataProvider({ children }) {
     return merged;
   }, [connected, timeSegments]);
 
+  // ─── Segment edit helpers ──────────────────────────────
+  // Owner-side fixes for segmented shifts. Common cases:
+  //   - "forgot to switch jobs" → updateTimeSegment(id, { jobId, kind: 'job' })
+  //   - "wrong start time"      → updateTimeSegment(id, { startedAt, endedAt })
+  //   - "missed a segment"      → addTimeSegment(entryId, { ... })
+  // durationMinutes is recomputed from startedAt/endedAt on every write so
+  // payroll math stays consistent. Per-job labor in finance.js prefers
+  // 'job'-kind segment durations, so editing here directly affects job costs.
+
+  const recomputeBreakMinutes = useCallback(async (timeEntryId, segments) => {
+    const breakMins = segments
+      .filter(s => s.timeEntryId === timeEntryId && s.kind === 'break' && s.endedAt)
+      .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+    if (connected) {
+      await supabase.from('time_entries').update({ break_minutes: breakMins }).eq('id', timeEntryId);
+    }
+    setTimeEntries(prev => {
+      const next = prev.map(t => t.id === timeEntryId ? { ...t, breakMinutes: breakMins } : t);
+      if (!connected) saveLocal('time_entries', next);
+      return next;
+    });
+  }, [connected]);
+
+  const updateTimeSegment = useCallback(async (id, data) => {
+    const seg = timeSegments.find(s => s.id === id);
+    if (!seg) return null;
+    const startedAt = data.startedAt || seg.startedAt;
+    const endedAt   = data.endedAt   !== undefined ? data.endedAt   : seg.endedAt;
+    const duration = endedAt
+      ? Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 60000))
+      : null;
+    // 'job' kind keeps jobId; non-job kinds clear it (travel/break never
+    // attribute to a job — finance.js depends on this invariant).
+    const nextKind = data.kind ?? seg.kind;
+    const nextJobId = nextKind === 'job' ? (data.jobId !== undefined ? data.jobId : seg.jobId) : null;
+    const patch = {
+      ...data,
+      startedAt,
+      endedAt,
+      durationMinutes: duration,
+      kind: nextKind,
+      jobId: nextJobId,
+    };
+    if (connected) {
+      const { error } = await supabase.from('time_segments').update(camelToSnake(patch)).eq('id', id);
+      if (error) throw error;
+    }
+    let nextSegments = null;
+    setTimeSegments(prev => {
+      nextSegments = prev.map(s => s.id === id ? { ...s, ...patch } : s);
+      if (!connected) saveLocal('time_segments', nextSegments);
+      return nextSegments;
+    });
+    if (nextSegments) await recomputeBreakMinutes(seg.timeEntryId, nextSegments);
+    return { ...seg, ...patch };
+  }, [connected, timeSegments, recomputeBreakMinutes]);
+
+  const deleteTimeSegment = useCallback(async (id) => {
+    const seg = timeSegments.find(s => s.id === id);
+    if (!seg) return;
+    if (connected) {
+      const { error } = await supabase.from('time_segments').delete().eq('id', id);
+      if (error) throw error;
+    }
+    let nextSegments = null;
+    setTimeSegments(prev => {
+      nextSegments = prev.filter(s => s.id !== id);
+      if (!connected) saveLocal('time_segments', nextSegments);
+      return nextSegments;
+    });
+    if (nextSegments) await recomputeBreakMinutes(seg.timeEntryId, nextSegments);
+  }, [connected, timeSegments, recomputeBreakMinutes]);
+
+  const addTimeSegment = useCallback(async (timeEntryId, { kind, jobId = null, startedAt, endedAt = null, notes = '' } = {}) => {
+    const entry = timeEntries.find(t => t.id === timeEntryId);
+    if (!entry) throw new Error('Time entry not found');
+    if (!startedAt) throw new Error('startedAt is required');
+    const memberId = entry.memberId || entry.teamMemberId;
+    const duration = endedAt
+      ? Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 60000))
+      : null;
+    const finalJobId = kind === 'job' ? jobId : null;
+    let inserted;
+    if (connected) {
+      const payload = {
+        org_id: orgId,
+        member_id: memberId,
+        time_entry_id: timeEntryId,
+        job_id: finalJobId,
+        kind,
+        started_at: startedAt,
+        ended_at: endedAt,
+        duration_minutes: duration,
+        notes: notes || '',
+      };
+      const { data: row, error } = await supabase.from('time_segments').insert(payload).select().single();
+      if (error) throw error;
+      inserted = snakeToCamel(row);
+    } else {
+      inserted = {
+        id: crypto.randomUUID(),
+        orgId, memberId, timeEntryId,
+        jobId: finalJobId, kind,
+        startedAt, endedAt, durationMinutes: duration,
+        notes: notes || '',
+        createdAt: new Date().toISOString(),
+      };
+    }
+    let nextSegments = null;
+    setTimeSegments(prev => {
+      nextSegments = [inserted, ...prev];
+      if (!connected) saveLocal('time_segments', nextSegments);
+      return nextSegments;
+    });
+    if (nextSegments) await recomputeBreakMinutes(timeEntryId, nextSegments);
+    return inserted;
+  }, [connected, orgId, timeEntries, recomputeBreakMinutes]);
+
   // ─── Job Expenses ──────────────────────────────────────
   const addJobExpense = useCallback(async (data) => {
     if (connected) {
@@ -1549,6 +1667,8 @@ export function DataProvider({ children }) {
 
     // Time — new shift+segment API
     startShift, endShift, switchSegment, annotateOpenSegment,
+    // Time — segment-level edits (owner-side payroll fixes)
+    updateTimeSegment, deleteTimeSegment, addTimeSegment,
     // Time — legacy aliases (kept so existing callers don't break)
     clockIn, clockOut, updateTimeEntry, deleteTimeEntry,
 

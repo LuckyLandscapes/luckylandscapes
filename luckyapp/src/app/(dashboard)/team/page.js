@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/apiClient';
 import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
-  HardHat, Truck, Coffee, Pencil,
+  HardHat, Truck, Coffee, Pencil, Plus,
 } from 'lucide-react';
 
 // ─── Datetime helpers ─────────────────────────────────────
@@ -46,7 +46,7 @@ function fmtCurrency(n) {
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, updateTimeEntry, deleteTimeEntry, addTeamMemberFromApi } = useData();
+  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, updateTimeEntry, deleteTimeEntry, updateTimeSegment, deleteTimeSegment, addTimeSegment, addTeamMemberFromApi } = useData();
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
@@ -379,7 +379,17 @@ export default function TeamPage() {
                     <td colSpan={7} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-md)', borderTop:'1px solid var(--border-subtle)' }}>
                         <h4 style={{ margin:'0 0 var(--space-sm)', fontSize:'0.85rem' }}>Time Log — {member.fullName}</h4>
-                        <TimeLog memberId={member.id} timeEntries={timeEntries} timeSegments={timeSegments} jobs={jobs} updateTimeEntry={updateTimeEntry} deleteTimeEntry={deleteTimeEntry} />
+                        <TimeLog
+                          memberId={member.id}
+                          timeEntries={timeEntries}
+                          timeSegments={timeSegments}
+                          jobs={jobs}
+                          updateTimeEntry={updateTimeEntry}
+                          deleteTimeEntry={deleteTimeEntry}
+                          updateTimeSegment={updateTimeSegment}
+                          deleteTimeSegment={deleteTimeSegment}
+                          addTimeSegment={addTimeSegment}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -486,7 +496,7 @@ export default function TeamPage() {
 // and see the per-segment breakdown (job / travel / break). The pencil icon
 // opens an edit modal; the trash icon prompts a delete. Both are owner-gated
 // at the page level (Team & Payroll is in the owner-only sidebar).
-function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTimeEntry, deleteTimeEntry }) {
+function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTimeEntry, deleteTimeEntry, updateTimeSegment, deleteTimeSegment, addTimeSegment }) {
   const [openRow, setOpenRow] = useState(null);
   const [editing, setEditing] = useState(null); // entry being edited
   const [editForm, setEditForm] = useState({ clockIn: '', clockOut: '', breakMinutes: 0, notes: '' });
@@ -639,19 +649,21 @@ function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTi
       {/* Edit shift modal */}
       {editing && (
         <div className="modal-overlay" onClick={() => !editBusy && setEditing(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth:'440px' }}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: editing.hasSegs ? '720px' : '440px' }}>
             <div className="modal-header">
               <h2><Pencil size={18} style={{ marginRight:8, verticalAlign:'middle' }} />Edit Shift</h2>
               <button className="btn btn-icon btn-ghost" onClick={() => setEditing(null)} disabled={editBusy}><X size={20} /></button>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Clock In</label>
-                <input className="form-input" type="datetime-local" value={editForm.clockIn} onChange={ev => setEditForm(f => ({ ...f, clockIn: ev.target.value }))} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Clock Out</label>
-                <input className="form-input" type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))} />
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              <div className="form-row">
+                <div className="form-group">
+                  <label className="form-label">Clock In</label>
+                  <input className="form-input" type="datetime-local" value={editForm.clockIn} onChange={ev => setEditForm(f => ({ ...f, clockIn: ev.target.value }))} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Clock Out</label>
+                  <input className="form-input" type="datetime-local" value={editForm.clockOut} onChange={ev => setEditForm(f => ({ ...f, clockOut: ev.target.value }))} />
+                </div>
               </div>
               {!editing.hasSegs && (
                 <div className="form-group">
@@ -660,10 +672,14 @@ function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTi
                 </div>
               )}
               {editing.hasSegs && (
-                <div style={{ display:'flex', gap:8, padding:'10px 12px', background:'var(--status-info-bg)', borderRadius:'var(--radius-md)', color:'var(--status-info)', fontSize:'0.78rem', marginBottom:'var(--space-md)' }}>
-                  <AlertCircle size={14} style={{ flexShrink:0, marginTop:2 }} />
-                  <span>This shift has detailed segments — payroll math comes from those, not the entry-level break minutes. Editing the bounds here only changes shift display, not job-cost attribution. To re-do segment math, delete and have the worker re-clock.</span>
-                </div>
+                <SegmentEditor
+                  entryId={editing.id}
+                  segments={timeSegments.filter(s => s.timeEntryId === editing.id)}
+                  jobs={jobs}
+                  updateTimeSegment={updateTimeSegment}
+                  deleteTimeSegment={deleteTimeSegment}
+                  addTimeSegment={addTimeSegment}
+                />
               )}
               <div className="form-group">
                 <label className="form-label">Notes</label>
@@ -711,5 +727,255 @@ function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTi
         </div>
       )}
     </>
+  );
+}
+
+// ─── SegmentEditor ────────────────────────────────────────
+// Owner-side fix-it tool for segmented shifts. Lets the owner re-attribute
+// a segment to a different job (the "forgot to switch jobs" case),
+// adjust segment start/end times, change kind (job/travel/break), or add
+// a missed segment. Each row's Save calls the underlying mutator
+// immediately — payroll math (which prefers segment durations) updates
+// in real time. Add/edit/delete all flow through data.js mutators that
+// recompute parent break_minutes as a side effect.
+function SegmentEditor({ entryId, segments, jobs = [], updateTimeSegment, deleteTimeSegment, addTimeSegment }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [addForm, setAddForm] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const sorted = [...segments].sort((a,b) => new Date(a.startedAt) - new Date(b.startedAt));
+  // For the job dropdown — show only active jobs but always include the one
+  // currently set on the segment (so "stale" job assignments aren't hidden).
+  const jobOptions = (currentJobId) => {
+    const opts = jobs.filter(j => j.status !== 'cancelled');
+    if (currentJobId && !opts.find(j => j.id === currentJobId)) {
+      const stale = jobs.find(j => j.id === currentJobId);
+      if (stale) opts.unshift(stale);
+    }
+    return opts;
+  };
+
+  const startEdit = (seg) => {
+    setEditingId(seg.id);
+    setEditForm({
+      kind: seg.kind,
+      jobId: seg.jobId || '',
+      startedAt: isoToLocalInput(seg.startedAt),
+      endedAt: isoToLocalInput(seg.endedAt),
+      notes: seg.notes || '',
+    });
+    setErr(null);
+  };
+
+  const handleSave = async () => {
+    if (!editForm) return;
+    const startIso = localInputToIso(editForm.startedAt);
+    const endIso = editForm.endedAt ? localInputToIso(editForm.endedAt) : null;
+    if (!startIso) { setErr('Start time is required.'); return; }
+    if (endIso && new Date(endIso) <= new Date(startIso)) {
+      setErr('End time must be after start time.');
+      return;
+    }
+    if (editForm.kind === 'job' && !editForm.jobId) {
+      setErr('Pick a job for this segment, or change the kind to Travel/Break.');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await updateTimeSegment(editingId, {
+        kind: editForm.kind,
+        jobId: editForm.kind === 'job' ? editForm.jobId : null,
+        startedAt: startIso,
+        endedAt: endIso,
+        notes: editForm.notes,
+      });
+      setEditingId(null);
+      setEditForm(null);
+    } catch (e) {
+      setErr(e?.message || 'Could not save segment.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this segment? Payroll will recompute.')) return;
+    setBusy(true);
+    try {
+      await deleteTimeSegment(id);
+    } catch (e) {
+      console.error('deleteTimeSegment failed', e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startAdd = () => {
+    // Default new-segment start = end of last segment (so the user can fill a gap)
+    const last = sorted[sorted.length - 1];
+    setAddForm({
+      kind: 'job',
+      jobId: '',
+      startedAt: last?.endedAt ? isoToLocalInput(last.endedAt) : '',
+      endedAt: '',
+      notes: '',
+    });
+    setAdding(true);
+    setErr(null);
+  };
+
+  const handleAdd = async () => {
+    if (!addForm) return;
+    const startIso = localInputToIso(addForm.startedAt);
+    const endIso = addForm.endedAt ? localInputToIso(addForm.endedAt) : null;
+    if (!startIso) { setErr('Start time is required.'); return; }
+    if (endIso && new Date(endIso) <= new Date(startIso)) {
+      setErr('End time must be after start time.');
+      return;
+    }
+    if (addForm.kind === 'job' && !addForm.jobId) {
+      setErr('Pick a job for this segment, or change the kind.');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await addTimeSegment(entryId, {
+        kind: addForm.kind,
+        jobId: addForm.kind === 'job' ? addForm.jobId : null,
+        startedAt: startIso,
+        endedAt: endIso,
+        notes: addForm.notes,
+      });
+      setAdding(false);
+      setAddForm(null);
+    } catch (e) {
+      setErr(e?.message || 'Could not add segment.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const KIND_OPTS = [
+    { value: 'job',    label: 'Job',          icon: HardHat },
+    { value: 'travel', label: 'Travel/Yard',  icon: Truck },
+    { value: 'break',  label: 'Break',        icon: Coffee },
+  ];
+
+  const renderRow = (seg) => {
+    if (editingId === seg.id) {
+      return (
+        <tr key={seg.id} style={{ background: 'var(--bg-elevated)' }}>
+          <td colSpan={6} style={{ padding: '8px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+              <select className="form-select" value={editForm.kind} onChange={ev => setEditForm(f => ({ ...f, kind: ev.target.value, jobId: ev.target.value === 'job' ? f.jobId : '' }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }}>
+                {KIND_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              {editForm.kind === 'job' ? (
+                <select className="form-select" value={editForm.jobId} onChange={ev => setEditForm(f => ({ ...f, jobId: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }}>
+                  <option value="">— Pick a job —</option>
+                  {jobOptions(editForm.jobId).map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                </select>
+              ) : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', alignSelf: 'center' }}>(no job — {editForm.kind})</span>}
+              <input className="form-input" type="datetime-local" value={editForm.startedAt} onChange={ev => setEditForm(f => ({ ...f, startedAt: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }} />
+              <input className="form-input" type="datetime-local" value={editForm.endedAt} onChange={ev => setEditForm(f => ({ ...f, endedAt: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }} />
+            </div>
+            <input className="form-input" placeholder="Notes (optional)" value={editForm.notes} onChange={ev => setEditForm(f => ({ ...f, notes: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem', marginBottom: 6 }} />
+            {err && <div style={{ fontSize: '0.75rem', color: 'var(--status-danger)', marginBottom: 6 }}><AlertCircle size={12} /> {err}</div>}
+            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary btn-sm" onClick={() => { setEditingId(null); setErr(null); }} disabled={busy}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={busy}>
+                {busy ? <Loader2 size={12} className="spin" /> : <Save size={12} />} Save
+              </button>
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    const job = seg.jobId ? jobs.find(j => j.id === seg.jobId) : null;
+    const Icon = seg.kind === 'job' ? HardHat : seg.kind === 'travel' ? Truck : Coffee;
+    const tint = seg.kind === 'break' ? 'var(--lucky-gold)' : seg.kind === 'travel' ? '#63b3ff' : 'var(--lucky-green-light)';
+    const label = seg.kind === 'job' ? (job?.title || '⚠ Unknown job') : seg.kind === 'travel' ? 'Travel / Yard' : 'Break';
+    return (
+      <tr key={seg.id}>
+        <td style={{ width: 22 }}><Icon size={12} style={{ color: tint }} /></td>
+        <td style={{ fontWeight: 600 }}>{label}</td>
+        <td style={{ color: 'var(--text-tertiary)' }}>{new Date(seg.startedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</td>
+        <td style={{ color: 'var(--text-tertiary)' }}>{seg.endedAt ? new Date(seg.endedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : <em>open</em>}</td>
+        <td>{fmtDur(Number(seg.durationMinutes || 0))}</td>
+        <td style={{ width: 60, textAlign: 'right' }}>
+          <button className="btn btn-icon btn-ghost" title="Edit segment" onClick={() => startEdit(seg)} disabled={busy} style={{ padding: 2 }}><Pencil size={11} /></button>
+          <button className="btn btn-icon btn-ghost" title="Delete segment" onClick={() => handleDelete(seg.id)} disabled={busy} style={{ padding: 2, color: 'var(--status-danger)' }}><Trash2 size={11} /></button>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="form-group">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+        <label className="form-label" style={{ marginBottom: 0 }}>Segments &mdash; payroll math comes from these</label>
+        {!adding && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={startAdd} disabled={busy}>
+            <Plus size={12} /> Add segment
+          </button>
+        )}
+      </div>
+      <div style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+        <table style={{ width: '100%', fontSize: '0.78rem' }}>
+          <thead>
+            <tr style={{ background: 'var(--bg-elevated)' }}>
+              <th></th>
+              <th style={{ textAlign: 'left' }}>Kind / Job</th>
+              <th style={{ textAlign: 'left' }}>Start</th>
+              <th style={{ textAlign: 'left' }}>End</th>
+              <th style={{ textAlign: 'left' }}>Duration</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(renderRow)}
+            {adding && (
+              <tr style={{ background: 'rgba(45,122,58,0.06)' }}>
+                <td colSpan={6} style={{ padding: '8px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '110px 1fr 1fr 1fr', gap: 6, marginBottom: 6 }}>
+                    <select className="form-select" value={addForm.kind} onChange={ev => setAddForm(f => ({ ...f, kind: ev.target.value, jobId: ev.target.value === 'job' ? f.jobId : '' }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }}>
+                      {KIND_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                    {addForm.kind === 'job' ? (
+                      <select className="form-select" value={addForm.jobId} onChange={ev => setAddForm(f => ({ ...f, jobId: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }}>
+                        <option value="">— Pick a job —</option>
+                        {jobOptions(addForm.jobId).map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                      </select>
+                    ) : <span style={{ color: 'var(--text-tertiary)', fontSize: '0.75rem', alignSelf: 'center' }}>(no job — {addForm.kind})</span>}
+                    <input className="form-input" type="datetime-local" value={addForm.startedAt} onChange={ev => setAddForm(f => ({ ...f, startedAt: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }} />
+                    <input className="form-input" type="datetime-local" value={addForm.endedAt} onChange={ev => setAddForm(f => ({ ...f, endedAt: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem' }} placeholder="(optional)" />
+                  </div>
+                  <input className="form-input" placeholder="Notes (optional)" value={addForm.notes} onChange={ev => setAddForm(f => ({ ...f, notes: ev.target.value }))} style={{ padding: '4px 6px', fontSize: '0.78rem', marginBottom: 6 }} />
+                  {err && <div style={{ fontSize: '0.75rem', color: 'var(--status-danger)', marginBottom: 6 }}><AlertCircle size={12} /> {err}</div>}
+                  <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                    <button className="btn btn-secondary btn-sm" onClick={() => { setAdding(false); setErr(null); }} disabled={busy}>Cancel</button>
+                    <button className="btn btn-primary btn-sm" onClick={handleAdd} disabled={busy}>
+                      {busy ? <Loader2 size={12} className="spin" /> : <Plus size={12} />} Add
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )}
+            {sorted.length === 0 && !adding && (
+              <tr><td colSpan={6} style={{ padding: 'var(--space-md)', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '0.78rem' }}>No segments. Click &quot;Add segment&quot; to create one.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 6, marginBottom: 0 }}>
+        Tip: re-assign a segment by editing it and picking a different job. Per-job labor cost updates as soon as you save.
+      </p>
+    </div>
   );
 }
