@@ -291,6 +291,13 @@
 
     <!-- Styles -->
     <link rel="stylesheet" href="/styles.css" />
+
+    <!-- Preload the hero LCP image. On mobile this IS the hero background
+         (the MP4 source is filtered out by media query — see <video> below);
+         on desktop it's still the video poster, fetched anyway. Either way
+         making it fetchpriority=high pulls LCP forward. -->
+    <link rel="preload" as="image" href="/images/banner.jpg" fetchpriority="high" />
+
     <!-- LL:HEAD-INJECT v3 -->
     <!-- Preconnect to critical third parties -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -388,11 +395,16 @@
 
         <!-- ==================== HERO ==================== -->
         <header class="hero" id="hero">
-            <!-- Video Background -->
+            <!-- Video Background.
+                 The <source media="(min-width: 768px)"> filters the MP4 out on phones,
+                 so iOS Safari / Android Chrome don't fetch the 3.2 MB file. With no
+                 matching source, the <video> falls back to the poster image as a
+                 static background — same look, ~95% less data, and avoids iOS Safari
+                 memory-killing the tab (was causing partial render + auto-refresh). -->
             <div class="hero-video-wrap">
                 <video class="hero-video" autoplay muted loop playsinline preload="metadata"
                     poster="/images/banner.jpg">
-                    <source src="/images/webheromain.mp4" type="video/mp4" />
+                    <source src="/images/webheromain.mp4" type="video/mp4" media="(min-width: 768px)" />
                 </video>
                 <div class="hero-overlay"></div>
             </div>
