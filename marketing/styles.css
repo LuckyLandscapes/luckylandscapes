@@ -1884,14 +1884,22 @@ textarea {
 }
 
 /* ============================================
-   MOBILE: kill GPU-heavy effects that evict layers
+   MOBILE: aggressive simplification — animations + compositor hints OFF
    ============================================
-   iOS Safari handles backdrop-filter and large filter:blur on videos very
-   poorly. Under memory pressure, it drops off-screen compositor layers and
-   re-composites them slowly when scrolled into view, which looks like content
-   "not loading until 7 seconds later" or a section appearing blank/white.
-   On touch devices we strip the cosmetic blurs and force critical sections
-   to keep their own layer with translateZ(0). */
+   Two symptoms observed on Firefox iOS (and likely flaky on Safari iOS too):
+   (1) CSS opacity animations stall at `from { opacity: 0 }` on initial paint
+       and on bfcache restore, leaving hero text greyed and reveal sections
+       invisible. The page eventually un-blanks 8–12 seconds later when
+       something forces a repaint.
+   (2) `transform: translateZ(0)` on major sections doesn't actually pin the
+       compositor layer in memory — the browser still evicts it under
+       pressure, and Firefox iOS doesn't reliably re-paint when scrolled
+       back in, which is why the dark-green section bg renders as cream
+       below the hero.
+   Fix: on touch devices, just don't run the animations and don't ask for
+   compositor layers we can't reliably keep. Mobile users barely notice
+   missing fade-ins, and a section painted as a solid block beats a
+   section that doesn't paint at all. */
 @media (hover: none), (pointer: coarse) {
     * {
         backdrop-filter: none !important;
@@ -1904,19 +1912,20 @@ textarea {
         filter: brightness(.85) !important;
     }
 
-    /* Force major sections to live in their own GPU layer so iOS Safari
-       cannot evict them mid-scroll. translateZ(0) is the standard
-       hardware-acceleration hint. */
-    .home-services-section,
-    .reviews-section,
-    .gallery-section,
-    .about-section,
-    .cta-section,
-    .booking-banner,
-    .stats-bar,
-    .faq-section {
-        transform: translateZ(0);
-        -webkit-transform: translateZ(0);
+    /* Kill every cosmetic entrance animation on mobile. Content is rendered
+       at its final state immediately, no fade-up, no slide-up. */
+    .reveal,
+    .reveal-left,
+    .reveal-right,
+    .reveal-scale,
+    .stagger-children > *,
+    .hero-content .hero-badge,
+    .hero-content .hero-title,
+    .hero-content .hero-sub,
+    .hero-content .hero-buttons {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
     }
 }
 

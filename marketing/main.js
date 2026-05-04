@@ -340,12 +340,22 @@ revealEls.forEach(el => revealObs.observe(el));
 // a no-op (animation already finished). On Firefox iOS where the animation
 // never started, this is what un-blanks the page — without it, sections stay
 // invisible for 8–12 seconds (or until the user manually scrolls into them).
-setTimeout(() => {
+function forceRevealAll() {
     revealEls.forEach(el => {
         el.classList.add('revealed');
-        revealObs.unobserve(el);
+        try { revealObs.unobserve(el); } catch (_) {}
     });
-}, 1200);
+}
+setTimeout(forceRevealAll, 1200);
+
+// bfcache restore (Safari/Firefox/Chrome iOS all fire pageshow with
+// event.persisted=true when the user hits Back from a sub-page). On restore,
+// CSS animations don't replay and any pending setTimeout from the previous
+// lifecycle is gone — so without this handler, content can be left stuck at
+// `from { opacity: 0 }` after Back navigation. Force-reveal immediately.
+window.addEventListener('pageshow', (event) => {
+    if (event.persisted) forceRevealAll();
+});
 
 // ============================================
 // GSAP — HERO PARALLAX
