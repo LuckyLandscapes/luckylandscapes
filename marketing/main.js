@@ -156,28 +156,42 @@ function trackEvent(name, params = {}) {
 }
 
 // ============================================
-// CLOUDFLARE TURNSTILE — anti-bot widget on forms (only active when configured)
+// CLOUDFLARE TURNSTILE — anti-bot widget on forms (lazy-loaded)
 // ============================================
-// Loads the Turnstile API and mounts a widget in every form-mount point on the
-// page when LL_CONFIG.turnstile is set. Forms that include a
-// `<div class="cf-turnstile-mount"></div>` will get the widget injected.
-(function setupTurnstile() {
+// Was eager-loading on every page that had a `.cf-turnstile-mount` element,
+// including the homepage's contact section. On iOS WKWebView, Turnstile's
+// failure_retry loop runs in a tight cycle that starves the main thread for
+// 8–12 seconds, leaving below-the-fold sections un-painted. Defer the load
+// until the user actually focuses on a form input — at that point the form
+// is being filled out, the widget can verify in the background, and the
+// initial render is no longer blocked.
+(function setupTurnstileLazy() {
     const key = (window.LL_CONFIG && window.LL_CONFIG.turnstile) || '';
     if (!key) return;
     const mounts = document.querySelectorAll('.cf-turnstile-mount');
     if (mounts.length === 0) return;
-    const s = document.createElement('script');
-    s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__llTurnstileReady';
-    s.async = true;
-    s.defer = true;
-    window.__llTurnstileReady = function () {
-        mounts.forEach(m => {
-            if (m.dataset.rendered) return;
-            m.dataset.rendered = '1';
-            window.turnstile && window.turnstile.render(m, { sitekey: key, theme: 'light', size: 'normal' });
-        });
-    };
-    document.head.appendChild(s);
+    const formInputs = document.querySelectorAll('form input, form textarea, form select');
+    if (formInputs.length === 0) return;
+
+    let loaded = false;
+    function loadTurnstile() {
+        if (loaded) return;
+        loaded = true;
+        const s = document.createElement('script');
+        s.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=__llTurnstileReady';
+        s.async = true;
+        s.defer = true;
+        window.__llTurnstileReady = function () {
+            mounts.forEach(m => {
+                if (m.dataset.rendered) return;
+                m.dataset.rendered = '1';
+                window.turnstile && window.turnstile.render(m, { sitekey: key, theme: 'light', size: 'normal' });
+            });
+        };
+        document.head.appendChild(s);
+    }
+
+    formInputs.forEach(el => el.addEventListener('focus', loadTurnstile, { once: true, passive: true }));
 })();
 
 // ============================================
