@@ -1923,10 +1923,16 @@ textarea {
 /* ============================================
    SCROLL REVEAL ANIMATIONS
    ============================================
-   Pure-CSS one-shot fade-in. Runs once on first paint regardless of JS state,
-   so content is *never* permanently hidden if main.js is slow, errors, or
-   IntersectionObserver/ScrollTrigger fails to fire. The .revealed class is
-   still added by JS but is now redundant — kept as a no-op for safety.
+   Pure-CSS one-shot fade-in. Runs once on first paint regardless of JS state.
+   On healthy browsers the animation interpolates opacity 0→1 and content is
+   visible after .8s. On Firefox iOS (and sometimes WKWebView), CSS animations
+   with `from { opacity: 0 }` get stuck — the animation doesn't auto-start at
+   parse time and content stays invisible until something triggers a repaint
+   (often a scroll), causing 8–12 seconds of blank below-the-fold sections.
+   Failsafe: main.js adds `.revealed` to every reveal element after 1.2s
+   (and on intersection). The rules at the bottom of this block force
+   opacity:1 / transform:none whenever .revealed is present, so even if the
+   CSS animation never plays, content becomes visible.
    prefers-reduced-motion gets static visible content with no animation. */
 .reveal,
 .reveal-left,
@@ -1961,6 +1967,26 @@ textarea {
     .stagger-children>* {
         animation: none !important;
     }
+}
+
+/* Failsafe override — see the comment block above. When JS adds .revealed
+   (either via IntersectionObserver on scroll-into-view, or via the timeout
+   failsafe in main.js), force the element visible regardless of whether the
+   CSS animation ever ran. !important is needed to defeat the animation's
+   `from` state, which CSS animations leave applied while paused. */
+.reveal.revealed,
+.reveal-left.revealed,
+.reveal-right.revealed,
+.reveal-scale.revealed,
+.stagger-children.revealed > *,
+.hero-content.revealed > *,
+.hero-content.revealed .hero-badge,
+.hero-content.revealed .hero-title,
+.hero-content.revealed .hero-sub,
+.hero-content.revealed .hero-buttons {
+    opacity: 1 !important;
+    transform: none !important;
+    animation: none !important;
 }
 
 /* Hero animations */

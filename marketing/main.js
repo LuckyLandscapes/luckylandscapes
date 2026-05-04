@@ -308,8 +308,13 @@ document.querySelectorAll('a[href^="#"], a[href^="/#"]').forEach(anchor => {
 // ============================================
 // SCROLL REVEAL (IntersectionObserver)
 // ============================================
+// Includes .hero-content because Firefox iOS (and occasionally other WKWebView
+// surfaces) sometimes never auto-starts CSS animations at parse time, leaving
+// content with `from { opacity: 0 }` stuck invisible. The .revealed class has
+// !important rules in styles.css that force opacity:1 + transform:none, so
+// adding it kicks content visible regardless of whether the animation ran.
 const revealEls = document.querySelectorAll(
-    '.reveal, .reveal-left, .reveal-right, .reveal-scale, .stagger-children'
+    '.reveal, .reveal-left, .reveal-right, .reveal-scale, .stagger-children, .hero-content'
 );
 
 // Looser thresholds + positive bottom rootMargin so reveals fire as soon as
@@ -329,15 +334,18 @@ const revealObs = new IntersectionObserver(
 
 revealEls.forEach(el => revealObs.observe(el));
 
-// Failsafe: force-reveal every .reveal* element after 3 seconds, regardless of
-// scroll position. Content visibility must NEVER depend on the observer firing
-// — better to skip the animation than show a blank section.
+// Failsafe: force-reveal every .reveal* element after 1.2 seconds, regardless
+// of scroll position. 1.2s is just longer than the longest staged animation
+// (.8s + .48s stagger delay = 1.28s) so on healthy browsers the failsafe is
+// a no-op (animation already finished). On Firefox iOS where the animation
+// never started, this is what un-blanks the page — without it, sections stay
+// invisible for 8–12 seconds (or until the user manually scrolls into them).
 setTimeout(() => {
     revealEls.forEach(el => {
         el.classList.add('revealed');
         revealObs.unobserve(el);
     });
-}, 3000);
+}, 1200);
 
 // ============================================
 // GSAP — HERO PARALLAX
