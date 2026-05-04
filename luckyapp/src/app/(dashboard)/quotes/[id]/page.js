@@ -221,13 +221,17 @@ export default function QuoteDetailPage() {
         throw new Error(data.error || 'Failed to send email');
       }
 
-      // Update quote status
-      await updateQuote(id, { status: 'sent' });
+      // Resend should NOT downgrade an accepted/declined/viewed quote back to 'sent'.
+      // Only flip status when the quote was a draft. Always stamp sentAt.
+      const wasResend = !!quote.sentAt || quote.status !== 'draft';
+      const updates = { sentAt: new Date().toISOString() };
+      if (quote.status === 'draft') updates.status = 'sent';
+      await updateQuote(id, updates);
       await addActivity({
         customerId: quote.customerId,
         quoteId: quote.id,
         type: 'quote_sent',
-        title: `Quote #${quote.quoteNumber} sent`,
+        title: `Quote #${quote.quoteNumber} ${wasResend ? 'resent' : 'sent'}`,
         description: `Emailed to ${sendEmail}`,
       });
 
@@ -243,14 +247,18 @@ export default function QuoteDetailPage() {
   };
 
   // ─── Mark quote as sent + log activity ────────────────────
+  // Don't clobber accepted/declined when resending — only promote 'draft' → 'sent'.
   const markQuoteSent = async (descriptionSuffix = 'via copied SMS') => {
     try {
-      await updateQuote(id, { status: 'sent' });
+      const wasResend = !!quote.sentAt || quote.status !== 'draft';
+      const updates = { sentAt: new Date().toISOString() };
+      if (quote.status === 'draft') updates.status = 'sent';
+      await updateQuote(id, updates);
       await addActivity({
         customerId: quote.customerId,
         quoteId: quote.id,
         type: 'quote_sent',
-        title: `Quote #${quote.quoteNumber} sent`,
+        title: `Quote #${quote.quoteNumber} ${wasResend ? 'resent' : 'sent'}`,
         description: descriptionSuffix,
       });
     } catch { /* best effort */ }
@@ -314,26 +322,32 @@ export default function QuoteDetailPage() {
       {/* Header */}
       <div className="page-header">
         <div className="page-header-left">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
             <h1>Quote #{quote.quoteNumber}</h1>
             <span className={`badge badge-${quote.status}`} style={{ fontSize: '0.82rem', padding: '4px 14px' }}>
               <span className="badge-dot" />
               {quote.status.charAt(0).toUpperCase() + quote.status.slice(1)}
             </span>
+            {quote.sentAt && (
+              <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-secondary)', padding: '4px 12px', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', fontWeight: 600 }}>
+                Sent {new Date(quote.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            )}
           </div>
           <p>{quote.category} • Created {quote.createdAt ? new Date(quote.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</p>
         </div>
         <div className="page-header-actions">
-          {quote.status === 'draft' && (
+          {quote.status === 'draft' ? (
             <button className="btn btn-primary" onClick={openSendModal}>
               <Send size={16} /> Send Quote
+            </button>
+          ) : (
+            <button className="btn btn-secondary" onClick={openSendModal}>
+              <Send size={16} /> Resend Quote
             </button>
           )}
           {quote.status === 'sent' && (
             <>
-              <button className="btn btn-secondary" onClick={openSendModal}>
-                <Send size={16} /> Resend Quote
-              </button>
               <button className="btn btn-primary" onClick={() => handleStatusChange('accepted')} style={{ background: 'var(--status-success)', borderColor: 'var(--status-success)' }}>
                 <CheckCircle2 size={16} /> Mark Accepted
               </button>

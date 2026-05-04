@@ -233,6 +233,8 @@ export default function InvoiceDetailPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send invoice');
 
+      const wasResend = !!invoice.sentAt;
+      const noun = invoice.status === 'paid' ? 'Receipt' : 'Invoice';
       await updateInvoice(id, {
         sentAt: new Date().toISOString(),
         sentVia: invoice.sentVia === 'sms' ? 'both' : 'email',
@@ -241,14 +243,14 @@ export default function InvoiceDetailPage() {
       await addActivity({
         customerId: invoice.customerId,
         type: 'invoice_sent',
-        title: `Invoice ${invoice.invoiceNumber} sent`,
+        title: `${noun} ${invoice.invoiceNumber} ${wasResend ? 'resent' : 'sent'}`,
         description: `Emailed to ${sendEmail}`,
       });
 
       setSendState({ loading: false, success: true, error: null });
       setTimeout(() => {
         setShowSendModal(false);
-        showToast('success', `Invoice emailed to ${sendEmail}`);
+        showToast('success', `${noun} emailed to ${sendEmail}`);
       }, 1500);
     } catch (err) {
       setSendState({ loading: false, success: false, error: err.message });
@@ -256,10 +258,27 @@ export default function InvoiceDetailPage() {
   };
 
   // Pre-formatted SMS body — copy/paste into any messaging app
+  const isPaid = invoice?.status === 'paid';
   const smsBody = useMemo(() => {
     if (!invoice) return '';
     const firstName = customer?.firstName || 'there';
-    const lines = [
+    const lines = isPaid ? [
+      `Hi ${firstName}! 🍀 Here's your paid receipt from Lucky Landscapes.`,
+      ``,
+      `📄 Invoice ${invoice.invoiceNumber}`,
+      `✅ Paid in full: ${formatCurrency(invoice.total)}`,
+      invoice.paidDate ? `📅 Paid: ${formatDate(invoice.paidDate)}` : null,
+      ``,
+      sendMessage || null,
+      sendMessage ? '' : null,
+      `View your receipt online:`,
+      payUrl,
+      ``,
+      `Questions? Just reply or call (402) 405-5475.`,
+      ``,
+      `Thanks again!`,
+      `— The Lucky Landscapes Team`,
+    ] : [
       `Hi ${firstName}! 🍀 Thanks again for your business — your invoice from Lucky Landscapes is ready.`,
       ``,
       `📄 Invoice ${invoice.invoiceNumber}`,
@@ -277,10 +296,12 @@ export default function InvoiceDetailPage() {
       `— The Lucky Landscapes Team`,
     ];
     return lines.filter(l => l !== null).join('\n');
-  }, [invoice, customer, balance, sendMessage, payUrl]);
+  }, [invoice, customer, balance, sendMessage, payUrl, isPaid]);
 
   const markInvoiceSent = async () => {
     try {
+      const wasResend = !!invoice.sentAt;
+      const noun = invoice.status === 'paid' ? 'Receipt' : 'Invoice';
       await updateInvoice(id, {
         sentAt: new Date().toISOString(),
         sentVia: invoice.sentVia === 'email' ? 'both' : 'sms',
@@ -289,7 +310,7 @@ export default function InvoiceDetailPage() {
       await addActivity({
         customerId: invoice.customerId,
         type: 'invoice_sent',
-        title: `Invoice ${invoice.invoiceNumber} sent`,
+        title: `${noun} ${invoice.invoiceNumber} ${wasResend ? 'resent' : 'sent'}`,
         description: sendPhone ? `Texted to ${sendPhone}` : 'Sent via copied SMS',
       });
     } catch (e) { /* best effort */ }
@@ -348,11 +369,15 @@ export default function InvoiceDetailPage() {
           <p>Created {formatDate(invoice.createdAt)} {invoice.dueDate ? `• Due ${formatDate(invoice.dueDate)}` : ''}</p>
         </div>
         <div className="page-header-actions">
+          {invoice.status !== 'cancelled' && (
+            <button className="btn btn-primary" onClick={openSendModal}>
+              <Send size={16} /> {invoice.status === 'paid'
+                ? (invoice.sentAt ? 'Resend Receipt' : 'Send Receipt')
+                : (invoice.sentAt ? 'Resend Invoice' : 'Send Invoice')}
+            </button>
+          )}
           {invoice.status !== 'paid' && invoice.status !== 'cancelled' && (
             <>
-              <button className="btn btn-primary" onClick={openSendModal}>
-                <Send size={16} /> {invoice.sentAt ? 'Resend Invoice' : 'Send Invoice'}
-              </button>
               <button className="btn btn-secondary" onClick={() => { setPayAmount(String(balance.toFixed(2))); setShowPayModal(true); }}>
                 <CreditCard size={16} /> Record Payment
               </button>
@@ -599,14 +624,14 @@ export default function InvoiceDetailPage() {
         <div className="modal-overlay" onClick={() => !sendState.loading && setShowSendModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
             <div className="modal-header">
-              <h2><Send size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Send Invoice</h2>
+              <h2><Send size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> {isPaid ? 'Send Receipt' : 'Send Invoice'}</h2>
               <button className="btn btn-icon btn-ghost" onClick={() => !sendState.loading && setShowSendModal(false)}><X size={20} /></button>
             </div>
             <div className="modal-body">
               {sendState.success ? (
                 <div className="send-success-state">
                   <div className="send-success-icon"><CheckCircle size={48} /></div>
-                  <h3>{sendTab === 'email' ? 'Invoice Sent!' : 'Message Copied!'}</h3>
+                  <h3>{sendTab === 'email' ? (isPaid ? 'Receipt Sent!' : 'Invoice Sent!') : 'Message Copied!'}</h3>
                   <p>{sendTab === 'email' ? `${invoice.invoiceNumber} has been emailed` : 'Paste it into your favorite messaging app'}</p>
                 </div>
               ) : (
@@ -623,11 +648,11 @@ export default function InvoiceDetailPage() {
                     <div>
                       <div style={{ fontWeight: 700 }}>{invoice.invoiceNumber}</div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
-                        Includes secure online payment link
+                        {isPaid ? 'Paid in full — sending a copy as a receipt' : 'Includes secure online payment link'}
                       </div>
                     </div>
                     <div style={{ fontWeight: 800, fontSize: '1.125rem', color: 'var(--lucky-green-light)' }}>
-                      {formatCurrency(balance)}
+                      {isPaid ? formatCurrency(invoice.total) : formatCurrency(balance)}
                     </div>
                   </div>
 
@@ -656,7 +681,9 @@ export default function InvoiceDetailPage() {
                       </div>
                       <div style={infoBoxStyle}>
                         <Mail size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-                        <span>A branded email with the invoice and a secure "Pay Online" button will be sent.</span>
+                        <span>{isPaid
+                          ? 'A branded email with the paid invoice as a receipt — includes a "View Invoice" link to the online copy.'
+                          : 'A branded email with the invoice and a secure "Pay Online" button will be sent.'}</span>
                       </div>
                     </>
                   )}
@@ -720,7 +747,9 @@ export default function InvoiceDetailPage() {
                 <button className="btn btn-secondary" onClick={() => setShowSendModal(false)} disabled={sendState.loading}>Cancel</button>
                 {sendTab === 'email' ? (
                   <button className="btn btn-primary" onClick={handleSendEmail} disabled={!sendEmail || sendState.loading}>
-                    {sendState.loading ? <><Loader2 size={16} className="spin" /> Sending...</> : <><Mail size={16} /> Send Email</>}
+                    {sendState.loading
+                      ? <><Loader2 size={16} className="spin" /> Sending...</>
+                      : <><Mail size={16} /> {isPaid ? 'Send Receipt' : 'Send Email'}</>}
                   </button>
                 ) : (
                   <>

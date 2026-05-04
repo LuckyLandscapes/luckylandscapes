@@ -43,6 +43,10 @@ export async function POST(request) {
     const balance = Math.max(0, Number(invoice.total || 0) - Number(invoice.amount_paid || 0));
     const items = Array.isArray(invoice.items) ? invoice.items : [];
     const dueDate = formatDate(invoice.due_date);
+    // Receipt mode: invoice fully paid → swap "Pay Online" CTA for "View Invoice",
+    // drop the "how payment works" section, and re-word as a thank-you/receipt.
+    const isReceipt = invoice.status === 'paid' || balance <= 0;
+    const paidDate = formatDate(invoice.paid_date);
 
     const itemRows = items.map(item => `
       <tr>
@@ -67,20 +71,24 @@ export async function POST(request) {
 
     <div style="padding:32px;">
       <!-- Greeting -->
-      <h2 style="color:#1f2937; margin:0 0 12px; font-size:22px; font-weight:700;">Hi ${customerName}, your invoice is ready 👋</h2>
+      <h2 style="color:#1f2937; margin:0 0 12px; font-size:22px; font-weight:700;">${isReceipt
+        ? `Hi ${customerName}, here's your paid receipt 🍀`
+        : `Hi ${customerName}, your invoice is ready 👋`}</h2>
       <p style="color:#4b5563; font-size:15px; line-height:1.65; margin:0 0 20px;">
-        ${customMessage || 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready below, and you can pay online in just a few clicks using the secure button below.'}
+        ${customMessage || (isReceipt
+          ? `Thanks again for choosing Lucky Landscapes! This is your receipt for invoice ${invoice.invoice_number} — paid in full. Save this email for your records, or click below to view the invoice online anytime.`
+          : 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready below, and you can pay online in just a few clicks using the secure button below.')}
       </p>
 
-      <!-- Pay button — primary CTA -->
+      <!-- Primary CTA -->
       <div style="text-align:center; margin:28px 0;">
         <a href="${payUrl}" style="display:inline-block; background:#2d7a3a; color:#fff; text-decoration:none; padding:16px 44px; border-radius:10px; font-weight:700; font-size:16px; box-shadow:0 2px 8px rgba(45,122,58,0.25);">
-          Pay ${formatUSD(balance)} Online →
+          ${isReceipt ? 'View Invoice Online →' : `Pay ${formatUSD(balance)} Online →`}
         </a>
-        <div style="color:#6b7280; font-size:13px; margin-top:12px; line-height:1.5;">
+        ${isReceipt ? '' : `<div style="color:#6b7280; font-size:13px; margin-top:12px; line-height:1.5;">
           💳 Credit/Debit Card &nbsp;•&nbsp; 🏦 Bank Transfer (ACH)<br>
           <span style="color:#9ca3af; font-size:11px;">Secured by Stripe — your payment info never touches our servers</span>
-        </div>
+        </div>`}
       </div>
 
       <!-- Invoice header bar -->
@@ -90,7 +98,9 @@ export async function POST(request) {
               <td style="padding:5px 0; text-align:right; font-weight:700; color:#1f2937; font-size:14px;">${invoice.invoice_number}</td></tr>
           <tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Issued</td>
               <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937; font-size:14px;">${formatDate(invoice.created_at?.split('T')[0]) || 'Today'}</td></tr>
-          ${dueDate ? `<tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Due</td>
+          ${isReceipt && paidDate ? `<tr><td style="padding:5px 0; color:#2d7a3a; font-size:13px; font-weight:600;">Paid</td>
+              <td style="padding:5px 0; text-align:right; font-weight:700; color:#2d7a3a; font-size:14px;">${paidDate}</td></tr>` : ''}
+          ${!isReceipt && dueDate ? `<tr><td style="padding:5px 0; color:#6b7280; font-size:13px;">Due</td>
               <td style="padding:5px 0; text-align:right; font-weight:700; color:#1f2937; font-size:14px;">${dueDate}</td></tr>` : ''}
         </table>
       </div>
@@ -115,14 +125,14 @@ export async function POST(request) {
               <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.tax)}</td></tr>` : ''}
           ${Number(invoice.amount_paid) ? `<tr><td style="padding:5px 0; color:#2d7a3a; font-size:14px; font-weight:600;">Already paid</td>
               <td style="padding:5px 0; text-align:right; font-weight:600; color:#2d7a3a;">−${formatUSD(invoice.amount_paid)}</td></tr>` : ''}
-          <tr><td style="padding:10px 0 0; border-top:2px solid #1f2937; font-size:17px; font-weight:700; color:#1f2937;">Balance due</td>
-              <td style="padding:10px 0 0; border-top:2px solid #1f2937; text-align:right; font-size:22px; font-weight:800; color:#2d7a3a;">${formatUSD(balance)}</td></tr>
+          <tr><td style="padding:10px 0 0; border-top:2px solid #1f2937; font-size:17px; font-weight:700; color:#1f2937;">${isReceipt ? 'Paid in full' : 'Balance due'}</td>
+              <td style="padding:10px 0 0; border-top:2px solid #1f2937; text-align:right; font-size:22px; font-weight:800; color:#2d7a3a;">${formatUSD(isReceipt ? invoice.total : balance)}</td></tr>
         </table>
       </div>
 
       ${invoice.notes ? `<div style="background:#fafaf8; border-left:3px solid #6B8E4E; padding:14px 18px; margin:0 0 22px; font-size:14px; color:#4b5563; line-height:1.6;"><strong style="color:#1f2937;">A note from us:</strong><br>${invoice.notes}</div>` : ''}
 
-      <!-- How to pay -->
+      ${isReceipt ? '' : `<!-- How to pay -->
       <div style="background:#f0f7f0; border:1px solid #d4e7d4; border-radius:10px; padding:18px 22px; margin:0 0 24px;">
         <div style="font-weight:700; color:#1f6f3a; margin-bottom:8px; font-size:14px;">💡 How payment works</div>
         <p style="color:#4b5563; font-size:13px; line-height:1.6; margin:0;">
@@ -135,7 +145,12 @@ export async function POST(request) {
         <strong style="color:#4b5563;">Prefer to pay another way?</strong><br>
         Cash or check: drop off or mail to <strong>109 South Canopy ST, Lincoln, NE</strong>.<br>
         Questions about this invoice? Just reply to this email or call <a href="tel:+14024055475" style="color:#2d7a3a; text-decoration:none; font-weight:600;">(402) 405-5475</a>.
-      </div>
+      </div>`}
+
+      ${isReceipt ? `<!-- Receipt-mode contact line -->
+      <div style="font-size:13px; color:#6b7280; line-height:1.7; margin:0 0 20px; text-align:center;">
+        Need anything else? Just reply to this email or call <a href="tel:+14024055475" style="color:#2d7a3a; text-decoration:none; font-weight:600;">(402) 405-5475</a>.
+      </div>` : ''}
 
       <div style="text-align:center; margin:28px 0 8px;">
         <p style="color:#1f2937; font-size:14px; margin:0; font-weight:600;">Thanks again for your business!</p>
@@ -153,7 +168,23 @@ export async function POST(request) {
   </div>
 </body></html>`;
 
-    const text = [
+    const text = (isReceipt ? [
+      `Hi ${customerName},`,
+      '',
+      customMessage || `Thanks again for choosing Lucky Landscapes! This is your receipt for invoice ${invoice.invoice_number} — paid in full.`,
+      '',
+      `─── RECEIPT — INVOICE ${invoice.invoice_number} ───`,
+      `Paid in full: ${formatUSD(invoice.total)}`,
+      paidDate ? `Paid: ${paidDate}` : null,
+      '',
+      `View invoice online:`,
+      payUrl,
+      '',
+      `Questions? Reply to this email or call (402) 405-5475.`,
+      '',
+      `Thanks again!`,
+      `— The Lucky Landscapes Team 🍀`,
+    ] : [
       `Hi ${customerName},`,
       '',
       customMessage || 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready.',
@@ -172,7 +203,7 @@ export async function POST(request) {
       '',
       `Thanks again!`,
       `— The Lucky Landscapes Team 🍀`,
-    ].filter(l => l !== null).join('\n');
+    ]).filter(l => l !== null).join('\n');
 
     const resend = new Resend(process.env.RESEND_API_KEY);
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'Lucky Landscapes <onboarding@resend.dev>';
@@ -182,7 +213,9 @@ export async function POST(request) {
       from: fromAddress,
       reply_to: replyTo,
       to: [to],
-      subject: `Your invoice from Lucky Landscapes — ${formatUSD(balance)} due (${invoice.invoice_number})`,
+      subject: isReceipt
+        ? `Receipt from Lucky Landscapes — ${invoice.invoice_number} (paid in full)`
+        : `Your invoice from Lucky Landscapes — ${formatUSD(balance)} due (${invoice.invoice_number})`,
       html,
       text,
       headers: {
