@@ -5,9 +5,15 @@ import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { apiFetch } from '@/lib/apiClient';
 import {
+  getPayrollSettings,
+  computeBurdenedHourlyRate,
+  PAYROLL_CLASSIFICATIONS,
+  PAYROLL_BURDEN_CONSTANTS,
+} from '@/lib/finance';
+import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
-  HardHat, Truck, Coffee, Pencil, Plus,
+  HardHat, Truck, Coffee, Pencil, Plus, Settings, Info, ShieldAlert,
 } from 'lucide-react';
 
 // ─── Datetime helpers ─────────────────────────────────────
@@ -46,15 +52,19 @@ function fmtCurrency(n) {
 
 export default function TeamPage() {
   const { user } = useAuth();
-  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, updateTimeEntry, deleteTimeEntry, updateTimeSegment, deleteTimeSegment, addTimeSegment, addTeamMemberFromApi } = useData();
+  const { teamMembers, timeEntries, timeSegments, jobs, updateTeamMember, loadTeamMembers, updateTimeEntry, deleteTimeEntry, updateTimeSegment, deleteTimeSegment, addTimeSegment, addTeamMemberFromApi, org, updateOrgSettings } = useData();
+  const payrollSettings = useMemo(() => getPayrollSettings(org), [org]);
+
   const [editingId, setEditingId] = useState(null);
   const [editRate, setEditRate] = useState('');
   const [editRole, setEditRole] = useState('');
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [editClassification, setEditClassification] = useState('w2_employee');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
+  const [showPayrollSettings, setShowPayrollSettings] = useState(false);
   const [dateRange, setDateRange] = useState('week'); // 'week', 'biweek', 'month'
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
@@ -82,6 +92,10 @@ export default function TeamPage() {
   // (job + travel) durations. Falls back to the legacy
   // (clock_out - clock_in - break_minutes) for entries logged before the
   // segment system landed.
+  //
+  // Loaded cost adds employer burden (FICA + FUTA + SUTA + WC) for W-2
+  // employees only. 1099 contractors and owner-excluded LLC members get
+  // gross only — they don't trigger employer payroll tax.
   const payrollData = useMemo(() => {
     return teamMembers.map(member => {
       const entries = timeEntries.filter(t =>
@@ -104,15 +118,32 @@ export default function TeamPage() {
         }
       }
       const totalHours = totalMinutes / 60;
-      const totalPay = totalHours * (member.hourlyRate || 15);
+      const rateInfo = computeBurdenedHourlyRate(member, payrollSettings);
+      const grossPay = totalHours * rateInfo.gross;
+      const burdenAmount = totalHours * rateInfo.burdenAmount;
+      const totalPay = grossPay + burdenAmount;
       const activeEntry = timeEntries.find(t => t.teamMemberId === member.id && !t.clockOut);
-      return { member, entries, totalMinutes, totalBreakMinutes, totalHours, totalPay, activeEntry };
+      return {
+        member,
+        entries,
+        totalMinutes,
+        totalBreakMinutes,
+        totalHours,
+        grossPay,
+        burdenAmount,
+        totalPay,
+        rateInfo,
+        activeEntry,
+      };
     });
-  }, [teamMembers, timeEntries, timeSegments, cutoffDate]);
+  }, [teamMembers, timeEntries, timeSegments, cutoffDate, payrollSettings]);
 
   const totalPayroll = payrollData.reduce((s, d) => s + d.totalPay, 0);
+  const totalGross = payrollData.reduce((s, d) => s + d.grossPay, 0);
+  const totalBurden = payrollData.reduce((s, d) => s + d.burdenAmount, 0);
   const totalHours = payrollData.reduce((s, d) => s + d.totalHours, 0);
   const clockedInCount = payrollData.filter(d => d.activeEntry).length;
+  const wcIsEstimate = !payrollSettings.wcRatePer100;
 
   const startEdit = (member) => {
     setEditingId(member.id);
@@ -121,6 +152,7 @@ export default function TeamPage() {
     setEditName(member.fullName || '');
     setEditEmail(member.email || '');
     setEditPassword('');
+    setEditClassification(member.payrollClassification || 'w2_employee');
     setEditError(null);
   };
 
@@ -128,12 +160,13 @@ export default function TeamPage() {
     setEditSaving(true);
     setEditError(null);
     try {
-      // Update local fields (role, rate)
+      // Update local fields (role, rate, payroll classification)
       await updateTeamMember(id, {
         hourlyRate: parseFloat(editRate) || 15,
         role: editRole,
         fullName: editName,
         email: editEmail,
+        payrollClassification: editClassification,
       });
 
       // Update auth credentials (name, email, password) via server API
@@ -214,6 +247,9 @@ export default function TeamPage() {
           <p>Manage your crew, track hours, and review payroll.</p>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => setShowPayrollSettings(true)} title="Payroll burden + workers comp settings">
+            <Settings size={18} /> Payroll Settings
+          </button>
           <button className="btn btn-primary" onClick={() => {
             setInviteEmail(''); setInviteName(''); setInvitePassword(''); setInviteConfirmPw('');
             setInviteRole('worker'); setInviteRate('15');
@@ -223,6 +259,28 @@ export default function TeamPage() {
           </button>
         </div>
       </div>
+
+      {/* WC compliance / estimate banner */}
+      {wcIsEstimate && (
+        <div style={{
+          background: 'rgba(220, 100, 50, 0.08)',
+          border: '1px solid rgba(220, 100, 50, 0.35)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-md)',
+          marginBottom: 'var(--space-lg)',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 'var(--space-sm)',
+        }}>
+          <ShieldAlert size={18} style={{ color: 'rgb(220, 100, 50)', flexShrink: 0, marginTop: 2 }} />
+          <div style={{ fontSize: '0.85rem', lineHeight: 1.5 }}>
+            <strong style={{ color: 'rgb(220, 100, 50)' }}>Workers comp rate is an estimate.</strong>{' '}
+            True cost below uses a placeholder of {(payrollSettings.wcEstimatePct * 100).toFixed(1)}% of payroll for class code {payrollSettings.wcClassCode}.
+            Once Farm Bureau (or whoever) binds the policy, click <strong>Payroll Settings</strong> and enter the real rate.{' '}
+            <span style={{ color: 'var(--text-tertiary)' }}>NE law requires WC for any business with one or more employees — bind a policy before the next shift.</span>
+          </div>
+        </div>
+      )}
 
       {/* Summary Stats */}
       <div className="stats-grid" style={{ marginBottom:'var(--space-lg)' }}>
@@ -239,7 +297,12 @@ export default function TeamPage() {
         <div className="stat-card" style={{ '--accent':'var(--lucky-gold)', '--accent-bg':'rgba(212,169,62,0.12)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><DollarSign /></div></div>
           <div className="stat-card-value">{fmtCurrency(totalPayroll)}</div>
-          <div className="stat-card-label">Est. Payroll ({dateRange === 'week' ? 'This Week' : dateRange === 'biweek' ? 'Last 2 Weeks' : 'This Month'})</div>
+          <div className="stat-card-label">True Labor Cost — gross + employer tax + WC</div>
+        </div>
+        <div className="stat-card" style={{ '--accent':'rgb(220, 100, 50)', '--accent-bg':'rgba(220, 100, 50, 0.10)' }} title="Employer-side payroll tax + workers comp burden on top of gross wages">
+          <div className="stat-card-header"><div className="stat-card-icon"><ShieldAlert /></div></div>
+          <div className="stat-card-value">{fmtCurrency(totalBurden)}</div>
+          <div className="stat-card-label">Employer Burden ({fmtCurrency(totalGross)} gross)</div>
         </div>
       </div>
 
@@ -263,17 +326,20 @@ export default function TeamPage() {
             <tr>
               <th>Member</th>
               <th>Role</th>
+              <th>Class</th>
               <th>Rate</th>
               <th>Hours</th>
-              <th>Pay</th>
+              <th>Pay (gross / true cost)</th>
               <th>Status</th>
               <th style={{ width:'60px' }}></th>
             </tr>
           </thead>
           <tbody>
-            {payrollData.map(({ member, totalMinutes, totalHours: hrs, totalPay, activeEntry: active }) => {
+            {payrollData.map(({ member, totalMinutes, totalHours: hrs, grossPay, burdenAmount, totalPay, rateInfo, activeEntry: active }) => {
               const isEditing = editingId === member.id;
               const isExpanded = expandedMember === member.id;
+              const classification = member.payrollClassification || 'w2_employee';
+              const classMeta = PAYROLL_CLASSIFICATIONS[classification] || PAYROLL_CLASSIFICATIONS.w2_employee;
 
               return [
                 <tr key={member.id} style={{ cursor:'pointer' }} onClick={() => setExpandedMember(isExpanded ? null : member.id)}>
@@ -318,6 +384,23 @@ export default function TeamPage() {
                   </td>
                   <td>
                     {isEditing ? (
+                      <select className="form-select" value={editClassification} onChange={e => setEditClassification(e.target.value)} style={{ width:'150px', padding:'4px 8px', fontSize:'0.78rem' }} onClick={e => e.stopPropagation()} title={PAYROLL_CLASSIFICATIONS[editClassification]?.description}>
+                        {Object.entries(PAYROLL_CLASSIFICATIONS).map(([key, meta]) => (
+                          <option key={key} value={key}>{meta.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span
+                        className={`tag ${classification === 'w2_employee' ? 'tag-blue' : classification === '1099_contractor' ? 'tag-gold' : 'tag-gray'}`}
+                        title={classMeta.description}
+                        style={{ fontSize: '0.7rem' }}
+                      >
+                        {classification === 'w2_employee' ? 'W-2' : classification === '1099_contractor' ? '1099' : 'Owner'}
+                      </span>
+                    )}
+                  </td>
+                  <td>
+                    {isEditing ? (
                       <div style={{ display:'flex', alignItems:'center', gap:'2px' }} onClick={e => e.stopPropagation()}>
                         <span style={{ color:'var(--text-tertiary)', fontSize:'0.82rem' }}>$</span>
                         <input className="form-input" type="number" value={editRate} onChange={e => setEditRate(e.target.value)}
@@ -325,11 +408,34 @@ export default function TeamPage() {
                         <span style={{ color:'var(--text-tertiary)', fontSize:'0.75rem' }}>/hr</span>
                       </div>
                     ) : (
-                      <span style={{ fontWeight:600 }}>${member.hourlyRate || 15}/hr</span>
+                      <div style={{ lineHeight: 1.25 }}>
+                        <div style={{ fontWeight:600 }}>${(member.hourlyRate || 15).toFixed(2)}/hr</div>
+                        {rateInfo.burdenAmount > 0 && (
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                            true ${rateInfo.total.toFixed(2)}/hr
+                          </div>
+                        )}
+                      </div>
                     )}
                   </td>
                   <td style={{ fontWeight:600 }}>{fmtDur(totalMinutes)}</td>
-                  <td style={{ fontWeight:600, color:'var(--lucky-green-light)' }}>{fmtCurrency(totalPay)}</td>
+                  <td>
+                    <div style={{ lineHeight: 1.25 }}>
+                      <div style={{ fontWeight:600, color:'var(--lucky-green-light)' }}>{fmtCurrency(grossPay)}</div>
+                      {burdenAmount > 0 ? (
+                        <div
+                          style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}
+                          title={`Gross ${fmtCurrency(grossPay)} + employer burden ${fmtCurrency(burdenAmount)} (FICA ${(rateInfo.burden.ficaPct*100).toFixed(2)}% + FUTA ${(rateInfo.burden.futaPct*100).toFixed(2)}% + SUTA ${(rateInfo.burden.sutaPct*100).toFixed(2)}% + WC ${(rateInfo.burden.wcPct*100).toFixed(2)}%${rateInfo.burden.wcIsEstimate ? ' est.' : ''}) = ${fmtCurrency(totalPay)}`}
+                        >
+                          + {fmtCurrency(burdenAmount)} tax = {fmtCurrency(totalPay)}
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                          {classification === '1099_contractor' ? 'no payroll tax (1099)' : classification === 'owner_excluded' ? 'owner draw (no payroll tax)' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </td>
                   <td>
                     {active ? (
                       <span className="badge badge-accepted"><span className="badge-dot" /> On Clock</span>
@@ -355,7 +461,7 @@ export default function TeamPage() {
                 // Password field when editing
                 isEditing && (
                   <tr key={`${member.id}-edit-extra`}>
-                    <td colSpan={7} style={{ padding:0 }}>
+                    <td colSpan={8} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-sm) var(--space-md)', borderTop:'1px solid var(--border-subtle)', display:'flex', alignItems:'center', gap:'var(--space-md)', flexWrap:'wrap' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:'var(--space-sm)' }}>
                           <Key size={14} style={{ color:'var(--text-tertiary)' }} />
@@ -376,7 +482,7 @@ export default function TeamPage() {
                 // Expanded time log
                 isExpanded && !isEditing && (
                   <tr key={`${member.id}-detail`}>
-                    <td colSpan={7} style={{ padding:0 }}>
+                    <td colSpan={8} style={{ padding:0 }}>
                       <div style={{ background:'var(--bg-elevated)', padding:'var(--space-md)', borderTop:'1px solid var(--border-subtle)' }}>
                         <h4 style={{ margin:'0 0 var(--space-sm)', fontSize:'0.85rem' }}>Time Log — {member.fullName}</h4>
                         <TimeLog
@@ -399,6 +505,17 @@ export default function TeamPage() {
           </tbody>
         </table>
       </div>
+
+      {/* Payroll Settings Modal */}
+      {showPayrollSettings && (
+        <PayrollSettingsModal
+          payrollSettings={payrollSettings}
+          totalGross={totalGross}
+          totalBurden={totalBurden}
+          updateOrgSettings={updateOrgSettings}
+          onClose={() => setShowPayrollSettings(false)}
+        />
+      )}
 
       {/* Invite Modal */}
       {showInviteModal && (
@@ -976,6 +1093,212 @@ function SegmentEditor({ entryId, segments, jobs = [], updateTimeSegment, delete
       <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 6, marginBottom: 0 }}>
         Tip: re-assign a segment by editing it and picking a different job. Per-job labor cost updates as soon as you save.
       </p>
+    </div>
+  );
+}
+
+// ─── PayrollSettingsModal ────────────────────────────────
+// Edits the WC piece of org.settings.payroll. Federal/state burden rates
+// are read-only — they're law. The "estimate %" only applies when no real
+// WC rate is entered, so the user can preview job profitability before
+// the actual policy gets bound.
+function PayrollSettingsModal({ payrollSettings, totalGross, totalBurden, updateOrgSettings, onClose }) {
+  const [form, setForm] = useState({
+    wcClassCode:     payrollSettings.wcClassCode || '0042',
+    wcRatePer100:    payrollSettings.wcRatePer100 != null ? String(payrollSettings.wcRatePer100) : '',
+    wcExperienceMod: String(payrollSettings.wcExperienceMod ?? 1),
+    wcCarrier:       payrollSettings.wcCarrier || '',
+    wcEstimatePct:   String((payrollSettings.wcEstimatePct ?? 0.05) * 100), // shown as percent for UX
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState(null);
+  const [savedAt, setSavedAt] = useState(null);
+
+  const previewWcPct = useMemo(() => {
+    const r = parseFloat(form.wcRatePer100);
+    if (Number.isFinite(r) && r > 0) {
+      return (r / 100) * (parseFloat(form.wcExperienceMod) || 1);
+    }
+    return (parseFloat(form.wcEstimatePct) || 0) / 100;
+  }, [form.wcRatePer100, form.wcExperienceMod, form.wcEstimatePct]);
+
+  const previewIsEstimate = !(parseFloat(form.wcRatePer100) > 0);
+  const totalPct = PAYROLL_BURDEN_CONSTANTS.FICA_EMPLOYER_PCT + PAYROLL_BURDEN_CONSTANTS.FUTA_EFFECTIVE_PCT + PAYROLL_BURDEN_CONSTANTS.SUTA_NE_NEW_PCT + previewWcPct;
+
+  const handleSave = async () => {
+    setSaving(true);
+    setErr(null);
+    try {
+      const r = parseFloat(form.wcRatePer100);
+      const patch = {
+        wcClassCode:     form.wcClassCode || '0042',
+        wcRatePer100:    Number.isFinite(r) && r > 0 ? r : null,
+        wcExperienceMod: parseFloat(form.wcExperienceMod) || 1,
+        wcCarrier:       form.wcCarrier,
+        wcEstimatePct:   Math.max(0, (parseFloat(form.wcEstimatePct) || 0) / 100),
+      };
+      await updateOrgSettings({ payroll: patch });
+      setSavedAt(new Date());
+    } catch (e) {
+      setErr(e?.message || 'Could not save settings.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const fmtPct = (p) => `${(p * 100).toFixed(2)}%`;
+
+  return (
+    <div className="modal-overlay" onClick={() => !saving && onClose()}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }}>
+        <div className="modal-header">
+          <h2><Settings size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />Payroll Settings</h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose} disabled={saving}><X size={20} /></button>
+        </div>
+        <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+
+          <div style={{
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-md)',
+            marginBottom: 'var(--space-md)',
+            fontSize: '0.82rem',
+          }}>
+            <strong style={{ display: 'block', marginBottom: 6 }}>What is "employer burden"?</strong>
+            <p style={{ margin: 0, color: 'var(--text-tertiary)' }}>
+              For every $1 of W-2 wages, the business also pays payroll tax (FICA + FUTA + SUTA) and workers comp insurance.
+              These add up to ~10–15% on top of gross pay. The /team page and job profitability use these numbers so margins
+              reflect what you actually spend, not just what shows on the paycheck.
+            </p>
+          </div>
+
+          {/* Federal / State (read-only) */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Info size={14} style={{ color: 'var(--text-tertiary)' }} />
+              Federal &amp; Nebraska burden (fixed by law)
+            </label>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 8,
+              fontSize: '0.82rem',
+              padding: 'var(--space-sm)',
+              background: 'var(--bg-elevated)',
+              borderRadius: 'var(--radius-md)',
+            }}>
+              <div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>FICA (employer)</div>
+                <div style={{ fontWeight: 600 }}>{fmtPct(PAYROLL_BURDEN_CONSTANTS.FICA_EMPLOYER_PCT)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>SS 6.2 + Medicare 1.45</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>FUTA (effective)</div>
+                <div style={{ fontWeight: 600 }}>{fmtPct(PAYROLL_BURDEN_CONSTANTS.FUTA_EFFECTIVE_PCT)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>after state credit</div>
+              </div>
+              <div>
+                <div style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>NE SUTA</div>
+                <div style={{ fontWeight: 600 }}>{fmtPct(PAYROLL_BURDEN_CONSTANTS.SUTA_NE_NEW_PCT)}</div>
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>new-employer rate</div>
+              </div>
+            </div>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginTop: 4, marginBottom: 0 }}>
+              Lincoln NE has no city income tax. SUTA gets re-rated by NE DoL after 2 years of UI history — update the constant in <code>finance.js</code> when that happens.
+            </p>
+          </div>
+
+          {/* Workers Comp (editable) */}
+          <div className="form-group">
+            <label className="form-label">Workers Comp</label>
+
+            <div className="form-row" style={{ marginBottom: 8 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>Carrier</label>
+                <input className="form-input" value={form.wcCarrier} onChange={e => setForm(f => ({ ...f, wcCarrier: e.target.value }))} placeholder="e.g. Farm Bureau" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>NCCI Class Code</label>
+                <input className="form-input" value={form.wcClassCode} onChange={e => setForm(f => ({ ...f, wcClassCode: e.target.value }))} placeholder="0042" />
+              </div>
+            </div>
+
+            <div className="form-row" style={{ marginBottom: 8 }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>
+                  Rate per $100 payroll
+                  <span style={{ color: 'var(--text-tertiary)', fontWeight: 'normal', marginLeft: 6 }}>($)</span>
+                </label>
+                <input className="form-input" type="number" step="0.01" min="0" value={form.wcRatePer100}
+                  onChange={e => setForm(f => ({ ...f, wcRatePer100: e.target.value }))}
+                  placeholder="e.g. 4.50 once policy is bound" />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label" style={{ fontSize: '0.78rem' }}>Experience Mod</label>
+                <input className="form-input" type="number" step="0.01" min="0.5" max="2" value={form.wcExperienceMod}
+                  onChange={e => setForm(f => ({ ...f, wcExperienceMod: e.target.value }))} />
+                <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>1.00 for new business</div>
+              </div>
+            </div>
+
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label" style={{ fontSize: '0.78rem' }}>
+                Estimate % (used when rate per $100 is blank)
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <input className="form-input" type="number" step="0.5" min="0" max="20" style={{ width: 100 }}
+                  value={form.wcEstimatePct}
+                  onChange={e => setForm(f => ({ ...f, wcEstimatePct: e.target.value }))} />
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem' }}>%</span>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  (NE landscaping is typically 4–6%)
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Live preview */}
+          <div style={{
+            background: 'var(--lucky-green-glow)',
+            border: '1px solid rgba(45, 122, 58, 0.35)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-md)',
+            marginTop: 'var(--space-md)',
+          }}>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>
+              Total burden on each $1 of W-2 gross pay
+            </div>
+            <div style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--lucky-green-light)' }}>
+              {fmtPct(totalPct)}
+              {previewIsEstimate && <span style={{ fontSize: '0.7rem', color: 'var(--lucky-gold)', marginLeft: 8 }}>(WC is estimate)</span>}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 4 }}>
+              FICA {fmtPct(PAYROLL_BURDEN_CONSTANTS.FICA_EMPLOYER_PCT)} + FUTA {fmtPct(PAYROLL_BURDEN_CONSTANTS.FUTA_EFFECTIVE_PCT)} + SUTA {fmtPct(PAYROLL_BURDEN_CONSTANTS.SUTA_NE_NEW_PCT)} + WC {fmtPct(previewWcPct)}
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 8 }}>
+              This period: gross {fmtCurrency(totalGross)} → burden {fmtCurrency(totalGross * totalPct)} → true cost {fmtCurrency(totalGross * (1 + totalPct))}
+            </div>
+          </div>
+
+          {err && (
+            <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: 'var(--status-danger-bg)', color: 'var(--status-danger)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', marginTop: 'var(--space-md)' }}>
+              <AlertCircle size={14} /> {err}
+            </div>
+          )}
+          {savedAt && (
+            <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: 'var(--lucky-green-glow)', color: 'var(--lucky-green-light)', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', marginTop: 'var(--space-md)' }}>
+              <CheckCircle size={14} /> Saved {savedAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose} disabled={saving}>Close</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? <><Loader2 size={14} className="spin" /> Saving</> : <><Save size={14} /> Save Settings</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

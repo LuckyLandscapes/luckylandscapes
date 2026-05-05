@@ -94,6 +94,135 @@ export const OPEX_TO_SCHEDULE_C = {
 // our contractor model handles this separately via 1099 totals.
 export const SCHEDULE_C_LINE_WAGES = '26';
 
+// ─── Payroll burden (employer side only) ────────────────────
+// What the BUSINESS pays on top of gross wages for a W-2 employee.
+// These are federal/state law, not user-configurable. Update if rates
+// change at the federal/state level.
+//
+// Simplifications worth knowing:
+//   - FUTA is technically 6.0% on first $7k/employee minus 5.4% state credit
+//     = 0.6% effective. We treat it as flat 0.6% of gross. For a $40k worker
+//     this overstates FUTA by ~$198/yr; for job-cost honesty that's noise.
+//   - SUTA is on first $9,000/employee in NE. We treat it as flat 1.25%
+//     (NE new-employer rate). Once Lucky has 2+ years of UI history the
+//     rate gets re-rated by NE DoL — update SUTA_NE_PCT then.
+//   - Additional Medicare (0.9% over $200k wages) ignored — none of these
+//     workers are anywhere near that threshold.
+export const PAYROLL_BURDEN_CONSTANTS = {
+  FICA_EMPLOYER_PCT:  0.0765,  // 6.20% Social Security + 1.45% Medicare
+  FUTA_EFFECTIVE_PCT: 0.006,   // 0.6% effective after state credit
+  SUTA_NE_NEW_PCT:    0.0125,  // 1.25% Nebraska new-employer rate
+};
+
+// Payroll classification — must match team_members.payroll_classification CHECK
+export const PAYROLL_CLASSIFICATIONS = {
+  w2_employee:     { label: 'W-2 Employee',     description: 'On payroll. Employer pays FICA + FUTA + SUTA + WC on top of gross.', burden: true,  schedC: 'wages' },
+  '1099_contractor': { label: '1099 Contractor', description: 'Invoiced as outside vendor. No employer tax. Issue 1099-NEC at year-end if paid ≥$600.', burden: false, schedC: 'contract' },
+  owner_excluded:  { label: 'Owner (excluded)', description: 'LLC owner taking draws/distributions, not wages. Not on payroll.', burden: false, schedC: 'none' },
+};
+
+// Org-level payroll settings. These live on organizations.settings.payroll
+// (the existing JSONB column — no migration needed for the org table).
+export const DEFAULT_PAYROLL_SETTINGS = {
+  wcClassCode:      '0042',     // NCCI Landscape Gardening & Drivers
+  wcRatePer100:     null,       // $/100 of payroll. Null = use estimate.
+  wcExperienceMod:  1.00,       // New-business default. Carrier mod ~0.85-1.30 once they have claim history.
+  wcCarrier:        '',         // 'Farm Bureau' once policy is bound.
+  wcEstimatePct:    0.05,       // Placeholder used when wcRatePer100 is null.
+};
+
+export function getPayrollSettings(org) {
+  const fromOrg = org?.settings?.payroll || {};
+  return { ...DEFAULT_PAYROLL_SETTINGS, ...fromOrg };
+}
+
+// Compute the WC piece as a fraction of gross.
+// Returns { pct, isEstimate } — pct is unit fraction (0.045 = 4.5%).
+export function computeWcPct(payrollSettings) {
+  const s = { ...DEFAULT_PAYROLL_SETTINGS, ...payrollSettings };
+  if (s.wcRatePer100 != null && Number(s.wcRatePer100) > 0) {
+    // wcRatePer100 is "$X per $100 of payroll" → unit fraction = X/100
+    return {
+      pct: (Number(s.wcRatePer100) / 100) * Number(s.wcExperienceMod || 1),
+      isEstimate: false,
+    };
+  }
+  return { pct: Number(s.wcEstimatePct) || 0, isEstimate: true };
+}
+
+// Compute the burden breakdown for a W-2 employee.
+// Returns null for non-W-2 (1099, owner_excluded) — caller should treat
+// burden as 0 for those.
+export function computePayrollBurden(payrollSettings, classification = 'w2_employee') {
+  if (classification !== 'w2_employee') return null;
+  const wc = computeWcPct(payrollSettings);
+  const { FICA_EMPLOYER_PCT, FUTA_EFFECTIVE_PCT, SUTA_NE_NEW_PCT } = PAYROLL_BURDEN_CONSTANTS;
+  const totalPct = FICA_EMPLOYER_PCT + FUTA_EFFECTIVE_PCT + SUTA_NE_NEW_PCT + wc.pct;
+  return {
+    ficaPct:  FICA_EMPLOYER_PCT,
+    futaPct:  FUTA_EFFECTIVE_PCT,
+    sutaPct:  SUTA_NE_NEW_PCT,
+    wcPct:    wc.pct,
+    wcIsEstimate: wc.isEstimate,
+    totalPct,
+  };
+}
+
+// True hourly cost for a member: gross + employer burden (W-2 only).
+// Returns { gross, burdenAmount, total, burdenPct, burden } where `burden`
+// is the breakdown object (or null for non-W-2).
+export function computeBurdenedHourlyRate(member, payrollSettings) {
+  const gross = Number(member?.hourlyRate || 0);
+  const classification = member?.payrollClassification || 'w2_employee';
+  const burden = computePayrollBurden(payrollSettings, classification);
+  if (!burden) return { gross, burdenAmount: 0, total: gross, burdenPct: 0, burden: null, classification };
+  const burdenAmount = gross * burden.totalPct;
+  return {
+    gross,
+    burdenAmount,
+    total: gross + burdenAmount,
+    burdenPct: burden.totalPct,
+    burden,
+    classification,
+  };
+}
+
+// Burdened version of laborCostForJob.
+// Drop-in replacement that loads `useBurden: true` to opt in. We keep the
+// non-burdened `laborCostForJob` for callers that want raw gross.
+export function laborCostForJobBurdened(jobId, timeEntries, teamMembers, timeSegments = [], payrollSettings = DEFAULT_PAYROLL_SETTINGS) {
+  let total = 0;
+  const memberMultiplier = (memberId) => {
+    const m = teamMembers.find(x => x.id === memberId);
+    if (!m) return { rate: 0, mult: 1 };
+    const rate = Number(m.hourlyRate || 0);
+    const burden = computePayrollBurden(payrollSettings, m.payrollClassification || 'w2_employee');
+    return { rate, mult: burden ? 1 + burden.totalPct : 1 };
+  };
+
+  for (const seg of timeSegments) {
+    if (seg.kind !== 'job' || seg.jobId !== jobId) continue;
+    if (!seg.endedAt) continue;
+    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+    if (!entry) continue;
+    const { rate, mult } = memberMultiplier(entry.teamMemberId || entry.memberId);
+    total += rate * mult * (Number(seg.durationMinutes || 0) / 60);
+  }
+
+  const legacyEntries = timeEntries.filter(t =>
+    t.jobId === jobId && t.clockIn && t.clockOut &&
+    !timeSegments.some(s => s.timeEntryId === t.id)
+  );
+  for (const t of legacyEntries) {
+    const { rate, mult } = memberMultiplier(t.teamMemberId || t.memberId);
+    const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
+    const breakHrs = Number(t.breakMinutes || 0) / 60;
+    const paidHours = Math.max(0, totalHours - breakHrs);
+    total += rate * mult * paidHours;
+  }
+  return total;
+}
+
 // ─── Period helpers ─────────────────────────────────────────
 export function getPeriodRange(period, ref = new Date()) {
   const end = new Date(ref);
@@ -190,7 +319,11 @@ export function laborCostForJob(jobId, timeEntries, teamMembers, timeSegments = 
 }
 
 // ─── Per-job financials ─────────────────────────────────────
-export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments = []) {
+// payrollSettings (5th arg) is optional. When passed, labor cost includes
+// employer burden (FICA + FUTA + SUTA + WC) for W-2 members so the margin
+// reflects what the business actually pays. Pre-existing callers that
+// don't pass it still get raw gross-wage labor.
+export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments = [], payrollSettings = null) {
   if (!job) return null;
 
   const expenses = jobExpenses.filter(e => e.jobId === job.id);
@@ -213,7 +346,12 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSe
   const materialCosts = byCategory.materials;
   const equipmentCosts = byCategory.equipment;
   const otherExpenses = byCategory.fuel + byCategory.dump_fees + byCategory.subcontractor + byCategory.permits + byCategory.other;
-  const laborCosts = laborCostForJob(job.id, timeEntries, teamMembers, timeSegments);
+  const laborCostsGross = laborCostForJob(job.id, timeEntries, teamMembers, timeSegments);
+  const laborCostsBurdened = payrollSettings
+    ? laborCostForJobBurdened(job.id, timeEntries, teamMembers, timeSegments, payrollSettings)
+    : laborCostsGross;
+  const laborBurdenAmount = laborCostsBurdened - laborCostsGross;
+  const laborCosts = laborCostsBurdened;
 
   const revenue = Number(job.revenue || job.total || 0);
   const totalExpenses = materialCosts + equipmentCosts + otherExpenses + laborCosts;
@@ -227,6 +365,8 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSe
     equipmentCosts,
     otherExpenses,
     laborCosts,
+    laborCostsGross,
+    laborBurdenAmount,
     totalExpenses,
     profit,
     margin,
@@ -244,7 +384,16 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSe
 // labor and materials until completion. Revenue still recognizes on completion
 // (or on payment when basis === 'paid'); over a 30-day window the mismatch is
 // usually small for short-cycle landscaping work.
-function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, start, end, basis }) {
+function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, start, end, basis, payrollSettings = null }) {
+  // Multiplier on a member's gross rate to include employer burden when
+  // payrollSettings is provided. Returns 1.0 (no burden) when settings are
+  // missing so legacy callers preserve behavior.
+  const burdenMult = (memberId) => {
+    if (!payrollSettings) return 1;
+    const m = teamMembers.find(x => x.id === memberId);
+    const burden = computePayrollBurden(payrollSettings, m?.payrollClassification || 'w2_employee');
+    return burden ? 1 + burden.totalPct : 1;
+  };
   // Revenue
   let revenue = 0;
   if (basis === 'paid') {
@@ -277,15 +426,23 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     if (seg.kind !== 'job' || !seg.endedAt) continue;
     if (!inRange(seg.startedAt, start, end)) continue;
     const entry = timeEntries.find(t => t.id === seg.timeEntryId);
-    const member = teamMembers.find(m => m.id === (entry?.teamMemberId || entry?.memberId));
+    const memberId = entry?.teamMemberId || entry?.memberId;
+    const member = teamMembers.find(m => m.id === memberId);
     const rate = Number(member?.hourlyRate || 0);
-    directLabor += rate * (Number(seg.durationMinutes || 0) / 60);
+    directLabor += rate * burdenMult(memberId) * (Number(seg.durationMinutes || 0) / 60);
   }
   const legacyDirect = timeEntries.filter(t =>
     t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
     !timeSegments.some(s => s.timeEntryId === t.id)
   );
-  directLabor += laborCostForEntries(legacyDirect, teamMembers, []);
+  for (const t of legacyDirect) {
+    const memberId = t.teamMemberId || t.memberId;
+    const member = teamMembers.find(m => m.id === memberId);
+    const rate = Number(member?.hourlyRate || 0);
+    const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
+    const breakHrs = Number(t.breakMinutes || 0) / 60;
+    directLabor += rate * burdenMult(memberId) * Math.max(0, totalHours - breakHrs);
+  }
 
   const cogs = Object.values(cogsByCat).reduce((a, b) => a + b, 0) + directLabor;
 
@@ -305,15 +462,23 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     if (seg.kind !== 'travel' || !seg.endedAt) continue;
     if (!inRange(seg.startedAt, start, end)) continue;
     const entry = timeEntries.find(t => t.id === seg.timeEntryId);
-    const member = teamMembers.find(m => m.id === (entry?.teamMemberId || entry?.memberId));
+    const memberId = entry?.teamMemberId || entry?.memberId;
+    const member = teamMembers.find(m => m.id === memberId);
     const rate = Number(member?.hourlyRate || 0);
-    indirectLabor += rate * (Number(seg.durationMinutes || 0) / 60);
+    indirectLabor += rate * burdenMult(memberId) * (Number(seg.durationMinutes || 0) / 60);
   }
   const legacyIndirect = timeEntries.filter(t =>
     !t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
     !timeSegments.some(s => s.timeEntryId === t.id)
   );
-  indirectLabor += laborCostForEntries(legacyIndirect, teamMembers, []);
+  for (const t of legacyIndirect) {
+    const memberId = t.teamMemberId || t.memberId;
+    const member = teamMembers.find(m => m.id === memberId);
+    const rate = Number(member?.hourlyRate || 0);
+    const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
+    const breakHrs = Number(t.breakMinutes || 0) / 60;
+    indirectLabor += rate * burdenMult(memberId) * Math.max(0, totalHours - breakHrs);
+  }
   const opex = Object.values(opexByCat).reduce((a, b) => a + b, 0) + indirectLabor;
 
   const grossProfit = revenue - cogs;
@@ -333,9 +498,11 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
 }
 
 // Build full P&L plus prior-period comparison.
-export function buildPnL({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, period = 'month', basis = 'completed' }) {
+// payrollSettings (optional) — when passed, labor lines include employer
+// burden (FICA + FUTA + SUTA + WC) so net margin reflects true labor cost.
+export function buildPnL({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, period = 'month', basis = 'completed', payrollSettings = null }) {
   const { start, end, prevStart, prevEnd } = getPeriodRange(period);
-  const args = { jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, basis };
+  const args = { jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, basis, payrollSettings };
   const current = pnlForRange({ ...args, start, end });
   const previous = pnlForRange({ ...args, start: prevStart, end: prevEnd });
   return { ...current, range: { start, end }, previous };

@@ -1,4 +1,4 @@
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-04
 **Confidence:** Partially Known
 
 # Finances
@@ -14,7 +14,7 @@
 ## Cost structure
 | Bucket | Approx % of revenue | Notes |
 |---|---|---|
-| Labor (wages + payroll tax(.2) + workers comp) | TODO | TODO |
+| Labor (wages + payroll tax + workers comp) | TODO % | Gross wages × ~13.6% employer burden (FICA 7.65 + FUTA 0.6 + NE SUTA 1.25 + WC ~5% est.). See [Labor cost & employer burden](#labor-cost--employer-burden) below. |
 | Materials (mulch, plants, stone, etc.) | TODO | TODO |
 | Equipment (fuel, maintenance, depreciation) fuel is $750 a month, maintenance is around $150 a month, depreciation is around $200 a month | TODO | TODO |
 | Vehicles | $800/month | TODO |
@@ -43,6 +43,27 @@
 - **Books / accounting:** None Yet, but will hopefully integrate into the luckyapp in the near future.
 - **Tax preparer / CPA:** Need to figure this out ASAP, we are not LEGALLY COVERED for anything, have LLC AND EIN and have no clue what to do, We have not been paying ourselves.
 
+## Labor cost & employer burden
+For every $1 of W-2 gross wages, the business pays additional tax + insurance on top. Lucky uses these numbers in /team and in per-job profitability so margins reflect what the business actually spends:
+
+| Component | Rate | Notes |
+|---|---|---|
+| FICA (employer side) | **7.65%** | Social Security 6.20% + Medicare 1.45%. Match for what's withheld from the employee. |
+| FUTA (effective) | **0.6%** | 6.0% on first $7k/employee minus 5.4% state credit. Treated as flat for simplicity. |
+| Nebraska SUTA | **1.25%** | NE new-employer rate, first $9k/employee. Re-rated by NE DoL after ~2 years of UI history. |
+| Workers comp (NCCI 0042 — Landscape Gardening) | **~5% (estimate)** | Real number replaces this once Farm Bureau binds the policy. NE landscaping is typically 4–6%. Calc: `wcRatePer100 / 100 × experienceMod`. |
+| **Total burden on W-2 wages** | **~13.6%** | Multiplier applied: gross × 1.136 ≈ true labor cost. |
+
+**Where this lives in the app:**
+- /team page → "Payroll Settings" button. WC carrier + rate + experience mod are editable per-org. Federal/state rates are constants in [`src/lib/finance.js`](../luckyapp/src/lib/finance.js) (`PAYROLL_BURDEN_CONSTANTS`).
+- Per-job profitability ([`src/lib/finance.js`](../luckyapp/src/lib/finance.js) `jobFinancials`) and the P&L (`buildPnL`) both apply burden when `payrollSettings` is passed — which the data context now does by default.
+- Per-team-member `payroll_classification` (migration 034) decides whether burden applies:
+  - `w2_employee` (default) — full burden.
+  - `1099_contractor` — vendor invoice, no employer tax. Issue 1099-NEC at year-end if paid ≥$600. Macoy fits here (paid through WE Media, a pre-existing media agency).
+  - `owner_excluded` — LLC owner taking draws not wages. Riley fits here.
+
+**What this does NOT do:** real paycheck withholding (federal income tax W-4 tables, employee SS/Medicare deductions, NE income tax). That's Gusto's job — see "Payroll / W-2" below.
+
 ## Tax tooling in luckyapp
 The app provides starting points for tax filings — **none of it is a substitute for a CPA.**
 
@@ -69,3 +90,8 @@ The app provides starting points for tax filings — **none of it is a substitut
 
 ## Known financial issues / questions
 I have no clue what our margins are, we have never paid ourselves. we are not sure what to do, you will be our accountant/CPA.
+
+### Open items (2026-05)
+- **Workers comp not bound yet.** Farm Bureau quote in motion. Until bound, the /team page uses a 5% placeholder for WC. **Bind before next shift** — uncovered W-2 employees in NE = personal liability + Class III misdemeanor per day.
+- **Owner pay structure undecided.** Riley is currently `owner_excluded` (no wages, takes draws). Once cash flow allows, decide between (a) staying with draws as a single-member LLC and paying SE tax on Schedule C, or (b) electing S-corp status to split owner pay between W-2 wages and distributions (saves SE tax above ~$60k profit but adds payroll filing overhead). CPA call.
+- **Macoy 1099 through WE Media.** Macoy is *not* legally a member of Lucky LLC despite the 30%-ownership shorthand in [`docs/company.md`](company.md). WE Media is a pre-existing arms-length media agency he owned before Lucky was formed. As a 1099 vendor invoicing for marketing/dev/sales, this is fine — but document the relationship in writing (services agreement) so the IRS has nothing to reclassify. CPA should confirm.

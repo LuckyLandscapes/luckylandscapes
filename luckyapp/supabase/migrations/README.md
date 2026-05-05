@@ -46,6 +46,7 @@ prefix is a sort key, not a uniqueness guarantee.
 | 031 | `031_materials_rebuild.sql` | **Drops + rebuilds materials** with supplier_id FK, single unit_cost + tax_rate, customer-visible flag, dropped image/image_emoji/cost_low/cost_high redundancy. Take a Supabase backup first. |
 | 032 | `032_selected_materials.sql` | Adds `selected_materials` JSONB to quotes + contracts (visual material approval, no prices) |
 | 033 | `033_subcontract_support.sql` | `customers.customer_type` (homeowner/business/general_contractor); `jobs.work_authorization` (contract/subcontract/verbal) + work-order proof + site contact for sub work |
+| 034 | `034_payroll_classification.sql` | `team_members.payroll_classification` (`w2_employee` / `1099_contractor` / `owner_excluded`). Drives whether the /team page applies employer-side payroll burden (FICA + FUTA + SUTA + WC). Org-level WC config lives in the existing `organizations.settings` JSONB — no schema change there. |
 
 > **Files 001 and 002 overlap.** Both create base tables. Run 001 first — its
 > `CREATE TABLE IF NOT EXISTS` statements prevent conflicts when 002 runs.
