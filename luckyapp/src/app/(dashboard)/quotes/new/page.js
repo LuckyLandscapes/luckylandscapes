@@ -4,9 +4,10 @@ import { useState, useEffect, useRef, Suspense } from 'react';
 import { useData } from '@/lib/data';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward, Package, Save } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward, Package, Save, Calculator as CalcIcon, X } from 'lucide-react';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import SelectMaterialsModal from '@/components/SelectMaterialsModal';
+import MaterialCalculator from '@/components/MaterialCalculator';
 import DepositCard from '@/components/DepositCard';
 import { DEPOSIT_TYPES } from '@/lib/deposit';
 import { computeSelectedMaterialsCost } from '@/lib/catalog';
@@ -27,6 +28,7 @@ function NewQuoteContent() {
   const [items, setItems] = useState([]);
   const [selectedMaterials, setSelectedMaterials] = useState([]);
   const [showMaterialsPicker, setShowMaterialsPicker] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
   const [notes, setNotes] = useState('');
   const [materialsCost, setMaterialsCost] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -540,9 +542,14 @@ function NewQuoteContent() {
                   Customer sees photos + names + quantities (never prices) — both on the quote and on the contract they sign.
                 </p>
               </div>
-              <button className="btn btn-secondary" onClick={() => setShowMaterialsPicker(true)}>
-                <Plus size={14} /> {selectedMaterials.length === 0 ? 'Pick materials' : 'Edit selection'}
-              </button>
+              <div style={{ display: 'flex', gap: 'var(--space-sm)' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => setShowCalculator(true)} title="Cubic yards / weight / bag count calculator">
+                  <CalcIcon size={14} /> Calculator
+                </button>
+                <button className="btn btn-secondary" onClick={() => setShowMaterialsPicker(true)}>
+                  <Plus size={14} /> {selectedMaterials.length === 0 ? 'Pick materials' : 'Edit selection'}
+                </button>
+              </div>
             </div>
             {selectedMaterials.length > 0 && (
               <>
@@ -632,6 +639,37 @@ function NewQuoteContent() {
           onClose={() => setShowMaterialsPicker(false)}
           onSave={setSelectedMaterials}
         />
+      )}
+
+      {/* Material calculator modal — opens from step 4. Pre-feeds the
+          current selectedMaterials so the salesperson can apply the
+          calculated quantity straight onto a material with one click. */}
+      {showCalculator && (
+        <div className="modal-overlay" onClick={() => setShowCalculator(false)}>
+          <div
+            className="modal"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: 980, width: '100%' }}
+          >
+            <div className="modal-header">
+              <h2><CalcIcon size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} /> Material Calculator</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => setShowCalculator(false)} aria-label="Close calculator">
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <MaterialCalculator
+                embedded
+                selectedMaterials={selectedMaterials}
+                onApplyQuantity={({ index, quantity }) => {
+                  setSelectedMaterials(prev => prev.map((sm, i) =>
+                    i === index ? { ...sm, quantity } : sm
+                  ));
+                }}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Step 5: Review */}
