@@ -84,6 +84,32 @@ export function formatTaxRate(rate) {
   return `${(n * 100).toFixed(2).replace(/\.?0+$/, '')}%`;
 }
 
+// Internal-cost rollup for a list of selected_materials snapshots.
+//
+// Snapshots are price-free by design (customer-shape data — see
+// CustomerCatalogCard). To convert a snapshot back to a cost figure for the
+// salesperson's "materialsCost" field, we look up each material in the
+// current catalog and compute `quantity × actual cost (incl. tax)`.
+//
+// Materials that have been deleted since the snapshot are skipped silently
+// — there's no good fallback price, and pretending we have one would
+// invent a number Riley would have to manually correct.
+export function computeSelectedMaterialsCost(selectedMaterials, materials = [], suppliers = []) {
+  if (!Array.isArray(selectedMaterials) || selectedMaterials.length === 0) return 0;
+  const materialMap = new Map((materials || []).map(m => [m.id, m]));
+  const supplierMap = new Map((suppliers || []).map(s => [s.id, s]));
+  let total = 0;
+  for (const sm of selectedMaterials) {
+    const m = materialMap.get(sm.materialId);
+    if (!m) continue;
+    const supplier = m.supplierId ? supplierMap.get(m.supplierId) : null;
+    const actualCost = getMaterialActualCost(m, supplier);
+    const qty = Number(sm.quantity) || 0;
+    if (qty > 0 && actualCost > 0) total += qty * actualCost;
+  }
+  return Math.round(total * 100) / 100;
+}
+
 // Snapshot a material into the shape stored in quote.selected_materials and
 // contract.selected_materials. Strips internal-only fields and adds the
 // quantity + timestamp the salesperson chose at selection time.

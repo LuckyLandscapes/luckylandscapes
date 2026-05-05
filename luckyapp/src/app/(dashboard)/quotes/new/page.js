@@ -1,21 +1,22 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useData } from '@/lib/data';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward, Package } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Camera, SkipForward, Package, Save } from 'lucide-react';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import SelectMaterialsModal from '@/components/SelectMaterialsModal';
 import DepositCard from '@/components/DepositCard';
 import { DEPOSIT_TYPES } from '@/lib/deposit';
+import { computeSelectedMaterialsCost } from '@/lib/catalog';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
 }
 
 function NewQuoteContent() {
-  const { customers, services, addQuote, getQuoteMediaByCustomer } = useData();
+  const { customers, services, addQuote, getQuoteMediaByCustomer, materials, suppliers } = useData();
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedCustomer = searchParams.get('customer') || '';
@@ -33,6 +34,85 @@ function NewQuoteContent() {
   const [depositPercentage, setDepositPercentage] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  // ─── Crash-recovery autosave ──────────────────────────────────────
+  // Backs up the in-flight quote to localStorage so a closed tab, browser
+  // crash, or accidental nav-away doesn't lose the work. NOT a replacement
+  // for "Save as Draft" — that explicitly commits to Postgres so the row
+  // shows up on /quotes for next time.
+  const DRAFT_KEY = 'lucky_quote_draft_inprogress';
+  const DRAFT_MAX_AGE_DAYS = 7;
+  const [restorePrompt, setRestorePrompt] = useState(null);
+  const hydrated = useRef(false);
+
+  // On mount: check for an unfinished draft and offer to restore.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (hydrated.current) return;
+    hydrated.current = true;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      const ageDays = (Date.now() - new Date(saved.savedAt || 0).getTime()) / (1000 * 60 * 60 * 24);
+      if (ageDays > DRAFT_MAX_AGE_DAYS) {
+        window.localStorage.removeItem(DRAFT_KEY);
+        return;
+      }
+      // Only prompt if the draft has anything meaningful in it
+      const hasWork = saved.customerId || saved.category || (saved.items?.length > 0) || (saved.selectedMaterials?.length > 0) || saved.notes;
+      if (hasWork) setRestorePrompt(saved);
+    } catch (err) {
+      console.warn('Could not parse saved draft', err);
+    }
+  }, []);
+
+  const acceptRestore = () => {
+    const s = restorePrompt;
+    if (!s) return;
+    if (s.customerId) setCustomerId(s.customerId);
+    if (s.category) setCategory(s.category);
+    if (Array.isArray(s.items)) setItems(s.items);
+    if (Array.isArray(s.selectedMaterials)) setSelectedMaterials(s.selectedMaterials);
+    if (s.notes != null) setNotes(s.notes);
+    if (s.materialsCost != null) setMaterialsCost(s.materialsCost);
+    if (s.deliveryFee != null) setDeliveryFee(s.deliveryFee);
+    if (s.depositType) setDepositType(s.depositType);
+    if (s.depositPercentage != null) setDepositPercentage(s.depositPercentage);
+    if (s.step) setStep(s.step);
+    setRestorePrompt(null);
+  };
+
+  const dismissRestore = () => {
+    setRestorePrompt(null);
+    if (typeof window !== 'undefined') window.localStorage.removeItem(DRAFT_KEY);
+  };
+
+  // Debounced autosave on every state change. Skipped while the restore
+  // prompt is up so we don't overwrite the saved snapshot before the user
+  // decides whether to restore.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (restorePrompt) return;
+    const t = setTimeout(() => {
+      try {
+        window.localStorage.setItem(DRAFT_KEY, JSON.stringify({
+          customerId, category, items, selectedMaterials, notes,
+          materialsCost, deliveryFee, depositType, depositPercentage, step,
+          savedAt: new Date().toISOString(),
+        }));
+      } catch {
+        // localStorage may be full or blocked — silent fallback
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [customerId, category, items, selectedMaterials, notes, materialsCost, deliveryFee, depositType, depositPercentage, step, restorePrompt]);
+
+  const clearDraft = () => {
+    if (typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* noop */ }
+    }
+  };
 
   const categories = [
     { value: 'Lawn Care', icon: '🌿', description: 'Mowing, cleanups, maintenance' },
@@ -87,6 +167,9 @@ function NewQuoteContent() {
   const removeItem = (id) => setItems(items.filter(i => i.id !== id));
 
   const subtotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
+  // Grand total includes delivery so quote.total IS the customer-facing total
+  // everywhere (PDF, public quote, percentage-deposit math, invoices).
+  const grandTotal = subtotal + (parseFloat(deliveryFee) || 0);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -98,7 +181,7 @@ function NewQuoteContent() {
         items,
         selectedMaterials,
         notes,
-        total: subtotal,
+        total: grandTotal,
         materialsCost: parseFloat(materialsCost) || 0,
         deliveryFee: parseFloat(deliveryFee) || 0,
         depositType,
@@ -107,6 +190,7 @@ function NewQuoteContent() {
           : null,
         status: 'draft',
       });
+      clearDraft();
       if (newQuote?.id) {
         router.push(`/quotes/${newQuote.id}`);
       } else {
@@ -127,11 +211,38 @@ function NewQuoteContent() {
         </Link>
       </div>
 
+      {restorePrompt && (
+        <div className="card" style={{ marginBottom: 'var(--space-md)', border: '1px solid var(--lucky-green)', background: 'rgba(45, 74, 34, 0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
+            <div>
+              <strong>Resume your unfinished quote?</strong>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                Saved {new Date(restorePrompt.savedAt).toLocaleString()} — {restorePrompt.items?.length || 0} line items, {restorePrompt.selectedMaterials?.length || 0} materials.
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button className="btn btn-secondary btn-sm" onClick={dismissRestore}>Discard</button>
+              <button className="btn btn-primary btn-sm" onClick={acceptRestore}>Resume</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div className="page-header-left">
           <h1>Create New Quote</h1>
-          <p>Build a detailed quote for your customer.</p>
+          <p>Build a detailed quote for your customer. Work autosaves locally so you can come back later.</p>
         </div>
+        {step >= 2 && customerId && (
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={handleSubmit}
+            disabled={saving}
+            title="Commit what you have so far as a draft. You can resume editing from /quotes."
+          >
+            <Save size={14} /> Save as Draft
+          </button>
+        )}
       </div>
 
       {/* Progress */}
@@ -383,10 +494,20 @@ function NewQuoteContent() {
                 justifyContent: 'flex-end',
               }}>
                 <div style={{ width: '240px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 'var(--space-xs)' }}>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Subtotal</span>
+                    <span style={{ fontSize: '0.9rem' }}>{formatCurrency(subtotal)}</span>
+                  </div>
+                  {(parseFloat(deliveryFee) || 0) > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 'var(--space-xs)' }}>
+                      <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Delivery</span>
+                      <span style={{ fontSize: '0.9rem' }}>{formatCurrency(parseFloat(deliveryFee) || 0)}</span>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 'var(--space-sm)', borderTop: '2px solid var(--border-secondary)' }}>
                     <span style={{ fontWeight: 700 }}>Total</span>
                     <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>
-                      {formatCurrency(subtotal)}
+                      {formatCurrency(grandTotal)}
                     </span>
                   </div>
                 </div>
@@ -424,19 +545,42 @@ function NewQuoteContent() {
               </button>
             </div>
             {selectedMaterials.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
-                {selectedMaterials.map((sm, i) => (
-                  <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
-                    <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
-                      {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                  {selectedMaterials.map((sm, i) => (
+                    <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                      <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
+                        {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                      </div>
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                  ))}
+                </div>
+                {(() => {
+                  const suggested = computeSelectedMaterialsCost(selectedMaterials, materials, suppliers);
+                  const current = parseFloat(materialsCost) || 0;
+                  if (suggested <= 0) return null;
+                  const matches = Math.abs(suggested - current) < 0.01;
+                  return (
+                    <div style={{ marginTop: 'var(--space-sm)', padding: 'var(--space-sm)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                        Cost from selection (incl. tax): <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(suggested)}</strong>
+                      </div>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${matches ? 'btn-secondary' : 'btn-primary'}`}
+                        onClick={() => setMaterialsCost(suggested)}
+                        disabled={matches}
+                      >
+                        {matches ? 'Applied' : 'Use as materials cost'}
+                      </button>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  );
+                })()}
+              </>
             )}
           </div>
 
@@ -452,7 +596,7 @@ function NewQuoteContent() {
             setMaterialsCost={setMaterialsCost}
             deliveryFee={deliveryFee}
             setDeliveryFee={setDeliveryFee}
-            subtotal={subtotal}
+            subtotal={grandTotal}
           />
 
           <div className="form-group" style={{ marginTop: 'var(--space-lg)', maxWidth: '600px' }}>
@@ -514,8 +658,13 @@ function NewQuoteContent() {
               <div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '4px' }}>Total</div>
                 <div style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>
-                  {formatCurrency(subtotal)}
+                  {formatCurrency(grandTotal)}
                 </div>
+                {(parseFloat(deliveryFee) || 0) > 0 && (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                    {formatCurrency(subtotal)} items + {formatCurrency(parseFloat(deliveryFee) || 0)} delivery
+                  </div>
+                )}
               </div>
             </div>
           </div>

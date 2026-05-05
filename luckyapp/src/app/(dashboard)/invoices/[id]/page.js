@@ -70,6 +70,10 @@ export default function InvoiceDetailPage() {
   const [toast, setToast] = useState(null);
   const [copied, setCopied] = useState(false);
 
+  // While `deleting` is true the row may already be gone from local state
+  // (the data layer updates before router.push lands). Don't flash the
+  // "not found" page during that brief window — let the navigation finish.
+  if (!invoice && deleting) return null;
   if (!invoice) {
     return (
       <div className="page">

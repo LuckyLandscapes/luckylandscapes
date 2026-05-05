@@ -316,17 +316,29 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   // =============== TOTALS BOX ===============
   const totalsWidth = 240;
   const totalsX = pageWidth - margin - totalsWidth;
+  const grandTotal = Number(quote.total || 0);
+  const deliveryFeeForTotals = Number(quote.deliveryFee || 0);
+  const lineItemsSubtotal = Math.max(0, grandTotal - deliveryFeeForTotals);
 
-  // Subtotal
+  // Subtotal (line items only)
   doc.setFontSize(9);
   doc.setTextColor(...GRAY);
   doc.text('Subtotal', totalsX, y + 4);
   doc.setTextColor(...CHARCOAL);
   doc.setFont('helvetica', 'bold');
-  doc.text(formatCurrency(quote.total), pageWidth - margin, y + 4, { align: 'right' });
+  doc.text(formatCurrency(lineItemsSubtotal), pageWidth - margin, y + 4, { align: 'right' });
   doc.setFont('helvetica', 'normal');
 
   y += 20;
+
+  // Delivery (if applicable)
+  if (deliveryFeeForTotals > 0) {
+    doc.setTextColor(...GRAY);
+    doc.text('Delivery', totalsX, y + 4);
+    doc.setTextColor(...CHARCOAL);
+    doc.text(formatCurrency(deliveryFeeForTotals), pageWidth - margin, y + 4, { align: 'right' });
+    y += 20;
+  }
 
   // Tax
   doc.setTextColor(...GRAY);
@@ -343,12 +355,12 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
 
   y += 18;
 
-  // Total
+  // Total (includes delivery)
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...CLOVER);
   doc.text('TOTAL', totalsX, y + 4);
-  doc.text(formatCurrency(quote.total), pageWidth - margin, y + 4, { align: 'right' });
+  doc.text(formatCurrency(grandTotal), pageWidth - margin, y + 4, { align: 'right' });
 
   y += 40;
 

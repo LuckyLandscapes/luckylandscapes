@@ -45,6 +45,10 @@ export default function ContractDetailPage() {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // While `deleting` is true the row may already be gone from local state
+  // (the data layer updates before router.push lands). Don't flash the
+  // "not found" page during that brief window — let the navigation finish.
+  if (!contract && deleting) return null;
   if (!contract) {
     return (
       <div className="page">

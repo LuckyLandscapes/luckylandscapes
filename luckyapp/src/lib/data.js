@@ -833,6 +833,23 @@ export function DataProvider({ children }) {
     return { ...seg, ...patch };
   }
 
+  // If a crew member starts a shift on a job they weren't originally
+  // assigned to, append them to the job's assigned_to array. This way:
+  //   - Per-job labor cost rolls up correctly (finance.js prefers segments,
+  //     but assigned_to is what the schedule UI/PDFs show as the crew list)
+  //   - The 2-day-job-with-late-help case (Riley's note) works without
+  //     needing a separate "add crew" UI step
+  // No-op if the member is already on the job.
+  const ensureMemberOnJob = async (memberId, jobId) => {
+    if (!memberId || !jobId) return;
+    const job = jobs.find(j => j.id === jobId);
+    if (!job) return;
+    const current = Array.isArray(job.assignedTo) ? job.assignedTo : [];
+    if (current.includes(memberId)) return;
+    const next = [...current, memberId];
+    await updateJob(jobId, { assignedTo: next });
+  };
+
   // Open a shift + an initial segment.
   const startShift = useCallback(async (memberId, { jobId = null, kind = null, notes = '' } = {}) => {
     const segKind = kind || (jobId ? 'job' : 'travel');
@@ -854,9 +871,13 @@ export function DataProvider({ children }) {
       setTimeEntries(prev => { const next = [entry, ...prev]; saveLocal('time_entries', next); return next; });
     }
     const seg = await insertSegment({ memberId, timeEntryId: entry.id, kind: segKind, jobId, notes });
+    if (segKind === 'job' && jobId) {
+      // Best-effort — don't block shift start if assigned_to write fails.
+      try { await ensureMemberOnJob(memberId, jobId); } catch (e) { console.warn('ensureMemberOnJob failed', e); }
+    }
     return { entry, segment: seg };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, orgId]);
+  }, [connected, orgId, jobs]);
 
   // Close the current open segment and open a new one.
   const switchSegment = useCallback(async (timeEntryId, { kind, jobId = null, notes = '' } = {}) => {
@@ -866,9 +887,14 @@ export function DataProvider({ children }) {
     const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
     if (open) await closeSegment(open.id);
     const seg = await insertSegment({ memberId, timeEntryId, kind, jobId, notes });
+    // Auto-extend job assigned_to if a worker switches to a job they
+    // weren't originally on (e.g. day-2 reinforcements showing up).
+    if (kind === 'job' && jobId) {
+      try { await ensureMemberOnJob(memberId, jobId); } catch (e) { console.warn('ensureMemberOnJob failed', e); }
+    }
     return seg;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, timeEntries, timeSegments]);
+  }, [connected, timeEntries, timeSegments, jobs]);
 
   // Close any open segment, set clock_out, roll up break minutes onto the entry.
   const endShift = useCallback(async (timeEntryId, { notes = '' } = {}) => {

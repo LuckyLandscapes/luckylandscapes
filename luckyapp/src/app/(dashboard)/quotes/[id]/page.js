@@ -46,7 +46,10 @@ export default function QuoteDetailPage() {
     ? `${window.location.origin}/quote/${quote.publicToken}`
     : '';
 
-  if (!quote) {
+  // While `deleting` is true the row may already be gone from local state
+  // (the data layer updates before router.push lands). Don't flash the
+  // "not found" page during that brief window — let the navigation finish.
+  if (!quote && !deleting) {
     return (
       <div className="page">
         <div className="empty-state">
@@ -58,6 +61,7 @@ export default function QuoteDetailPage() {
       </div>
     );
   }
+  if (!quote) return null;
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -497,8 +501,16 @@ export default function QuoteDetailPage() {
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px' }}>
                 <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Subtotal</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(quote.total)}</span>
+                <span style={{ fontWeight: 600 }}>
+                  {formatCurrency(Math.max(0, Number(quote.total || 0) - Number(quote.deliveryFee || 0)))}
+                </span>
               </div>
+              {Number(quote.deliveryFee || 0) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px' }}>
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Delivery</span>
+                  <span style={{ fontWeight: 600 }}>{formatCurrency(Number(quote.deliveryFee || 0))}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px' }}>
                 <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Tax</span>
                 <span style={{ fontWeight: 600 }}>$0.00</span>

@@ -9,6 +9,7 @@ import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import SelectMaterialsModal from '@/components/SelectMaterialsModal';
 import DepositCard from '@/components/DepositCard';
 import { DEPOSIT_TYPES } from '@/lib/deposit';
+import { computeSelectedMaterialsCost } from '@/lib/catalog';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -17,7 +18,7 @@ function formatCurrency(n) {
 export default function EditQuotePage() {
   const { id } = useParams();
   const router = useRouter();
-  const { getQuote, getCustomer, customers, services, updateQuote } = useData();
+  const { getQuote, getCustomer, customers, services, updateQuote, materials, suppliers } = useData();
 
   const quote = getQuote(id);
   const customer = quote ? getCustomer(quote.customerId) : null;
@@ -118,6 +119,9 @@ export default function EditQuotePage() {
   const removeItem = (itemId) => setItems(items.filter(i => i.id !== itemId));
 
   const subtotal = items.reduce((sum, i) => sum + (i.total || 0), 0);
+  // Grand total includes delivery so quote.total IS the customer-facing total
+  // everywhere (PDF, public quote, percentage-deposit math, invoices).
+  const grandTotal = subtotal + (parseFloat(deliveryFee) || 0);
 
   const handleSave = async () => {
     await updateQuote(id, {
@@ -127,7 +131,7 @@ export default function EditQuotePage() {
       selectedMaterials,
       notes,
       status,
-      total: subtotal,
+      total: grandTotal,
       materialsCost: parseFloat(materialsCost) || 0,
       deliveryFee: parseFloat(deliveryFee) || 0,
       depositType,
@@ -322,10 +326,20 @@ export default function EditQuotePage() {
             justifyContent: 'flex-end',
           }}>
             <div style={{ width: '240px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 'var(--space-xs)' }}>
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Subtotal</span>
+                <span style={{ fontSize: '0.9rem' }}>{formatCurrency(subtotal)}</span>
+              </div>
+              {(parseFloat(deliveryFee) || 0) > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: 'var(--space-xs)' }}>
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>Delivery</span>
+                  <span style={{ fontSize: '0.9rem' }}>{formatCurrency(parseFloat(deliveryFee) || 0)}</span>
+                </div>
+              )}
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 'var(--space-sm)', borderTop: '2px solid var(--border-secondary)' }}>
                 <span style={{ fontWeight: 700 }}>Total</span>
                 <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>
-                  {formatCurrency(subtotal)}
+                  {formatCurrency(grandTotal)}
                 </span>
               </div>
             </div>
@@ -361,19 +375,42 @@ export default function EditQuotePage() {
           </button>
         </div>
         {selectedMaterials.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
-            {selectedMaterials.map((sm, i) => (
-              <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
-                <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
-                  {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+              {selectedMaterials.map((sm, i) => (
+                <div key={`${sm.materialId}-${i}`} style={{ display: 'flex', gap: 8, padding: 8, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)' }}>
+                  <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', background: 'var(--surface-1)', overflow: 'hidden', flexShrink: 0 }}>
+                    {sm.imageUrl ? <img src={sm.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : null}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+                  </div>
                 </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{sm.name}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>{sm.quantity} {sm.unit}</div>
+              ))}
+            </div>
+            {(() => {
+              const suggested = computeSelectedMaterialsCost(selectedMaterials, materials, suppliers);
+              const current = parseFloat(materialsCost) || 0;
+              if (suggested <= 0) return null;
+              const matches = Math.abs(suggested - current) < 0.01;
+              return (
+                <div style={{ marginTop: 'var(--space-sm)', padding: 'var(--space-sm)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                    Cost from selection (incl. tax): <strong style={{ color: 'var(--text-primary)' }}>{formatCurrency(suggested)}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${matches ? 'btn-secondary' : 'btn-primary'}`}
+                    onClick={() => setMaterialsCost(suggested)}
+                    disabled={matches}
+                  >
+                    {matches ? 'Applied' : 'Use as materials cost'}
+                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
+              );
+            })()}
+          </>
         )}
       </div>
 
@@ -396,7 +433,7 @@ export default function EditQuotePage() {
           setMaterialsCost={setMaterialsCost}
           deliveryFee={deliveryFee}
           setDeliveryFee={setDeliveryFee}
-          subtotal={subtotal}
+          subtotal={grandTotal}
         />
       </div>
 

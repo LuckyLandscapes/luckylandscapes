@@ -113,6 +113,10 @@ export default function JobDetailPage({ params }) {
     setTimeout(() => setToast(null), 4000);
   };
 
+  // While `deleting` is true the row may already be gone from local state
+  // (the data layer updates before router.push lands). Don't flash the
+  // "not found" page during that brief window — let the navigation finish.
+  if (!job && deleting) return null;
   if (!job) {
     return (
       <div className="page animate-fade-in" style={{ textAlign: 'center', paddingTop: 'var(--space-2xl)' }}>

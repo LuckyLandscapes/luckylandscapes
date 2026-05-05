@@ -15,6 +15,24 @@ Rebuilt 2026-05 in migrations 030–032. If you're touching anything material-re
 - **Manual refresh:** `app/api/catalog/refresh-batch/route.js` + `scripts/refresh-catalog-prices.js`. No cron — by design.
 - **Sales tax assumption:** NE Option 1 (contractor pays tax to supplier; doesn't charge customer). If Riley confirms a different election, `getMaterialActualCost` and the customer-tax-on-quote handling need to change.
 
+# Quote total — quick map (post-migration 036)
+
+If you're touching anything that reads or writes `quotes.total`:
+
+- **`quote.total` is the customer-facing grand total** — line items + delivery_fee. Migration 036 backfilled existing rows.
+- **Write path:** `(dashboard)/quotes/new/page.js` and `(dashboard)/quotes/[id]/edit/page.js` both compute `grandTotal = subtotal + (parseFloat(deliveryFee) || 0)` and save `total: grandTotal`. Don't revert this — it breaks percentage-deposit math (`total × pct`) and the public quote total display.
+- **Read sites** (PDF, public quote, dashboard detail page) all show a "Subtotal / Delivery / Total" breakdown. The line-item subtotal is computed back as `quote.total - quote.deliveryFee`.
+- **Don't add `+ deliveryFee` at any read site** — the value is already baked into `quote.total`.
+- **Materials cost auto-fill:** `computeSelectedMaterialsCost(selectedMaterials, materials, suppliers)` in `src/lib/catalog.js` rolls up `quantity × actual cost` from snapshots back to the live catalog. UI surfaces a "Use as materials cost" button under the selected-materials grid in both new and edit quote pages.
+
+# Minor compliance — quick map (migration 037)
+
+- **Schema:** `team_members.date_of_birth DATE`, nullable.
+- **Helpers:** `src/lib/minorCompliance.js` — `computeAge`, `isMinor`, `isUnder16`, `ageTier`, `getComplianceWarnings`, plus the `HAZARDOUS_TASKS_UNDER_18` / `HOUR_CAPS_UNDER_16` reference data.
+- **NOT a tax field.** Non-family W-2s owe full FICA/FUTA regardless of age. This drives FLSA child-labor flags only — hazardous tasks (chainsaws, chippers, riding mowers >20HP per 29 CFR 570.50–570.68) and under-16 hour caps (29 CFR 570.35).
+- **UI surface:** team page (`(dashboard)/team/page.js`) — age pill on member rows; "No chainsaw / chipper / riding mower" warning for minors; DOB input in edit row + Add Team Member modal.
+- **API:** `/api/invite-member` accepts and persists `dateOfBirth`.
+
 # Subcontract / authorization gate — quick map
 
 Added 2026-05 in migration 033. If you're touching the start-job gate, customer types, or the job edit modal:

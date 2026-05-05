@@ -51,6 +51,7 @@ export default function CustomerDetailPage() {
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [editForm, setEditForm] = useState({});
 
   const openEditModal = () => {
@@ -78,8 +79,14 @@ export default function CustomerDetailPage() {
   };
 
   const handleDelete = async () => {
-    await deleteCustomer(id);
-    router.push('/customers');
+    setDeleting(true);
+    try {
+      await deleteCustomer(id);
+      router.push('/customers');
+    } catch (err) {
+      console.error('Error deleting customer:', err);
+      setDeleting(false);
+    }
   };
 
   const handleTagToggle = (tag) => {
@@ -91,6 +98,10 @@ export default function CustomerDetailPage() {
     }
   };
 
+  // While `deleting` is true the row may already be gone from local state
+  // (the data layer updates before router.push lands). Don't flash the
+  // "not found" page during that brief window — let the navigation finish.
+  if (!customer && deleting) return null;
   if (!customer) {
     return (
       <div className="page">

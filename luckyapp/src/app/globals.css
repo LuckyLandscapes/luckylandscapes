@@ -1213,6 +1213,11 @@ tbody tr:last-child td {
   /* Generic mid-gray chevron — readable on cream and on dark surfaces */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   padding-right: 36px;
+  /* Kill the 300ms tap delay that makes selects feel like they need a
+     "double click" on touch devices. Also prevents focus/click race on
+     trackpads where the first click only focuses. */
+  touch-action: manipulation;
+  cursor: pointer;
 }
 
 .form-select::-ms-expand { display: none; }
@@ -6390,30 +6395,9 @@ body {
   background: var(--status-danger-bg);
 }
 
-/* ============================================
-   Components: Form Select
-   ============================================ */
-.form-select {
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-secondary);
-  background: var(--bg-card);
-  color: var(--text-primary);
-  font-size: 0.88rem;
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 10px center;
-  background-repeat: no-repeat;
-  background-size: 20px;
-}
-
-.form-select:focus {
-  outline: none;
-  border-color: var(--lucky-green);
-  box-shadow: 0 0 0 3px var(--lucky-green-glow);
-}
+/* (Old duplicate .form-select block removed — was shadowing the
+   canonical declaration above near .form-input. cursor: pointer and
+   touch-action: manipulation are now on the canonical rule.) */
 
 /* ============================================
    CATALOG — Material Grid

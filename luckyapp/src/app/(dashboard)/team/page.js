@@ -14,7 +14,9 @@ import {
   Users, Clock, DollarSign, UserPlus, Edit2, Save, X, Trash2,
   ChevronDown, ChevronUp, CheckCircle, AlertCircle, Loader2, Send, Mail, Key,
   HardHat, Truck, Coffee, Pencil, Plus, Settings, Info, ShieldAlert,
+  Cake,
 } from 'lucide-react';
+import { computeAge, isMinor, ageTier, getComplianceWarnings } from '@/lib/minorCompliance';
 
 // ─── Datetime helpers ─────────────────────────────────────
 // HTML5 <input type="datetime-local"> uses local-tz strings (no Z suffix).
@@ -62,6 +64,7 @@ export default function TeamPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editPassword, setEditPassword] = useState('');
   const [editClassification, setEditClassification] = useState('w2_employee');
+  const [editDob, setEditDob] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
   const [showPayrollSettings, setShowPayrollSettings] = useState(false);
@@ -73,6 +76,7 @@ export default function TeamPage() {
   const [inviteConfirmPw, setInviteConfirmPw] = useState('');
   const [inviteRole, setInviteRole] = useState('worker');
   const [inviteRate, setInviteRate] = useState('15');
+  const [inviteDob, setInviteDob] = useState('');
   const [inviteState, setInviteState] = useState({ loading:false, success:false, error:null });
   const [expandedMember, setExpandedMember] = useState(null);
 
@@ -153,6 +157,7 @@ export default function TeamPage() {
     setEditEmail(member.email || '');
     setEditPassword('');
     setEditClassification(member.payrollClassification || 'w2_employee');
+    setEditDob(member.dateOfBirth || '');
     setEditError(null);
   };
 
@@ -160,13 +165,14 @@ export default function TeamPage() {
     setEditSaving(true);
     setEditError(null);
     try {
-      // Update local fields (role, rate, payroll classification)
+      // Update local fields (role, rate, payroll classification, DOB)
       await updateTeamMember(id, {
         hourlyRate: parseFloat(editRate) || 15,
         role: editRole,
         fullName: editName,
         email: editEmail,
         payrollClassification: editClassification,
+        dateOfBirth: editDob || null,
       });
 
       // Update auth credentials (name, email, password) via server API
@@ -218,6 +224,7 @@ export default function TeamPage() {
           role: inviteRole,
           hourlyRate: parseFloat(inviteRate) || 15,
           orgName: user?.orgName,
+          dateOfBirth: inviteDob || null,
         }),
       });
       const data = await res.json();
@@ -358,13 +365,34 @@ export default function TeamPage() {
                               style={{ width:'160px', padding:'4px 8px', fontSize:'0.82rem', marginBottom:'2px' }}
                               onClick={e => e.stopPropagation()} placeholder="Full Name" />
                             <input className="form-input" type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
-                              style={{ width:'160px', padding:'4px 8px', fontSize:'0.78rem' }}
+                              style={{ width:'160px', padding:'4px 8px', fontSize:'0.78rem', marginBottom:'2px' }}
                               onClick={e => e.stopPropagation()} placeholder="Email" />
+                            <input className="form-input" type="date" value={editDob} onChange={e => setEditDob(e.target.value)}
+                              style={{ width:'160px', padding:'4px 8px', fontSize:'0.78rem' }}
+                              onClick={e => e.stopPropagation()} placeholder="Date of birth" title="Date of birth — for FLSA child-labor compliance flags" />
                           </>
                         ) : (
                           <>
-                            <div className="table-name">{member.fullName}</div>
+                            <div className="table-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              {member.fullName}
+                              {(() => {
+                                const age = computeAge(member.dateOfBirth);
+                                if (age == null) return null;
+                                const tier = ageTier(member);
+                                const tagClass = tier === 'strict' ? 'tag-red' : tier === 'restricted' ? 'tag-gold' : 'tag-gray';
+                                return (
+                                  <span className={`tag ${tagClass}`} style={{ fontSize: '0.65rem' }} title={tier === 'adult' ? 'Adult' : 'Minor — FLSA restrictions apply'}>
+                                    {tier === 'adult' ? `${age}` : `Minor · ${age}`}
+                                  </span>
+                                );
+                              })()}
+                            </div>
                             <div className="table-sub">{member.email}</div>
+                            {isMinor(member.dateOfBirth) && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--status-warning, #d97706)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }} title={getComplianceWarnings(member).join('\n')}>
+                                <ShieldAlert size={11} /> No chainsaw / chipper / riding mower
+                              </div>
+                            )}
                           </>
                         )}
                       </div>
@@ -573,6 +601,25 @@ export default function TeamPage() {
                         <span style={{ color:'var(--text-tertiary)', fontSize:'0.82rem' }}>/hr</span>
                       </div>
                     </div>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">
+                      <Cake size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                      Date of birth <span style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', fontWeight: 400 }}>(optional, for FLSA child-labor flags)</span>
+                    </label>
+                    <input className="form-input" type="date" value={inviteDob} onChange={e => setInviteDob(e.target.value)} disabled={inviteState.loading} />
+                    {inviteDob && (() => {
+                      const age = computeAge(inviteDob);
+                      if (age == null) return null;
+                      if (age < 18) {
+                        return (
+                          <div style={{ fontSize: '0.78rem', color: 'var(--status-warning, #d97706)', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <ShieldAlert size={12} /> Age {age} — restricted from chainsaws, chippers, riding mowers &gt;20HP.
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                   <div style={{ fontSize:'0.75rem', color:'var(--text-tertiary)', marginBottom:'var(--space-md)' }}>
                     {inviteRole === 'worker' && 'Workers see their schedule, job details, and can clock in/out. Mobile-optimized.'}

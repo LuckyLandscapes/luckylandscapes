@@ -254,6 +254,18 @@ export default function QuotePage({ params }) {
             )}
 
             <div style={styles.totals}>
+              {Number(quote.delivery_fee || 0) > 0 && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#666' }}>
+                    <span>Subtotal</span>
+                    <span>{formatUSD(Math.max(0, Number(quote.total || 0) - Number(quote.delivery_fee || 0)))}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13, color: '#666' }}>
+                    <span>Delivery</span>
+                    <span>{formatUSD(Number(quote.delivery_fee || 0))}</span>
+                  </div>
+                </>
+              )}
               <div style={styles.totalRow} className="quote-total-row"><span>Estimated Total</span><span>{formatUSD(quote.total)}</span></div>
             </div>
 

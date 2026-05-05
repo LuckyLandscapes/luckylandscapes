@@ -8,7 +8,7 @@ export async function POST(request) {
     const auth = await authenticateRequest(request, { requireRole: 'admin' });
     if (!auth.ok) return auth.response;
 
-    const { email, password, fullName, role, hourlyRate, orgName } = await request.json();
+    const { email, password, fullName, role, hourlyRate, orgName, dateOfBirth } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json(
@@ -156,6 +156,7 @@ export async function POST(request) {
           role: memberRole,
           hourly_rate: hourlyRate || 15,
           is_active: true,
+          date_of_birth: dateOfBirth || null,
         })
         .select()
         .single();
