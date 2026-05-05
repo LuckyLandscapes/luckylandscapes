@@ -50,6 +50,13 @@ html, body {
   table-layout: fixed;
 }
 
+/* The .quote-td-label spans are only meant for the mobile stacked-card layout
+   (where the <thead> is hidden and each cell needs its own label). Hide them
+   on desktop so they don't smash up against the value (e.g. "Qty8"). */
+.quote-td-label {
+  display: none;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -152,6 +159,7 @@ html, body {
     gap: 12px;
   }
   .quote-td-label {
+    display: inline;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;

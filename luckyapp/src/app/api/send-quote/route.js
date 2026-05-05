@@ -30,9 +30,9 @@ export async function POST(request) {
     const formattedTotal = formatUSD(total);
     const deposit = Number(depositAmount || 0);
     const formattedDeposit = formatUSD(deposit);
-    const acceptCta = deposit > 0
-      ? `Review &amp; accept estimate (${formattedDeposit} to schedule)`
-      : 'Review &amp; accept estimate';
+    // Neutral CTA — clicking the link doesn't commit to anything; the customer
+    // chooses to accept, request changes, or close the tab on the next page.
+    const acceptCta = 'Review your estimate';
 
     // Build line-items HTML rows
     const itemRows = (items || [])
@@ -127,30 +127,40 @@ export async function POST(request) {
       ` : ''}
 
       ${publicLink ? `
-      <!-- Primary CTA: review & accept on the customer-facing page -->
+      <!-- "What you can do on the next page" preview — set expectations BEFORE the CTA
+           so the customer knows clicking is non-committal. -->
+      <div style="background:#f0f7f0; border:1px solid #d4e7d4; border-radius:10px; padding:18px 22px; margin:0 0 18px;">
+        <div style="font-weight:700; color:#1f6f3a; margin-bottom:10px; font-size:14px;">You're not committing yet — here's what's on the next page</div>
+        <p style="color:#4b5563; font-size:13px; line-height:1.7; margin:0;">
+          • <strong>Looks good?</strong> ${deposit > 0 ? `Pay the ${formattedDeposit} deposit to lock in your spot — the rest is invoiced after the work.` : 'Accept the estimate and we&rsquo;ll reach out to schedule.'}<br>
+          • <strong>Want changes or have questions?</strong> Tap "Request changes" and tell us what to adjust, swap, or remove. We&rsquo;ll send a revised estimate.<br>
+          • <strong>Not the right fit?</strong> No problem — just close the tab, or hit "Request changes" and let us know. No pressure.<br>
+          • <strong>Prefer cash or check?</strong> Call <a href="tel:+14024055475" style="color:#2d7a3a;">(402) 405-5475</a> and we&rsquo;ll arrange pickup or mailing.
+        </p>
+      </div>
+
+      <!-- Primary CTA: opens the customer-facing page where they choose what to do -->
       <div style="text-align:center; margin:8px 0 20px;">
         <a href="${publicLink}" style="display:inline-block; background:#2d7a3a; color:#fff; text-decoration:none; padding:16px 32px; border-radius:10px; font-weight:700; font-size:15px; box-shadow:0 2px 8px rgba(45,122,58,0.25);">
           ${acceptCta}
         </a>
-        <div style="font-size:12px; color:#888; margin-top:10px;">
+        <div style="font-size:13px; color:#4b5563; margin-top:10px; line-height:1.5;">
+          Opens a page where you can accept${deposit > 0 ? ` (${formattedDeposit} deposit)` : ''}, request changes, or just look around.
+        </div>
+        <div style="font-size:11px; color:#9ca3af; margin-top:10px;">
           Or open the link directly: <a href="${publicLink}" style="color:#2d7a3a; word-break:break-all;">${publicLink}</a>
         </div>
       </div>
-      ` : ''}
-
-      <!-- Next steps -->
+      ` : `
+      <!-- No public link (Stripe not configured) — fall back to email reply -->
       <div style="background:#f0f7f0; border:1px solid #d4e7d4; border-radius:10px; padding:18px 22px; margin:0 0 24px;">
         <div style="font-weight:700; color:#1f6f3a; margin-bottom:10px; font-size:14px;">How to respond</div>
         <p style="color:#4b5563; font-size:13px; line-height:1.7; margin:0;">
-          ${publicLink ? `
-          • <strong>Looks good?</strong> Tap the button above to ${deposit > 0 ? `pay the ${formattedDeposit} deposit and ` : ''}auto-accept the estimate. We&rsquo;ll reach out to schedule.<br>
-          • <strong>Want changes?</strong> Tap "Request changes" on the same page and tell us what to adjust or remove.<br>
-          ` : `
-          • <strong>Reply to this email</strong> to accept or to ask for changes.<br>
-          `}
-          • <strong>Prefer cash or check?</strong> Call us at <a href="tel:+14024055475" style="color:#2d7a3a;">(402) 405-5475</a> and we&rsquo;ll arrange pickup or mailing — please don&rsquo;t mail anything until we&rsquo;ve coordinated.
+          • <strong>Reply to this email</strong> to accept, ask for changes, or let us know it's not the right fit — no pressure either way.<br>
+          • <strong>Prefer cash or check?</strong> Call <a href="tel:+14024055475" style="color:#2d7a3a;">(402) 405-5475</a> and we&rsquo;ll arrange pickup or mailing.
         </p>
       </div>
+      `}
 
       <p style="color:#6b7280; font-size:13px; line-height:1.65; margin:24px 0 0; text-align:center;">
         This estimate is valid for <strong>30 days</strong>. After that, prices may change due to seasonality and material costs — but we&rsquo;ll always work with you.
@@ -192,9 +202,13 @@ export async function POST(request) {
       `Valid for: 30 days`,
       deposit > 0 ? `Deposit to schedule: ${formattedDeposit} (materials${Number(deliveryFee || 0) > 0 ? ' + delivery' : ''})` : null,
       '',
-      'HOW TO RESPOND',
-      publicLink ? `  • Review and accept here: ${publicLink}` : '  • Reply to this email to accept or request changes',
-      '  • Want changes? Tap "Request changes" on the link and tell us what to adjust',
+      'WHAT YOU CAN DO',
+      publicLink ? `  • Review your estimate: ${publicLink}` : '  • Reply to this email with any of the responses below',
+      publicLink
+        ? `  • Looks good? ${deposit > 0 ? `Pay the ${formattedDeposit} deposit on that page to lock in your spot` : "Accept on that page and we'll reach out to schedule"}`
+        : '  • Reply "looks good" to accept',
+      '  • Want changes or have questions? Tap "Request changes" and tell us what to adjust',
+      '  • Not the right fit? No pressure — just close the tab or let us know',
       '  • Prefer cash or check? Call (402) 405-5475 and we\'ll arrange pickup or mailing',
       '',
       'Looking forward to working with you!',

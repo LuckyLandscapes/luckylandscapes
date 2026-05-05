@@ -48,6 +48,13 @@ html, body {
   table-layout: fixed;
 }
 
+/* The .pay-td-label spans only render on the mobile stacked-card layout (where
+   the <thead> is hidden). Hide them on desktop so they don't smash up against
+   the value (e.g. "Qty8" instead of "8" with header above it). */
+.pay-td-label {
+  display: none;
+}
+
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
@@ -140,6 +147,7 @@ html, body {
     gap: 12px;
   }
   .pay-td-label {
+    display: inline;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
