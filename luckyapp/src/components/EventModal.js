@@ -725,7 +725,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
                     />
                   </div>
                   {showCustomerDropdown && filteredCustomers.length > 0 && (
-                    <div className="cal-customer-dropdown">
+                    <div className="cal-customer-dropdown" data-menu-scroll>
                       {filteredCustomers.map(c => (
                         <button
                           key={c.id}

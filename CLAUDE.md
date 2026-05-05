@@ -135,6 +135,9 @@ Migration 037 added `team_members.date_of_birth`. Helpers in [`src/lib/minorComp
 ### Global modal scroll lock
 [`<BodyScrollLock />`](luckyapp/src/components/BodyScrollLock.js) is mounted once in [`root-providers.js`](luckyapp/src/app/root-providers.js). Watches the DOM via MutationObserver for any `.modal-overlay`, `.sidebar-mobile-overlay`, or `[role="dialog"][aria-modal="true"]` and toggles `body { overflow: hidden }` plus a paddingRight compensation for the disappearing scrollbar. **One-time setup covers every modal globally** — individual modals do not need to call anything. New modals work for free as long as they render a `.modal-overlay` backdrop.
 
+### Global menu scroll redirect
+[`<MenuScrollRedirect />`](luckyapp/src/components/MenuScrollRedirect.js), also mounted in [`root-providers.js`](luckyapp/src/app/root-providers.js), redirects mouse-wheel scroll into any open popup menu so the user doesn't have to hover the dropdown to scroll a long list. **Opt-in via `data-menu-scroll`** on the scrollable container (must be `overflow-y:auto`). Currently applied to the customer dropdown on `/measure` and the customer-search dropdown in [`EventModal.js`](luckyapp/src/components/EventModal.js). Listener uses `capture: true, passive: false` so it intercepts before Google Maps' wheel-zoom handler when the dropdown sits over the satellite view. If multiple `[data-menu-scroll]` elements are mounted, the last one in DOM order wins.
+
 ### Refresh-to-deleted-page fix
 After clicking Delete on `/quotes/[id]`, `/jobs/[id]`, etc., the data layer's local state updates synchronously while `router.push('/list')` is still pending. That brief render flashed the "X not found" empty state. Fix in each detail page is one line: add `if (!entity && deleting) return null;` before the not-found fallback. The `deleting` state is already tracked everywhere except customers (which I added). Pattern is grep-able as `if (!quote && deleting)` etc.
 

@@ -1249,6 +1249,12 @@ export default function MeasurePage() {
     if (searchInputRef.current && cleanQuery) {
       searchInputRef.current.value = cleanQuery;
       setHasSearchText(true);
+      // The Google Places Autocomplete attached to this input will pop up its
+      // suggestion list after a programmatic value-set. Hide it so the user
+      // doesn't have to dismiss it (or click an autocomplete suggestion) to
+      // get the map to actually navigate.
+      document.querySelectorAll('.pac-container').forEach(c => { c.style.display = 'none'; });
+      searchInputRef.current.blur();
     }
 
     const goTo = (location) => {
@@ -1258,12 +1264,30 @@ export default function MeasurePage() {
       movePanoTo(location);
     };
 
-    const geocodeAndCenter = () => {
-      if (!cleanQuery || !mapInstanceRef.current) return;
+    const runGeocode = (query) => new Promise(resolve => {
       const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: cleanQuery }, (results, status) => {
-        if (status === 'OK' && results[0]) goTo(results[0].geometry.location);
+      geocoder.geocode({ address: query }, (results, status) => {
+        resolve(status === 'OK' && results[0] ? results[0].geometry.location : null);
       });
+    });
+
+    const geocodeAndCenter = async () => {
+      if (!cleanQuery || !mapInstanceRef.current) return;
+      setIsSearching(true);
+      let location = await runGeocode(cleanQuery);
+      // Fall back to the street address alone if the full query failed —
+      // a typo'd or missing zip shouldn't strand the user.
+      if (!location && customer.address) {
+        const fallback = [customer.address, customer.city, customer.state]
+          .filter(p => p && String(p).trim()).join(', ');
+        if (fallback && fallback !== cleanQuery) location = await runGeocode(fallback);
+      }
+      setIsSearching(false);
+      if (location) {
+        goTo(location);
+      } else {
+        showToast(`Couldn't locate "${cleanQuery}".`, 'info');
+      }
     };
 
     if (customer.measurements?.shapes?.length) {
@@ -1479,7 +1503,7 @@ export default function MeasurePage() {
         </div>
 
         {showCustomerAddresses && (
-          <div className="measure-customer-dropdown">
+          <div className="measure-customer-dropdown" data-menu-scroll>
             <div className="measure-customer-header">Customers · click to load saved yard</div>
             {customers.filter(c => c.address).map(c => {
               const hasMeasurements = !!c.measurements?.shapes?.length;
