@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import ScheduleJobModal from '@/components/ScheduleJobModal';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
+import { computeQuoteDeposit, formatDepositLabel, isPercentageDeposit } from '@/lib/deposit';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -38,7 +39,9 @@ export default function QuoteDetailPage() {
   const customer = quote ? getCustomer(quote.customerId) : null;
   const linkedJob = quote ? jobs.find(j => j.quoteId === id) : null;
   const linkedContract = quote ? (contracts || []).find(c => c.quoteId === id) : null;
-  const depositAmount = quote ? (Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0)) : 0;
+  const depositAmount = quote ? computeQuoteDeposit(quote) : 0;
+  const depositLabel = quote ? formatDepositLabel(quote) : '';
+  const isPctDeposit = quote ? isPercentageDeposit(quote) : false;
   const publicLink = quote?.publicToken && typeof window !== 'undefined'
     ? `${window.location.origin}/quote/${quote.publicToken}`
     : '';
@@ -177,7 +180,7 @@ export default function QuoteDetailPage() {
         `Review and respond here:`,
         publicLink,
         '',
-        `Tap "Looks good" to pay the deposit${depositAmount > 0 ? ` (${formatCurrency(depositAmount)} for materials + delivery)` : ''} and schedule, or "Request changes" to send us what you'd like adjusted.`,
+        `Tap "Looks good" to pay the deposit${depositAmount > 0 ? ` (${formatCurrency(depositAmount)}${isPctDeposit ? ` — ${depositLabel}` : ' for materials + delivery'})` : ''} and schedule, or "Request changes" to send us what you'd like adjusted.`,
       );
     } else {
       lines.push(
@@ -212,6 +215,8 @@ export default function QuoteDetailPage() {
           depositAmount,
           materialsCost: Number(quote.materialsCost || 0),
           deliveryFee: Number(quote.deliveryFee || 0),
+          depositType: quote.depositType || null,
+          depositPercentage: quote.depositPercentage != null ? Number(quote.depositPercentage) : null,
         }),
       });
 
@@ -579,16 +584,31 @@ export default function QuoteDetailPage() {
 
           {/* Deposit Card */}
           <div className="card">
-            <h4 style={{ marginBottom: 'var(--space-md)', color: 'var(--text-secondary)' }}>Deposit to Schedule</h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 'var(--space-md)' }}>
+              <h4 style={{ color: 'var(--text-secondary)', margin: 0 }}>Deposit to Schedule</h4>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                {depositLabel}
+              </span>
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--text-tertiary)' }}>Materials</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(quote.materialsCost || 0)}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                <span style={{ color: 'var(--text-tertiary)' }}>Delivery</span>
-                <span style={{ fontWeight: 600 }}>{formatCurrency(quote.deliveryFee || 0)}</span>
-              </div>
+              {!isPctDeposit && (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Materials</span>
+                    <span style={{ fontWeight: 600 }}>{formatCurrency(quote.materialsCost || 0)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Delivery</span>
+                    <span style={{ fontWeight: 600 }}>{formatCurrency(quote.deliveryFee || 0)}</span>
+                  </div>
+                </>
+              )}
+              {isPctDeposit && (
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-tertiary)' }}>{Number(quote.depositPercentage || 0)}% of {formatCurrency(quote.total || 0)}</span>
+                  <span style={{ fontWeight: 600 }}>{formatCurrency(depositAmount)}</span>
+                </div>
+              )}
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
                 paddingTop: 'var(--space-sm)', borderTop: '1px solid var(--border-primary)',
@@ -600,7 +620,7 @@ export default function QuoteDetailPage() {
               </div>
               {depositAmount === 0 && (
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 'var(--space-xs)' }}>
-                  No deposit set — customer can accept without paying. Edit the quote to charge for materials/delivery.
+                  No deposit set — customer can accept without paying. Edit the quote to set materials/delivery or a percentage.
                 </p>
               )}
             </div>

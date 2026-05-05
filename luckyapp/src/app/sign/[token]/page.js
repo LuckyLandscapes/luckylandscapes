@@ -121,7 +121,9 @@ export default function SignPage({ params }) {
           <SummaryCard
             label="Deposit on signing"
             value={Number(contract.deposit_amount) > 0 ? formatUSD(contract.deposit_amount) : '—'}
-            sub={Number(contract.deposit_amount) > 0 ? `Balance ${formatUSD(balance)} due on completion` : 'Full amount due on completion'}
+            sub={Number(contract.deposit_amount) > 0
+              ? `${contract.deposit_type === 'percentage' && contract.deposit_percentage ? `${contract.deposit_percentage}% of total · ` : ''}Balance ${formatUSD(balance)} due on completion`
+              : 'Full amount due on completion'}
           />
           <SummaryCard label="Estimated start" value={formatDate(contract.start_date)} />
           <SummaryCard label="Completion window" value={contract.completion_window || 'TBD'} />

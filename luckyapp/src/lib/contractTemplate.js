@@ -11,6 +11,8 @@
 // business evolves; legal review is recommended before treating these as
 // authoritative for high-value work.
 
+import { computeQuoteDeposit, DEPOSIT_TYPES } from './deposit';
+
 const COMPANY_NAME = 'Lucky Landscapes';
 const COMPANY_ADDR = '109 South Canopy ST, Lincoln, NE';
 const COMPANY_PHONE = '(402) 405-5475';
@@ -55,7 +57,11 @@ function buildScopeOfWork(quote) {
 
 export function buildContractFromQuote({ quote, customer, options = {} }) {
   const total = Number(quote?.total || 0);
-  const deposit = Number(quote?.materialsCost || 0) + Number(quote?.deliveryFee || 0);
+  const deposit = computeQuoteDeposit(quote);
+  const depositType = quote?.depositType || DEPOSIT_TYPES.MATERIALS_DELIVERY;
+  const depositPercentage = depositType === DEPOSIT_TYPES.PERCENTAGE
+    ? Number(quote?.depositPercentage || 0)
+    : null;
   const balance = Math.max(0, total - deposit);
   const startDate = options.startDate || null;
   const completionWindow = options.completionWindow || 'within 14 business days of the agreed start date, weather permitting';
@@ -74,6 +80,8 @@ export function buildContractFromQuote({ quote, customer, options = {} }) {
     scope,
     total,
     deposit,
+    depositType,
+    depositPercentage,
     balance,
     startDate,
     completionWindow,
@@ -87,6 +95,8 @@ export function buildContractFromQuote({ quote, customer, options = {} }) {
     scopeOfWork: scope,
     totalAmount: total,
     depositAmount: deposit,
+    depositType,
+    depositPercentage,
     startDate,
     completionWindow,
     body,
@@ -114,6 +124,8 @@ export function renderContractBody({
   scope,
   total,
   deposit,
+  depositType,
+  depositPercentage,
   balance,
   startDate,
   completionWindow,
@@ -122,8 +134,11 @@ export function renderContractBody({
 }) {
   const dateStr = fmtDate(today || new Date());
   const startStr = fmtDate(startDate);
+  const depositBasis = depositType === DEPOSIT_TYPES.PERCENTAGE && depositPercentage
+    ? `representing ${depositPercentage}% of the total contract price`
+    : 'covering materials and delivery';
   const depositLine = deposit > 0
-    ? `A non-refundable deposit of ${fmtMoney(deposit)} (covering materials and delivery) is due upon signing. The remaining balance of ${fmtMoney(balance)} is due upon substantial completion of the work, payable within seven (7) days of invoice.`
+    ? `A non-refundable deposit of ${fmtMoney(deposit)} (${depositBasis}) is due upon signing. The remaining balance of ${fmtMoney(balance)} is due upon substantial completion of the work, payable within seven (7) days of invoice.`
     : `Full payment of ${fmtMoney(total)} is due upon substantial completion of the work, payable within seven (7) days of invoice.`;
 
   return [

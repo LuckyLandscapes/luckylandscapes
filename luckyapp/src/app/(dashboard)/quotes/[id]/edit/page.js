@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { ArrowLeft, Plus, Trash2, Save, X, Package } from 'lucide-react';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import SelectMaterialsModal from '@/components/SelectMaterialsModal';
+import DepositCard from '@/components/DepositCard';
+import { DEPOSIT_TYPES } from '@/lib/deposit';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -28,6 +30,8 @@ export default function EditQuotePage() {
   const [notes, setNotes] = useState('');
   const [materialsCost, setMaterialsCost] = useState(0);
   const [deliveryFee, setDeliveryFee] = useState(0);
+  const [depositType, setDepositType] = useState(DEPOSIT_TYPES.MATERIALS_DELIVERY);
+  const [depositPercentage, setDepositPercentage] = useState('');
   const [status, setStatus] = useState('draft');
   const [loaded, setLoaded] = useState(false);
 
@@ -41,6 +45,8 @@ export default function EditQuotePage() {
       setNotes(quote.notes || '');
       setMaterialsCost(quote.materialsCost || 0);
       setDeliveryFee(quote.deliveryFee || 0);
+      setDepositType(quote.depositType || DEPOSIT_TYPES.MATERIALS_DELIVERY);
+      setDepositPercentage(quote.depositPercentage != null ? String(quote.depositPercentage) : '');
       setStatus(quote.status || 'draft');
       setLoaded(true);
     }
@@ -124,6 +130,10 @@ export default function EditQuotePage() {
       total: subtotal,
       materialsCost: parseFloat(materialsCost) || 0,
       deliveryFee: parseFloat(deliveryFee) || 0,
+      depositType,
+      depositPercentage: depositType === DEPOSIT_TYPES.PERCENTAGE
+        ? (parseFloat(depositPercentage) || 0)
+        : null,
     });
     router.push(`/quotes/${id}`);
   };
@@ -375,48 +385,19 @@ export default function EditQuotePage() {
         />
       )}
 
-      {/* Deposit (Materials + Delivery) */}
-      <div className="card" style={{ maxWidth: '600px', marginBottom: 'var(--space-lg)' }}>
-        <h4 style={{ marginBottom: 'var(--space-xs)' }}>Deposit to Schedule</h4>
-        <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
-          What the customer pays online to lock in their job. Set delivery to $0 if not needed.
-        </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Materials cost</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={materialsCost}
-              onChange={(e) => setMaterialsCost(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-          <div className="form-group" style={{ margin: 0 }}>
-            <label className="form-label">Delivery fee</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              step="0.01"
-              value={deliveryFee}
-              onChange={(e) => setDeliveryFee(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
-        <div style={{
-          marginTop: 'var(--space-md)', paddingTop: 'var(--space-sm)',
-          borderTop: '1px solid var(--border-primary)', display: 'flex',
-          justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>Deposit due to schedule</span>
-          <span style={{ fontWeight: 800, color: 'var(--lucky-green-light)' }}>
-            {formatCurrency((parseFloat(materialsCost) || 0) + (parseFloat(deliveryFee) || 0))}
-          </span>
-        </div>
+      {/* Deposit — materials+delivery or percentage of total */}
+      <div style={{ marginBottom: 'var(--space-lg)' }}>
+        <DepositCard
+          depositType={depositType}
+          setDepositType={setDepositType}
+          depositPercentage={depositPercentage}
+          setDepositPercentage={setDepositPercentage}
+          materialsCost={materialsCost}
+          setMaterialsCost={setMaterialsCost}
+          deliveryFee={deliveryFee}
+          setDeliveryFee={setDeliveryFee}
+          subtotal={subtotal}
+        />
       </div>
 
       {/* Notes */}

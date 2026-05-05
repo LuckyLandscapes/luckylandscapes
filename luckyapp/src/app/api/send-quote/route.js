@@ -7,7 +7,10 @@ export async function POST(request) {
     const {
       to, customerName, quoteNumber, category, items, total, message,
       publicLink, depositAmount, materialsCost, deliveryFee,
+      depositType, depositPercentage,
     } = body;
+    const isPercentageDeposit = depositType === 'percentage';
+    const depositPct = Number(depositPercentage || 0);
 
     // ── Validate ──────────────────────────────────────────────
     if (!to || !quoteNumber) {
@@ -114,8 +117,10 @@ export async function POST(request) {
       <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; margin-bottom:24px;">
         <div style="font-size:11px; color:#888; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:10px;">Deposit to schedule</div>
         <table style="width:100%; border-collapse:collapse;">
-          ${Number(materialsCost || 0) > 0 ? `<tr><td style="padding:4px 0; font-size:13px; color:#6b7280;">Materials</td><td style="padding:4px 0; text-align:right; font-size:13px; color:#1f2937;">${formatUSD(materialsCost)}</td></tr>` : ''}
-          ${Number(deliveryFee || 0) > 0 ? `<tr><td style="padding:4px 0; font-size:13px; color:#6b7280;">Delivery</td><td style="padding:4px 0; text-align:right; font-size:13px; color:#1f2937;">${formatUSD(deliveryFee)}</td></tr>` : ''}
+          ${isPercentageDeposit
+            ? `<tr><td style="padding:4px 0; font-size:13px; color:#6b7280;">${depositPct}% of ${formattedTotal}</td><td style="padding:4px 0; text-align:right; font-size:13px; color:#1f2937;">${formattedDeposit}</td></tr>`
+            : `${Number(materialsCost || 0) > 0 ? `<tr><td style="padding:4px 0; font-size:13px; color:#6b7280;">Materials</td><td style="padding:4px 0; text-align:right; font-size:13px; color:#1f2937;">${formatUSD(materialsCost)}</td></tr>` : ''}
+          ${Number(deliveryFee || 0) > 0 ? `<tr><td style="padding:4px 0; font-size:13px; color:#6b7280;">Delivery</td><td style="padding:4px 0; text-align:right; font-size:13px; color:#1f2937;">${formatUSD(deliveryFee)}</td></tr>` : ''}`}
           <tr><td colspan="2" style="padding-top:8px; border-top:1px solid #e5e7eb;"></td></tr>
           <tr>
             <td style="padding:6px 0 0; font-size:14px; font-weight:700; color:#1f2937;">Due now to lock in your spot</td>
@@ -200,7 +205,7 @@ export async function POST(request) {
       '─────────────────────────────',
       `Estimated total: ${formattedTotal}`,
       `Valid for: 30 days`,
-      deposit > 0 ? `Deposit to schedule: ${formattedDeposit} (materials${Number(deliveryFee || 0) > 0 ? ' + delivery' : ''})` : null,
+      deposit > 0 ? `Deposit to schedule: ${formattedDeposit} (${isPercentageDeposit ? `${depositPct}% of total` : `materials${Number(deliveryFee || 0) > 0 ? ' + delivery' : ''}`})` : null,
       '',
       'WHAT YOU CAN DO',
       publicLink ? `  • Review your estimate: ${publicLink}` : '  • Reply to this email with any of the responses below',

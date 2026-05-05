@@ -91,7 +91,7 @@ export async function POST(request) {
           processor_fee: fee,
           net_amount: amount - fee,
           paid_at: paidAt,
-          notes: `Quote #${meta.quote_number || ''} deposit (materials + delivery) via ${method === 'ach' ? 'bank transfer' : 'card'}`,
+          notes: `Quote #${meta.quote_number || ''} deposit (${meta.deposit_type === 'percentage' && meta.deposit_percentage ? `${meta.deposit_percentage}% of total` : 'materials + delivery'}) via ${method === 'ach' ? 'bank transfer' : 'card'}`,
         });
 
         // Mark quote accepted + record the deposit

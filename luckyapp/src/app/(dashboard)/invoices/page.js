@@ -7,6 +7,7 @@ import {
   Receipt, Plus, Search, Filter, DollarSign, Clock, CheckCircle2,
   AlertCircle, FileText, ChevronRight, X, CalendarDays, Loader2, CheckCircle,
 } from 'lucide-react';
+import { computeQuoteDeposit } from '@/lib/deposit';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -111,7 +112,7 @@ export default function InvoicesPage() {
       // If they paid $2000 of a $3000 quote upfront, the new invoice opens with
       // amountPaid = $2000 and status = 'partial' so the balance due is $1000.
       const depositPaid = quote?.depositPaidAt
-        ? Math.max(0, Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0))
+        ? computeQuoteDeposit(quote)
         : 0;
       const amountPaid = Math.min(depositPaid, subtotal);
       let status = 'unpaid';
@@ -317,7 +318,7 @@ export default function InvoicesPage() {
                       const quote = job.quoteId ? getQuote(job.quoteId) : null;
                       const billable = Number(job.revenue || job.total || quote?.total || 0);
                       const depositPaid = quote?.depositPaidAt
-                        ? Math.max(0, Number(quote.materialsCost || 0) + Number(quote.deliveryFee || 0))
+                        ? computeQuoteDeposit(quote)
                         : 0;
                       const isSelected = selectedJobId === job.id;
                       return (

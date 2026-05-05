@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fullLogoSrc from '@/assets/Fulllogopdf.png';
+import { computeQuoteDeposit, isPercentageDeposit } from '@/lib/deposit';
 
 /**
  * Load an image from a URL/import and return a base64 data URL.
@@ -355,7 +356,9 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   {
     const materialsCost = Number(quote.materialsCost || 0);
     const deliveryFee = Number(quote.deliveryFee || 0);
-    const deposit = materialsCost + deliveryFee;
+    const deposit = computeQuoteDeposit(quote);
+    const isPct = isPercentageDeposit(quote);
+    const depositPct = Number(quote.depositPercentage || 0);
 
     if (deposit > 0) {
       if (y + 80 > doc.internal.pageSize.getHeight() - 60) {
@@ -380,18 +383,26 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
       const depRightX = pageWidth - margin - 16;
 
       let dY = y + 34;
-      doc.setTextColor(...GRAY);
-      doc.text(`Materials`, depLeftX, dY);
-      doc.setTextColor(...CHARCOAL);
-      doc.text(formatCurrency(materialsCost), depRightX, dY, { align: 'right' });
 
-      dY += 12;
-      doc.setTextColor(...GRAY);
-      doc.text(`Delivery`, depLeftX, dY);
-      doc.setTextColor(...CHARCOAL);
-      doc.text(formatCurrency(deliveryFee), depRightX, dY, { align: 'right' });
+      if (isPct) {
+        doc.setTextColor(...GRAY);
+        doc.text(`${depositPct}% of ${formatCurrency(quote.total || 0)}`, depLeftX, dY);
+        doc.setTextColor(...CHARCOAL);
+        doc.text(formatCurrency(deposit), depRightX, dY, { align: 'right' });
+        dY += 12;
+      } else {
+        doc.setTextColor(...GRAY);
+        doc.text(`Materials`, depLeftX, dY);
+        doc.setTextColor(...CHARCOAL);
+        doc.text(formatCurrency(materialsCost), depRightX, dY, { align: 'right' });
 
-      // Highlighted deposit total
+        dY += 12;
+        doc.setTextColor(...GRAY);
+        doc.text(`Delivery`, depLeftX, dY);
+        doc.setTextColor(...CHARCOAL);
+        doc.text(formatCurrency(deliveryFee), depRightX, dY, { align: 'right' });
+      }
+
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...CLOVER);
       doc.text(`Due to schedule:`, depLeftX + 200, dY);
@@ -418,9 +429,10 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   }
 
   // =============== HOW TO RESPOND (replaces signature/acceptance) ===============
-  const materialsCost = Number(quote.materialsCost || 0);
   const deliveryFee = Number(quote.deliveryFee || 0);
-  const deposit = materialsCost + deliveryFee;
+  const deposit = computeQuoteDeposit(quote);
+  const isPct = isPercentageDeposit(quote);
+  const depositPct = Number(quote.depositPercentage || 0);
 
   const stepsBoxHeight = 130;
   if (y + stepsBoxHeight + 30 > doc.internal.pageSize.getHeight() - 60) {
@@ -444,7 +456,7 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   doc.setTextColor(...CHARCOAL);
 
   const depositLine = deposit > 0
-    ? `Tap "Looks good" on the link in your email/text to pay the ${formatCurrency(deposit)} deposit (materials${deliveryFee > 0 ? ' + delivery' : ''}) — that locks in your spot and we’ll reach out to schedule.`
+    ? `Tap "Looks good" on the link in your email/text to pay the ${formatCurrency(deposit)} deposit (${isPct ? `${depositPct}% of total` : `materials${deliveryFee > 0 ? ' + delivery' : ''}`}) — that locks in your spot and we’ll reach out to schedule.`
     : 'Tap "Looks good" on the link in your email/text to accept the estimate, and we’ll reach out to schedule.';
   const changesLine = 'Want changes? Tap "Request changes" on the same link and tell us what to adjust or remove — we’ll send a revised estimate.';
   const cashLine = 'Prefer cash or check? Call (402) 405-5475 and we’ll arrange pickup or mailing — no need to send anything by mail unless we’ve coordinated it first.';

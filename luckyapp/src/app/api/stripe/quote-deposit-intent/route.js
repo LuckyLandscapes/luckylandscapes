@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getStripe, isStripeConfigured, getServiceSupabase } from '@/lib/stripeServer';
+import { computeQuoteDeposit, DEPOSIT_TYPES } from '@/lib/deposit';
 
 export async function POST(request) {
   try {
@@ -16,8 +17,9 @@ export async function POST(request) {
     const { data: quote, error } = await supabase
       .from('quotes')
       .select(`
-        id, org_id, customer_id, quote_number, status,
-        materials_cost, delivery_fee, deposit_paid_at, public_token,
+        id, org_id, customer_id, quote_number, status, total,
+        materials_cost, delivery_fee, deposit_type, deposit_percentage,
+        deposit_paid_at, public_token,
         customers ( first_name, last_name, email )
       `)
       .eq('public_token', token)
@@ -33,7 +35,9 @@ export async function POST(request) {
 
     const materials = Number(quote.materials_cost || 0);
     const delivery = Number(quote.delivery_fee || 0);
-    const deposit = Math.max(0, materials + delivery);
+    const isPercentage = quote.deposit_type === DEPOSIT_TYPES.PERCENTAGE;
+    const depositPct = Number(quote.deposit_percentage || 0);
+    const deposit = computeQuoteDeposit(quote);
 
     if (deposit <= 0) {
       return NextResponse.json(
@@ -45,13 +49,16 @@ export async function POST(request) {
     const amountInCents = Math.round(deposit * 100);
     const customer = quote.customers || {};
     const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim();
+    const breakdown = isPercentage
+      ? `${depositPct}% of total`
+      : 'materials + delivery';
 
     const stripe = getStripe();
     const intent = await stripe.paymentIntents.create({
       amount: amountInCents,
       currency: 'usd',
       payment_method_types: ['card', 'us_bank_account'],
-      description: `Quote #${quote.quote_number} deposit (materials + delivery) — Lucky Landscapes`,
+      description: `Quote #${quote.quote_number} deposit (${breakdown}) — Lucky Landscapes`,
       receipt_email: customer.email || undefined,
       metadata: {
         kind: 'quote_deposit',
@@ -62,6 +69,8 @@ export async function POST(request) {
         public_token: quote.public_token,
         materials_cost: String(materials),
         delivery_fee: String(delivery),
+        deposit_type: quote.deposit_type || DEPOSIT_TYPES.MATERIALS_DELIVERY,
+        deposit_percentage: isPercentage ? String(depositPct) : '',
       },
     });
 
@@ -71,6 +80,8 @@ export async function POST(request) {
       amount: deposit,
       materials,
       delivery,
+      depositType: quote.deposit_type || DEPOSIT_TYPES.MATERIALS_DELIVERY,
+      depositPercentage: isPercentage ? depositPct : null,
       quoteNumber: quote.quote_number,
       customerName,
     });

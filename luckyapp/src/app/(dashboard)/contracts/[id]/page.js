@@ -337,7 +337,12 @@ export default function ContractDetailPage() {
               <strong>{formatCurrency(contract.totalAmount)}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-              <span style={{ color: 'var(--text-secondary)' }}>Deposit</span>
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Deposit
+                {contract.depositType === 'percentage' && contract.depositPercentage
+                  ? <span style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', marginLeft: 4 }}>({contract.depositPercentage}%)</span>
+                  : null}
+              </span>
               <strong>{formatCurrency(contract.depositAmount)}</strong>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>

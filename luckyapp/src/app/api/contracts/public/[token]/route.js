@@ -18,7 +18,8 @@ export async function GET(_request, { params }) {
     .from('contracts')
     .select(`
       id, contract_number, status, title, category,
-      total_amount, deposit_amount, start_date, completion_window,
+      total_amount, deposit_amount, deposit_type, deposit_percentage,
+      start_date, completion_window,
       body, customer_snapshot, public_token,
       sent_at, last_viewed_at, signed_at, declined_at,
       signature_typed_name, pdf_url, created_at,

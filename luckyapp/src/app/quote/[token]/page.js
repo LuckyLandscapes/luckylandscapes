@@ -130,7 +130,12 @@ export default function QuotePage({ params }) {
   const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   const materials = Number(quote.materials_cost || 0);
   const delivery = Number(quote.delivery_fee || 0);
-  const deposit = materials + delivery;
+  const isPercentage = quote.deposit_type === 'percentage';
+  const depositPct = Number(quote.deposit_percentage || 0);
+  const totalNum = Number(quote.total || 0);
+  const deposit = isPercentage
+    ? Math.max(0, Math.round(totalNum * depositPct) / 100)
+    : materials + delivery;
   const isAccepted = view === 'accepted' || quote.deposit_paid_at;
 
   return (
@@ -267,6 +272,9 @@ export default function QuotePage({ params }) {
                 deposit={deposit}
                 materials={materials}
                 delivery={delivery}
+                isPercentage={isPercentage}
+                depositPct={depositPct}
+                quoteTotal={totalNum}
                 onAccept={startAcceptFlow}
                 onRequestChanges={() => setView('changes')}
               />
@@ -277,6 +285,9 @@ export default function QuotePage({ params }) {
                 deposit={deposit}
                 materials={materials}
                 delivery={delivery}
+                isPercentage={isPercentage}
+                depositPct={depositPct}
+                quoteTotal={totalNum}
                 clientSecret={clientSecret}
                 paymentError={paymentError}
                 paymentLoading={paymentLoading}
@@ -338,7 +349,7 @@ export default function QuotePage({ params }) {
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
 
-function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges }) {
+function ReviewPanel({ deposit, materials, delivery, isPercentage, depositPct, quoteTotal, onAccept, onRequestChanges }) {
   return (
     <div>
       <h3 style={styles.panelHeading} className="quote-panel-heading">How does it look? 🌿</h3>
@@ -351,12 +362,20 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
           <div style={{ fontSize: 11, color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6, fontWeight: 600 }}>
             Deposit to Schedule
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
-            <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
-            <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
-          </div>
+          {isPercentage ? (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+              <span>{depositPct}% of {formatUSD(quoteTotal)}</span><span style={{ fontWeight: 600 }}>{formatUSD(deposit)}</span>
+            </div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+                <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+                <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
+              </div>
+            </>
+          )}
           <div style={{
             display: 'flex', justifyContent: 'space-between',
             paddingTop: 8, borderTop: '1px solid #e5e7eb',
@@ -396,7 +415,7 @@ function ReviewPanel({ deposit, materials, delivery, onAccept, onRequestChanges 
   );
 }
 
-function AcceptPanel({ deposit, materials, delivery, clientSecret, paymentError, paymentLoading, customerEmail, quoteNumber, onBack, onPaid }) {
+function AcceptPanel({ deposit, materials, delivery, isPercentage, depositPct, quoteTotal, clientSecret, paymentError, paymentLoading, customerEmail, quoteNumber, onBack, onPaid }) {
   return (
     <div>
       <button onClick={onBack} style={styles.backLink}>← Back</button>
@@ -407,15 +426,23 @@ function AcceptPanel({ deposit, materials, delivery, clientSecret, paymentError,
       </p>
 
       <div style={styles.depositBox} className="quote-deposit-box">
-        {materials > 0 && (
+        {isPercentage ? (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
-            <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
+            <span>{depositPct}% of {formatUSD(quoteTotal)}</span><span style={{ fontWeight: 600 }}>{formatUSD(deposit)}</span>
           </div>
-        )}
-        {delivery > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
-            <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
-          </div>
+        ) : (
+          <>
+            {materials > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+                <span>Materials</span><span style={{ fontWeight: 600 }}>{formatUSD(materials)}</span>
+              </div>
+            )}
+            {delivery > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', padding: '4px 0' }}>
+                <span>Delivery</span><span style={{ fontWeight: 600 }}>{formatUSD(delivery)}</span>
+              </div>
+            )}
+          </>
         )}
         <div style={{
           display: 'flex', justifyContent: 'space-between',
