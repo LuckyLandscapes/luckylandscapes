@@ -102,6 +102,62 @@ function dataToOverlay(g, map, def, kind) {
   return new g.Polygon({ ...opts, paths: def.path });
 }
 
+// Address → LatLng using the Places API (same path the search-bar
+// autocomplete uses). Works even when the Geocoding API isn't enabled
+// on the key.
+function findPlaceLocation(query, map) {
+  return new Promise(resolve => {
+    const places = window.google?.maps?.places;
+    if (!places || !map) return resolve({ location: null, formatted: null });
+    const auto = new places.AutocompleteService();
+    auto.getPlacePredictions({
+      input: query,
+      componentRestrictions: { country: 'us' },
+      types: ['address'],
+    }, (predictions, status) => {
+      if (status !== 'OK' || !predictions?.length) return resolve({ location: null, formatted: null });
+      const svc = new places.PlacesService(map);
+      svc.getDetails({
+        placeId: predictions[0].place_id,
+        fields: ['geometry', 'formatted_address'],
+      }, (place, detailStatus) => {
+        if (detailStatus === 'OK' && place?.geometry?.location) {
+          resolve({ location: place.geometry.location, formatted: place.formatted_address || null });
+        } else {
+          resolve({ location: null, formatted: null });
+        }
+      });
+    });
+  });
+}
+
+// Geocoder fallback. componentRestrictions biases ambiguous queries
+// to the US so "Lincoln" doesn't end up in the UK.
+function runGeocoderUS(query) {
+  return new Promise(resolve => {
+    const g = window.google?.maps;
+    if (!g) return resolve({ location: null, formatted: null });
+    const geocoder = new g.Geocoder();
+    geocoder.geocode({
+      address: query,
+      componentRestrictions: { country: 'us' },
+    }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        resolve({ location: results[0].geometry.location, formatted: results[0].formatted_address || null });
+      } else {
+        resolve({ location: null, formatted: null });
+      }
+    });
+  });
+}
+
+// Try Places first, fall back to Geocoder.
+async function lookupAddress(query, map) {
+  const place = await findPlaceLocation(query, map);
+  if (place.location) return place;
+  return runGeocoderUS(query);
+}
+
 export default function MeasurePage() {
   const router = useRouter();
   const { customers, updateCustomer } = useData();
@@ -1264,23 +1320,19 @@ export default function MeasurePage() {
       movePanoTo(location);
     };
 
-    const runGeocode = (query) => new Promise(resolve => {
-      const geocoder = new window.google.maps.Geocoder();
-      geocoder.geocode({ address: query }, (results, status) => {
-        resolve(status === 'OK' && results[0] ? results[0].geometry.location : null);
-      });
-    });
-
     const geocodeAndCenter = async () => {
-      if (!cleanQuery || !mapInstanceRef.current) return;
+      const map = mapInstanceRef.current;
+      if (!cleanQuery || !map) return;
       setIsSearching(true);
-      let location = await runGeocode(cleanQuery);
-      // Fall back to the street address alone if the full query failed —
+      let { location } = await lookupAddress(cleanQuery, map);
+      // If the full query failed, try a less-strict version without the zip —
       // a typo'd or missing zip shouldn't strand the user.
       if (!location && customer.address) {
         const fallback = [customer.address, customer.city, customer.state]
           .filter(p => p && String(p).trim()).join(', ');
-        if (fallback && fallback !== cleanQuery) location = await runGeocode(fallback);
+        if (fallback && fallback !== cleanQuery) {
+          ({ location } = await lookupAddress(fallback, map));
+        }
       }
       setIsSearching(false);
       if (location) {
@@ -1349,25 +1401,26 @@ export default function MeasurePage() {
     });
   }, []);
 
-  const handleSearchKeyDown = useCallback((e) => {
+  const handleSearchKeyDown = useCallback(async (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     const query = searchInputRef.current?.value?.trim();
-    if (!query || !mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+    if (!query || !map) return;
     document.querySelectorAll('.pac-container').forEach(c => { c.style.display = 'none'; });
     setIsSearching(true);
-    const geocoder = new window.google.maps.Geocoder();
-    geocoder.geocode({ address: query }, (results, status) => {
-      setIsSearching(false);
-      if (status === 'OK' && results[0]) {
-        mapInstanceRef.current.setCenter(results[0].geometry.location);
-        mapInstanceRef.current.setZoom(20);
-        searchInputRef.current.value = results[0].formatted_address || query;
-        setHasSearchText(true);
-        movePanoTo(results[0].geometry.location);
-      }
-    });
-  }, [movePanoTo]);
+    const { location, formatted } = await lookupAddress(query, map);
+    setIsSearching(false);
+    if (location) {
+      map.setCenter(location);
+      map.setZoom(20);
+      searchInputRef.current.value = formatted || query;
+      setHasSearchText(true);
+      movePanoTo(location);
+    } else {
+      showToast(`Couldn't locate "${query}".`, 'info');
+    }
+  }, [movePanoTo, showToast]);
 
   const clearSearch = useCallback(() => {
     if (searchInputRef.current) {
