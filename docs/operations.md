@@ -1,4 +1,4 @@
-**Last updated:** 2026-04-27
+**Last updated:** 2026-05-04
 **Confidence:** Partially Known 
 
 # Operations — How the work gets done
@@ -7,7 +7,7 @@
 - **Total headcount:** Full Time(1) Seasonal(6)
 - **Crews / teams:** 1 Crews (4 people a crew)
 - **Roles on a crew:** Crew Leader, Laborer
-- **Pay structure:** Hourly $17.50 for laborers, $22.50 for crew leaders.
+- **Pay structure:** Hourly $17.50 for laborers, **$20.00** for crew leaders (current). Crew leaders bump to **$22.50** once fully trained and consistently performing.
 
 ## Time tracking — shift + segment model
 Workers use the **Today Cockpit** at [`/crew-dashboard`](../luckyapp/src/app/(dashboard)/crew-dashboard/page.js). The model:
@@ -64,8 +64,8 @@ Landscaping is brutally seasonal. Spell out the year:
 - **Web push notifications:** Configured. `NEXT_PUBLIC_VAPID_PUBLIC_KEY` + `VAPID_PRIVATE_KEY` are set in Vercel env; `notifyOrg()` pushes to any device that subscribed via the in-app prompt. Stale subscriptions are auto-pruned on 404/410.
 - **Calendar sync:** Google Calendar (via luckyapp, [`src/lib/googleCalendar.js`](../luckyapp/src/lib/googleCalendar.js)).
 - **Accounting / books:** Nothing as of now but hoping the luckyapp will have something in the near future.
-- **Payroll:** we can track hours in luckyapp.
-- **Insurance / certs:** WE HAVE TO GET THIS FIGURED OUT, NOT LEGALLY COVERED FOR ANYTHING, have LLC AND EIN
+- **Payroll:** we can track hours in luckyapp. The /team page applies an **employer burden** on top of gross wages so the "true cost" line reflects what the business actually pays — see [`docs/finances.md`](finances.md#labor-cost--employer-burden). When Riley actually starts running W-2 paychecks, outsource to **Gusto** (~$40/mo + $6/employee). Do not build paycheck withholding in luckyapp.
+- **Insurance / certs:** WE HAVE TO GET THIS FIGURED OUT, NOT LEGALLY COVERED FOR ANYTHING, have LLC AND EIN. **Workers comp meeting with Farm Bureau scheduled** — once the policy is bound, enter the actual rate per $100 of payroll into /team → Payroll Settings (replaces the 5% placeholder used for job-cost previews).
 
 ## Customer lifecycle
 1. **Lead in:** Refferals, family, social media, yard signs, we rank fairly well on google for lincoln nebraska landscaping, yelp.
@@ -77,3 +77,8 @@ Landscaping is brutally seasonal. Spell out the year:
 
 ## Known operational pain points
 Us just being young and not having any real management experience is the biggest. Being able to off load work of riley and have him just focus on quotes sales and leading crews.
+
+### Compliance gaps to close
+1. **No workers comp policy yet.** Nebraska Workers' Comp Act §48-115 requires coverage for *any* business with one or more employees. As of 2026-05-04 Lucky has 6 W-2 employees and zero policy. Farm Bureau quote is in motion — bind a policy before the next shift, not "soon." Penalty for an uncovered injury: full medical + lost wages + Class III misdemeanor per day uncovered.
+2. **Minor employees + power equipment.** Brodie, Nick, and Brenden are HS juniors (16-17). Federal Hazardous Occupations Order #11 (29 CFR 570.71) prohibits anyone under 18 from operating power-driven mowers (zero-turn included), hedge trimmers, chainsaws, or demo saws. Penalty up to ~$14k per violation. Either restrict them to hand tools + pickup work, or wait until they turn 18.
+3. **Payroll classification needs review with a CPA.** Macoy is paid as a 1099 vendor through WE Media (a pre-existing media agency he owned before Lucky). He is *not* a legally-bound member of Lucky LLC despite the 30%-ownership shorthand in [`docs/company.md`](company.md). Riley is the LLC's sole legal owner. Riley currently doesn't take wages — owner draws. Encode these as `payroll_classification` on `team_members`: Macoy = `1099_contractor`, Riley = `owner_excluded`, everyone else = `w2_employee`.

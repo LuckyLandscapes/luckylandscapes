@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConnected } from './supabase';
 import { useAuth } from './auth';
-import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging } from './finance';
+import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging, getPayrollSettings } from './finance';
 
 const DataContext = createContext(null);
 
@@ -91,6 +91,7 @@ export function DataProvider({ children }) {
   const [contracts, setContracts] = useState([]);
   const [mileageEntries, setMileageEntries] = useState([]);
   const [contractors, setContractors] = useState([]);
+  const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // ─── Fetch all data ─────────────────────────────────────
@@ -149,7 +150,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr, sup] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr, sup, orgRow] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -170,6 +171,7 @@ export function DataProvider({ children }) {
         supabase.from('mileage_entries').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true }).then(r => r).catch(() => ({ data: null })),
         supabase.from('suppliers').select('*').eq('org_id', orgId).order('sort_order', { ascending: true }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('organizations').select('*').eq('id', orgId).single().then(r => r).catch(() => ({ data: null })),
       ]);
 
       if (cust.data) setCustomers(snakeToCamel(cust.data));
@@ -192,6 +194,7 @@ export function DataProvider({ children }) {
       if (mile?.data) setMileageEntries(snakeToCamel(mile.data));
       if (cntr?.data) setContractors(snakeToCamel(cntr.data));
       if (sup?.data) setSuppliers(snakeToCamel(sup.data));
+      if (orgRow?.data) setOrg(snakeToCamel(orgRow.data));
     } catch (err) {
       console.error('Error fetching data:', err);
     } finally {
@@ -1127,12 +1130,12 @@ export function DataProvider({ children }) {
   // ─── Financial Helpers ─────────────────────────────────
   const getJobFinancials = useCallback((jobId) => {
     const job = jobs.find(j => j.id === jobId);
-    return computeJobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments);
-  }, [jobs, jobExpenses, timeEntries, teamMembers, timeSegments]);
+    return computeJobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSegments, getPayrollSettings(org));
+  }, [jobs, jobExpenses, timeEntries, teamMembers, timeSegments, org]);
 
   const getPnL = useCallback((period = 'month', basis = 'completed') =>
-    computeBuildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis }),
-    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses]);
+    computeBuildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis, payrollSettings: getPayrollSettings(org) }),
+    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, org]);
 
   const getARAging = useCallback(() => computeARAging(invoices), [invoices]);
 
@@ -1175,6 +1178,30 @@ export function DataProvider({ children }) {
     const { data } = await supabase.from('team_members').select('*').eq('org_id', orgId);
     if (data) setTeamMembers(snakeToCamel(data));
   }, [connected, orgId]);
+
+  // ─── Org settings ───────────────────────────────────────
+  // Deep-merges `patch` into the existing organizations.settings JSONB so
+  // setting one key (e.g. payroll.wcRatePer100) doesn't blow away unrelated
+  // siblings (e.g. settings.branding). Used for payroll burden config and
+  // anything else that doesn't justify its own column.
+  const updateOrgSettings = useCallback(async (patch) => {
+    const current = org?.settings || {};
+    // Merge one level deep — enough for our { payroll: {...}, branding: {...} } shape
+    const next = { ...current };
+    for (const k of Object.keys(patch || {})) {
+      const cur = current[k];
+      const inc = patch[k];
+      next[k] = (cur && typeof cur === 'object' && !Array.isArray(cur) && inc && typeof inc === 'object' && !Array.isArray(inc))
+        ? { ...cur, ...inc }
+        : inc;
+    }
+    if (connected) {
+      const { error } = await supabase.from('organizations').update({ settings: next }).eq('id', orgId);
+      if (error) throw error;
+    }
+    setOrg(prev => prev ? { ...prev, settings: next } : prev);
+    return next;
+  }, [connected, orgId, org]);
 
   // Inject a team member record from API response into local state
   // (fallback when RLS blocks the reload from seeing the new member)
@@ -1699,6 +1726,9 @@ export function DataProvider({ children }) {
 
     // Team
     addTeamMember, updateTeamMember, loadTeamMembers, addTeamMemberFromApi,
+
+    // Org settings (payroll burden lives in org.settings.payroll)
+    org, updateOrgSettings,
 
     // Refetch
     refetch: fetchAllFromSupabase,

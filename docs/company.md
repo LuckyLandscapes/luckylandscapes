@@ -1,4 +1,4 @@
-**Last updated:** 2026-04-27
+**Last updated:** 2026-05-04
 **Confidence:** mostly known
 
 # Company — Identity & Team
@@ -31,8 +31,8 @@ List people, roles, and what they actually own day-to-day. Include yourself.
 
 | Name | Role | Owns | Notes |
 |---|---|---|---|
-| Macoy Wollenburg | Co Founder / Co Owner | 30% | Co founder of Lucky Landscapes, I handle all marketing, development, and Sales. Also own a Media Agency called WE Media.
-| Riley Kopf | Owner | 70% | Owner of Lucky Landscapes, He handles all the day to day operations and crew management. 
+| Macoy Wollenburg | Co Founder (informal) | 30% (informal — not a legal LLC member) | Handles marketing, development, and sales. **Paid as an arms-length 1099 vendor through WE Media** (his pre-existing media agency that predates Lucky Landscapes). The 30% is a handshake split on profits, not a registered membership interest — legally Riley is sole member of Lucky Landscapes LLC. App classification: `1099_contractor`.
+| Riley Kopf | Owner (sole legal member) | 70% (informal) / 100% legal | Sole legal member of Lucky Landscapes LLC. Handles all day-to-day operations and crew management. Currently takes owner draws, not wages — app classification: `owner_excluded`.
 | Brodie Chase | Crew Leader | 0% | Employee of Lucky Landscapes, in charge of one of the crews Junior in Highschool.
 | Sean Chase | Laborer | 0% | Employee of Lucky Landscapes, works on jobsites, just graduated highschool, going to basic training in the fall, not fully signed.
 | Nick Sullivan| Laborer | 0% | Employee of Lucky Landscapes, works on jobsites, promising employee to be a crew leader next year, Junior in Highschool.
