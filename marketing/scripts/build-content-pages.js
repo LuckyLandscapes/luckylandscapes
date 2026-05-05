@@ -498,7 +498,7 @@ function postSchema(post) {
                 headline: post.title.replace(' — Lucky Landscapes', ''),
                 datePublished: post.date,
                 dateModified: post.date,
-                author: { '@type': 'Organization', '@id': 'https://luckylandscapes.com/#organization', name: 'Lucky Landscapes' },
+                author: { '@type': 'Organization', '@id': 'https://luckylandscapes.com/#business', name: 'Lucky Landscapes' },
                 publisher: {
                     '@type': 'Organization',
                     name: 'Lucky Landscapes',
@@ -716,7 +716,7 @@ const blogIndex = `${head({
                 name: 'Lucky Landscapes Blog',
                 description: 'Practical landscaping, lawn care, and hardscape advice for Lincoln, Nebraska homeowners.',
                 url: 'https://luckylandscapes.com/blog/',
-                publisher: { '@id': 'https://luckylandscapes.com/#organization' },
+                publisher: { '@id': 'https://luckylandscapes.com/#business' },
                 blogPost: POSTS.map(p => ({
                     '@type': 'BlogPosting',
                     headline: p.title.replace(' — Lucky Landscapes', ''),
