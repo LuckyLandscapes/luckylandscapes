@@ -27,7 +27,15 @@ export default function AddressAutocomplete({
 }) {
   const inputRef = useRef(null);
   const autocompleteRef = useRef(null);
+  // Keep the latest callbacks in refs so the autocomplete instance can stay
+  // mounted across parent re-renders even when the parent passes inline
+  // arrow functions. Without this, every keystroke would tear down and
+  // re-create the autocomplete, dropping the place_changed listener
+  // mid-interaction so city/state/zip never get filled.
+  const onPlaceSelectRef = useRef(onPlaceSelect);
   const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => { onPlaceSelectRef.current = onPlaceSelect; }, [onPlaceSelect]);
 
   // Load Google Maps script if not already loaded
   useEffect(() => {
@@ -84,15 +92,17 @@ export default function AddressAutocomplete({
         if (types.includes('street_number')) streetNumber = comp.long_name;
         if (types.includes('route')) route = comp.short_name;
         if (types.includes('locality')) city = comp.long_name;
+        // Some unincorporated areas only have sublocality / postal_town —
+        // fall through to those if locality isn't set.
+        if (!city && types.includes('postal_town')) city = comp.long_name;
+        if (!city && types.includes('sublocality')) city = comp.long_name;
         if (types.includes('administrative_area_level_1')) state = comp.short_name;
         if (types.includes('postal_code')) zip = comp.long_name;
       }
 
       const address = `${streetNumber} ${route}`.trim();
 
-      if (onPlaceSelect) {
-        onPlaceSelect({ address, city, state, zip });
-      }
+      onPlaceSelectRef.current?.({ address, city, state, zip });
     });
 
     return () => {
@@ -104,7 +114,7 @@ export default function AddressAutocomplete({
       }
       autocompleteRef.current = null;
     };
-  }, [loaded, onPlaceSelect]);
+  }, [loaded]);
 
   return (
     <div style={{ position: 'relative' }}>
