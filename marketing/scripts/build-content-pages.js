@@ -465,7 +465,9 @@ function areaSchema(area) {
                     name: `Landscaping Services in ${areaName}`,
                     itemListElement: offers,
                 },
-                aggregateRating: { '@type': 'AggregateRating', ratingValue: '5.0', reviewCount: '3', bestRating: '5' },
+                // aggregateRating intentionally omitted: GSC flags "Invalid object type
+                // for field <parent_node>" when the rating sits on a type without backing
+                // Review nodes. Reviews live on the homepage LocalBusiness only.
                 sameAs: [
                     'https://www.google.com/maps?cid=2884806323034838689',
                     'https://www.facebook.com/luckylandscapes',
