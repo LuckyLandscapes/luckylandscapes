@@ -25,10 +25,10 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
             <div class="nav-links">
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
-                <a href="/gallery.html" class="nav-link">Gallery</a>
+                <a href="/gallery" class="nav-link">Gallery</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
-                <a href="/quote.html" class="btn btn-primary nav-cta">Get a Quote</a>
+                <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
             </div>
             <button class="nav-toggle" id="nav-toggle" aria-label="Open menu">
                 <span></span><span></span><span></span>
@@ -39,10 +39,10 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
     <div class="mobile-menu" id="mobile-menu">
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
-        <a href="/gallery.html" class="mobile-link">Gallery</a>
+        <a href="/gallery" class="mobile-link">Gallery</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
-        <a href="/quote.html" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
+        <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
     </div>`;
 
 const FOOTER = `<footer class="footer">
@@ -59,17 +59,17 @@ const FOOTER = `<footer class="footer">
                     <h4>Quick Links</h4>
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
-                    <a href="/gallery.html">Gallery</a>
-                    <a href="/team.html">Our Team</a>
+                    <a href="/gallery">Gallery</a>
+                    <a href="/team">Our Team</a>
                     <a href="/#contact">Contact</a>
                 </div>
                 <div class="footer-nav">
                     <h4>Services</h4>
-                    <a href="/services/lawn-care.html">Lawn Care</a>
-                    <a href="/services/garden-beds.html">Garden &amp; Beds</a>
-                    <a href="/services/hardscaping.html">Hardscaping</a>
-                    <a href="/services/property-cleanup.html">Property Cleanup</a>
-                    <a href="/services/landscape-design.html">Landscape Design</a>
+                    <a href="/services/lawn-care">Lawn Care</a>
+                    <a href="/services/garden-beds">Garden &amp; Beds</a>
+                    <a href="/services/hardscaping">Hardscaping</a>
+                    <a href="/services/property-cleanup">Property Cleanup</a>
+                    <a href="/services/landscape-design">Landscape Design</a>
                 </div>
                 <div class="footer-contact">
                     <h4>Contact</h4>
@@ -81,8 +81,8 @@ const FOOTER = `<footer class="footer">
             <div class="footer-bottom">
                 <p>&copy; 2026 Lucky Landscapes. All rights reserved.</p>
                 <div class="footer-bottom-links">
-                    <a href="/privacy.html">Privacy Policy</a>
-                    <a href="/terms.html">Terms of Service</a>
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
                 </div>
             </div>
         </div>
@@ -413,13 +413,13 @@ const SERVICE_LABELS = {
 
 function areaSchema(area) {
     const areaName = area.h1.replace(/<[^>]+>/g, '').trim();
-    const url = `https://luckylandscapes.com/areas/${area.slug}.html`;
+    const url = `https://luckylandscapes.com/areas/${area.slug}`;
     const offers = (area.services || []).map(s => ({
         '@type': 'Offer',
         itemOffered: {
             '@type': 'Service',
             name: SERVICE_LABELS[s].title,
-            url: `https://luckylandscapes.com/services/${s}.html`,
+            url: `https://luckylandscapes.com/services/${s}`,
         },
     }));
     const faqs = (area.faqs || []).map(f => ({
@@ -486,7 +486,7 @@ function areaSchema(area) {
 }
 
 function postSchema(post) {
-    const url = `https://luckylandscapes.com/blog/${post.slug}.html`;
+    const url = `https://luckylandscapes.com/blog/${post.slug}`;
     return {
         '@context': 'https://schema.org',
         '@graph': [
@@ -523,9 +523,9 @@ function postSchema(post) {
 }
 
 function renderArea(area) {
-    const canonical = `https://luckylandscapes.com/areas/${area.slug}.html`;
+    const canonical = `https://luckylandscapes.com/areas/${area.slug}`;
     const services = area.services.map(s => `
-                    <a href="/services/${s}.html" class="home-service-card">
+                    <a href="/services/${s}" class="home-service-card">
                         <div class="home-service-icon">${SERVICE_LABELS[s].icon}</div>
                         <h3>${SERVICE_LABELS[s].title}</h3>
                         <p>${SERVICE_LABELS[s].desc}</p>
@@ -556,7 +556,7 @@ function renderArea(area) {
                     <h1>${area.h1}</h1>
                     <p class="hero-sub">${area.sub}</p>
                     <div class="hero-buttons">
-                        <a href="/quote.html" class="btn btn-primary btn-lg">Request a Free Estimate</a>
+                        <a href="/quote" class="btn btn-primary btn-lg">Request a Free Estimate</a>
                         <a href="tel:+14024055475" class="btn btn-outline btn-lg">📞 (402) 405-5475</a>
                     </div>
                 </div>
@@ -615,7 +615,7 @@ function renderArea(area) {
                     <h2>Ready to talk?</h2>
                     <p>Free estimate, 24-hour response, no obligation. Tell us about your project and we'll come look in person.</p>
                     <div class="hero-buttons">
-                        <a href="/quote.html" class="btn btn-primary btn-lg">Request My Free Estimate</a>
+                        <a href="/quote" class="btn btn-primary btn-lg">Request My Free Estimate</a>
                         <a href="tel:+14024055475" class="btn btn-outline btn-lg">📞 Call Now</a>
                     </div>
                 </div>
@@ -626,9 +626,9 @@ ${pageEnd()}`;
 }
 
 function renderPost(post) {
-    const canonical = `https://luckylandscapes.com/blog/${post.slug}.html`;
+    const canonical = `https://luckylandscapes.com/blog/${post.slug}`;
     const related = (post.related || []).map(s => `
-                    <a href="/services/${s}.html" class="home-service-card">
+                    <a href="/services/${s}" class="home-service-card">
                         <div class="home-service-icon">${SERVICE_LABELS[s].icon}</div>
                         <h3>${SERVICE_LABELS[s].title}</h3>
                         <p>${SERVICE_LABELS[s].desc}</p>
@@ -658,7 +658,7 @@ function renderPost(post) {
                 ${post.body}
 
                 <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--gray-200); text-align: center;">
-                    <a href="/quote.html" class="btn btn-primary btn-lg">Request a Free Estimate</a>
+                    <a href="/quote" class="btn btn-primary btn-lg">Request a Free Estimate</a>
                 </div>
             </div>
         </article>
@@ -686,15 +686,15 @@ await mkdir(join(ROOT, 'areas'), { recursive: true });
 await mkdir(join(ROOT, 'blog'), { recursive: true });
 
 for (const area of AREAS) {
-    const path = join(ROOT, 'areas', `${area.slug}.html`);
+    const path = join(ROOT, 'areas', `${area.slug}`);
     await writeFile(path, renderArea(area));
-    console.log('  area  ', `areas/${area.slug}.html`);
+    console.log('  area  ', `areas/${area.slug}`);
 }
 
 for (const post of POSTS) {
-    const path = join(ROOT, 'blog', `${post.slug}.html`);
+    const path = join(ROOT, 'blog', `${post.slug}`);
     await writeFile(path, renderPost(post));
-    console.log('  post  ', `blog/${post.slug}.html`);
+    console.log('  post  ', `blog/${post.slug}`);
 }
 
 // =====================================================================
@@ -718,7 +718,7 @@ const blogIndex = `${head({
                 blogPost: POSTS.map(p => ({
                     '@type': 'BlogPosting',
                     headline: p.title.replace(' — Lucky Landscapes', ''),
-                    url: `https://luckylandscapes.com/blog/${p.slug}.html`,
+                    url: `https://luckylandscapes.com/blog/${p.slug}`,
                     datePublished: p.date,
                     description: p.description,
                 })),
@@ -751,7 +751,7 @@ const blogIndex = `${head({
         <section class="svc-features">
             <div class="container" style="max-width: 760px;">
                 ${POSTS.map(p => `
-                <a href="/blog/${p.slug}.html" style="display:block; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--gray-200); border-radius: 1rem; text-decoration:none; color: inherit; transition: all .2s;">
+                <a href="/blog/${p.slug}" style="display:block; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--gray-200); border-radius: 1rem; text-decoration:none; color: inherit; transition: all .2s;">
                     <p class="section-label" style="margin-bottom:.5rem;">${p.category} • ${new Date(p.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
                     <h2 style="font-size: 1.5rem; margin: 0 0 .5rem;">${p.title.replace(' — Lucky Landscapes', '')}</h2>
                     <p style="color: var(--gray-600); margin:0;">${p.description}</p>

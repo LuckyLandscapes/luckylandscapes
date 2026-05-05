@@ -249,7 +249,7 @@ const NEW_BLOCK = `${NEW_MARKER}
                         </div>
 
                         <div class="celebration-actions" style="display:flex; gap:0.75rem; flex-wrap:wrap; justify-content:center; margin-top:1.5rem;">
-                            <a href="/gallery.html" class="btn btn-primary">See Recent Projects</a>
+                            <a href="/gallery" class="btn btn-primary">See Recent Projects</a>
                             <a href="https://www.instagram.com/lucky.landscapes/" class="btn btn-outline" target="_blank" rel="noopener">Follow on Instagram</a>
                         </div>
                     </div>
