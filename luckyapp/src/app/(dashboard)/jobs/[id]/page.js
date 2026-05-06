@@ -70,7 +70,7 @@ export default function JobDetailPage({ params }) {
   const jobId = resolvedParams.id;
   const router = useRouter();
   const { getJob, getCustomer, getQuote, getTeamMember, updateJob, deleteJob, teamMembers,
-    getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries,
+    getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries, timeSegments,
     calendarEvents, invoices, contracts } = useData();
   const { user, isOwnerOrAdmin, isWorker } = useAuth();
 
@@ -309,8 +309,33 @@ export default function JobDetailPage({ params }) {
     ? activeMembers.filter(m => m.fullName?.toLowerCase().includes(crewSearch.toLowerCase()))
     : activeMembers;
 
-  // Get time entries for this job
-  const jobTimeEntries = timeEntries.filter(t => t.jobId === jobId && t.clockIn && t.clockOut);
+  // Get time entries for this job. An entry belongs in the labor breakdown if
+  // EITHER its legacy jobId matches OR it has any 'job'-kind segment for this
+  // job (mid-shift switches, late-added crew). Without the segment lookup,
+  // workers added after job creation never show up here even though their
+  // hours are correctly counted in the financials banner total.
+  const jobSegments = timeSegments.filter(s => s.kind === 'job' && s.jobId === jobId);
+  const entryIdsFromSegments = new Set(jobSegments.map(s => s.timeEntryId));
+  const jobTimeEntries = timeEntries.filter(t =>
+    (t.jobId === jobId || entryIdsFromSegments.has(t.id)) && t.clockIn && t.clockOut
+  );
+
+  // Per-entry labor on THIS job. If segments exist for the entry, sum the
+  // job-segment durations (so a worker who split a shift across two jobs is
+  // only charged for the slice that was on this one). Else fall back to the
+  // legacy full-shift math.
+  const computeEntryJobHours = (entry) => {
+    const segs = timeSegments.filter(s => s.timeEntryId === entry.id);
+    if (segs.length > 0) {
+      const onThisJobMins = segs
+        .filter(s => s.kind === 'job' && s.jobId === jobId && s.endedAt)
+        .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+      return { hours: onThisJobMins / 60, fromSegments: true };
+    }
+    const totalHours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
+    const breakHrs = Number(entry.breakMinutes || 0) / 60;
+    return { hours: Math.max(0, totalHours - breakHrs), fromSegments: false };
+  };
 
   return (
     <div className="page job-detail-page animate-fade-in">
@@ -910,21 +935,20 @@ export default function JobDetailPage({ params }) {
             {jobTimeEntries.length > 0 ? (
               <div className="expenses-list">
                 {jobTimeEntries.map(entry => {
-                  const member = teamMembers.find(m => m.id === entry.teamMemberId);
+                  const member = teamMembers.find(m => m.id === (entry.teamMemberId || entry.memberId));
                   const rate = Number(member?.hourlyRate || 0);
                   const totalHours = (new Date(entry.clockOut) - new Date(entry.clockIn)) / (1000 * 60 * 60);
                   const breakMins = Number(entry.breakMinutes || 0);
-                  const breakHrs = breakMins / 60;
-                  const paidHours = Math.max(0, totalHours - breakHrs);
-                  const cost = rate * paidHours;
+                  const { hours: jobHours, fromSegments } = computeEntryJobHours(entry);
+                  const cost = rate * jobHours;
                   return (
                     <div key={entry.id} className="expense-row">
                       <span className="expense-icon">👷</span>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>{member?.fullName || 'Unknown'}</div>
                         <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                          {paidHours.toFixed(1)} paid hrs × ${rate.toFixed(2)}/hr
-                          {breakMins > 0 && (
+                          {jobHours.toFixed(1)} {fromSegments ? 'hrs on this job' : 'paid hrs'} × ${rate.toFixed(2)}/hr
+                          {!fromSegments && breakMins > 0 && (
                             <span style={{ color: 'var(--lucky-gold)', marginLeft: '6px' }}>
                               ☕ {breakMins} min break deducted
                             </span>
@@ -932,6 +956,11 @@ export default function JobDetailPage({ params }) {
                         </div>
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', opacity: 0.7, marginTop: '1px' }}>
                           Total shift: {totalHours.toFixed(1)} hrs
+                          {fromSegments && jobHours < totalHours - 0.05 && (
+                            <span style={{ marginLeft: '6px' }}>
+                              · split across jobs
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ fontWeight: 700, color: 'var(--lucky-gold)', fontSize: '0.9rem' }}>
