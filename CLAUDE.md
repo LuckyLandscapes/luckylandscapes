@@ -82,6 +82,25 @@ SQL migrations are numbered files in [`luckyapp/supabase/migrations/`](luckyapp/
 - Latest migrations on disk: `029_job_workday_set.sql`, then the catalog rebuild trio — `030_suppliers_table.sql`, `031_materials_rebuild.sql` (DROPS and recreates materials with supplier_id FK + tax_rate + customer-visible flag), `032_selected_materials.sql` (adds JSONB columns to quotes + contracts), `033_subcontract_support.sql` (`customers.customer_type` + `jobs.work_authorization`/`work_order_*`/`site_contact_*` for sub work), `034_payroll_classification.sql` (`team_members.payroll_classification` w2/1099/owner — burden config piggybacks on existing `organizations.settings` JSONB, no schema change there), `035_deposit_options.sql` (`deposit_type` + `deposit_percentage` on quotes + contracts — adds percentage-of-total deposit mode alongside the legacy materials+delivery sum), `036_quote_total_includes_delivery.sql` (one-shot backfill: `quotes.total = total + delivery_fee` so `quote.total` is now the customer-facing grand total — see "Quote total now includes delivery" below), and `037_team_member_dob.sql` (`team_members.date_of_birth` for FLSA child-labor compliance flags). `028` was deliberately skipped. Next one should be `038_…`.
 - `FULL_REBUILD.sql` is **deprecated** — it only covers 001–013 and is missing every newer table and column. Always run the numbered files in order; do not use the rebuild script.
 
+### Database backups — daily encrypted dump via GitHub Actions
+Supabase free tier has **no automated backups and no point-in-time recovery** — those are Pro-tier ($25/mo). Lucky rolls its own via [`.github/workflows/supabase-backup.yml`](.github/workflows/supabase-backup.yml), which runs daily at 07:00 UTC and:
+
+1. `pg_dump`s the whole database (`--clean --if-exists --no-owner --no-acl`) — schema + data, restorable into any Postgres.
+2. Walks every Storage bucket via the `/storage/v1` REST API ([`luckyapp/scripts/backup-storage.mjs`](luckyapp/scripts/backup-storage.mjs), zero deps, native fetch) and downloads every file. **This is load-bearing** — the DB dump alone leaves dead URLs for `quote-media`, `receipts`, `contract-pdfs`, and the new `mileage/` + work-order folders.
+3. Tarballs both, encrypts with `gpg --symmetric --cipher-algo AES256` against `BACKUP_PASS`, uploads as a 90-day GitHub Actions artifact.
+
+**Required repo secrets** (Settings → Secrets and variables → Actions):
+- `SUPABASE_DB_URL` — Session pooler connection string from Supabase dashboard → Project Settings → Database. **Port 5432, NOT 6543** — `pg_dump` needs session mode, not transaction mode.
+- `SUPABASE_URL` — `https://<project-ref>.supabase.co`.
+- `SUPABASE_SERVICE_ROLE_KEY` — service_role JWT (anon key won't see all files due to RLS).
+- `BACKUP_PASS` — long random passphrase. **Save in 1Password or similar — losing it means losing every backup.**
+
+**Side benefit:** the daily `pg_dump` query keeps the project active, dodging the free-tier 7-day auto-pause that would otherwise break the marketing site's quote form whenever Lucky goes a week without dashboard activity.
+
+**Restore instructions** are in the workflow file's header comment. Restore is rare enough that the inverse-of-backup-storage script isn't pre-built — write it when actually needed.
+
+**When to upgrade to Pro ($25/mo):** once Lucky has ~10+ paying contracts/month, the math flips. Pro gets daily managed backups with 7-day retention, PITR within that window, no auto-pause, and one-click restore via dashboard. Until then this setup is genuinely sufficient.
+
 ### Catalog system — suppliers, materials, customer view, selected materials on quotes/contracts
 Rebuilt in 030–032. Source files live in [`src/app/(dashboard)/catalog/page.js`](luckyapp/src/app/(dashboard)/catalog/page.js), [`src/components/MaterialFormModal.js`](luckyapp/src/components/MaterialFormModal.js), [`src/components/CustomerCatalogCard.js`](luckyapp/src/components/CustomerCatalogCard.js), [`src/components/SelectMaterialsModal.js`](luckyapp/src/components/SelectMaterialsModal.js), [`src/components/ImportMaterialsModal.js`](luckyapp/src/components/ImportMaterialsModal.js), [`src/lib/catalog.js`](luckyapp/src/lib/catalog.js), [`src/lib/csvCatalog.js`](luckyapp/src/lib/csvCatalog.js).
 

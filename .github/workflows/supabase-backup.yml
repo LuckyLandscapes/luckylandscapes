@@ -1,0 +1,85 @@
+# Daily encrypted backup of Lucky's Supabase database + Storage buckets.
+#
+# Runs at 07:00 UTC (~01:00 / 02:00 Lincoln time) every day. Free-tier-safe:
+# the daily query against the DB also keeps the project from auto-pausing
+# after 7 days of inactivity.
+#
+# REQUIRED REPO SECRETS (Settings → Secrets and variables → Actions):
+#   SUPABASE_DB_URL              postgres://...:5432/postgres  (Session pooler — port 5432, NOT 6543)
+#   SUPABASE_URL                 https://<project-ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE_KEY    service_role JWT (not anon — we need to read every bucket)
+#   BACKUP_PASS                  Long random passphrase. Save in 1Password / similar — losing this = losing the backups.
+#
+# RESTORE:
+#   1. Download the latest artifact from the Actions tab → "Supabase backup" run.
+#   2. gpg --decrypt --passphrase "$BACKUP_PASS" -o backup.tar.gz backup-YYYY-MM-DD.tar.gz.gpg
+#   3. tar xzf backup.tar.gz                     (yields db.sql + storage/<bucket>/...)
+#   4. Restore DB to a fresh Supabase project:
+#        psql "$NEW_DB_URL" -f db.sql
+#   5. Re-upload storage with luckyapp/scripts/restore-storage.mjs (mirror of the backup script — write
+#      one if/when you actually need to restore; not pre-built since restore is rare and details depend on
+#      whether you're restoring to the same project or a fresh one).
+
+name: Supabase backup
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install postgres client + gpg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y postgresql-client gnupg
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/backup
+          pg_dump "$SUPABASE_DB_URL" \
+            --no-owner --no-acl --clean --if-exists \
+            --quote-all-identifiers \
+            > /tmp/backup/db.sql
+          ls -lh /tmp/backup/db.sql
+
+      - name: Dump storage buckets
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node luckyapp/scripts/backup-storage.mjs /tmp/backup/storage
+
+      - name: Pack and encrypt
+        env:
+          BACKUP_PASS: ${{ secrets.BACKUP_PASS }}
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +%Y-%m-%d)
+          cd /tmp/backup
+          tar czf "/tmp/backup-${DATE}.tar.gz" db.sql storage/
+          gpg --batch --yes --passphrase "$BACKUP_PASS" \
+            --symmetric --cipher-algo AES256 \
+            --output "/tmp/backup-${DATE}.tar.gz.gpg" \
+            "/tmp/backup-${DATE}.tar.gz"
+          rm "/tmp/backup-${DATE}.tar.gz"
+          ls -lh "/tmp/backup-${DATE}.tar.gz.gpg"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ github.run_id }}
+          path: /tmp/backup-*.tar.gz.gpg
+          retention-days: 90
+          if-no-files-found: error
