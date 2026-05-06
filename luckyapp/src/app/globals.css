@@ -2770,6 +2770,13 @@ body {
   filter: invert(0.85) grayscale(1) !important;
 }
 
+/* Popup menus opting into scroll-lock behavior. BodyScrollLock locks the
+   page; overscroll-behavior:contain stops scroll chaining at the menu's
+   boundary so the (locked) body doesn't dead-end the wheel. */
+[data-menu-scroll] {
+  overscroll-behavior: contain;
+}
+
 .measure-customer-dropdown {
   position: absolute;
   top: 56px;

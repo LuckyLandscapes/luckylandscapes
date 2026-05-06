@@ -2,20 +2,22 @@
 
 import { useEffect } from 'react';
 
-// Global body-scroll-lock for modals.
+// Global body-scroll-lock for modals AND popup menus.
 //
-// Watches the DOM for any element with .modal-overlay (or [role="dialog"])
-// and locks body scroll while one is mounted. Unlocks automatically when
-// every overlay is gone, even if the modal unmounted abnormally.
+// Watches the DOM for any element with .modal-overlay (or [role="dialog"]),
+// or any popup with [data-menu-scroll], and locks body scroll while one is
+// mounted. Unlocks automatically when every overlay/menu is gone, even if
+// it unmounted abnormally.
 //
-// One mount in RootProviders covers every modal in the app — individual
-// modals do not need to call anything. New modals work for free as long
-// as they render a .modal-overlay backdrop.
+// One mount in RootProviders covers every modal and popup menu in the app
+// — individual surfaces do not need to call anything. New modals work for
+// free as long as they render a .modal-overlay backdrop; new popup menus
+// work as long as they tag the scrollable container with data-menu-scroll.
 export default function BodyScrollLock() {
   useEffect(() => {
     if (typeof document === 'undefined') return;
 
-    const SELECTOR = '.modal-overlay, .sidebar-mobile-overlay, [role="dialog"][aria-modal="true"]';
+    const SELECTOR = '.modal-overlay, .sidebar-mobile-overlay, [role="dialog"][aria-modal="true"], [data-menu-scroll]';
     let savedOverflow = '';
     let savedPaddingRight = '';
     let locked = false;
