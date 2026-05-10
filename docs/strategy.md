@@ -10,7 +10,7 @@ TODO: e.g. revenue target, crew count, service mix, geographic reach, life-of-ow
 - **Revenue target:**  500k+
 - **Top 3 outcomes by EOY:** having no debt, owning a fleet, owing a house/shop.
 - **What "winning the year" looks like:** not failing in our first year, not being broke in our personal lives, growing. 
-- Macoy wants to do snow removal in the winter to keep cash flowing, but riley isn't a fan of it, hates the cold. (pussy)
+- Macoy wants to do snow removal in the winter to keep cash flowing, but riley isn't a fan of it, hates the cold.
 ## This-quarter / this-season focus
 - **What I'm actively pushing on right now:** website, our own app, marketing.
 - **What I'm explicitly NOT working on (so it doesn't sneak in):** doing projects for friends and family for free, taking on work that we can't handle, not charging what we're worth.

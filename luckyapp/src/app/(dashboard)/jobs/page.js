@@ -5,8 +5,9 @@ import { useData } from '@/lib/data';
 import Link from 'next/link';
 import {
   Search, Briefcase, Plus, ArrowRight, DollarSign, TrendingUp, TrendingDown,
-  CalendarDays, Users, Filter,
+  CalendarDays, Users, Filter, Upload,
 } from 'lucide-react';
+import ImportHistoricalJobsModal from '@/components/ImportHistoricalJobsModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n || 0);
@@ -29,6 +30,7 @@ export default function JobsPage() {
   const { jobs, customers, getCustomer, getJobFinancials } = useData();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [showImport, setShowImport] = useState(false);
 
   const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
@@ -68,11 +70,16 @@ export default function JobsPage() {
           <p>{jobs.length} total jobs from accepted quotes</p>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+            <Upload size={18} /> Import History
+          </button>
           <Link href="/calendar" className="btn btn-secondary">
             <CalendarDays size={18} /> View Calendar
           </Link>
         </div>
       </div>
+
+      {showImport && <ImportHistoricalJobsModal onClose={() => setShowImport(false)} />}
 
       {/* Financial Summary Cards */}
       <div className="stats-grid" style={{ marginBottom: 'var(--space-lg)' }}>

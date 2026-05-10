@@ -1685,6 +1685,94 @@ export function DataProvider({ children }) {
     return { inserted, updated, errors };
   }, [connected, orgId, materials]);
 
+  // ─── Historical backfill (Google Sheets → Lucky) ───────────
+  // For each row we may need to (1) create a customer, (2) create a job
+  // with status=completed, (3) fan out optional cost columns into
+  // job_expenses rows. Anything that throws gets captured per-row so a
+  // single bad row doesn't abort the whole batch.
+  const bulkImportHistoricalJobs = useCallback(async (rows) => {
+    let insertedJobs = 0, insertedCustomers = 0, insertedExpenses = 0;
+    const errors = [];
+
+    // Build an in-memory name index so successive rows for the same NEW
+    // customer dedupe to a single created customers row.
+    const localNameIndex = new Map();
+    customers.forEach(c => {
+      const key = `${(c.firstName || '').toLowerCase().trim()} ${(c.lastName || '').toLowerCase().trim()}`.trim();
+      if (key && !localNameIndex.has(key)) localNameIndex.set(key, c.id);
+    });
+
+    for (const row of rows) {
+      try {
+        let customerId = null;
+        if (row.customerMatch.kind === 'existing') {
+          customerId = row.customerMatch.id;
+        } else {
+          const key = `${row.customerMatch.firstName} ${row.customerMatch.lastName}`.trim().toLowerCase();
+          if (localNameIndex.has(key)) {
+            customerId = localNameIndex.get(key);
+          } else {
+            const created = await addCustomer({
+              firstName: row.customerMatch.firstName,
+              lastName: row.customerMatch.lastName,
+              email: '',
+              phone: '',
+              address: row.payload.address || '',
+              tags: ['imported'],
+              source: 'imported',
+            });
+            customerId = created?.id || null;
+            if (customerId) {
+              localNameIndex.set(key, customerId);
+              insertedCustomers += 1;
+            }
+          }
+        }
+
+        const job = await addJob({ ...row.payload, customerId });
+        if (!job?.id) throw new Error('addJob returned no id');
+        // addJob's localStorage path hard-codes status='scheduled' regardless
+        // of what we pass — patch it back to the imported status here.
+        if (job.status !== row.payload.status || job.completedAt !== row.payload.completedAt) {
+          await updateJob(job.id, { status: row.payload.status, completedAt: row.payload.completedAt });
+        }
+        insertedJobs += 1;
+
+        for (const seed of row.expenseSeeds) {
+          try {
+            await addJobExpense({
+              jobId: job.id,
+              category: seed.category,
+              description: seed.description,
+              amount: seed.amount,
+            });
+            insertedExpenses += 1;
+          } catch (err) {
+            errors.push({ item: `Row ${row.rowIndex} expense (${seed.description})`, error: err.message || String(err) });
+          }
+        }
+      } catch (err) {
+        errors.push({ item: `Row ${row.rowIndex} (${row.customerMatch.label})`, error: err.message || String(err) });
+      }
+    }
+
+    return { insertedJobs, insertedCustomers, insertedExpenses, errors };
+  }, [customers, addCustomer, addJob, updateJob, addJobExpense]);
+
+  const bulkImportHistoricalCompanyExpenses = useCallback(async (rows) => {
+    let inserted = 0;
+    const errors = [];
+    for (const row of rows) {
+      try {
+        await addCompanyExpense(row.payload);
+        inserted += 1;
+      } catch (err) {
+        errors.push({ item: `Row ${row.rowIndex} (${row.payload.date} ${row.payload.category})`, error: err.message || String(err) });
+      }
+    }
+    return { inserted, errors };
+  }, [addCompanyExpense]);
+
   // ─── Context value ──────────────────────────────────────
   const value = {
     // State
@@ -1711,6 +1799,9 @@ export function DataProvider({ children }) {
 
     // Jobs
     addJob, updateJob, deleteJob, convertQuoteToJob,
+
+    // Historical backfill (CSV import for legacy Google Sheet data)
+    bulkImportHistoricalJobs, bulkImportHistoricalCompanyExpenses,
 
     // Calendar
     addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,

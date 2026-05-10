@@ -11,9 +11,10 @@ import {
 import {
   Plus, X, Trash2, Edit3, Save, DollarSign, Calendar, Repeat,
   Receipt, AlertTriangle, BarChart3, TrendingDown, FileText, Building2,
-  Send, Mail, Loader2, CheckCircle2, Eye, AlertCircle, CheckCircle,
+  Send, Mail, Loader2, CheckCircle2, Eye, AlertCircle, CheckCircle, Upload,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
+import ImportHistoricalExpensesModal from '@/components/ImportHistoricalExpensesModal';
 
 const CATEGORY_ICONS = {
   vehicle: '🚐',
@@ -61,6 +62,7 @@ export default function FinancePage() {
   const [period, setPeriod] = useState('month');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState(emptyForm());
   const [editingId, setEditingId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -225,6 +227,9 @@ export default function FinancePage() {
           <p>Track company overhead, recurring bills, and outstanding invoices.</p>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
+            <Upload size={16} /> Import History
+          </button>
           <Link href="/reports" className="btn btn-secondary">
             <BarChart3 size={16} /> P&amp;L Report
           </Link>
@@ -233,6 +238,8 @@ export default function FinancePage() {
           </button>
         </div>
       </div>
+
+      {showImport && <ImportHistoricalExpensesModal onClose={() => setShowImport(false)} />}
 
       {/* Stats */}
       <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
