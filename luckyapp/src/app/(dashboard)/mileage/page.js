@@ -4,19 +4,69 @@
 // requires: date, miles, business purpose, place. Odometer photos are the
 // best contemporaneous proof and slot into the existing `receipts` storage
 // bucket under a mileage/ folder.
+//
+// Live-trip workflow: snap the start odometer to open a trip; snap the end
+// odometer to close it. The active trip ID lives in localStorage so a phone
+// reload / app close mid-drive doesn't lose state. An orphan-recovery effect
+// re-adopts any "Trip in progress" row that exists in the DB but isn't
+// pinned locally — covers a fresh device or a cleared browser.
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { fmtCurrency, isInPeriod } from '@/lib/finance';
 import {
   Plus, X, Save, Car, Camera, Trash2, Edit3, MapPin, Briefcase, FileText,
-  Download, AlertTriangle,
+  Download, AlertTriangle, Square, Loader2,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 
 // Standard IRS business mileage rate. 2026 = $0.70/mi; bump this annually.
 const MILEAGE_RATE_2026 = 0.70;
+const ACTIVE_TRIP_KEY = 'lucky_mileage_active_trip_id';
+// Sentinel purpose used while a trip is mid-drive. The DB requires a
+// non-empty `purpose` and `miles >= 0`, so we stamp this placeholder until
+// the user fills in real details on close.
+const IN_PROGRESS_PURPOSE = 'Trip in progress';
+
+// Inline image compression — same shape as ReceiptUpload but reachable from
+// the live-trip handlers without rendering the upload UI. 1600px JPEG q=0.7
+// brings a 4MB phone photo to ~250KB, keeping the receipts bucket inside
+// the Supabase free-tier 1GB cap.
+const ODO_MAX_DIM = 1600;
+const ODO_QUALITY = 0.7;
+const ODO_SKIP_COMPRESS = 200_000;
+
+async function compressOdometerImage(file) {
+  if (!file.type?.startsWith('image/')) return file;
+  if (file.size < ODO_SKIP_COMPRESS) return file;
+  let bitmap;
+  try { bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch { return file; }
+  const ratio = Math.min(1, ODO_MAX_DIM / Math.max(bitmap.width, bitmap.height));
+  const w = Math.round(bitmap.width * ratio);
+  const h = Math.round(bitmap.height * ratio);
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  bitmap.close?.();
+  const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', ODO_QUALITY));
+  if (!blob || blob.size >= file.size) return file;
+  return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+}
+
+async function uploadOdometerPhoto(file, orgId) {
+  const compressed = await compressOdometerImage(file);
+  const ext = compressed.type === 'image/png' ? 'png' : 'jpg';
+  const key = `${orgId}/mileage/${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${ext}`;
+  const { error } = await supabase.storage.from('receipts').upload(key, compressed, {
+    contentType: compressed.type, upsert: false,
+  });
+  if (error) throw error;
+  const { data: pub } = supabase.storage.from('receipts').getPublicUrl(key);
+  return { url: pub.publicUrl, path: key };
+}
 
 const PERIODS = [
   { key: 'week', label: 'Week' },
@@ -56,6 +106,42 @@ export default function MileagePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
+  // Live-trip state
+  const [activeTripId, setActiveTripId] = useState(null);
+  const [capturing, setCapturing] = useState(null); // 'start' | 'end' | null
+  const [captureError, setCaptureError] = useState(null);
+  const startInputRef = useRef(null);
+  const endInputRef = useRef(null);
+
+  // Restore the pinned active trip from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = localStorage.getItem(ACTIVE_TRIP_KEY);
+    if (stored) setActiveTripId(stored);
+  }, []);
+
+  // Orphan recovery: if the DB has a "Trip in progress" row that we're not
+  // tracking locally (cleared browser, fresh device, app reinstall), adopt
+  // it so the user can finish it. Skips when we already have a pin.
+  useEffect(() => {
+    if (activeTripId) return;
+    const orphan = mileageEntries.find(m => m.purpose === IN_PROGRESS_PURPOSE);
+    if (orphan) {
+      setActiveTripId(orphan.id);
+      if (typeof window !== 'undefined') localStorage.setItem(ACTIVE_TRIP_KEY, orphan.id);
+    }
+  }, [mileageEntries, activeTripId]);
+
+  const activeTrip = useMemo(
+    () => activeTripId ? mileageEntries.find(m => m.id === activeTripId) : null,
+    [activeTripId, mileageEntries],
+  );
+
+  const clearActiveTrip = () => {
+    setActiveTripId(null);
+    if (typeof window !== 'undefined') localStorage.removeItem(ACTIVE_TRIP_KEY);
+  };
+
   // Auto-fill miles when odometer values are both present
   const setOdo = (which, value) => {
     setForm(f => {
@@ -69,11 +155,112 @@ export default function MileagePage() {
     });
   };
 
+  // Hide the active trip from the main list — it's surfaced in the live-trip
+  // banner instead so we don't show a confusing 0-mile "Trip in progress" row.
   const filtered = useMemo(() => {
     return mileageEntries
+      .filter(m => m.id !== activeTripId)
       .filter(m => period === 'all' || isInPeriod(m.date, period))
       .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  }, [mileageEntries, period]);
+  }, [mileageEntries, period, activeTripId]);
+
+  // ─── Live trip handlers ─────────────────────────────────
+  const handleStartTripFile = async (file) => {
+    if (!file) return;
+    if (!user?.orgId) { setCaptureError('Not signed in.'); return; }
+    if (activeTrip) { setCaptureError('You already have a trip in progress.'); return; }
+    setCapturing('start');
+    setCaptureError(null);
+    try {
+      const photo = await uploadOdometerPhoto(file, user.orgId);
+      const entry = await addMileageEntry({
+        date: todayISO(),
+        miles: 0,
+        purpose: IN_PROGRESS_PURPOSE,
+        teamMemberId: user?.id || null,
+        startPhotoUrl: photo.url,
+        startPhotoPath: photo.path,
+      });
+      setActiveTripId(entry.id);
+      if (typeof window !== 'undefined') localStorage.setItem(ACTIVE_TRIP_KEY, entry.id);
+    } catch (err) {
+      console.error('[MileagePage] start trip failed', err);
+      setCaptureError(err?.message || 'Failed to start trip.');
+    } finally {
+      setCapturing(null);
+      if (startInputRef.current) startInputRef.current.value = '';
+    }
+  };
+
+  const handleEndTripFile = async (file) => {
+    if (!file) return;
+    if (!user?.orgId || !activeTrip) { setCaptureError('No trip in progress.'); return; }
+    setCapturing('end');
+    setCaptureError(null);
+    try {
+      const photo = await uploadOdometerPhoto(file, user.orgId);
+      // Persist immediately so a closed/cancelled details modal doesn't lose the photo
+      await updateMileageEntry(activeTrip.id, {
+        endPhotoUrl: photo.url,
+        endPhotoPath: photo.path,
+      });
+      // Pop the form pre-filled with both photos so the user can confirm
+      // miles + purpose + addresses (the IRS-required fields).
+      setEditingId(activeTrip.id);
+      setForm({
+        date: activeTrip.date || todayISO(),
+        miles: '',
+        purpose: '',
+        startAddress: activeTrip.startAddress || '',
+        endAddress: '',
+        startOdometer: activeTrip.startOdometer != null ? String(activeTrip.startOdometer) : '',
+        endOdometer: '',
+        vehicle: activeTrip.vehicle || '',
+        jobId: activeTrip.jobId || '',
+        notes: activeTrip.notes || '',
+        startPhoto: { url: activeTrip.startPhotoUrl || null, path: activeTrip.startPhotoPath || null },
+        endPhoto: { url: photo.url, path: photo.path },
+      });
+      setShowForm(true);
+    } catch (err) {
+      console.error('[MileagePage] end trip failed', err);
+      setCaptureError(err?.message || 'Failed to end trip.');
+    } finally {
+      setCapturing(null);
+      if (endInputRef.current) endInputRef.current.value = '';
+    }
+  };
+
+  const handleResumeActiveTrip = () => {
+    if (!activeTrip) return;
+    setEditingId(activeTrip.id);
+    setForm({
+      date: activeTrip.date || todayISO(),
+      miles: activeTrip.miles && Number(activeTrip.miles) > 0 ? String(activeTrip.miles) : '',
+      purpose: activeTrip.purpose === IN_PROGRESS_PURPOSE ? '' : (activeTrip.purpose || ''),
+      startAddress: activeTrip.startAddress || '',
+      endAddress: activeTrip.endAddress || '',
+      startOdometer: activeTrip.startOdometer != null ? String(activeTrip.startOdometer) : '',
+      endOdometer: activeTrip.endOdometer != null ? String(activeTrip.endOdometer) : '',
+      vehicle: activeTrip.vehicle || '',
+      jobId: activeTrip.jobId || '',
+      notes: activeTrip.notes || '',
+      startPhoto: { url: activeTrip.startPhotoUrl || null, path: activeTrip.startPhotoPath || null },
+      endPhoto: { url: activeTrip.endPhotoUrl || null, path: activeTrip.endPhotoPath || null },
+    });
+    setShowForm(true);
+  };
+
+  const handleCancelActiveTrip = async () => {
+    if (!activeTrip) return;
+    if (!confirm('Cancel this trip? The odometer photo(s) will be deleted.')) return;
+    try {
+      await deleteMileageEntry(activeTrip.id);
+      clearActiveTrip();
+    } catch (err) {
+      alert(err?.message || 'Cancel failed.');
+    }
+  };
 
   const totalMiles = filtered.reduce((s, m) => s + Number(m.miles || 0), 0);
   const totalDeduction = totalMiles * MILEAGE_RATE_2026;
@@ -139,6 +326,9 @@ export default function MileagePage() {
       };
       if (editingId) {
         await updateMileageEntry(editingId, payload);
+        // Closing the live trip — drop the pin so the banner disappears
+        // and the row re-joins the main list with real values.
+        if (editingId === activeTripId) clearActiveTrip();
       } else {
         await addMileageEntry(payload);
       }
@@ -197,10 +387,119 @@ export default function MileagePage() {
           <button className="btn btn-secondary" onClick={exportCSV} disabled={!filtered.length}>
             <Download size={16} /> Export CSV
           </button>
-          <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}>
-            <Plus size={16} /> Log Trip
+          <button className="btn btn-secondary" onClick={() => { setShowForm(true); setEditingId(null); setForm(emptyForm()); }}>
+            <Plus size={16} /> Add Manually
           </button>
         </div>
+      </div>
+
+      {/* Hidden capture inputs — `capture="environment"` opens the back camera on mobile */}
+      <input
+        ref={startInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => handleStartTripFile(e.target.files?.[0])}
+      />
+      <input
+        ref={endInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        style={{ display: 'none' }}
+        onChange={(e) => handleEndTripFile(e.target.files?.[0])}
+      />
+
+      {/* Live-trip strip — primary CTA on this page. Banner when a trip is open;
+          big "Start Trip" button when none. */}
+      <div style={{ marginBottom: 'var(--space-lg)' }}>
+        {activeTrip ? (
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.10), rgba(34,197,94,0.04))',
+            border: '1px solid rgba(34,197,94,0.35)',
+            borderRadius: 'var(--radius-md)',
+            padding: 'var(--space-md)',
+            display: 'flex', gap: 'var(--space-md)', alignItems: 'center', flexWrap: 'wrap',
+          }}>
+            {activeTrip.startPhotoUrl && (
+              <a href={activeTrip.startPhotoUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
+                <img src={activeTrip.startPhotoUrl} alt="Start odometer" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+              </a>
+            )}
+            <div style={{ flex: 1, minWidth: '180px' }}>
+              <div style={{ fontWeight: 700, color: 'var(--status-success)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: 'var(--status-success)', animation: 'pulse 2s ease-in-out infinite' }} />
+                Trip in progress
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '2px' }}>
+                Started {activeTrip.createdAt ? new Date(activeTrip.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'today'}
+                {activeTrip.endPhotoUrl ? ' · end odometer captured — finish the details to close.' : ' · snap the end odometer to close.'}
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {activeTrip.endPhotoUrl ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleResumeActiveTrip}
+                  disabled={capturing !== null}
+                >
+                  <Save size={16} /> Finish Details
+                </button>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => endInputRef.current?.click()}
+                  disabled={capturing !== null}
+                  style={{ background: 'var(--status-danger)', borderColor: 'var(--status-danger)' }}
+                >
+                  {capturing === 'end' ? (<><Loader2 size={16} className="spin" /> Uploading…</>) : (<><Square size={16} fill="currentColor" /> End Trip</>)}
+                </button>
+              )}
+              <button
+                className="btn btn-icon btn-ghost"
+                onClick={handleCancelActiveTrip}
+                title="Cancel trip"
+                disabled={capturing !== null}
+              >
+                <Trash2 size={16} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => startInputRef.current?.click()}
+            disabled={capturing !== null}
+            style={{
+              width: '100%',
+              padding: 'var(--space-md) var(--space-lg)',
+              background: 'var(--accent-primary)',
+              color: 'var(--accent-primary-contrast, white)',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '1rem',
+              fontWeight: 600,
+              cursor: capturing ? 'wait' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              minHeight: '56px',
+            }}
+          >
+            {capturing === 'start' ? (
+              <><Loader2 size={20} className="spin" /> Uploading start odometer…</>
+            ) : (
+              <><Camera size={20} /> Start Trip — snap the start odometer</>
+            )}
+          </button>
+        )}
+        {captureError && (
+          <div style={{ marginTop: '8px', fontSize: '0.82rem', color: 'var(--status-danger)' }}>
+            {captureError}
+          </div>
+        )}
       </div>
 
       {/* Stats */}
