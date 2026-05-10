@@ -8,6 +8,7 @@ import {
   CalendarDays, Users, Filter, Upload,
 } from 'lucide-react';
 import ImportHistoricalJobsModal from '@/components/ImportHistoricalJobsModal';
+import AddPastJobModal from '@/components/AddPastJobModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n || 0);
@@ -31,6 +32,7 @@ export default function JobsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showImport, setShowImport] = useState(false);
+  const [showAddPast, setShowAddPast] = useState(false);
 
   const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
@@ -70,8 +72,11 @@ export default function JobsPage() {
           <p>{jobs.length} total jobs from accepted quotes</p>
         </div>
         <div className="page-header-actions">
+          <button className="btn btn-primary" onClick={() => setShowAddPast(true)}>
+            <Plus size={18} /> Add Past Job
+          </button>
           <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
-            <Upload size={18} /> Import History
+            <Upload size={18} /> Import CSV
           </button>
           <Link href="/calendar" className="btn btn-secondary">
             <CalendarDays size={18} /> View Calendar
@@ -80,6 +85,7 @@ export default function JobsPage() {
       </div>
 
       {showImport && <ImportHistoricalJobsModal onClose={() => setShowImport(false)} />}
+      {showAddPast && <AddPastJobModal onClose={() => setShowAddPast(false)} />}
 
       {/* Financial Summary Cards */}
       <div className="stats-grid" style={{ marginBottom: 'var(--space-lg)' }}>

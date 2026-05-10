@@ -224,7 +224,7 @@ export default function FinancePage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Finance</h1>
-          <p>Track company overhead, recurring bills, and outstanding invoices.</p>
+          <p>Track company overhead, recurring bills, and outstanding invoices. <strong>New Expense</strong> works for any date — pick a past date to log historical expenses.</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-secondary" onClick={() => setShowImport(true)}>

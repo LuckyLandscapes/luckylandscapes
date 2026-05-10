@@ -1759,6 +1759,82 @@ export function DataProvider({ children }) {
     return { insertedJobs, insertedCustomers, insertedExpenses, errors };
   }, [customers, addCustomer, addJob, updateJob, addJobExpense]);
 
+  // Single-row typed entry for a completed job — what the "Add Past Job"
+  // form on /jobs hits. Same write path as bulkImportHistoricalJobs but
+  // with one row of input. Accepts either an existing customerId or
+  // (firstName, lastName) for inline-create.
+  // Input shape: {
+  //   customerId?: string, firstName?: string, lastName?: string,
+  //   title, dateCompleted (YYYY-MM-DD), address?, description?, notes?,
+  //   revenue (number),
+  //   materialsCost?, equipmentCost?, laborCost?, otherCost? (numbers),
+  // }
+  const addHistoricalJob = useCallback(async (input) => {
+    let customerId = input.customerId || null;
+    let createdCustomer = null;
+
+    if (!customerId) {
+      const fn = (input.firstName || '').trim();
+      const ln = (input.lastName || '').trim();
+      if (!fn) throw new Error('Pick a customer or type a first name to create a new one');
+      createdCustomer = await addCustomer({
+        firstName: fn,
+        lastName: ln,
+        email: '',
+        phone: '',
+        address: input.address || '',
+        tags: ['imported'],
+        source: 'imported',
+      });
+      customerId = createdCustomer?.id || null;
+      if (!customerId) throw new Error('Failed to create customer');
+    }
+
+    const dateCompleted = input.dateCompleted;
+    if (!dateCompleted) throw new Error('date_completed is required');
+    const revenue = Number(input.revenue) || 0;
+
+    const jobPayload = {
+      customerId,
+      title: (input.title || '').trim() || 'Imported job',
+      status: 'completed',
+      description: input.description || '',
+      address: input.address || '',
+      scheduledDate: dateCompleted,
+      completedAt: `${dateCompleted}T12:00:00.000Z`,
+      crewNotes: input.notes || '',
+      total: revenue,
+      revenue,
+      assignedTo: [],
+    };
+
+    const job = await addJob(jobPayload);
+    if (!job?.id) throw new Error('addJob returned no id');
+    if (job.status !== 'completed' || job.completedAt !== jobPayload.completedAt) {
+      await updateJob(job.id, { status: 'completed', completedAt: jobPayload.completedAt });
+    }
+
+    const seeds = [
+      ['materialsCost', 'materials', 'Materials (imported)'],
+      ['equipmentCost', 'equipment', 'Equipment (imported)'],
+      ['laborCost', 'other', 'Labor (imported)'],
+      ['otherCost', 'other', 'Other (imported)'],
+    ];
+    let insertedExpenses = 0;
+    for (const [key, category, label] of seeds) {
+      const v = Number(input[key]);
+      if (!Number.isFinite(v) || v <= 0) continue;
+      try {
+        await addJobExpense({ jobId: job.id, category, description: label, amount: v });
+        insertedExpenses += 1;
+      } catch (err) {
+        console.warn('[addHistoricalJob] expense seed failed', label, err);
+      }
+    }
+
+    return { job, createdCustomer, insertedExpenses };
+  }, [addCustomer, addJob, updateJob, addJobExpense]);
+
   const bulkImportHistoricalCompanyExpenses = useCallback(async (rows) => {
     let inserted = 0;
     const errors = [];
@@ -1802,6 +1878,7 @@ export function DataProvider({ children }) {
 
     // Historical backfill (CSV import for legacy Google Sheet data)
     bulkImportHistoricalJobs, bulkImportHistoricalCompanyExpenses,
+    addHistoricalJob,
 
     // Calendar
     addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,
