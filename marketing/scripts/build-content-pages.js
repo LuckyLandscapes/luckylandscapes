@@ -68,6 +68,7 @@ const FOOTER = `<footer class="footer">
                     <a href="/services/lawn-care">Lawn Care</a>
                     <a href="/services/garden-beds">Garden &amp; Beds</a>
                     <a href="/services/hardscaping">Hardscaping</a>
+                    <a href="/services/fencing">Fencing</a>
                     <a href="/services/property-cleanup">Property Cleanup</a>
                     <a href="/services/landscape-design">Landscape Design</a>
                 </div>

@@ -18,6 +18,7 @@ export default defineConfig({
                 svcLawnCare: resolve(__dirname, 'services/lawn-care.html'),
                 svcGardenBeds: resolve(__dirname, 'services/garden-beds.html'),
                 svcHardscaping: resolve(__dirname, 'services/hardscaping.html'),
+                svcFencing: resolve(__dirname, 'services/fencing.html'),
                 svcPropertyCleanup: resolve(__dirname, 'services/property-cleanup.html'),
                 svcLandscapeDesign: resolve(__dirname, 'services/landscape-design.html'),
                 areaEastLincoln: resolve(__dirname, 'areas/east-lincoln.html'),

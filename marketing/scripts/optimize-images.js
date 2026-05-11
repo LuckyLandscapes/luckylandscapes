@@ -46,6 +46,7 @@ const PROFILES = {
     gardenbed:      { maxW: 1600, q: 76 },
     mulchgardenbeds:{ maxW: 1600, q: 76 },
     megandeck:      { maxW: 1600, q: 76 },
+    fencing:        { maxW: 1600, q: 76 },
     LawnRestore:    { maxW: 1600, q: 78 },
     team:           { maxW: 900,  q: 80 },
     // Favicons folder — tiny PNGs, copy as-is.
