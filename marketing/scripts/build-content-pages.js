@@ -762,15 +762,15 @@ await mkdir(join(ROOT, 'areas'), { recursive: true });
 await mkdir(join(ROOT, 'blog'), { recursive: true });
 
 for (const area of AREAS) {
-    const path = join(ROOT, 'areas', `${area.slug}`);
+    const path = join(ROOT, 'areas', `${area.slug}.html`);
     await writeFile(path, renderArea(area));
-    console.log('  area  ', `areas/${area.slug}`);
+    console.log('  area  ', `areas/${area.slug}.html`);
 }
 
 for (const post of POSTS) {
-    const path = join(ROOT, 'blog', `${post.slug}`);
+    const path = join(ROOT, 'blog', `${post.slug}.html`);
     await writeFile(path, renderPost(post));
-    console.log('  post  ', `blog/${post.slug}`);
+    console.log('  post  ', `blog/${post.slug}.html`);
 }
 
 // =====================================================================
