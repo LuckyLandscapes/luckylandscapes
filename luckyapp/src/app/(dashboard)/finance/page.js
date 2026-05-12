@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useData } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
@@ -12,6 +12,7 @@ import {
   Plus, X, Trash2, Edit3, Save, DollarSign, Calendar, Repeat,
   Receipt, AlertTriangle, BarChart3, TrendingDown, FileText, Building2,
   Send, Mail, Loader2, CheckCircle2, Eye, AlertCircle, CheckCircle, Upload,
+  Landmark, ArrowDownToLine, RefreshCw,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 import ImportHistoricalExpensesModal from '@/components/ImportHistoricalExpensesModal';
@@ -121,6 +122,101 @@ export default function FinancePage() {
       .sort((a, b) => b[1] - a[1]);
     return entries;
   }, [pnl.paymentsByMethod]);
+
+  // ─── Cash Flow: Stripe payouts (upcoming + recent) ─────────
+  const [payoutsData, setPayoutsData] = useState({ loading: true, error: null, configured: false, balance: null, payouts: [] });
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPayouts() {
+      try {
+        const res = await fetch('/api/stripe/payouts');
+        const data = await res.json();
+        if (!cancelled) {
+          setPayoutsData({
+            loading: false,
+            error: res.ok ? null : (data.error || 'Failed to load'),
+            configured: !!data.configured,
+            balance: data.balance,
+            payouts: data.payouts || [],
+          });
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPayoutsData({ loading: false, error: err.message, configured: false, balance: null, payouts: [] });
+        }
+      }
+    }
+    fetchPayouts();
+    return () => { cancelled = true; };
+  }, []);
+
+  const refreshPayouts = async () => {
+    setPayoutsData(p => ({ ...p, loading: true }));
+    try {
+      const res = await fetch('/api/stripe/payouts');
+      const data = await res.json();
+      setPayoutsData({
+        loading: false,
+        error: res.ok ? null : (data.error || 'Failed to load'),
+        configured: !!data.configured,
+        balance: data.balance,
+        payouts: data.payouts || [],
+      });
+    } catch (err) {
+      setPayoutsData(p => ({ ...p, loading: false, error: err.message }));
+    }
+  };
+
+  // Group Stripe payouts: in-transit / pending = future bank deposits;
+  // paid = already landed
+  const upcomingPayouts = useMemo(() =>
+    payoutsData.payouts.filter(p => p.status === 'pending' || p.status === 'in_transit'),
+    [payoutsData.payouts]
+  );
+  const paidOutPayouts = useMemo(() =>
+    payoutsData.payouts.filter(p => p.status === 'paid').slice(0, 5),
+    [payoutsData.payouts]
+  );
+
+  // ─── Expected income from unpaid invoices, bucketed by due date ─
+  // Mirrors A/R aging but forward-looking: groups by week so Riley can see
+  // "next week: $X expected" at a glance.
+  const expectedIncome = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const buckets = {
+      thisWeek: { label: 'This week', total: 0, count: 0, end: addDays(today, 7) },
+      nextWeek: { label: 'Next week', total: 0, count: 0, end: addDays(today, 14) },
+      twoToFour: { label: '2–4 weeks', total: 0, count: 0, end: addDays(today, 30) },
+      later: { label: '30+ days out', total: 0, count: 0, end: null },
+      overdue: { label: 'Past due (chase)', total: 0, count: 0, end: null },
+    };
+    for (const inv of invoices) {
+      if (inv.status === 'paid' || inv.status === 'cancelled') continue;
+      const due = inv.dueDate ? new Date(inv.dueDate + 'T12:00:00') : null;
+      const balance = (inv.total || 0) - (inv.amountPaid || 0);
+      if (balance <= 0) continue;
+      let key;
+      if (!due) {
+        key = 'later';
+      } else if (due < today) {
+        key = 'overdue';
+      } else if (due <= buckets.thisWeek.end) {
+        key = 'thisWeek';
+      } else if (due <= buckets.nextWeek.end) {
+        key = 'nextWeek';
+      } else if (due <= buckets.twoToFour.end) {
+        key = 'twoToFour';
+      } else {
+        key = 'later';
+      }
+      buckets[key].total += balance;
+      buckets[key].count += 1;
+    }
+    const next30 = buckets.thisWeek.total + buckets.nextWeek.total + buckets.twoToFour.total;
+    return { buckets, next30 };
+  }, [invoices]);
 
   // All unpaid invoices (current + overdue), sorted worst-offender first.
   // The card stays visible whenever there's anything outstanding so the Preview
@@ -282,6 +378,162 @@ export default function FinancePage() {
           <div className="stat-card-header"><div className="stat-card-icon"><AlertTriangle /></div></div>
           <div className="stat-card-value">{fmtCurrency(aging.totals.days30 + aging.totals.days60 + aging.totals.days90 + aging.totals.days90plus)}</div>
           <div className="stat-card-label">Past Due (A/R)</div>
+        </div>
+      </div>
+
+      {/* Cash Flow — Stripe payouts + expected income from unpaid invoices */}
+      <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+          <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Landmark size={18} style={{ color: 'var(--status-success)' }} />
+            Cash Flow
+            <span style={{ background: 'var(--bg-elevated)', color: 'var(--text-tertiary)', padding: '2px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 600 }}>
+              Money coming in
+            </span>
+          </h3>
+          {payoutsData.configured && (
+            <button className="btn btn-ghost btn-sm" onClick={refreshPayouts} disabled={payoutsData.loading} title="Refresh from Stripe">
+              {payoutsData.loading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+              {payoutsData.loading ? 'Refreshing…' : 'Refresh'}
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+          {/* Left: Stripe payouts */}
+          <div>
+            <h4 style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', marginBottom: 'var(--space-sm)' }}>
+              From Stripe → Your Bank
+            </h4>
+            {payoutsData.loading && !payoutsData.balance && (
+              <div style={{ padding: 'var(--space-md)', color: 'var(--text-tertiary)', fontSize: '0.85rem' }}>
+                <Loader2 size={16} className="animate-spin" /> Loading Stripe data…
+              </div>
+            )}
+            {!payoutsData.loading && !payoutsData.configured && (
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>
+                Stripe isn&apos;t configured for this environment. Set <code>STRIPE_SECRET_KEY</code> to see live payouts.
+              </p>
+            )}
+            {!payoutsData.loading && payoutsData.configured && payoutsData.error && (
+              <p style={{ fontSize: '0.82rem', color: 'var(--status-danger)' }}>
+                Couldn&apos;t reach Stripe: {payoutsData.error}
+              </p>
+            )}
+            {payoutsData.configured && payoutsData.balance && (
+              <>
+                {/* Balance summary */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: 'var(--space-md)' }}>
+                  <div style={{ background: 'var(--bg-elevated)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Available</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--status-success)' }}>
+                      {fmtCurrency(payoutsData.balance.available, 2)}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>ready to pay out</div>
+                  </div>
+                  <div style={{ background: 'var(--bg-elevated)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Pending</div>
+                    <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--status-info)' }}>
+                      {fmtCurrency(payoutsData.balance.pending, 2)}
+                    </div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>still clearing</div>
+                  </div>
+                </div>
+
+                {/* Upcoming payouts */}
+                {upcomingPayouts.length > 0 && (
+                  <div style={{ marginBottom: 'var(--space-md)' }}>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>Arriving in your bank</div>
+                    {upcomingPayouts.map(p => (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                        <ArrowDownToLine size={14} style={{ color: 'var(--status-info)', flexShrink: 0 }} />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 600 }}>{fmtArrival(p.arrivalDate)}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                            {p.status === 'in_transit' ? 'In transit' : 'Scheduled'} · {p.method === 'instant' ? 'Instant' : 'Standard ACH'}
+                          </div>
+                        </div>
+                        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--status-info)' }}>
+                          {fmtCurrency(p.amount, 2)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Recently paid out */}
+                {paidOutPayouts.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginBottom: 4 }}>Recently deposited</div>
+                    {paidOutPayouts.map(p => (
+                      <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', fontSize: '0.78rem' }}>
+                        <CheckCircle2 size={12} style={{ color: 'var(--status-success)', flexShrink: 0 }} />
+                        <span style={{ flex: 1, color: 'var(--text-secondary)' }}>{fmtArrival(p.arrivalDate)}</span>
+                        <span style={{ fontWeight: 600 }}>{fmtCurrency(p.amount, 2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {upcomingPayouts.length === 0 && paidOutPayouts.length === 0 && (
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>
+                    No payouts yet. As customers pay through Stripe, deposits will appear here with arrival dates.
+                  </p>
+                )}
+                <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                  <a href="https://dashboard.stripe.com/payouts" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--lucky-green-light)' }}>
+                    Full payout history on Stripe →
+                  </a>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Right: Expected income from unpaid invoices */}
+          <div>
+            <h4 style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-tertiary)', marginBottom: 'var(--space-sm)' }}>
+              Expected from Unpaid Invoices
+            </h4>
+            <div style={{ background: 'var(--bg-elevated)', padding: 'var(--space-md)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-md)' }}>
+              <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Next 30 days</div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--status-success)' }}>
+                {fmtCurrency(expectedIncome.next30, 2)}
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                from invoices due in the window — assumes customers pay on time
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {Object.entries(expectedIncome.buckets).map(([key, b]) => {
+                if (b.total <= 0) return null;
+                const isOverdue = key === 'overdue';
+                return (
+                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 0', borderBottom: '1px solid var(--border-subtle)' }}>
+                    <Calendar size={12} style={{ color: isOverdue ? 'var(--status-danger)' : 'var(--text-tertiary)', flexShrink: 0 }} />
+                    <span style={{ flex: 1, fontSize: '0.82rem', fontWeight: 600, color: isOverdue ? 'var(--status-danger)' : undefined }}>
+                      {b.label}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                      {b.count} {b.count === 1 ? 'inv' : 'invs'}
+                    </span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: isOverdue ? 'var(--status-danger)' : 'var(--status-success)', minWidth: 80, textAlign: 'right' }}>
+                      {fmtCurrency(b.total, 2)}
+                    </span>
+                  </div>
+                );
+              })}
+              {expectedIncome.next30 === 0 && expectedIncome.buckets.overdue.total === 0 && expectedIncome.buckets.later.total === 0 && (
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', textAlign: 'center', padding: 'var(--space-md)' }}>
+                  No unpaid invoices on file. 🎉
+                </p>
+              )}
+            </div>
+            <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+              <Link href="/invoices" style={{ color: 'var(--lucky-green-light)' }}>
+                View all invoices →
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -666,6 +918,25 @@ export default function FinancePage() {
 
 function periodLabel(p) {
   return ({ week: 'this week', month: 'this month', quarter: 'this quarter', year: 'this year', all: 'all time' })[p] || p;
+}
+
+function addDays(d, n) {
+  const out = new Date(d);
+  out.setDate(out.getDate() + n);
+  out.setHours(23, 59, 59, 999);
+  return out;
+}
+
+function fmtArrival(iso) {
+  if (!iso) return '';
+  const d = new Date(iso + 'T12:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const tom = new Date(today); tom.setDate(tom.getDate() + 1);
+  const daysOut = Math.round((d - today) / (1000 * 60 * 60 * 24));
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === tom.toDateString()) return 'Tomorrow';
+  if (daysOut > 0 && daysOut < 7) return d.toLocaleDateString('en-US', { weekday: 'long' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function fmtDate(d) {
