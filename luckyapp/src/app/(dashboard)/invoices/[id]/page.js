@@ -94,6 +94,25 @@ export default function InvoiceDetailPage() {
     ? `${window.location.origin}/pay/${invoice.publicToken}`
     : null;
 
+  // Overpayment detection — when amount_paid exceeds invoice total. Almost
+  // always means a duplicate payment (manual Mark Paid + Stripe webhook both
+  // fired). The webhook flags its row with "DUPLICATE" or "OVERPAYMENT" in
+  // notes; we prefer that one for the "delete the duplicate" CTA since it's
+  // the audit-traceable Stripe charge, not the manual entry.
+  // (Plain const, not useMemo — cheap to compute and we're past an early
+  // return, so a Hook would violate rules-of-hooks.)
+  const overpayAmount = Math.max(0, (invoice.amountPaid || 0) - (invoice.total || 0));
+  let duplicatePayment = null;
+  if (overpayAmount > 0) {
+    // Prefer payments flagged by the webhook (have DUPLICATE / OVERPAYMENT in notes)
+    duplicatePayment = payments.find(p => /DUPLICATE|OVERPAYMENT/i.test(p.notes || ''))
+      // Otherwise, the manually-marked one we set "Marked paid…" on
+      || payments.find(p => p.method === 'other' && /^Marked paid/i.test(p.notes || ''))
+      // Last resort: a payment whose amount matches the overpay difference
+      || payments.find(p => Math.abs((p.amount || 0) - overpayAmount) < 0.01)
+      || null;
+  }
+
   const showToast = (type, message) => {
     setToast({ type, message });
     setTimeout(() => setToast(null), 4000);
@@ -157,6 +176,18 @@ export default function InvoiceDetailPage() {
     if (invoice.status === 'paid') {
       showToast('error', 'This invoice is already marked paid.');
       return;
+    }
+    // Guardrail: if the public payment link is still live, the customer may
+    // also be paying via Stripe right now. Marking it paid here AND letting
+    // Stripe complete the charge has caused $X paid against $X total →
+    // duplicate $2X paid against $X total (real incident 2026-05-12).
+    if (invoice.publicToken && invoice.status !== 'cancelled') {
+      const ok = confirm(
+        `The Stripe payment link for this invoice is still live. If the customer also pays via that link, you'll have a duplicate payment to refund.\n\n` +
+        `Only continue if you're 100% sure the customer paid by cash/check/etc. and is NOT going to pay through the link.\n\n` +
+        `Continue marking paid?`
+      );
+      if (!ok) return;
     }
     try {
       const balanceDue = Math.max(0, (invoice.total || 0) - (invoice.amountPaid || 0));
@@ -436,6 +467,52 @@ export default function InvoiceDetailPage() {
         </div>
       )}
 
+      {/* Overpayment alert — appears when amount_paid exceeds total. Almost
+          always means a duplicate payment slipped through (manual + Stripe
+          both fired). Shows the over-amount + a one-click "Find duplicate"
+          that scrolls to and highlights the dupe row in payment history. */}
+      {overpayAmount > 0 && (
+        <div className="card" style={{
+          marginBottom: 'var(--space-md)',
+          borderLeft: '4px solid var(--status-danger)',
+          background: 'var(--status-danger-bg)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--space-md)' }}>
+            <AlertTriangle size={22} style={{ color: 'var(--status-danger)', flexShrink: 0, marginTop: 2 }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, color: 'var(--status-danger)', marginBottom: 4 }}>
+                Overpaid by {formatCurrency(overpayAmount)}
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
+                This invoice has {formatCurrency(invoice.amountPaid)} paid against {formatCurrency(invoice.total)} owed.
+                Most often this is a duplicate — Riley marked it paid AND the customer also paid through the Stripe link.
+                {duplicatePayment && (
+                  <> The duplicate is flagged in the payment history below.</>
+                )}
+              </div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                {duplicatePayment && (
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleDeletePayment(duplicatePayment)}
+                  >
+                    <Trash2 size={14} /> Delete the duplicate ({formatCurrency(duplicatePayment.amount)})
+                  </button>
+                )}
+                <a
+                  href="https://dashboard.stripe.com/payments"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-secondary btn-sm"
+                >
+                  Open Stripe to refund
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Payment Progress Bar */}
       {invoice.status !== 'cancelled' && (
         <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
@@ -449,7 +526,7 @@ export default function InvoiceDetailPage() {
             <div style={{
               height: '100%',
               width: `${Math.min(100, ((invoice.amountPaid || 0) / (invoice.total || 1)) * 100)}%`,
-              background: invoice.status === 'paid' ? 'var(--status-success)' : 'var(--lucky-green)',
+              background: overpayAmount > 0 ? 'var(--status-danger)' : invoice.status === 'paid' ? 'var(--status-success)' : 'var(--lucky-green)',
               borderRadius: '4px',
               transition: 'width 0.5s ease',
             }} />
@@ -538,34 +615,42 @@ export default function InvoiceDetailPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {payments.map(p => (
-                    <tr key={p.id}>
-                      <td style={{ fontSize: '0.82rem' }}>{formatDateTime(p.paidAt || p.createdAt)}</td>
-                      <td>
-                        <span style={{ fontWeight: 600, fontSize: '0.82rem' }}>{METHOD_LABEL[p.method] || p.method}</span>
-                        {p.stripePaymentIntentId && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontFamily: 'monospace', marginTop: 2 }}>
-                            {p.stripePaymentIntentId.slice(0, 24)}…
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ fontWeight: 700, color: 'var(--status-success)' }}>{formatCurrency(p.amount)}</td>
-                      <td>
-                        <span className="badge" style={{
-                          background: p.status === 'succeeded' ? 'var(--status-success-bg)' : 'var(--status-warning-bg)',
-                          color: p.status === 'succeeded' ? 'var(--status-success)' : 'var(--status-warning)',
-                        }}>
-                          {p.status}
-                        </span>
-                      </td>
-                      <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{p.notes || '—'}</td>
-                      <td>
-                        <button className="btn btn-ghost btn-sm" onClick={() => handleDeletePayment(p)} title="Delete payment">
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {payments.map(p => {
+                    const isDupe = /DUPLICATE|OVERPAYMENT/i.test(p.notes || '');
+                    return (
+                      <tr key={p.id} style={isDupe ? { background: 'var(--status-danger-bg)' } : undefined}>
+                        <td style={{ fontSize: '0.82rem' }}>{formatDateTime(p.paidAt || p.createdAt)}</td>
+                        <td>
+                          <span style={{ fontWeight: 600, fontSize: '0.82rem' }}>{METHOD_LABEL[p.method] || p.method}</span>
+                          {isDupe && (
+                            <span className="badge" style={{ background: 'var(--status-danger-bg)', color: 'var(--status-danger)', marginLeft: 6, fontSize: '0.65rem' }}>
+                              <AlertTriangle size={10} style={{ marginRight: 2 }} /> Duplicate
+                            </span>
+                          )}
+                          {p.stripePaymentIntentId && (
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', fontFamily: 'monospace', marginTop: 2 }}>
+                              {p.stripePaymentIntentId.slice(0, 24)}…
+                            </div>
+                          )}
+                        </td>
+                        <td style={{ fontWeight: 700, color: isDupe ? 'var(--status-danger)' : 'var(--status-success)' }}>{formatCurrency(p.amount)}</td>
+                        <td>
+                          <span className="badge" style={{
+                            background: p.status === 'succeeded' ? 'var(--status-success-bg)' : 'var(--status-warning-bg)',
+                            color: p.status === 'succeeded' ? 'var(--status-success)' : 'var(--status-warning)',
+                          }}>
+                            {p.status}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>{p.notes || '—'}</td>
+                        <td>
+                          <button className="btn btn-ghost btn-sm" onClick={() => handleDeletePayment(p)} title="Delete payment">
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             )}

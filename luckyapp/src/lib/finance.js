@@ -408,8 +408,19 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
   let revenue = 0;
   // Payment-method breakdown (used by both /finance and the Stripe-fee line).
   // Always built — cheap to compute and the UI uses it regardless of basis.
+  //
+  // Duplicate-flagged payments (where the webhook detected the invoice was
+  // already paid and tagged the row "DUPLICATE" / "OVERPAYMENT" in notes) are
+  // EXCLUDED from revenue + processor fees + payment-method breakdown. They
+  // represent a charge that Riley needs to refund — counting them as revenue
+  // would lie about real income until the refund posts. The audit row still
+  // lives in the payments table so the invoice detail page can flag the
+  // overpayment and let Riley delete it.
+  const isDuplicateFlag = /DUPLICATE|OVERPAYMENT/i;
   const paymentsInRange = payments.filter(p =>
-    (p.status === 'succeeded' || !p.status) && inRange(p.paidAt || p.paid_at || p.createdAt, start, end)
+    (p.status === 'succeeded' || !p.status) &&
+    inRange(p.paidAt || p.paid_at || p.createdAt, start, end) &&
+    !isDuplicateFlag.test(p.notes || '')
   );
   const paymentsByMethod = {};
   let processorFees = 0;

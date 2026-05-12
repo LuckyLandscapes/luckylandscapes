@@ -192,6 +192,14 @@ The dashboard and `/reports` both **default to cash basis** because that's what 
 
 **Important: "Mark Paid" creates a payment row** ([`(dashboard)/invoices/[id]/page.js`](luckyapp/src/app/(dashboard)/invoices/[id]/page.js) `handleMarkPaid`). Before migration 038, that button only updated `invoices.amount_paid` without inserting into `payments`, which silently broke cash-basis revenue for every invoice marked paid through the legacy flow. Now it inserts a `method='other'` row (using `invoice.payment_method` if set) so the invoice immediately shows up in cash revenue + payment-method breakdown. **Don't revert** — anyone touching this code needs to keep the payment-row insert in lockstep with the invoice update, or cash-basis revenue will desync from the dashboard "Outstanding" badge.
 
+**Double-pay protection (Mark Paid + Stripe both fire).** Real incident 2026-05-12: an invoice showed $6,010 paid against $3,005 total because Riley clicked "Mark Paid" before the Stripe webhook fired, then the customer's Stripe charge also completed. Three defenses:
+
+1. **Mark Paid confirm prompt** — if `invoice.publicToken` exists and status isn't `cancelled`, the button prompts "the Stripe payment link is still live; if the customer also pays through it, you'll have a duplicate to refund. Continue?" before proceeding.
+2. **Webhook self-heals** — [`/api/stripe/webhook`](luckyapp/src/app/api/stripe/webhook/route.js) fetches the invoice BEFORE inserting the payment row. If `inv.status === 'paid'` OR `currentPaid + amount > total + 0.01`, it inserts the payment row with a `DUPLICATE` / `OVERPAYMENT` note **and does NOT increment `invoices.amount_paid`** (no double-count on the invoice). It also fires a `notifyOrg('invoice_overpaid')` event so Riley sees the duplicate immediately.
+3. **Overpayment alert UI** — on `/invoices/[id]`, when `amount_paid > total` the page shows a red-bordered alert at the top with the over-amount, a "Delete the duplicate ($X)" one-click action (auto-picks the webhook-flagged row, falls back to the manually-marked one), and a "Open Stripe to refund" link. Duplicate-flagged rows in the payment history get red row backgrounds + a "Duplicate" badge.
+
+**Cash-basis revenue excludes duplicate-flagged payments.** [`pnlForRange`](luckyapp/src/lib/finance.js) drops rows whose notes match `/DUPLICATE|OVERPAYMENT/i` from the in-range filter, so the dashboard doesn't show inflated revenue between when the duplicate fires and when Riley deletes the row. Keep this filter in sync with the webhook's note format — change one, change both, or the dashboard will silently double-count again.
+
 If `payments` is empty (data-layer not wired through yet), cash-basis revenue returns $0 — `buildPnL` accepts an optional `payments=[]` default so legacy callers don't crash, but they'll show no cash revenue.
 
 ### A/R collection — auto-dunning + dashboard surface

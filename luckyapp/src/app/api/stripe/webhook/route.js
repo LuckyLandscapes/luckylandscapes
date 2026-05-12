@@ -184,7 +184,39 @@ export async function POST(request) {
         return NextResponse.json({ received: true });
       }
 
-      // Record payment row
+      // Fetch the invoice FIRST so we can detect already-paid / overpayment
+      // before we commit the new payment row. Two paths can fire for the
+      // same invoice — manual "Mark Paid" / "Record Payment" AND the webhook —
+      // and the prior code blindly incremented amount_paid, doubling the
+      // amount on the invoice when both fired (see screenshot 2026-05-12).
+      const { data: inv, error: invFetchErr } = await supabase
+        .from('invoices')
+        .select('total, amount_paid, status, invoice_number, customer_id, items')
+        .eq('id', invoiceId)
+        .single();
+      if (invFetchErr) {
+        console.error('[stripe webhook] invoice fetch failed:', invFetchErr);
+        return NextResponse.json({ error: 'invoice fetch failed' }, { status: 500 });
+      }
+
+      const currentPaid = Number(inv?.amount_paid || 0);
+      const total = Number(inv?.total || 0);
+      const alreadyFullyPaid = inv?.status === 'paid' || currentPaid >= total;
+      const wouldOverpay = currentPaid + amount > total + 0.01; // 1¢ tolerance for FP rounding
+
+      // Record payment row. If the invoice was already paid (or this charge
+      // would push amount_paid past total), we STILL log the row — Stripe
+      // genuinely took the customer's money and we need an audit trail — but
+      // we flag it so Riley can refund and avoid double-counting in revenue.
+      const isDuplicate = alreadyFullyPaid || wouldOverpay;
+      const noteParts = [`Online payment via ${method === 'ach' ? 'bank transfer' : 'card'}`];
+      if (isDuplicate) {
+        noteParts.push(
+          alreadyFullyPaid
+            ? 'DUPLICATE — invoice was already marked paid before this charge succeeded. Refund the customer to balance.'
+            : `OVERPAYMENT — this charge pushes total paid (${(currentPaid + amount).toFixed(2)}) past invoice total (${total.toFixed(2)}). Refund the difference.`
+        );
+      }
       const { error: payErr } = await supabase.from('payments').insert({
         org_id: orgId,
         invoice_id: invoiceId,
@@ -197,7 +229,7 @@ export async function POST(request) {
         processor_fee: fee,
         net_amount: amount - fee,
         paid_at: new Date(intent.created * 1000).toISOString(),
-        notes: `Online payment via ${method === 'ach' ? 'bank transfer' : 'card'}`,
+        notes: noteParts.join(' '),
       });
       if (payErr) {
         // Don't update the invoice if we failed to record the payment — return
@@ -207,20 +239,14 @@ export async function POST(request) {
         return NextResponse.json({ error: 'payment insert failed' }, { status: 500 });
       }
 
-      // Update invoice totals — also pull items so the receipt email can show them
-      const { data: inv, error: invFetchErr } = await supabase
-        .from('invoices')
-        .select('total, amount_paid, invoice_number, customer_id, items')
-        .eq('id', invoiceId)
-        .single();
-      if (invFetchErr) {
-        console.error('[stripe webhook] invoice fetch failed:', invFetchErr);
-        return NextResponse.json({ error: 'invoice fetch failed' }, { status: 500 });
-      }
+      // Update invoice totals — only if this isn't a duplicate. For duplicates
+      // we leave invoice.amount_paid alone (already at total) so the invoice
+      // doesn't show $6010 paid against a $3005 total. The duplicate payment
+      // row above preserves the audit trail.
       let newStatus = null;
-      if (inv) {
-        const newPaid = Number(inv.amount_paid || 0) + amount;
-        newStatus = newPaid >= Number(inv.total || 0) ? 'paid' : 'partial';
+      if (inv && !isDuplicate) {
+        const newPaid = currentPaid + amount;
+        newStatus = newPaid >= total ? 'paid' : 'partial';
         const updates = {
           amount_paid: newPaid,
           status: newStatus,
@@ -231,6 +257,23 @@ export async function POST(request) {
         if (invUpdateErr) {
           console.error('[stripe webhook] invoice update failed:', invUpdateErr);
           return NextResponse.json({ error: 'invoice update failed' }, { status: 500 });
+        }
+      }
+
+      // Always notify the org when a duplicate fires so Riley can refund.
+      // This is separate from the normal "invoice paid" notification flow below.
+      if (isDuplicate) {
+        try {
+          await notifyOrg({
+            orgId,
+            type: 'invoice_overpaid',
+            title: `⚠️ Duplicate payment on Invoice #${inv?.invoice_number || ''}`,
+            body: `Stripe charged ${fmtMoney(amount)} but this invoice was already marked paid. Refund the customer in Stripe to balance. The duplicate payment is flagged in the invoice's payment history.`,
+            link: `/invoices/${invoiceId}`,
+            data: { invoiceId, amount, method, kind: 'duplicate_payment' },
+          });
+        } catch (notifyErr) {
+          console.error('[stripe webhook] duplicate notify failed', notifyErr);
         }
       }
 
