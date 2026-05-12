@@ -5146,6 +5146,11 @@ body.promo-active .mobile-menu {
     border-color: rgba(107, 142, 78, .3);
 }
 
+/* Center an orphan card in the last row of the services grid. */
+.home-service-card--orphan-center {
+    grid-column: 2 / 3;
+}
+
 .home-service-badge {
     position: absolute;
     top: 1rem;
@@ -6435,6 +6440,13 @@ body.promo-active .mobile-menu {
         grid-template-columns: repeat(2, 1fr);
     }
 
+    /* Tablet: span the row and center, keeping the card the same width as siblings. */
+    .home-service-card--orphan-center {
+        grid-column: 1 / -1;
+        justify-self: center;
+        max-width: calc(50% - 0.75rem);
+    }
+
     .reviews-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -6459,6 +6471,13 @@ body.promo-active .mobile-menu {
         grid-template-columns: 1fr;
         max-width: 420px;
         margin: 0 auto;
+    }
+
+    /* Mobile: single column already centers; reset the desktop/tablet placement. */
+    .home-service-card--orphan-center {
+        grid-column: auto;
+        justify-self: stretch;
+        max-width: none;
     }
 
     .reviews-grid {
