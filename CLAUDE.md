@@ -200,6 +200,12 @@ The dashboard and `/reports` both **default to cash basis** because that's what 
 
 **Cash-basis revenue excludes duplicate-flagged payments.** [`pnlForRange`](luckyapp/src/lib/finance.js) drops rows whose notes match `/DUPLICATE|OVERPAYMENT/i` from the in-range filter, so the dashboard doesn't show inflated revenue between when the duplicate fires and when Riley deletes the row. Keep this filter in sync with the webhook's note format — change one, change both, or the dashboard will silently double-count again.
 
+**Cash Flow card on `/finance`** ([`(dashboard)/finance/page.js`](luckyapp/src/app/(dashboard)/finance/page.js) — search for "Cash Flow"). Two-column card directly under the stats grid:
+- **Left — From Stripe → Your Bank.** Pulls live from [`/api/stripe/payouts`](luckyapp/src/app/api/stripe/payouts/route.js) which calls `stripe.balance.retrieve()` + `stripe.payouts.list({limit: 10})`. Shows available balance, pending balance, upcoming (`in_transit` / `pending`) payouts with arrival dates (e.g. "Tomorrow · $1,250"), and the last 5 paid-out deposits. Has a Refresh button — no caching, just refetch on demand. Gracefully degrades when `STRIPE_SECRET_KEY` is missing (shows config hint). Stripe API calls are free in this volume, so live-fetch on page load is fine.
+- **Right — Expected from Unpaid Invoices.** Forward-looking version of A/R aging that buckets unpaid invoices by `dueDate`: this week / next week / 2–4 weeks / 30+ days out / past due. Computes a "next 30 days" total. No API call — pure derivation from `invoices` state.
+
+The whole card answers "when is money landing in my account?" with one screen — Stripe's actual payout dates on the left, customer-due-date estimates on the right.
+
 If `payments` is empty (data-layer not wired through yet), cash-basis revenue returns $0 — `buildPnL` accepts an optional `payments=[]` default so legacy callers don't crash, but they'll show no cash revenue.
 
 ### A/R collection — auto-dunning + dashboard surface
