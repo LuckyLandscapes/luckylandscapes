@@ -1160,8 +1160,8 @@ export function DataProvider({ children }) {
   }, [jobs, jobExpenses, timeEntries, teamMembers, timeSegments, org]);
 
   const getPnL = useCallback((period = 'month', basis = 'completed') =>
-    computeBuildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis, payrollSettings: getPayrollSettings(org) }),
-    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, org]);
+    computeBuildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, payments, period, basis, payrollSettings: getPayrollSettings(org) }),
+    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, payments, org]);
 
   const getARAging = useCallback(() => computeARAging(invoices), [invoices]);
 

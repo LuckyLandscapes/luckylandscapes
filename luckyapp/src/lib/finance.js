@@ -381,10 +381,20 @@ export function jobFinancials(job, jobExpenses, timeEntries, teamMembers, timeSe
 // Cash-basis-ish: costs are recognized when they're incurred (segment ended,
 // expense dated), not when the parent job completes. Otherwise mid-period
 // dashboards understate spend on jobs still in progress, which silently hides
-// labor and materials until completion. Revenue still recognizes on completion
-// (or on payment when basis === 'paid'); over a 30-day window the mismatch is
-// usually small for short-cycle landscaping work.
-function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, start, end, basis, payrollSettings = null }) {
+// labor and materials until completion.
+//
+// Revenue depends on basis:
+//   - 'completed' (accrual): sum of completed-job revenue dated in period.
+//   - 'paid' (cash):         sum of payments.amount with paid_at in period.
+//                            This picks up deposits, partial payments, and
+//                            anything that hit the bank — the prior behavior
+//                            (only fully-paid invoices) silently dropped
+//                            partial payments and quote deposits.
+//
+// Processor fees (Stripe / Square / etc.) come back as their own number so
+// the UI can show them as a separate expense line rather than burying them
+// in 'other'.
+function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, payments = [], start, end, basis, payrollSettings = null }) {
   // Multiplier on a member's gross rate to include employer burden when
   // payrollSettings is provided. Returns 1.0 (no burden) when settings are
   // missing so legacy callers preserve behavior.
@@ -396,12 +406,24 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
   };
   // Revenue
   let revenue = 0;
+  // Payment-method breakdown (used by both /finance and the Stripe-fee line).
+  // Always built — cheap to compute and the UI uses it regardless of basis.
+  const paymentsInRange = payments.filter(p =>
+    (p.status === 'succeeded' || !p.status) && inRange(p.paidAt || p.paid_at || p.createdAt, start, end)
+  );
+  const paymentsByMethod = {};
+  let processorFees = 0;
+  for (const p of paymentsInRange) {
+    const method = p.method || 'other';
+    paymentsByMethod[method] = (paymentsByMethod[method] || 0) + Number(p.amount || 0);
+    processorFees += Number(p.processorFee || p.processor_fee || 0);
+  }
+  const paymentsTotal = Object.values(paymentsByMethod).reduce((a, b) => a + b, 0);
+
   if (basis === 'paid') {
-    for (const inv of invoices) {
-      if (inv.status !== 'paid') continue;
-      if (!inRange(inv.paidDate || inv.createdAt, start, end)) continue;
-      revenue += Number(inv.total || 0);
-    }
+    // Cash basis: every dollar that hit the bank counts, regardless of whether
+    // it was a deposit, partial payment, or fully closed invoice.
+    revenue = paymentsTotal;
   }
   // periodJobs is the per-job drill-down list (used by /reports). Always
   // completed jobs in range, regardless of basis.
@@ -479,7 +501,11 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     const breakHrs = Number(t.breakMinutes || 0) / 60;
     indirectLabor += rate * burdenMult(memberId) * Math.max(0, totalHours - breakHrs);
   }
-  const opex = Object.values(opexByCat).reduce((a, b) => a + b, 0) + indirectLabor;
+  // Processor fees count as an operating expense — Stripe/Square skim off the
+  // top of every card/ACH payment. Showing them as a P&L line keeps the
+  // "money in" and "money kept" numbers honest. (They show up here regardless
+  // of basis so accrual P&Ls also see the real net cost of accepting cards.)
+  const opex = Object.values(opexByCat).reduce((a, b) => a + b, 0) + indirectLabor + processorFees;
 
   const grossProfit = revenue - cogs;
   const netProfit = grossProfit - opex;
@@ -490,8 +516,9 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
     revenue,
     cogs, cogsByCat, directLabor,
     grossProfit, grossMargin,
-    opex, opexByCat, indirectLabor,
+    opex, opexByCat, indirectLabor, processorFees,
     netProfit, netMargin,
+    paymentsByMethod, paymentsTotal, paymentsInRange,
     periodJobs,
     revenueJobs: periodJobs,
   };
@@ -500,9 +527,12 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
 // Build full P&L plus prior-period comparison.
 // payrollSettings (optional) — when passed, labor lines include employer
 // burden (FICA + FUTA + SUTA + WC) so net margin reflects true labor cost.
-export function buildPnL({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, period = 'month', basis = 'completed', payrollSettings = null }) {
+// payments (optional) — required for cash-basis revenue + processor-fee
+// expense line. When omitted, cash basis returns 0 and the processor-fee
+// line is hidden (back-compat with callers that haven't been updated yet).
+export function buildPnL({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMembers, invoices, companyExpenses, payments = [], period = 'month', basis = 'completed', payrollSettings = null }) {
   const { start, end, prevStart, prevEnd } = getPeriodRange(period);
-  const args = { jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, basis, payrollSettings };
+  const args = { jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, payments, basis, payrollSettings };
   const current = pnlForRange({ ...args, start, end });
   const previous = pnlForRange({ ...args, start: prevStart, end: prevEnd });
   return { ...current, range: { start, end }, previous };

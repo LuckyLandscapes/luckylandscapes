@@ -63,10 +63,17 @@ export default function DashboardPage() {
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Pull headline numbers from the canonical P&L (last 30 days)
-  const pnl = useMemo(() => getPnL('month', 'completed'), [getPnL]);
+  // Pull headline numbers from the canonical P&L (last 30 days).
+  // Default to CASH basis ('paid') so deposits and partial payments hit the
+  // headline number the moment money lands — accrual basis hides those until
+  // the job is marked complete, which surprises owners who reasonably expect
+  // "we got paid $X" to mean "revenue went up by $X". The earned-vs-collected
+  // sub-line below makes the difference explicit when they diverge.
+  const pnl = useMemo(() => getPnL('month', 'paid'), [getPnL]);
+  const pnlAccrual = useMemo(() => getPnL('month', 'completed'), [getPnL]);
   const totalRevenue = pnl.revenue;
   const netProfit = pnl.netProfit;
+  const revenueEarned = pnlAccrual.revenue;
 
   const pendingQuotes = quotes.filter(q => q.status === 'draft' || q.status === 'sent');
   const pendingValue = pendingQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
@@ -147,7 +154,12 @@ export default function DashboardPage() {
         <div className="stat-card" style={{ '--accent': 'var(--status-success)', '--accent-bg': 'var(--status-success-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><DollarSign /></div></div>
           <div className="stat-card-value">{formatCurrency(totalRevenue)}</div>
-          <div className="stat-card-label">Revenue (30 days)</div>
+          <div className="stat-card-label">Collected (30 days)</div>
+          {revenueEarned !== totalRevenue && (
+            <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+              Earned: {formatCurrency(revenueEarned)}
+            </div>
+          )}
         </div>
         <div className="stat-card" style={{ '--accent': 'var(--status-info)', '--accent-bg': 'var(--status-info-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><FileText /></div></div>

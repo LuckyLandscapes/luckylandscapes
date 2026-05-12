@@ -28,15 +28,17 @@ const BASES = [
 export default function ReportsPage() {
   const {
     jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices,
-    companyExpenses, getCustomer,
+    companyExpenses, payments, getCustomer,
   } = useData();
 
   const [period, setPeriod] = useState('month');
-  const [basis, setBasis] = useState('completed');
+  // Default to cash basis here too — matches the dashboard, and is the basis
+  // owners intuitively expect when they ask "how much did we make?".
+  const [basis, setBasis] = useState('paid');
 
   const pnl = useMemo(
-    () => buildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis }),
-    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, period, basis]
+    () => buildPnL({ jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, payments, period, basis }),
+    [jobs, jobExpenses, timeEntries, timeSegments, teamMembers, invoices, companyExpenses, payments, period, basis]
   );
 
   const aging = useMemo(() => buildARAging(invoices), [invoices]);
@@ -183,6 +185,7 @@ export default function ReportsPage() {
               <PnLRow key={cat} label={OPEX_LABELS[cat] || cat} amount={val} />
             ))}
             {pnl.indirectLabor > 0 && <PnLRow label="Indirect Labor (overhead time)" amount={pnl.indirectLabor} />}
+            {pnl.processorFees > 0 && <PnLRow label="Payment processing fees (Stripe)" amount={pnl.processorFees} />}
             {pnl.opex === 0 && <EmptyRow text={<>No overhead logged. <Link href="/finance" style={{ color: 'var(--lucky-green-light)' }}>Add company expenses →</Link></>} />}
           </PnLSection>
           <PnLTotal label="Total Operating Expenses" amount={pnl.opex} />

@@ -52,10 +52,20 @@ function emptyForm() {
   };
 }
 
+const METHOD_META = {
+  card:   { label: 'Card',          icon: '💳' },
+  ach:    { label: 'Bank (ACH)',    icon: '🏦' },
+  cash:   { label: 'Cash',          icon: '💵' },
+  check:  { label: 'Check',         icon: '🏷️' },
+  venmo:  { label: 'Venmo',         icon: '📲' },
+  zelle:  { label: 'Zelle',         icon: '⚡' },
+  other:  { label: 'Other',         icon: '📦' },
+};
+
 export default function FinancePage() {
   const {
     companyExpenses, addCompanyExpense, updateCompanyExpense, deleteCompanyExpense,
-    invoices, customers, getCustomer, updateInvoice,
+    invoices, customers, getCustomer, updateInvoice, getPnL,
   } = useData();
   const { user } = useAuth();
 
@@ -101,6 +111,16 @@ export default function FinancePage() {
   }, [filtered]);
 
   const aging = useMemo(() => buildARAging(invoices), [invoices]);
+
+  // Pull cash-basis P&L for the period — gives us paymentsByMethod and the
+  // total processor fee for the same window the user is looking at.
+  const pnl = useMemo(() => getPnL(period, 'paid'), [getPnL, period]);
+  const paymentMethodRows = useMemo(() => {
+    const entries = Object.entries(pnl.paymentsByMethod || {})
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1]);
+    return entries;
+  }, [pnl.paymentsByMethod]);
 
   // All unpaid invoices (current + overdue), sorted worst-offender first.
   // The card stays visible whenever there's anything outstanding so the Preview
@@ -362,8 +382,58 @@ export default function FinancePage() {
           </table>
         </div>
 
-        {/* Sidebar: category breakdown + A/R aging */}
+        {/* Sidebar: payments collected + category breakdown + A/R aging */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          <div className="card">
+            <h4 style={{ marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <DollarSign size={16} style={{ color: 'var(--status-success)' }} /> Payments Collected
+            </h4>
+            <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
+              Money in for {periodLabel(period).toLowerCase()} — by payment method.
+            </div>
+            {paymentMethodRows.length > 0 ? (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {paymentMethodRows.map(([method, amount]) => {
+                    const meta = METHOD_META[method] || METHOD_META.other;
+                    const pct = pnl.paymentsTotal > 0 ? (amount / pnl.paymentsTotal) * 100 : 0;
+                    return (
+                      <div key={method}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: '3px' }}>
+                          <span>{meta.icon} {meta.label}</span>
+                          <strong>{fmtCurrency(amount, 2)}</strong>
+                        </div>
+                        <div style={{ height: '6px', background: 'var(--bg-elevated)', borderRadius: '3px', overflow: 'hidden' }}>
+                          <div style={{ width: `${pct}%`, height: '100%', background: 'var(--status-success)' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 700 }}>
+                    <span>Total collected</span>
+                    <span style={{ color: 'var(--status-success)' }}>{fmtCurrency(pnl.paymentsTotal, 2)}</span>
+                  </div>
+                  {pnl.processorFees > 0 && (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--status-warning)' }}>
+                        <span>− Stripe / processor fees</span>
+                        <span>{fmtCurrency(pnl.processorFees, 2)}</span>
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', fontWeight: 700, marginTop: 2 }}>
+                        <span>Net to your bank</span>
+                        <span>{fmtCurrency(pnl.paymentsTotal - pnl.processorFees, 2)}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>No payments collected in this period.</p>
+            )}
+          </div>
+
           <div className="card">
             <h4 style={{ marginBottom: 'var(--space-md)' }}>By Category</h4>
             {byCategory.length > 0 ? (

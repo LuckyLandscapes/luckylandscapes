@@ -159,6 +159,22 @@ export default function InvoiceDetailPage() {
       return;
     }
     try {
+      const balanceDue = Math.max(0, (invoice.total || 0) - (invoice.amountPaid || 0));
+      // Create a payment row for the balance so cash-basis revenue (P&L,
+      // dashboard, /finance payments-by-method) sees the cash. Without this,
+      // "Mark Paid" silently flipped the invoice status but never showed up
+      // as revenue collected.
+      if (balanceDue > 0) {
+        await addPayment({
+          invoiceId: id,
+          customerId: invoice.customerId || null,
+          amount: balanceDue,
+          method: invoice.paymentMethod || 'other',
+          status: 'succeeded',
+          notes: 'Marked paid (no method specified — edit on the payments list to correct)',
+          paidAt: new Date().toISOString(),
+        });
+      }
       await updateInvoice(id, {
         amountPaid: invoice.total,
         status: 'paid',
