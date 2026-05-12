@@ -2151,7 +2151,7 @@ textarea {
 
 @media (max-width:768px) {
     :root {
-        --section-pad: 4rem 0;
+        --section-pad: 5rem 0;
     }
 
     .nav-links {
@@ -2168,12 +2168,12 @@ textarea {
 
     .about-grid {
         grid-template-columns: 1fr;
-        gap: 1.5rem;
+        gap: 1.75rem;
     }
 
     .services-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 1rem;
+        gap: 1.5rem;
     }
 
     .gallery-grid {
@@ -2236,7 +2236,7 @@ textarea {
 
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
-        gap: 1.5rem;
+        gap: 1.75rem;
     }
 
     .team-grid {
@@ -5146,9 +5146,44 @@ body.promo-active .mobile-menu {
     border-color: rgba(107, 142, 78, .3);
 }
 
-/* Center an orphan card in the last row of the services grid. */
-.home-service-card--orphan-center {
-    grid-column: 2 / 3;
+/* Catch-all callout below the services grid for custom / mixed-service work. */
+.home-services-callout {
+    margin-top: 3.5rem;
+    padding: 2rem 2.5rem;
+    background: rgba(255, 255, 255, .06);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(143, 175, 114, .25);
+    border-radius: var(--radius-xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2rem;
+    position: relative;
+    z-index: 2;
+}
+
+.home-services-callout-text {
+    flex: 1;
+}
+
+.home-services-callout-text h3 {
+    font-family: var(--font-heading);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--white);
+    margin: 0 0 .35rem;
+}
+
+.home-services-callout-text p {
+    color: rgba(255, 255, 255, .75);
+    margin: 0;
+    line-height: 1.55;
+    max-width: 56ch;
+}
+
+.home-services-callout .btn {
+    flex-shrink: 0;
 }
 
 .home-service-badge {
@@ -5442,6 +5477,36 @@ body.promo-active .mobile-menu {
     gap: 1.5rem;
     max-width: 900px;
     margin: 0 auto;
+}
+
+/* CTA block below a features grid (e.g. pool prep specialty). */
+.svc-features-cta {
+    max-width: 900px;
+    margin: 2.5rem auto 0;
+    padding: 1.75rem 2rem;
+    background: var(--white);
+    border: 1px solid var(--gray-100);
+    border-radius: var(--radius-xl);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.25rem;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.svc-features-cta p {
+    flex: 1;
+    min-width: 240px;
+    margin: 0;
+    color: var(--gray-600);
+    line-height: 1.55;
+}
+
+.svc-features-cta a:not(.btn) {
+    color: var(--clover-dark);
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
 }
 
 .svc-feature-card {
@@ -6440,13 +6505,6 @@ body.promo-active .mobile-menu {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    /* Tablet: span the row and center, keeping the card the same width as siblings. */
-    .home-service-card--orphan-center {
-        grid-column: 1 / -1;
-        justify-self: center;
-        max-width: calc(50% - 0.75rem);
-    }
-
     .reviews-grid {
         grid-template-columns: repeat(2, 1fr);
     }
@@ -6464,20 +6522,28 @@ body.promo-active .mobile-menu {
 
 @media (max-width: 768px) {
     .home-services-section {
-        padding: 4rem 0;
+        padding: 5rem 0;
     }
 
     .home-services-grid {
         grid-template-columns: 1fr;
         max-width: 420px;
         margin: 0 auto;
+        gap: 1.75rem;
     }
 
-    /* Mobile: single column already centers; reset the desktop/tablet placement. */
-    .home-service-card--orphan-center {
-        grid-column: auto;
-        justify-self: stretch;
-        max-width: none;
+    /* Mobile: stack the callout vertically with the CTA underneath. */
+    .home-services-callout {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1.25rem;
+        padding: 1.75rem 1.5rem;
+        margin-top: 2.75rem;
+    }
+
+    .home-services-callout .btn {
+        width: 100%;
+        justify-content: center;
     }
 
     .reviews-grid {

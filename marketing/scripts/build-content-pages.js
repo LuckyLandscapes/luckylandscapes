@@ -398,6 +398,78 @@ const POSTS = [
         `,
         related: ['lawn-care'],
     },
+    {
+        slug: 'above-ground-pool-base-prep-lincoln-ne',
+        title: 'Above-Ground Pool Base Prep in Lincoln, NE — The Real Guide',
+        description: 'How to properly prep the ground for an above-ground pool in Lincoln, Nebraska. Screenings vs. sand, base depth, level tolerance, and what most installers skip.',
+        h1: 'Above-Ground Pool <em class="highlight">Base Prep</em> in Lincoln, NE',
+        sub: 'The base under your pool is doing more work than the pool itself. Here\'s how we actually build it — and what big-box installers leave out.',
+        date: '2026-05-12',
+        category: 'Hardscaping',
+        body: `
+        <p>A 24-foot above-ground pool full of water weighs north of 60,000 pounds. That entire weight sits on a thin liner, which sits on whatever you put under it. If the base is uneven, bumpy, or the wrong material, the pool wall pulls sideways, the legs sink unevenly, and the liner tears or wrinkles where it shouldn\'t.</p>
+        <p>The pool manual gives you a one-paragraph prep instruction that assumes you know what "level" actually means at this scale. Most homeowners and big-box delivery crews don\'t. So here\'s the real guide for Lincoln, Nebraska — what materials to use, how deep to go, and what we do on every pool prep we get hired for.</p>
+
+        <h2>How level does it really need to be?</h2>
+        <p>Pool manufacturers (Intex, Bestway, Coleman) say "within 1 inch across the diameter." That\'s the absolute outer limit before the pool fails. The real target is <strong>within 1/2 inch</strong>. Here\'s why:</p>
+        <ul>
+            <li>A 1-inch slope across a 24-foot round pool with the liner full of water puts about <strong>1,400 lbs of lateral force</strong> on the lower side of the wall. That force shows up as a bulge after a few weeks and a frame failure within a season.</li>
+            <li>1/2 inch is the sweet spot — barely visible, well within what a transit level can verify, and stable for the life of the pool.</li>
+            <li>You can\'t eyeball this. The ground always <em>looks</em> level. Use a 2x4 with a long level on it (rotate around the center pin), a transit, or a laser level rented from Home Depot.</li>
+        </ul>
+
+        <h2>The wrong way (which everyone does)</h2>
+        <p>The default DIY pool prep in Lincoln looks like:</p>
+        <ol>
+            <li>Pick the flattest-looking spot in the yard.</li>
+            <li>Skim some grass off with a shovel.</li>
+            <li>Spread a couple bags of "play sand" or "mason sand" from the hardware store.</li>
+            <li>Set the pool up and fill it.</li>
+        </ol>
+        <p>Every step of that is wrong, and the pool will fail within 1–2 summers. Here\'s why and what we do instead.</p>
+
+        <h2>Step 1: Strip the sod and topsoil</h2>
+        <p>Grass and topsoil are organic. They\'ll decompose under the pool over the season, the volume shrinks, and the surface goes uneven. We strip 2–3 inches down to firm subsoil over an area about 2 feet larger than the pool diameter (so for a 24\' pool, prep a 26\' circle).</p>
+        <p>If your subsoil is the typical Lincoln heavy clay, that\'s actually great news — clay compacts well and resists pumping water. If you hit something softer (old fill, sandy backfill), the base layer needs to be thicker to compensate.</p>
+
+        <h2>Step 2: Grade level</h2>
+        <p>This is where most installs go wrong. We grade with a transit or laser level, working from the center pin outward in 4-foot increments. The target is dead flat — no bow, no dish, no slope. If one side is high we cut into it; we never build it up with loose soil because loose soil compresses.</p>
+        <p>It\'s tedious. A proper 24\' pool grade takes 2–3 hours of just leveling. Most homeowners give it 20 minutes and then wonder why the pool wall starts pulling.</p>
+
+        <h2>Step 3: Compacted screenings base (the critical step)</h2>
+        <p>Over the level subsoil we lay 2 inches of <strong>1/4-minus screenings</strong> (also called crusher fines, or sometimes "stone dust" depending on the supplier). Screenings are tiny crushed limestone particles that lock together when compacted. They\'re the same material we use as the top course under a paver patio for exactly the same reason — they create a dense, stable, water-permeable surface.</p>
+        <p>We compact in two lifts (1 inch at a time) with a plate compactor, water-spraying between passes so the particles bind tightly. The finished base is hard enough that a heavy boot leaves no print.</p>
+        <p>You can buy screenings at any Lincoln aggregate yard. Outdoor Solutions in Roca, Stewart Sand & Materials, or Frontier Stone all carry it — typically $35–$45 per yard. A 24\' pool needs about 1.5–2 yards.</p>
+
+        <h2>Step 4: The sand top layer — and why mason sand is wrong</h2>
+        <p>On top of the compacted screenings goes a thin (1/2 to 1 inch) layer of <strong>concrete sand</strong> — sometimes called paver sand or leveling sand. Not mason sand. Not play sand. Not all-purpose sand. <strong>Concrete sand specifically.</strong></p>
+        <p>Why it matters:</p>
+        <ul>
+            <li><strong>Mason sand</strong> is too fine. It doesn\'t compact, drains too fast, and shifts under the pool liner. After a wet summer, mason sand under a pool turns into a slurry that leaves footprints, wrinkles, and visible imprints of every leg.</li>
+            <li><strong>Play sand</strong> has the same problem plus rounded particles that never lock.</li>
+            <li><strong>Concrete sand</strong> has angular, varied particle sizes that lock together when compacted. It supports the liner without shifting and gives a smooth surface without being slippery.</li>
+        </ul>
+        <p>This single choice — concrete sand vs. mason sand — is the difference between a pool base that looks perfect for 5+ years and one that gets visible footprints after a single summer. Pool manufacturers (Intex, Bestway, Coleman) all specify concrete or "leveling" sand in the fine print of their installation guides for exactly this reason. Most homeowners never read past the first paragraph.</p>
+
+        <h2>Step 5: Optional patio block pads under each leg</h2>
+        <p>For long-term peace of mind we recommend 16"x16" pre-cast concrete patio blocks under each pool leg (typically 6–8 blocks for an 18–24\' round). Cost: about $3 each at Menards.</p>
+        <p>Why they matter: the pool legs concentrate the structure\'s weight on tiny contact points. Even on a perfect base, those points can punch down 1/2 inch over a wet summer. A 16x16 block spreads that load and stops the legs from sinking. We set each block level with the surrounding sand surface — you should not be able to feel the blocks through the liner once the pool is set.</p>
+        <p>This step is "optional" but it\'s $30 of insurance against a $200 leveling fix in year 2. We always recommend it.</p>
+
+        <h2>Common mistakes we see in Lincoln yards</h2>
+        <ul>
+            <li><strong>Using a tarp on grass.</strong> Some installation guides say to lay a tarp and the pool on grass directly. Don\'t. The grass dies, decomposes, and the base becomes uneven within 30 days.</li>
+            <li><strong>"It\'s only a kiddie pool, it doesn\'t matter."</strong> Even a 12-foot 30-inch-deep round pool holds 1,800 gallons — about 15,000 lbs. The physics doesn\'t care about your kid.</li>
+            <li><strong>Setting up on a slope and shimming the legs.</strong> Shims under pool legs always fail. The pool wall has to be plumb at the base; shimming creates a torque load that pulls the wall sideways.</li>
+            <li><strong>Skipping the compaction step.</strong> Loose screenings settle 15–20% under load. The pool will be level on day 1 and out of level by week 3.</li>
+        </ul>
+
+        <h2>Want us to handle it?</h2>
+        <p>Pool prep is a half-day to full-day job for our crew depending on yard slope, pool size, and how much excavation is needed. We bundle it with paver walks around the pool or with a fence install if you\'re doing those at the same time, but we\'re happy to quote it standalone.</p>
+        <p>Most pool buyers in Lincoln contact us in late April or May — early enough that we can fit the prep ahead of pool delivery. If you\'ve already bought the pool and it\'s sitting in a box, give us a call and we\'ll come out for a free quote.</p>
+        `,
+        related: ['hardscaping', 'fencing'],
+    },
 ];
 
 // =====================================================================
@@ -408,6 +480,7 @@ const SERVICE_LABELS = {
     'lawn-care':         { title: 'Lawn Care', icon: '🌿', desc: 'Mowing, seasonal cleanups, leaf removal, year-round maintenance.' },
     'garden-beds':       { title: 'Garden & Beds', icon: '🌺', desc: 'Garden bed installation, mulching, edging, plant transplants.' },
     'hardscaping':       { title: 'Hardscaping', icon: '🧱', desc: 'Paver patios, walkways, retaining walls, outdoor living.' },
+    'fencing':           { title: 'Fencing', icon: '🪵', desc: 'Wood privacy, picket, chain link & ornamental iron — posts set deep for Nebraska weather.' },
     'property-cleanup':  { title: 'Property Cleanup', icon: '🧹', desc: 'Junk removal, debris hauling, overgrown yard restoration.' },
     'landscape-design':  { title: 'Landscape Design', icon: '🎨', desc: 'Concept-to-completion outdoor design and build.' },
 };

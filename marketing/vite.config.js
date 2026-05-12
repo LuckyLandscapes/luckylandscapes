@@ -30,6 +30,7 @@ export default defineConfig({
                 blogSpringLawn: resolve(__dirname, 'blog/spring-lawn-care-checklist-lincoln-ne.html'),
                 blogPaverCost: resolve(__dirname, 'blog/paver-patio-cost-lincoln-ne.html'),
                 blogOverseed: resolve(__dirname, 'blog/when-to-overseed-lawn-lincoln-ne.html'),
+                blogPoolPrep: resolve(__dirname, 'blog/above-ground-pool-base-prep-lincoln-ne.html'),
             },
         },
     },
