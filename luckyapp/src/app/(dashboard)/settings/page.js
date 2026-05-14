@@ -4,11 +4,17 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { apiFetch } from '@/lib/apiClient';
-import { Save, Building2, DollarSign, Users, X, Mail, Loader2, CheckCircle, AlertCircle, UserPlus } from 'lucide-react';
+import { Save, Building2, DollarSign, Users, X, Mail, Loader2, CheckCircle, AlertCircle, UserPlus, Percent } from 'lucide-react';
+import {
+  DEFAULT_CASH_DISCOUNT_PCT,
+  getCashDiscountPct,
+  estimateCardFee,
+  effectiveCardFeePct,
+} from '@/lib/paymentFees';
 
 export default function SettingsPage() {
   const { user } = useAuth();
-  const { services, teamMembers, loadTeamMembers } = useData();
+  const { services, teamMembers, loadTeamMembers, org, updateOrgSettings } = useData();
   const [activeTab, setActiveTab] = useState('company');
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteState, setInviteState] = useState({ loading: false, success: false, error: null });
@@ -16,12 +22,37 @@ export default function SettingsPage() {
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [toast, setToast] = useState(null);
+  const [cashDiscountInput, setCashDiscountInput] = useState('');
+  const [savingDiscount, setSavingDiscount] = useState(false);
+
+  // Sync the input with the stored value when org loads
+  useEffect(() => {
+    if (org) setCashDiscountInput(String(getCashDiscountPct(org)));
+  }, [org]);
 
   const tabs = [
     { id: 'company', label: 'Company Profile', icon: Building2 },
     { id: 'rates', label: 'Service Rates', icon: DollarSign },
+    { id: 'payments', label: 'Payments', icon: Percent },
     { id: 'team', label: 'Team', icon: Users },
   ];
+
+  const handleSaveDiscount = async () => {
+    const pct = parseFloat(cashDiscountInput);
+    if (!Number.isFinite(pct) || pct < 0 || pct > 50) {
+      showToast('error', 'Enter a number between 0 and 50.');
+      return;
+    }
+    setSavingDiscount(true);
+    try {
+      await updateOrgSettings({ cash_discount_percent: pct });
+      showToast('success', `Cash discount set to ${pct}%.`);
+    } catch (err) {
+      showToast('error', err?.message || 'Could not save.');
+    } finally {
+      setSavingDiscount(false);
+    }
+  };
 
   // Group services by category
   const servicesByCategory = {};
@@ -222,6 +253,106 @@ export default function SettingsPage() {
             <button className="btn btn-primary">
               <Save size={16} /> Save Rates
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Payments */}
+      {activeTab === 'payments' && (
+        <div style={{ maxWidth: '700px', display: 'flex', flexDirection: 'column', gap: 'var(--space-md)' }}>
+          <div className="card">
+            <h3 style={{ marginBottom: 'var(--space-md)' }}>Cash Discount</h3>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', marginBottom: 'var(--space-md)' }}>
+              Show customers a discount for paying by cash, check, Venmo, or Zelle — anything that doesn&apos;t cost you a Stripe fee. The discount appears on the public payment page and the invoice SMS. The Stripe link itself still charges the full amount; honor the discount when you record the cash payment.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">Discount percentage</label>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <input
+                  className="form-input"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="50"
+                  value={cashDiscountInput}
+                  onChange={(e) => setCashDiscountInput(e.target.value)}
+                  style={{ width: '120px' }}
+                />
+                <span style={{ color: 'var(--text-tertiary)', fontSize: '0.9rem' }}>%</span>
+                <button className="btn btn-primary btn-sm" onClick={handleSaveDiscount} disabled={savingDiscount} style={{ marginLeft: 'var(--space-sm)' }}>
+                  {savingDiscount ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Save
+                </button>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+                Set to 0 to disable the discount entirely. Default is {DEFAULT_CASH_DISCOUNT_PCT}%.
+              </div>
+            </div>
+
+            {/* Math preview */}
+            <div style={{ marginTop: 'var(--space-md)', padding: 'var(--space-md)', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', fontSize: '0.82rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>What this means on a $1,000 invoice:</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-sm)', color: 'var(--text-secondary)' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Card path</div>
+                  <div>Customer pays: $1,000.00</div>
+                  <div>Stripe takes: −${estimateCardFee(1000).toFixed(2)} ({effectiveCardFeePct(1000).toFixed(2)}%)</div>
+                  <div style={{ fontWeight: 700, color: 'var(--status-success)' }}>You net: ${(1000 - estimateCardFee(1000)).toFixed(2)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--lucky-green-light)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cash path ({cashDiscountInput || 0}% off)</div>
+                  <div>Customer pays: ${(1000 * (1 - (parseFloat(cashDiscountInput) || 0) / 100)).toFixed(2)}</div>
+                  <div>Stripe takes: −$0.00</div>
+                  <div style={{ fontWeight: 700, color: 'var(--status-success)' }}>You net: ${(1000 * (1 - (parseFloat(cashDiscountInput) || 0) / 100)).toFixed(2)}</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>
+                Difference: ${((1000 * (1 - (parseFloat(cashDiscountInput) || 0) / 100)) - (1000 - estimateCardFee(1000))).toFixed(2)} extra to you on the cash path.
+                {parseFloat(cashDiscountInput) > 2.95 && (parseFloat(cashDiscountInput) < 3.5) && (
+                  <> · You&apos;re passing the entire Stripe fee through as savings (roughly break-even).</>
+                )}
+                {parseFloat(cashDiscountInput) <= 2.5 && parseFloat(cashDiscountInput) > 0 && (
+                  <> · You&apos;re keeping some of the Stripe savings (more profitable on cash).</>
+                )}
+                {parseFloat(cashDiscountInput) >= 3.5 && (
+                  <> · You&apos;re discounting MORE than Stripe&apos;s fee — you lose money on every cash payment compared to card. Drop to 2.5–3% to fix.</>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 style={{ marginBottom: 'var(--space-md)' }}>Stripe Fees (reference)</h3>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', marginBottom: 'var(--space-md)' }}>
+              Standard US pricing. Lucky&apos;s actual fees come from each charge&apos;s balance_transaction (read live by the webhook) — these are estimates for the &ldquo;what you&apos;d net&rdquo; calculator on invoices.
+            </p>
+            <table style={{ width: '100%' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left' }}>Method</th>
+                  <th style={{ textAlign: 'right' }}>Rate</th>
+                  <th style={{ textAlign: 'right' }}>On $1,000</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>💳 Card (online)</td>
+                  <td style={{ textAlign: 'right' }}>2.9% + $0.30</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>${estimateCardFee(1000).toFixed(2)}</td>
+                </tr>
+                <tr>
+                  <td>🏦 ACH / bank transfer</td>
+                  <td style={{ textAlign: 'right' }}>0.8% (capped at $5)</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600 }}>$5.00</td>
+                </tr>
+                <tr>
+                  <td>💵 Cash / check / Zelle / Venmo</td>
+                  <td style={{ textAlign: 'right' }}>$0</td>
+                  <td style={{ textAlign: 'right', fontWeight: 600, color: 'var(--status-success)' }}>$0.00</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       )}

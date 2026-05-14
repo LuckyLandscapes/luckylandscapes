@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { computeCashDiscount, DEFAULT_CASH_DISCOUNT_PCT } from '@/lib/paymentFees';
 import './pay.css';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -86,6 +87,16 @@ export default function PayPage({ params }) {
   const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   const isPaid = invoice.status === 'paid' || balance <= 0;
   const isCancelled = invoice.status === 'cancelled';
+
+  // Cash discount — driven by the org's setting on organizations.settings,
+  // falls back to the library default (3%). We don't enforce it through Stripe
+  // (the Stripe link still charges the full amount); the discount is honored
+  // when the customer pays Lucky directly by cash/check, and Riley manually
+  // records the discounted amount. This is the standard "cash discount" model
+  // (legal everywhere, unlike a card-surcharge).
+  const cashDiscountPct = Number(invoice.organizations?.settings?.cash_discount_percent ?? DEFAULT_CASH_DISCOUNT_PCT);
+  const showCashDiscount = !isPaid && !isCancelled && cashDiscountPct > 0 && balance > 0;
+  const cashOption = showCashDiscount ? computeCashDiscount(balance, cashDiscountPct) : null;
 
   return (
     <div style={styles.page} className="pay-page-root">
@@ -180,6 +191,31 @@ export default function PayPage({ params }) {
               {Number(invoice.amount_paid) > 0 && <div style={{ ...styles.totalRow, color: '#2d7a3a' }}><span>Paid</span><span>−{formatUSD(invoice.amount_paid)}</span></div>}
               <div style={styles.balanceRow} className="pay-balance-row"><span>Balance Due</span><span>{formatUSD(balance)}</span></div>
             </div>
+
+            {/* Cash discount nudge — shown only when there's a balance due and
+                the org has discount > 0. Frames the savings concretely so the
+                customer can decide if it's worth contacting Lucky directly. */}
+            {showCashDiscount && (
+              <div style={{
+                marginTop: 16,
+                padding: 16,
+                background: '#e8f5e9',
+                border: '1px solid #a5d6a7',
+                borderRadius: 8,
+                fontSize: 14,
+                lineHeight: 1.5,
+              }}>
+                <div style={{ fontWeight: 700, color: '#1f6f3a', marginBottom: 4 }}>
+                  💰 Save {formatUSD(cashOption.discount)} ({cashDiscountPct}% off)
+                </div>
+                <div style={{ color: '#2c5430' }}>
+                  Pay by <strong>cash, check, Venmo, or Zelle</strong> and your balance drops to{' '}
+                  <strong>{formatUSD(cashOption.cashTotal)}</strong>. Call{' '}
+                  <a href="tel:+14024055475" style={{ color: '#1f6f3a', fontWeight: 600 }}>(402) 405-5475</a>{' '}
+                  or text us to arrange it — the discount doesn&apos;t apply if you pay through the card link below.
+                </div>
+              </div>
+            )}
 
             {invoice.notes && (
               <div style={styles.notes}>

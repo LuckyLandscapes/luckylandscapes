@@ -8,7 +8,13 @@ import {
   ArrowLeft, DollarSign, CheckCircle2, Clock, AlertCircle,
   Receipt, Trash2, X, AlertTriangle, CreditCard, Send,
   Mail, MessageSquare, Loader2, CheckCircle, Copy, Link as LinkIcon, Banknote,
+  Percent,
 } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import {
+  estimateCardFee, estimateAchFee, effectiveCardFeePct,
+  computeCashDiscount, getCashDiscountPct,
+} from '@/lib/paymentFees';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -45,8 +51,9 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const {
     getInvoice, updateInvoice, deleteInvoice, getCustomer, getJob, getQuote,
-    getInvoicePayments, addPayment, deletePayment, addActivity,
+    getInvoicePayments, addPayment, deletePayment, addActivity, org,
   } = useData();
+  const cashDiscountPct = getCashDiscountPct(org);
 
   const invoice = getInvoice(id);
   const customer = invoice?.customerId ? getCustomer(invoice.customerId) : null;
@@ -93,6 +100,23 @@ export default function InvoiceDetailPage() {
   const payUrl = invoice.publicToken && typeof window !== 'undefined'
     ? `${window.location.origin}/pay/${invoice.publicToken}`
     : null;
+
+  // Stripe fee aggregate — only counts non-duplicate rows. The webhook
+  // populates processor_fee + net_amount from the actual Stripe charge,
+  // so this is the real "what Stripe took" number, not an estimate.
+  const totalFees = payments
+    .filter(p => !/DUPLICATE|OVERPAYMENT/i.test(p.notes || ''))
+    .reduce((sum, p) => sum + Number(p.processorFee || 0), 0);
+  const totalNet = payments
+    .filter(p => !/DUPLICATE|OVERPAYMENT/i.test(p.notes || ''))
+    .reduce((sum, p) => sum + Number(p.netAmount != null ? p.netAmount : (p.amount - (p.processorFee || 0))), 0);
+
+  // Estimates for the unpaid balance — what the fee WOULD be if the customer
+  // paid by card vs ACH vs cash. Helps Riley see "if I push them to pay
+  // cash, I save $X". Cash-discount math respects the org setting.
+  const estCardFee = estimateCardFee(balance);
+  const estAchFee  = estimateAchFee(balance);
+  const cashOption = computeCashDiscount(balance, cashDiscountPct);
 
   // Overpayment detection — when amount_paid exceeds invoice total. Almost
   // always means a duplicate payment (manual Mark Paid + Stripe webhook both
@@ -313,6 +337,7 @@ export default function InvoiceDetailPage() {
   const smsBody = useMemo(() => {
     if (!invoice) return '';
     const firstName = customer?.firstName || 'there';
+    const smsCashOption = computeCashDiscount(balance, cashDiscountPct);
     const lines = isPaid ? [
       `Hi ${firstName}! 🍀 Here's your paid receipt from Lucky Landscapes.`,
       ``,
@@ -341,13 +366,15 @@ export default function InvoiceDetailPage() {
       `Pay securely online (credit/debit card or bank transfer — takes 30 seconds):`,
       payUrl,
       ``,
+      cashDiscountPct > 0 ? `💵 Save ${cashDiscountPct}% (${formatCurrency(smsCashOption.discount)}) by paying cash, check, Venmo, or Zelle — just reply to arrange. New balance would be ${formatCurrency(smsCashOption.cashTotal)}.` : null,
+      cashDiscountPct > 0 ? `` : null,
       `Questions? Just reply or call (402) 405-5475.`,
       ``,
       `Thanks!`,
       `— The Lucky Landscapes Team`,
     ];
     return lines.filter(l => l !== null).join('\n');
-  }, [invoice, customer, balance, sendMessage, payUrl, isPaid]);
+  }, [invoice, customer, balance, sendMessage, payUrl, isPaid, cashDiscountPct]);
 
   const markInvoiceSent = async () => {
     try {
@@ -633,7 +660,21 @@ export default function InvoiceDetailPage() {
                             </div>
                           )}
                         </td>
-                        <td style={{ fontWeight: 700, color: isDupe ? 'var(--status-danger)' : 'var(--status-success)' }}>{formatCurrency(p.amount)}</td>
+                        <td style={{ fontWeight: 700, color: isDupe ? 'var(--status-danger)' : 'var(--status-success)' }}>
+                          {formatCurrency(p.amount)}
+                          {(p.processorFee > 0 || p.netAmount != null) && (
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', fontWeight: 500, marginTop: 2 }}>
+                              − {formatCurrency(p.processorFee || 0)} fee
+                              {p.amount > 0 && p.processorFee > 0 && (
+                                <> ({((p.processorFee / p.amount) * 100).toFixed(2)}%)</>
+                              )}
+                              <br />
+                              <span style={{ color: 'var(--text-secondary)' }}>
+                                = {formatCurrency(p.netAmount != null ? p.netAmount : (p.amount - (p.processorFee || 0)))} net
+                              </span>
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <span className="badge" style={{
                             background: p.status === 'succeeded' ? 'var(--status-success-bg)' : 'var(--status-warning-bg)',
@@ -655,6 +696,71 @@ export default function InvoiceDetailPage() {
               </table>
             )}
           </div>
+
+          {/* Fee summary — totals across all payments on this invoice */}
+          {totalFees > 0 && (
+            <div className="card" style={{ marginTop: 'var(--space-md)' }}>
+              <h4 style={{ margin: 0, marginBottom: 'var(--space-md)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Percent size={16} style={{ color: 'var(--status-warning)' }} />
+                Processing Fees on this Invoice
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-md)' }}>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Customer Paid</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700 }}>{formatCurrency(invoice.amountPaid || 0)}</div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Stripe Took</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--status-warning)' }}>
+                    − {formatCurrency(totalFees)}
+                    {invoice.amountPaid > 0 && (
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginLeft: 4 }}>
+                        ({((totalFees / invoice.amountPaid) * 100).toFixed(2)}%)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Net to Bank</div>
+                  <div style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--status-success)' }}>{formatCurrency(totalNet)}</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Fee preview — what each payment method would cost on the unpaid balance */}
+          {balance > 0 && invoice.status !== 'cancelled' && (
+            <div className="card" style={{ marginTop: 'var(--space-md)' }}>
+              <h4 style={{ margin: 0, marginBottom: 'var(--space-sm)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Percent size={16} style={{ color: 'var(--text-tertiary)' }} />
+                What You&apos;d Net on the {formatCurrency(balance)} Balance
+              </h4>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginBottom: 'var(--space-md)' }}>
+                Internal estimate — for picking which payment method to nudge the customer toward. Customer never sees these fees; they pay {formatCurrency(balance)} regardless of method (unless they take the cash discount below).
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div style={{ background: 'var(--bg-elevated)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>💳 Card</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{formatCurrency(balance - estCardFee)}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--status-warning)' }}>− {formatCurrency(estCardFee)} fee ({effectiveCardFeePct(balance).toFixed(2)}%)</div>
+                </div>
+                <div style={{ background: 'var(--bg-elevated)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>🏦 Bank (ACH)</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{formatCurrency(balance - estAchFee)}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--status-warning)' }}>− {formatCurrency(estAchFee)} fee (capped at $5)</div>
+                </div>
+                <div style={{ background: 'var(--lucky-green-glow)', padding: 'var(--space-sm)', borderRadius: 'var(--radius-md)', border: '1px solid var(--lucky-green)' }}>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--lucky-green-light)' }}>💵 Cash/Check ({cashDiscountPct}% off)</div>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>{formatCurrency(cashOption.cashTotal)}</div>
+                  <div style={{ fontSize: '0.7rem', color: 'var(--lucky-green-light)' }}>− {formatCurrency(cashOption.discount)} discount (no Stripe fee)</div>
+                </div>
+              </div>
+              <div style={{ marginTop: 'var(--space-sm)', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                Card vs cash math: at {cashDiscountPct}% discount, you net about {((cashOption.cashTotal - (balance - estCardFee)) >= 0 ? '+' : '')}
+                {formatCurrency(cashOption.cashTotal - (balance - estCardFee))} extra when they pay cash vs card.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Sidebar */}

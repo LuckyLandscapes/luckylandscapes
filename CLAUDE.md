@@ -200,6 +200,29 @@ The dashboard and `/reports` both **default to cash basis** because that's what 
 
 **Cash-basis revenue excludes duplicate-flagged payments.** [`pnlForRange`](luckyapp/src/lib/finance.js) drops rows whose notes match `/DUPLICATE|OVERPAYMENT/i` from the in-range filter, so the dashboard doesn't show inflated revenue between when the duplicate fires and when Riley deletes the row. Keep this filter in sync with the webhook's note format — change one, change both, or the dashboard will silently double-count again.
 
+### Processing fees on invoices + cash discount
+
+Two related features driven from [`src/lib/paymentFees.js`](luckyapp/src/lib/paymentFees.js) — a single source of truth for Stripe fee math + cash discount math, so the invoice detail page, public pay page, SMS body, and settings page all agree.
+
+**Internal fee visibility on `/invoices/[id]`:**
+1. **Per-payment fee** — each row in payment history shows the actual `processor_fee` and `net_amount` from the webhook's `balance_transaction` fetch, plus the effective fee % (e.g. "− $29.30 fee (2.93%) = $970.70 net"). Real Stripe data, not estimates.
+2. **Processing Fees on this Invoice** card — aggregates "Customer Paid / Stripe Took / Net to Bank" across all non-duplicate payments. Lives under the payment history.
+3. **What You'd Net on the $X Balance** card — for unpaid invoices, shows side-by-side cards: 💳 Card (with estimated fee) / 🏦 ACH (capped at $5) / 💵 Cash (with the org's discount applied). Helps Riley decide which payment method to push for. Footer shows the net-difference between card and cash paths.
+
+**Customer-facing cash discount:**
+- **`/pay/[token]`** ([`pay/[token]/page.js`](luckyapp/src/app/pay/[token]/page.js)) renders a green banner under the balance: "💰 Save $X (Y% off) — pay by cash, check, Venmo, or Zelle. New balance: $Z. Call to arrange." The Stripe link itself still charges the full amount; the discount is honored when Riley records the cash payment manually.
+- **SMS body** in invoice detail also surfaces the discount line when discount > 0.
+- The discount % is org-configurable (see Settings → Payments tab). Default is `DEFAULT_CASH_DISCOUNT_PCT = 3%`. Stored on `organizations.settings.cash_discount_percent` (existing JSONB column, no migration). Set to 0 to disable.
+
+**Why "cash discount" not "card surcharge":** Card surcharges have legal restrictions (some states cap or ban them, Visa caps at 4%). Cash discounts are universally allowed — you're just charging less to cash payers. Same effective price difference, no compliance risk. The customer-facing copy is always "save X% with cash", never "pay X% more with card".
+
+**Discount-rate guidance** (surfaced on the Settings page math preview):
+- **2.5%** — you keep ~$5 of every $1,000 on cash vs card (more profitable on cash).
+- **3%** — roughly break-even with Stripe's ~2.93% on most invoice sizes (the default; signals fairness).
+- **>3.5%** — you LOSE money on cash vs card. The settings page warns about this inline.
+
+The public invoice endpoint [`/api/invoices/public/[token]`](luckyapp/src/app/api/invoices/public/[token]/route.js) now includes `organizations.settings` so the customer-facing pay page can read `cash_discount_percent`. Don't strip that selection — the discount banner won't render without it.
+
 **Cash Flow card on `/finance`** ([`(dashboard)/finance/page.js`](luckyapp/src/app/(dashboard)/finance/page.js) — search for "Cash Flow"). Two-column card directly under the stats grid:
 - **Left — From Stripe → Your Bank.** Pulls live from [`/api/stripe/payouts`](luckyapp/src/app/api/stripe/payouts/route.js) which calls `stripe.balance.retrieve()` + `stripe.payouts.list({limit: 10})`. Shows available balance, pending balance, upcoming (`in_transit` / `pending`) payouts with arrival dates (e.g. "Tomorrow · $1,250"), and the last 5 paid-out deposits. Has a Refresh button — no caching, just refetch on demand. Gracefully degrades when `STRIPE_SECRET_KEY` is missing (shows config hint). Stripe API calls are free in this volume, so live-fetch on page load is fine.
 - **Right — Expected from Unpaid Invoices.** Forward-looking version of A/R aging that buckets unpaid invoices by `dueDate`: this week / next week / 2–4 weeks / 30+ days out / past due. Computes a "next 30 days" total. No API call — pure derivation from `invoices` state.

@@ -19,7 +19,7 @@ export async function GET(_request, { params }) {
       id, invoice_number, status, total, subtotal, tax, tax_rate, amount_paid,
       due_date, paid_date, items, notes, terms, created_at, public_token,
       customers ( first_name, last_name, email, phone, address, city, state, zip ),
-      organizations ( name )
+      organizations ( name, settings )
     `)
     .eq('public_token', token)
     .single();
