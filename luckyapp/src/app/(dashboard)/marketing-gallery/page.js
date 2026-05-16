@@ -16,7 +16,7 @@ import { supabase, isSupabaseConnected } from '@/lib/supabase';
 import { compressImage, bytesPretty } from '@/lib/compressImage';
 import {
   Plus, X, Save, Upload, Trash2, Edit3, Eye, EyeOff, Camera, Loader2,
-  ArrowUp, ArrowDown, ExternalLink, ImagePlus, Tag, RefreshCw, Globe,
+  ArrowUp, ArrowDown, ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
 } from 'lucide-react';
 
 // Curated tag set. Free-form in the DB so new tags don't need a migration,
@@ -71,6 +71,50 @@ async function compressAndMeasure(file) {
   } catch {
     return { file: compressed, width: null, height: null };
   }
+}
+
+// Convert a File / Blob to a base64 string (no data-URL prefix). Used to send
+// the compressed image to the AI suggest endpoint.
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result || '';
+      // result is "data:image/jpeg;base64,..." — strip the prefix
+      const i = String(result).indexOf(',');
+      resolve(i >= 0 ? String(result).slice(i + 1) : String(result));
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// Call the AI suggest endpoint. Returns null if not configured (so the UI
+// can hide the auto-fill button) or throws for any other failure.
+async function fetchAiSuggestion(file) {
+  // Compress first so we send the same ~300KB the eventual upload will use —
+  // makes the AI call cheaper and faster.
+  const compressed = await compressImage(file);
+  const base64 = await fileToBase64(compressed);
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) throw new Error('Not signed in.');
+  const res = await fetch('/api/marketing/gallery/suggest', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify({ imageBase64: base64 }),
+  });
+  if (res.status === 503) {
+    // Not configured — caller treats this as "feature disabled".
+    return null;
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || data?.error || `AI failed (${res.status})`);
+  }
+  return data;
 }
 
 async function uploadGalleryImage(file, orgId) {
@@ -348,8 +392,11 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
 function UploadModal({ orgId, onClose, onUploaded }) {
   // Per-file form state. After picking files we generate one "pending"
   // entry per file with editable title/tags/description before uploading.
-  const [pending, setPending] = useState([]); // { file, preview, title, description, tags, before, beforeFile, beforePreview, error, uploading, done }
+  const [pending, setPending] = useState([]); // { file, preview, title, description, tags, before, beforeFile, beforePreview, error, uploading, done, aiLoading }
   const fileInputRef = useRef(null);
+  // null = not yet checked; true/false = result of last suggest call
+  const [aiAvailable, setAiAvailable] = useState(null);
+  const [bulkAiLoading, setBulkAiLoading] = useState(false);
 
   const addFiles = (files) => {
     const arr = Array.from(files || []);
@@ -390,6 +437,68 @@ function UploadModal({ orgId, onClose, onUploaded }) {
       beforeFile: file,
       beforePreview: file ? URL.createObjectURL(file) : null,
     });
+  };
+
+  const runAiSuggest = async (i) => {
+    const p = pending[i];
+    if (!p || p.done || p.uploading || p.aiLoading) return;
+    updateAt(i, { aiLoading: true, error: null });
+    try {
+      const suggestion = await fetchAiSuggestion(p.file);
+      if (suggestion === null) {
+        setAiAvailable(false);
+        updateAt(i, { aiLoading: false, error: 'AI auto-fill is not configured (set ANTHROPIC_API_KEY in Vercel).' });
+        return;
+      }
+      setAiAvailable(true);
+      // Merge tags: prefer AI's suggestions, dedupe against any the user already picked.
+      const mergedTags = Array.from(new Set([...(p.tags || []), ...(suggestion.tags || [])]));
+      updateAt(i, {
+        aiLoading: false,
+        title: suggestion.title || p.title,
+        description: suggestion.description || p.description,
+        tags: mergedTags,
+      });
+    } catch (err) {
+      console.error('[ai-suggest] failed', err);
+      updateAt(i, { aiLoading: false, error: 'Auto-fill failed: ' + (err.message || 'unknown error') });
+    }
+  };
+
+  const runAiSuggestAll = async () => {
+    setBulkAiLoading(true);
+    // Snapshot the items we'll process — pending closes over render-time
+    // state, so we use this to decide what to skip without React state
+    // updates interfering mid-loop.
+    const snapshot = pending.map((p, idx) => ({ idx, file: p.file, hasTitle: !!p.title, done: p.done, tags: p.tags || [] }));
+    let stillAvailable = true;
+    try {
+      for (const item of snapshot) {
+        if (!stillAvailable) break;
+        if (item.done || item.hasTitle) continue;
+        updateAt(item.idx, { aiLoading: true, error: null });
+        try {
+          const suggestion = await fetchAiSuggestion(item.file);
+          if (suggestion === null) {
+            stillAvailable = false;
+            setAiAvailable(false);
+            updateAt(item.idx, { aiLoading: false, error: 'AI auto-fill is not configured (set ANTHROPIC_API_KEY in Vercel).' });
+            break;
+          }
+          const mergedTags = Array.from(new Set([...item.tags, ...(suggestion.tags || [])]));
+          updateAt(item.idx, {
+            aiLoading: false,
+            title: suggestion.title || '',
+            description: suggestion.description || '',
+            tags: mergedTags,
+          });
+        } catch (err) {
+          updateAt(item.idx, { aiLoading: false, error: 'Auto-fill failed: ' + (err.message || 'unknown error') });
+        }
+      }
+    } finally {
+      setBulkAiLoading(false);
+    }
   };
 
   const uploadOne = async (i) => {
@@ -485,14 +594,32 @@ function UploadModal({ orgId, onClose, onUploaded }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {aiAvailable !== false && pending.length > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    className="btn btn-secondary"
+                    onClick={runAiSuggestAll}
+                    disabled={bulkAiLoading || pending.every(p => p.done || p.title)}
+                    style={{ gap: '.4rem' }}
+                  >
+                    {bulkAiLoading ? (
+                      <><Loader2 size={14} className="spin" /> Analyzing photos…</>
+                    ) : (
+                      <><Sparkles size={14} /> Auto-fill all with AI</>
+                    )}
+                  </button>
+                </div>
+              )}
               {pending.map((p, i) => (
                 <PendingUploadRow
                   key={i}
                   pending={p}
+                  aiAvailable={aiAvailable}
                   onChange={patch => updateAt(i, patch)}
                   onRemove={() => removeAt(i)}
                   onToggleTag={tag => toggleTagAt(i, tag)}
                   onBeforeFile={file => handleBeforeFileAt(i, file)}
+                  onAiSuggest={() => runAiSuggest(i)}
                 />
               ))}
               <button
@@ -536,27 +663,47 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   );
 }
 
-function PendingUploadRow({ pending, onChange, onRemove, onToggleTag, onBeforeFile }) {
+function PendingUploadRow({ pending, aiAvailable, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
+  const showAiButton = aiAvailable !== false && !pending.done;
   return (
     <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', padding: '1rem', display: 'flex', gap: '1rem', position: 'relative', opacity: pending.done ? 0.6 : 1 }}>
       <div style={{ flexShrink: 0, width: 120, height: 90, borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-subtle)' }}>
         <img src={pending.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.5rem', minWidth: 0 }}>
-        <input
-          type="text"
-          placeholder="Title (e.g. Maple St Retaining Wall, Backyard Fire Pit)"
-          value={pending.title}
-          onChange={e => onChange({ title: e.target.value, error: null })}
-          disabled={pending.done || pending.uploading}
-          style={{
-            padding: '.5rem .7rem',
-            border: '1px solid ' + (pending.title && looksGenericTitle(pending.title) ? 'var(--status-warning, #d97706)' : 'var(--border)'),
-            borderRadius: 'var(--radius-md)',
-            fontSize: '.9rem',
-            fontWeight: 600,
-          }}
-        />
+        <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Title (e.g. Maple St Retaining Wall, Backyard Fire Pit)"
+            value={pending.title}
+            onChange={e => onChange({ title: e.target.value, error: null })}
+            disabled={pending.done || pending.uploading}
+            style={{
+              flex: 1,
+              padding: '.5rem .7rem',
+              border: '1px solid ' + (pending.title && looksGenericTitle(pending.title) ? 'var(--status-warning, #d97706)' : 'var(--border)'),
+              borderRadius: 'var(--radius-md)',
+              fontSize: '.9rem',
+              fontWeight: 600,
+            }}
+          />
+          {showAiButton && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={onAiSuggest}
+              disabled={pending.aiLoading || pending.uploading}
+              title="Use AI to suggest a title, description, and tags from the photo"
+              style={{ flexShrink: 0, padding: '.45rem .7rem', fontSize: '.78rem', gap: '.3rem' }}
+            >
+              {pending.aiLoading ? (
+                <><Loader2 size={13} className="spin" /> Thinking…</>
+              ) : (
+                <><Sparkles size={13} /> Auto-fill</>
+              )}
+            </button>
+          )}
+        </div>
         {pending.title && looksGenericTitle(pending.title) && (
           <div style={{ fontSize: '.72rem', color: 'var(--status-warning, #d97706)', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
             ⚠ This shows on luckylandscapes.com — pick something descriptive your customers will recognize.
