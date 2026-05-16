@@ -927,6 +927,13 @@ buildGalleryGrid();
 
 const MARKETING_GALLERY_URL = 'https://app.luckylandscapes.com/api/marketing/gallery';
 
+// Category metadata from luckyapp's /api/marketing/gallery response. Each
+// entry: { name, displayName, coverImageUrl, icon, sortOrder }. ONLY visible
+// categories are included (Riley toggles per-category in the Manage Categories
+// modal). Empty array means he hasn't curated yet → public site falls back
+// to auto-derive (every unique tag becomes a tile, current behavior).
+let remoteCategories = [];
+
 // Convert the remote API response into the projectData shape the rendering
 // code already understands. Single rows become single cards; rows sharing
 // a `projectName` collapse into ONE card whose lightbox carousels through
@@ -1042,6 +1049,10 @@ async function loadMarketingGalleryFromLuckyapp() {
     // REPLACE — not merge. Luckyapp is the source of truth.
     projectData = converted;
     homepageFeatured = computeHomepageFeatured(projectData);
+    // Categories are optional — older luckyapp versions don't return them;
+    // an empty array also means Riley hasn't enabled any in Manage
+    // Categories. Either way, buildCategoryTiles() falls back to auto-derive.
+    remoteCategories = Array.isArray(json?.categories) ? json.categories : [];
 
     // Rebuild any gallery surfaces that have already mounted with the
     // static seed. Safe to re-call; both functions clear their containers.
@@ -1144,40 +1155,81 @@ function computeTagProjects() {
     return byTag;
 }
 
-// LEVEL 1 — Render the category tiles landing view. Each tile uses the
-// first project in that category as the background image. Click → detail.
+// LEVEL 1 — Render the category tiles landing view.
+//
+// Two modes depending on Riley's curation state in luckyapp:
+//
+//  CURATED MODE (remoteCategories has any entries):
+//    Render only those categories, in their server-side sort_order, using
+//    their explicit cover_image_url (falls back to the first project's
+//    cover if the explicit one is null), display_name override, and icon.
+//    Categories without any matching photos are skipped silently.
+//
+//  AUTO-DERIVE MODE (remoteCategories empty):
+//    Existing behavior — every unique tag found across projectData becomes
+//    a tile, sorted by descending project count. Used when Riley hasn't
+//    enabled any categories yet OR when running on the static fallback.
 function buildCategoryTiles() {
     if (!galleryCategoriesGrid) return;
     const byTag = computeTagProjects();
-    // Sort categories by project count (most work first), then alphabetical.
-    const sorted = Array.from(byTag.entries()).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+
+    // Decide which (tag, projects, meta) tuples to render.
+    let entries;
+    if (Array.isArray(remoteCategories) && remoteCategories.length > 0) {
+        // Curated mode — honor Riley's explicit picks.
+        entries = remoteCategories
+            .slice()
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map(meta => {
+                const projects = byTag.get(meta.name) || [];
+                return { tag: meta.name, projects, meta };
+            })
+            .filter(e => e.projects.length > 0);  // skip categories with zero photos
+    } else {
+        // Auto-derive mode — every tag becomes a tile.
+        entries = Array.from(byTag.entries())
+            .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+            .map(([tag, projects]) => ({ tag, projects, meta: null }));
+    }
 
     if (galleryCategoriesCount) {
         const totalProjects = projectData.length;
-        const totalCategories = sorted.length;
-        galleryCategoriesCount.textContent = `${totalProjects} ${totalProjects === 1 ? 'project' : 'projects'} across ${totalCategories} ${totalCategories === 1 ? 'category' : 'categories'}`;
+        const totalCategories = entries.length;
+        galleryCategoriesCount.textContent = totalCategories === 0
+            ? `${totalProjects} ${totalProjects === 1 ? 'project' : 'projects'} — gallery being curated`
+            : `${totalProjects} ${totalProjects === 1 ? 'project' : 'projects'} across ${totalCategories} ${totalCategories === 1 ? 'category' : 'categories'}`;
     }
 
-    galleryCategoriesGrid.innerHTML = sorted.map(([tag, projects]) => {
-        // Pick the cover photo from the first project in this category that
-        // has a usable image. Prefer the project's chosen cover index.
+    galleryCategoriesGrid.innerHTML = entries.map(({ tag, projects, meta }) => {
+        // Cover-image precedence: explicit meta.coverImageUrl → first project's
+        // chosen cover → first project's first image → fallback banner.
         let coverSrc = '/images/banner.jpg';
-        for (const { project } of projects) {
-            const coverIdx = project.cover ?? 0;
-            const coverImg = project.images?.[coverIdx] ?? project.images?.[0];
-            if (coverImg) {
-                coverSrc = getImageSrc(coverImg);
-                break;
+        if (meta?.coverImageUrl) {
+            coverSrc = meta.coverImageUrl;
+        } else {
+            for (const { project } of projects) {
+                const coverIdx = project.cover ?? 0;
+                const coverImg = project.images?.[coverIdx] ?? project.images?.[0];
+                if (coverImg) {
+                    coverSrc = getImageSrc(coverImg);
+                    break;
+                }
             }
         }
+        const displayLabel = meta?.displayName || tag;
         const safeTag = escapeHtml(tag);
+        const safeLabel = escapeHtml(displayLabel);
+        const iconHtml = meta?.icon
+            ? `<span aria-hidden="true" style="font-size:1.6rem;line-height:1;display:block;margin-bottom:.35rem;">${escapeHtml(meta.icon)}</span>`
+            : '';
         const count = projects.length;
         return `
-            <a href="#tag=${encodeURIComponent(tag)}" class="gallery-category-tile" data-tag="${safeTag}" aria-label="View ${safeTag} projects (${count})">
+            <a href="#tag=${encodeURIComponent(tag)}" class="gallery-category-tile" data-tag="${safeTag}" aria-label="View ${safeLabel} projects (${count})">
                 <img src="${escapeHtml(coverSrc)}" alt="" loading="lazy" class="gallery-category-img"
                      onerror="this.onerror=null;this.src='/images/banner.jpg';this.classList.add('is-fallback');" />
                 <div class="gallery-category-overlay">
-                    <h3 class="gallery-category-title">${safeTag}</h3>
+                    ${iconHtml}
+                    <h3 class="gallery-category-title">${safeLabel}</h3>
                     <p class="gallery-category-count">${count} ${count === 1 ? 'project' : 'projects'}</p>
                 </div>
             </a>

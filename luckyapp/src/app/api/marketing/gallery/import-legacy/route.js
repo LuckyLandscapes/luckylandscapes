@@ -325,6 +325,29 @@ export async function POST(request) {
   const failed = results.filter(r => !r.ok);
   const skipped = plan.length - remaining.length;
 
+  // Ensure a marketing_categories row exists for every tag we just inserted.
+  // Skipped photos already have categories from a prior run, so the union
+  // of all tags across the plan is what we need. ON CONFLICT DO NOTHING via
+  // .upsert with ignoreDuplicates=true so re-imports don't error.
+  const allTags = Array.from(new Set(plan.flatMap(p => p.tags || [])));
+  if (allTags.length) {
+    const { error: catErr } = await supabase
+      .from('marketing_categories')
+      .upsert(
+        allTags.map(name => ({
+          org_id: orgId,
+          name,
+          // Imported categories stay hidden by default — same policy as the
+          // 043 migration backfill. Riley enables what he wants in Manage
+          // Categories.
+          is_visible: false,
+          sort_order: 0,
+        })),
+        { onConflict: 'org_id,name', ignoreDuplicates: true }
+      );
+    if (catErr) console.error('[import-legacy] category backfill failed', catErr);
+  }
+
   return NextResponse.json({
     summary: { totalPlanned: plan.length, imported, skipped, failed: failed.length },
     failed,

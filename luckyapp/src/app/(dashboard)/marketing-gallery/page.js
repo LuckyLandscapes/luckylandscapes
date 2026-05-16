@@ -10,14 +10,16 @@
 // Compression happens client-side using the shared compressImage helper —
 // keeps phone uploads inside the Supabase free-tier 1GB cap.
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase, isSupabaseConnected } from '@/lib/supabase';
 import { compressImage, bytesPretty } from '@/lib/compressImage';
+import MarketingCategoriesModal from '@/components/MarketingCategoriesModal';
 import {
   Plus, X, Save, Upload, Trash2, Edit3, Eye, EyeOff, Camera, Loader2,
   ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
   Star, Crown, Download, GripVertical, FolderOpen, Image as ImageIcon,
+  Settings,
 } from 'lucide-react';
 import {
   DndContext, DragOverlay, PointerSensor, KeyboardSensor, TouchSensor,
@@ -263,6 +265,24 @@ export default function MarketingGalleryPage() {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [filterTag, setFilterTag] = useState('');
+  // Categories drive the public site's gallery landing tiles. Loaded
+  // once at mount, refreshed after the Manage Categories modal closes or
+  // a new tag is created inline during upload. Passed down to UploadModal
+  // so the category picker shows current categories instead of the legacy
+  // hardcoded GALLERY_TAGS list.
+  const [categories, setCategories] = useState([]);
+  const [categoriesOpen, setCategoriesOpen] = useState(false);
+
+  const loadCategories = useCallback(async () => {
+    if (!isSupabaseConnected() || !orgId) return;
+    const { data, error } = await supabase
+      .from('marketing_categories')
+      .select('*')
+      .eq('org_id', orgId)
+      .order('sort_order', { ascending: true });
+    if (error) console.error('[marketing-gallery] categories load failed', error);
+    setCategories(data || []);
+  }, [orgId]);
 
   const loadItems = async () => {
     if (!isSupabaseConnected() || !orgId) {
@@ -285,7 +305,8 @@ export default function MarketingGalleryPage() {
   useEffect(() => {
     if (authLoading) return;
     loadItems();
-  }, [authLoading, orgId]);
+    loadCategories();
+  }, [authLoading, orgId, loadCategories]);
 
   const handleDelete = async (item) => {
     if (!confirm(`Delete "${item.title}"? This removes it from the website immediately.`)) return;
@@ -677,6 +698,18 @@ export default function MarketingGalleryPage() {
           >
             {importing ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Download size={16} /> Import legacy</>}
           </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setCategoriesOpen(true)}
+            title="Add, rename, reorder, set covers, and toggle visibility of categories shown on the public gallery landing"
+          >
+            <Settings size={16} /> Manage Categories
+            {categories.filter(c => c.is_visible).length > 0 && (
+              <span style={{ marginLeft: '.35rem', fontSize: '.7rem', background: 'var(--accent)', color: 'white', padding: '.1rem .4rem', borderRadius: 'var(--radius-full)' }}>
+                {categories.filter(c => c.is_visible).length}
+              </span>
+            )}
+          </button>
           <button className="btn btn-ghost" onClick={loadItems} title="Reload">
             <RefreshCw size={16} /> Refresh
           </button>
@@ -712,7 +745,13 @@ export default function MarketingGalleryPage() {
             style={{ padding: '.35rem .6rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--bg-elevated)' }}
           >
             <option value="">All tags</option>
-            {GALLERY_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+            {/* Filter dropdown lists EVERY tag that actually exists on a
+                photo right now (union of items[].tags), so newly created
+                categories and legacy tags both appear without needing the
+                hardcoded GALLERY_TAGS list. */}
+            {Array.from(new Set(items.flatMap(it => Array.isArray(it.tags) ? it.tags : []))).sort().map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
           </select>
         </div>
       </div>
@@ -765,6 +804,8 @@ export default function MarketingGalleryPage() {
       {uploadOpen && (
         <UploadModal
           orgId={orgId}
+          categories={categories}
+          onCategoriesChanged={loadCategories}
           onClose={() => setUploadOpen(false)}
           onUploaded={async () => { await loadItems(); }}
         />
@@ -773,8 +814,19 @@ export default function MarketingGalleryPage() {
       {editingId && (
         <EditModal
           item={items.find(x => x.id === editingId)}
+          categories={categories}
+          onCategoriesChanged={loadCategories}
           onClose={() => setEditingId(null)}
           onSaved={async () => { setEditingId(null); await loadItems(); }}
+        />
+      )}
+
+      {categoriesOpen && (
+        <MarketingCategoriesModal
+          orgId={orgId}
+          items={items}
+          onClose={() => setCategoriesOpen(false)}
+          onChanged={loadCategories}
         />
       )}
     </div>
@@ -1094,12 +1146,22 @@ function useExistingProjectNames(orgId) {
   return names;
 }
 
-function UploadModal({ orgId, onClose, onUploaded }) {
+function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged, onClose, onUploaded }) {
   // Two-step wizard: first the user picks a category (the photo's primary
   // tag), then they drop photos for that category. Forcing the category
-  // upfront keeps the per-row form simple — no 12-pill tag picker per file —
-  // and guarantees every uploaded photo has at least one meaningful tag.
+  // upfront keeps the per-row form simple — no per-file picker — and
+  // guarantees every uploaded photo has at least one meaningful tag.
+  //
+  // Category list: pulled from the parent's marketing_categories load (post-042).
+  // Falls back to the legacy hardcoded GALLERY_TAGS if no categories exist yet
+  // (e.g. fresh org, migration not run). Riley can also create a new category
+  // inline via the "+ Add category" tile — that INSERTs a row and selects it.
   const [category, setCategory] = useState(null);
+  // Inline "+ Add category" state used in step 1
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('');
+  const [creatingCategory, setCreatingCategory] = useState(false);
   // Optional shared project name — when set, every photo uploaded in this
   // batch gets the same project_name and they group into ONE card on the
   // public site. Leave empty and each photo is its own card.
@@ -1306,6 +1368,52 @@ function UploadModal({ orgId, onClose, onUploaded }) {
 
   const allDone = pending.length > 0 && pending.every(p => p.done);
 
+  // Choose the source for the step-1 tile list:
+  //   • If marketing_categories has rows for this org → use those (Riley's
+  //     curated set, including ones he created himself)
+  //   • Else → fall back to the legacy hardcoded GALLERY_TAGS so the picker
+  //     still works on a fresh org or pre-migration state.
+  // Hidden categories are still shown in the picker — Riley can upload to
+  // a hidden category; visibility only controls the public landing.
+  const stepOneTiles = (Array.isArray(dynamicCategories) && dynamicCategories.length > 0)
+    ? dynamicCategories.map(c => ({
+        name: c.name,
+        label: c.display_name || c.name,
+        icon: c.icon || CATEGORY_ICON[c.name] || '📷',
+      }))
+    : GALLERY_TAGS
+        .filter(t => t !== 'Before & After')
+        .map(t => ({ name: t, label: t, icon: CATEGORY_ICON[t] || '📷' }));
+
+  const handleCreateCategoryInline = async () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    // Reject duplicates (case-insensitive — DB unique index is case-sensitive
+    // but the public site treats tag matches as exact, so duplicates would
+    // diverge silently. Block here.)
+    if (stepOneTiles.some(t => t.name.toLowerCase() === name.toLowerCase())) {
+      alert(`"${name}" already exists.`);
+      return;
+    }
+    setCreatingCategory(true);
+    // Sort_order = max + 10 so it lands at the end of Riley's category list.
+    const maxOrder = (dynamicCategories || []).reduce((m, c) => Math.max(m, c.sort_order || 0), -10);
+    const { error } = await supabase.from('marketing_categories').insert({
+      org_id: orgId,
+      name,
+      icon: newCategoryIcon.trim() || null,
+      is_visible: true,  // Riley explicitly creating = he wants to see it
+      sort_order: maxOrder + 10,
+    });
+    setCreatingCategory(false);
+    if (error) { alert('Failed to create category: ' + error.message); return; }
+    await onCategoriesChanged?.();
+    setCategory(name);   // jump straight into step 2 with the new category selected
+    setShowAddCategory(false);
+    setNewCategoryName('');
+    setNewCategoryIcon('');
+  };
+
   // STEP 1 — Category picker. No photos chosen yet. We show a visual
   // tile grid; clicking a tile advances the wizard.
   if (!category) {
@@ -1325,12 +1433,42 @@ function UploadModal({ orgId, onClose, onUploaded }) {
                 Pick a category — your photos will be tagged automatically.
               </p>
             </div>
+            {showAddCategory ? (
+              <div style={{ marginBottom: '1.25rem', padding: '1rem', background: 'var(--bg-elevated)', border: '2px solid var(--accent)', borderRadius: 'var(--radius-lg)' }}>
+                <div style={{ marginBottom: '.5rem', fontSize: '.85rem', fontWeight: 600 }}>Create a new category</div>
+                <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    placeholder="e.g. Lighting, Pool Patios, Walkways"
+                    value={newCategoryName}
+                    onChange={e => setNewCategoryName(e.target.value)}
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') handleCreateCategoryInline(); if (e.key === 'Escape') setShowAddCategory(false); }}
+                    style={{ flex: 1, padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.9rem' }}
+                  />
+                  <input
+                    type="text"
+                    placeholder="🏡"
+                    value={newCategoryIcon}
+                    onChange={e => setNewCategoryIcon(e.target.value)}
+                    maxLength={4}
+                    style={{ width: 60, padding: '.5rem', textAlign: 'center', fontSize: '1.2rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+                  />
+                  <button className="btn btn-primary" onClick={handleCreateCategoryInline} disabled={creatingCategory || !newCategoryName.trim()}>
+                    {creatingCategory ? <Loader2 size={14} className="spin" /> : <Plus size={14} />} Create
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => { setShowAddCategory(false); setNewCategoryName(''); setNewCategoryIcon(''); }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '.75rem' }}>
-              {GALLERY_TAGS.filter(t => t !== 'Before & After').map(tag => (
+              {stepOneTiles.map(tile => (
                 <button
-                  key={tag}
+                  key={tile.name}
                   type="button"
-                  onClick={() => setCategory(tag)}
+                  onClick={() => setCategory(tile.name)}
                   className="category-tile"
                   style={{
                     display: 'flex',
@@ -1349,10 +1487,33 @@ function UploadModal({ orgId, onClose, onUploaded }) {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-subtle)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-elevated)'; }}
                 >
-                  <span style={{ fontSize: '2rem', lineHeight: 1 }} aria-hidden="true">{CATEGORY_ICON[tag] || '📷'}</span>
-                  <span style={{ fontSize: '.88rem', fontWeight: 600, textAlign: 'center' }}>{tag}</span>
+                  <span style={{ fontSize: '2rem', lineHeight: 1 }} aria-hidden="true">{tile.icon}</span>
+                  <span style={{ fontSize: '.88rem', fontWeight: 600, textAlign: 'center' }}>{tile.label}</span>
                 </button>
               ))}
+              {/* "+ Add new" tile — visually distinct from category tiles to
+                  signal it's a different action. Opens the inline form above. */}
+              <button
+                type="button"
+                onClick={() => setShowAddCategory(true)}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '.6rem',
+                  padding: '1.25rem .75rem',
+                  background: 'transparent',
+                  border: '2px dashed var(--border)',
+                  borderRadius: 'var(--radius-lg)',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                <Plus size={26} />
+                <span style={{ fontSize: '.85rem', fontWeight: 600 }}>New category</span>
+              </button>
             </div>
             <p style={{ marginTop: '1.5rem', fontSize: '.78rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
               You&apos;ll be able to add more tags per photo after uploading.
@@ -1482,6 +1643,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
                   pending={p}
                   aiAvailable={aiAvailable}
                   primaryCategory={category}
+                  availableTags={stepOneTiles.map(t => t.name)}
                   onChange={patch => updateAt(i, patch)}
                   onRemove={() => removeAt(i)}
                   onToggleTag={tag => toggleTagAt(i, tag)}
@@ -1530,7 +1692,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   );
 }
 
-function PendingUploadRow({ pending, aiAvailable, primaryCategory, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
+function PendingUploadRow({ pending, aiAvailable, primaryCategory, availableTags, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
   const showAiButton = aiAvailable !== false && !pending.done;
   const [showMoreTags, setShowMoreTags] = useState(false);
   // Extra tags = anything beyond the wizard-picked category. Used to drive
@@ -1639,7 +1801,10 @@ function PendingUploadRow({ pending, aiAvailable, primaryCategory, onChange, onR
         </div>
         {showMoreTags && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', paddingTop: '.25rem', borderTop: '1px dashed var(--border)' }}>
-            {GALLERY_TAGS.filter(t => t !== primaryCategory).map(tag => (
+            {/* Use the dynamic category list when available (Riley's curated
+                set including custom categories). Falls back to GALLERY_TAGS
+                for fresh-org scenarios where availableTags wasn't passed. */}
+            {(Array.isArray(availableTags) && availableTags.length ? availableTags : GALLERY_TAGS).filter(t => t !== primaryCategory).map(tag => (
               <button
                 key={tag}
                 type="button"
@@ -1725,18 +1890,58 @@ function PendingUploadRow({ pending, aiAvailable, primaryCategory, onChange, onR
   );
 }
 
-function EditModal({ item, onClose, onSaved }) {
+function EditModal({ item, categories: dynamicCategories, onCategoriesChanged, onClose, onSaved }) {
   const [title, setTitle] = useState(item?.title || '');
   const [description, setDescription] = useState(item?.description || '');
   const [tags, setTags] = useState(Array.isArray(item?.tags) ? item.tags : []);
   const [projectName, setProjectName] = useState(item?.project_name || '');
   const [saving, setSaving] = useState(false);
+  const [newTagInput, setNewTagInput] = useState('');
   const existingProjectNames = useExistingProjectNames(item?.org_id);
+
+  // Resolve which tags appear in the picker. Prefer marketing_categories
+  // when populated (Riley's curated set, including custom categories); union
+  // in any tag already on this photo so legacy tags he hasn't formalized
+  // into categories yet still appear and can be toggled off.
+  const availableTags = useMemo(() => {
+    const fromCategories = (Array.isArray(dynamicCategories) && dynamicCategories.length)
+      ? dynamicCategories.map(c => c.name)
+      : GALLERY_TAGS;
+    const onPhoto = Array.isArray(item?.tags) ? item.tags : [];
+    return Array.from(new Set([...fromCategories, ...onPhoto]));
+  }, [dynamicCategories, item]);
 
   if (!item) return null;
 
   const toggleTag = (t) => {
     setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  };
+
+  const handleAddCustomTag = async () => {
+    const cleaned = newTagInput.trim();
+    if (!cleaned) return;
+    if (tags.includes(cleaned)) { setNewTagInput(''); return; }
+    // Tag the photo locally + persist category metadata so it shows up in
+    // future pickers and Manage Categories. ON CONFLICT means re-typing an
+    // existing category name just adds it to the photo without erroring.
+    if (item.org_id && !availableTags.includes(cleaned)) {
+      const maxOrder = (dynamicCategories || []).reduce((m, c) => Math.max(m, c.sort_order || 0), -10);
+      const { error } = await supabase.from('marketing_categories').insert({
+        org_id: item.org_id,
+        name: cleaned,
+        is_visible: true,
+        sort_order: maxOrder + 10,
+      });
+      // Ignore duplicate-key errors (the UNIQUE constraint catches case where
+      // the category already exists but isn't in dynamicCategories yet).
+      if (error && !String(error.message).toLowerCase().includes('duplicate')) {
+        alert('Failed to add category: ' + error.message);
+        return;
+      }
+      onCategoriesChanged?.();
+    }
+    setTags(prev => [...prev, cleaned]);
+    setNewTagInput('');
   };
 
   const handleSave = async () => {
@@ -1795,8 +2000,8 @@ function EditModal({ item, onClose, onSaved }) {
           </label>
           <div>
             <span style={{ fontSize: '.8rem', fontWeight: 600, display: 'block', marginBottom: '.4rem' }}>Tags</span>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
-              {GALLERY_TAGS.map(tag => (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', marginBottom: '.5rem' }}>
+              {availableTags.map(tag => (
                 <button
                   key={tag}
                   type="button"
@@ -1815,6 +2020,27 @@ function EditModal({ item, onClose, onSaved }) {
                   {tag}
                 </button>
               ))}
+            </div>
+            {/* Inline add — type a new tag name + Enter to create the category
+                and tag the photo with it in one shot. */}
+            <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
+              <input
+                type="text"
+                placeholder="Add a new category…"
+                value={newTagInput}
+                onChange={e => setNewTagInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddCustomTag(); } }}
+                style={{ flex: 1, padding: '.35rem .6rem', border: '1px dashed var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.8rem' }}
+              />
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={handleAddCustomTag}
+                disabled={!newTagInput.trim()}
+                style={{ padding: '.3rem .55rem' }}
+              >
+                <Plus size={13} /> Add
+              </button>
             </div>
           </div>
         </div>

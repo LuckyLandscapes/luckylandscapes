@@ -33,22 +33,37 @@ export async function GET() {
     );
   }
 
-  const { data, error } = await supabase
-    .from('marketing_gallery')
-    .select('id, title, description, tags, image_url, image_width, image_height, before_image_url, sort_order, is_featured, is_cover, project_name, created_at')
-    .eq('is_published', true)
-    .order('sort_order', { ascending: true })
-    .order('created_at', { ascending: false });
+  // Fire both queries in parallel — gallery items and category metadata
+  // hit different tables so there's no dependency.
+  const [galleryRes, categoriesRes] = await Promise.all([
+    supabase
+      .from('marketing_gallery')
+      .select('id, title, description, tags, image_url, image_width, image_height, before_image_url, sort_order, is_featured, is_cover, project_name, created_at')
+      .eq('is_published', true)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('marketing_categories')
+      .select('name, display_name, cover_image_url, icon, is_visible, sort_order')
+      .eq('is_visible', true)
+      .order('sort_order', { ascending: true }),
+  ]);
 
-  if (error) {
-    console.error('[api/marketing/gallery] query failed', error);
+  if (galleryRes.error) {
+    console.error('[api/marketing/gallery] gallery query failed', galleryRes.error);
     return NextResponse.json(
-      { items: [], error: 'query_failed' },
+      { items: [], categories: [], error: 'query_failed' },
       { status: 200, headers: { ...CORS_HEADERS, 'Cache-Control': 'no-store' } }
     );
   }
 
-  const items = (data || []).map(row => ({
+  // Categories failure is non-fatal — we just degrade to auto-derive on
+  // the public site. Logged so it's findable in Vercel.
+  if (categoriesRes.error) {
+    console.warn('[api/marketing/gallery] categories query failed (continuing without)', categoriesRes.error);
+  }
+
+  const items = (galleryRes.data || []).map(row => ({
     id: row.id,
     title: row.title,
     description: row.description || '',
@@ -64,8 +79,20 @@ export async function GET() {
     createdAt: row.created_at,
   }));
 
+  // Only visible categories are returned. Empty array means the public site
+  // falls back to auto-derive (every tag becomes a tile, existing behavior).
+  // As soon as Riley enables even one category in the manage UI, the public
+  // site switches to showing ONLY his curated picks.
+  const categories = (categoriesRes.data || []).map(row => ({
+    name: row.name,
+    displayName: row.display_name || row.name,
+    coverImageUrl: row.cover_image_url || null,
+    icon: row.icon || null,
+    sortOrder: row.sort_order ?? 0,
+  }));
+
   return NextResponse.json(
-    { items, count: items.length, generatedAt: new Date().toISOString() },
+    { items, categories, count: items.length, generatedAt: new Date().toISOString() },
     { status: 200, headers: { ...CORS_HEADERS, 'Cache-Control': CACHE_HEADER } }
   );
 }
