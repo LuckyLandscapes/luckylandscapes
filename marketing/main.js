@@ -913,23 +913,69 @@ async function loadMarketingGalleryFromLuckyapp() {
         const json = await res.json();
         const remote = Array.isArray(json?.items) ? json.items : [];
         if (remote.length === 0) return;
-        // Convert API shape → projectData shape (preserve before/after handling).
-        const converted = remote.map(item => {
+
+        // Two-pass conversion:
+        // 1) Group rows by projectName so multiple photos from one job collapse
+        //    into a single "project card" with N photos in its lightbox.
+        //    Rows without projectName stay as individual cards.
+        // 2) Map each group/single into the projectData shape the gallery
+        //    rendering code already understands.
+        const groups = new Map();
+        const singles = [];
+        remote.forEach(item => {
+            if (item.projectName) {
+                if (!groups.has(item.projectName)) groups.set(item.projectName, []);
+                groups.get(item.projectName).push(item);
+            } else {
+                singles.push(item);
+            }
+        });
+
+        const fromSingle = (item) => {
             const tags = Array.isArray(item.tags) ? item.tags : [];
             const tag = tags[0] || 'Project';
             const isBA = !!item.beforeImageUrl;
             return {
                 title: item.title || 'Untitled project',
                 tag,
-                tags,                          // keep the full list for filtering
+                tags,
                 desc: item.description || '',
-                cover: isBA ? 1 : 0,           // for before/after, show the "after" as the cover
+                cover: isBA ? 1 : 0,
                 images: isBA ? [item.beforeImageUrl, item.imageUrl] : [item.imageUrl],
+                imageDescs: isBA ? ['', item.description || ''] : [item.description || ''],
                 beforeAfter: isBA,
                 featured: !!item.isFeatured,
                 source: 'remote',
             };
-        });
+        };
+
+        const fromGroup = (projectName, members) => {
+            // Featured if ANY member is featured. Tags = union across the group.
+            const featured = members.some(m => m.isFeatured);
+            const tagsUnion = Array.from(new Set(members.flatMap(m => Array.isArray(m.tags) ? m.tags : [])));
+            const tag = tagsUnion[0] || 'Project';
+            // Description = first non-empty member description; per-photo
+            // descriptions also stored on imageDescs for the lightbox to
+            // swap as the user navigates.
+            const desc = members.map(m => m.description).find(d => d && d.trim()) || '';
+            return {
+                title: projectName,
+                tag,
+                tags: tagsUnion,
+                desc,
+                cover: 0,
+                images: members.map(m => m.imageUrl),
+                imageDescs: members.map(m => m.description || ''),
+                beforeAfter: false,  // groups don't use the slider — they use the carousel
+                featured,
+                source: 'remote',
+            };
+        };
+
+        const converted = [
+            ...Array.from(groups.entries()).map(([name, members]) => fromGroup(name, members)),
+            ...singles.map(fromSingle),
+        ];
         // Tag the static entries so filtering / styling can distinguish.
         // Static portfolio entries are always considered featured — they were
         // hand-picked curated photos before the marketing-gallery system existed.
@@ -1345,6 +1391,14 @@ function showCarouselImage(idx) {
 
         clCounter.textContent = `${idx + 1} / ${clCurrentProject.images.length}`;
         updateCarouselDots();
+        // Swap the description in the info pane to match the photo we're
+        // showing — each photo in a project may carry its own caption.
+        // Falls back to the project-level description for legacy entries
+        // that didn't ship per-image descs.
+        if (clDesc) {
+            const perPhotoDesc = clCurrentProject.imageDescs?.[idx];
+            clDesc.textContent = (perPhotoDesc && perPhotoDesc.trim()) || clCurrentProject.desc || '';
+        }
     }, 200);
 }
 

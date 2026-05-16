@@ -193,6 +193,12 @@ export async function POST(request) {
     const projSlug = slug(project.title);
     const tags = [project.tag, ...(project.extraTags || [])].filter(Boolean);
 
+    // For multi-photo projects we use project.title as the project_name so
+    // they collapse back into one card on the public site. Single-photo
+    // projects don't need a project_name (each is its own card anyway).
+    // Before/after pairs are inherently single-card so no project_name needed.
+    const groupName = (!project.beforeAfter && project.images.length > 1) ? project.title : null;
+
     if (project.beforeAfter && project.images.length === 2) {
       // Single row representing the before/after pair.
       const [beforeUrl, afterUrl] = project.images;
@@ -203,6 +209,7 @@ export async function POST(request) {
         description: project.desc,
         tags,
         featured: !!project.featured,
+        projectName: null,
         mainSourceUrl: MARKETING_SITE_ORIGIN + afterUrl,
         beforeSourceUrl: MARKETING_SITE_ORIGIN + beforeUrl,
         mainKey: `${orgId}/legacy/${projSlug}/after.${extFromUrl(afterUrl)}`,
@@ -222,6 +229,7 @@ export async function POST(request) {
           description: project.desc,
           tags,
           featured: !!project.featured,
+          projectName: groupName,
           mainSourceUrl: MARKETING_SITE_ORIGIN + relUrl,
           mainKey: `${orgId}/legacy/${projSlug}/${photoSlug}.${ext}`,
         });
@@ -280,6 +288,7 @@ export async function POST(request) {
         before_image_path: beforePath,
         is_published: true,
         is_featured: item.featured,
+        project_name: item.projectName,
         sort_order: 0,
       });
       if (insErr) throw new Error(`insert: ${insErr.message}`);

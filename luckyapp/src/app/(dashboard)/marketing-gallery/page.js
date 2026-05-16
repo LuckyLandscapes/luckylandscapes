@@ -472,6 +472,14 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
       </div>
       <div style={{ padding: '.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         <h4 style={{ margin: 0, fontSize: '.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
+        {item.project_name && (
+          <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <ImagePlus size={11} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              Project: <strong>{item.project_name}</strong>
+            </span>
+          </div>
+        )}
         {Array.isArray(item.tags) && item.tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem' }}>
             {item.tags.slice(0, 4).map(t => (
@@ -515,12 +523,40 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
   );
 }
 
+// Read the list of project_names already in this org. Powers the autocomplete
+// datalist in the upload modal — Riley sees "Maple St Wall" and "Smith Patio"
+// as suggestions so he doesn't typo a new name and accidentally create a
+// duplicate project. Returns deduped, sorted asc.
+function useExistingProjectNames(orgId) {
+  const [names, setNames] = useState([]);
+  useEffect(() => {
+    if (!orgId) return;
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('marketing_gallery')
+        .select('project_name')
+        .eq('org_id', orgId)
+        .not('project_name', 'is', null);
+      if (cancelled || error) return;
+      const unique = Array.from(new Set((data || []).map(r => r.project_name).filter(Boolean))).sort();
+      setNames(unique);
+    })();
+    return () => { cancelled = true; };
+  }, [orgId]);
+  return names;
+}
+
 function UploadModal({ orgId, onClose, onUploaded }) {
   // Two-step wizard: first the user picks a category (the photo's primary
   // tag), then they drop photos for that category. Forcing the category
   // upfront keeps the per-row form simple — no 12-pill tag picker per file —
   // and guarantees every uploaded photo has at least one meaningful tag.
   const [category, setCategory] = useState(null);
+  // Optional shared project name — when set, every photo uploaded in this
+  // batch gets the same project_name and they group into ONE card on the
+  // public site. Leave empty and each photo is its own card.
+  const [projectName, setProjectName] = useState('');
   // Per-file form state. After picking files we generate one "pending"
   // entry per file with editable title/tags/description before uploading.
   const [pending, setPending] = useState([]); // { file, preview, title, description, tags, before, beforeFile, beforePreview, error, uploading, done, aiLoading }
@@ -529,6 +565,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   const [aiAvailable, setAiAvailable] = useState(null);
   const [bulkAiLoading, setBulkAiLoading] = useState(false);
   const [aiModel, setAiModel] = useState(() => readPreferredModel());
+  const existingProjectNames = useExistingProjectNames(orgId);
 
   const handleModelChange = (id) => {
     setAiModel(id);
@@ -683,6 +720,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
         before_image_path: before?.path || null,
         is_published: true,
         is_featured: !!p.featured,
+        project_name: projectName.trim() || null,
         sort_order: 0,
       });
       if (error) throw error;
@@ -781,7 +819,34 @@ function UploadModal({ orgId, onClose, onUploaded }) {
           <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </header>
 
-        <div style={{ padding: '1.5rem', overflow: 'auto', flex: 1 }}>
+        <div style={{ padding: '1.5rem', overflow: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {/* Shared project name — applies to every photo uploaded in this
+              batch. Empty = each photo is its own card on the public site.
+              Filled = all photos group into one project card. */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem', background: 'var(--bg-elevated)', padding: '.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            <label htmlFor="upload-project-name" style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+              <ImagePlus size={13} style={{ color: 'var(--accent)' }} />
+              Project name <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(optional — groups photos into one card on the website)</span>
+            </label>
+            <input
+              id="upload-project-name"
+              type="text"
+              placeholder="e.g. Maple St Retaining Wall, Smith Backyard Patio"
+              value={projectName}
+              onChange={e => setProjectName(e.target.value)}
+              list="upload-project-name-suggestions"
+              style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.9rem', fontWeight: 500, background: 'var(--bg-base, var(--bg-subtle))' }}
+            />
+            <datalist id="upload-project-name-suggestions">
+              {existingProjectNames.map(n => <option key={n} value={n} />)}
+            </datalist>
+            <p style={{ margin: 0, fontSize: '.7rem', color: 'var(--text-tertiary)' }}>
+              {projectName.trim()
+                ? `All ${pending.length || 'these'} photos will appear together under "${projectName.trim()}".`
+                : 'Leave blank to upload each photo as its own card.'}
+            </p>
+          </div>
+
           {pending.length === 0 ? (
             <div
               onDragOver={e => { e.preventDefault(); }}
@@ -1099,7 +1164,9 @@ function EditModal({ item, onClose, onSaved }) {
   const [title, setTitle] = useState(item?.title || '');
   const [description, setDescription] = useState(item?.description || '');
   const [tags, setTags] = useState(Array.isArray(item?.tags) ? item.tags : []);
+  const [projectName, setProjectName] = useState(item?.project_name || '');
   const [saving, setSaving] = useState(false);
+  const existingProjectNames = useExistingProjectNames(item?.org_id);
 
   if (!item) return null;
 
@@ -1119,6 +1186,7 @@ function EditModal({ item, onClose, onSaved }) {
         title: title.trim(),
         description: description.trim() || null,
         tags,
+        project_name: projectName.trim() || null,
         updated_at: new Date().toISOString(),
       })
       .eq('id', item.id);
@@ -1143,6 +1211,22 @@ function EditModal({ item, onClose, onSaved }) {
           <label style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
             <span style={{ fontSize: '.8rem', fontWeight: 600 }}>Description</span>
             <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} style={{ padding: '.6rem .8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', resize: 'vertical' }} />
+          </label>
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+            <span style={{ fontSize: '.8rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+              Project <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(groups photos under one card on the website)</span>
+            </span>
+            <input
+              type="text"
+              placeholder="e.g. Maple St Retaining Wall — leave blank to keep as standalone photo"
+              value={projectName}
+              onChange={e => setProjectName(e.target.value)}
+              list="edit-project-name-suggestions"
+              style={{ padding: '.6rem .8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+            />
+            <datalist id="edit-project-name-suggestions">
+              {existingProjectNames.map(n => <option key={n} value={n} />)}
+            </datalist>
           </label>
           <div>
             <span style={{ fontSize: '.8rem', fontWeight: 600, display: 'block', marginBottom: '.4rem' }}>Tags</span>
