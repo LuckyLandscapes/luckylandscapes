@@ -915,8 +915,6 @@ async function loadMarketingGalleryFromLuckyapp() {
         if (remote.length === 0) return;
         // Convert API shape → projectData shape (preserve before/after handling).
         const converted = remote.map(item => {
-            // Prefer the second tag if first is "Construction" or generic — show
-            // the more specific service name on the card chip.
             const tags = Array.isArray(item.tags) ? item.tags : [];
             const tag = tags[0] || 'Project';
             const isBA = !!item.beforeImageUrl;
@@ -928,21 +926,30 @@ async function loadMarketingGalleryFromLuckyapp() {
                 cover: isBA ? 1 : 0,           // for before/after, show the "after" as the cover
                 images: isBA ? [item.beforeImageUrl, item.imageUrl] : [item.imageUrl],
                 beforeAfter: isBA,
+                featured: !!item.isFeatured,
                 source: 'remote',
             };
         });
         // Tag the static entries so filtering / styling can distinguish.
+        // Static portfolio entries are always considered featured — they were
+        // hand-picked curated photos before the marketing-gallery system existed.
         const staticTagged = staticProjectDataBackup.map(p => ({
             ...p,
             tags: p.tags || [p.tag].filter(Boolean),
+            featured: true,
             source: 'static',
         }));
         // Remote photos first (Riley's latest work leads), then the static portfolio.
         projectData = [...converted, ...staticTagged];
-        // Refresh the homepage curation — first 6 remote items, padded with
-        // earliest static entries if there are fewer than 6 remote photos.
-        const featuredCount = Math.min(6, projectData.length);
-        homepageFeatured = Array.from({ length: featuredCount }, (_, i) => i);
+        // Homepage curation: prefer items the owner explicitly starred as
+        // featured. Fall back to newest items if fewer than 6 are starred.
+        const featuredIdx = [];
+        const nonFeaturedIdx = [];
+        projectData.forEach((p, i) => {
+            if (p.featured) featuredIdx.push(i);
+            else nonFeaturedIdx.push(i);
+        });
+        homepageFeatured = [...featuredIdx, ...nonFeaturedIdx].slice(0, 6);
         // Rebuild any gallery surfaces that have already mounted.
         if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
         if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
@@ -964,13 +971,25 @@ loadMarketingGalleryFromLuckyapp();
 //   • Image Carousel — for projects with 2+ images (series viewer)
 
 const collectionGrid = document.getElementById('collection-grid');
-const galleryFilterPills = document.getElementById('gallery-filter-pills');
-const galleryFilterCount = document.getElementById('gallery-filter-count');
 const galleryEmpty = document.getElementById('gallery-empty');
 const galleryEmptyClear = document.getElementById('gallery-empty-clear');
+// Two-view gallery refs (categories landing + photos detail)
+const galleryCategoriesView = document.getElementById('gallery-categories-view');
+const galleryCategoriesGrid = document.getElementById('gallery-categories-grid');
+const galleryCategoriesCount = document.getElementById('gallery-categories-count');
+const galleryDetailView = document.getElementById('gallery-detail-view');
+const galleryDetailTitle = document.getElementById('gallery-detail-title');
+const galleryDetailCount = document.getElementById('gallery-detail-count');
+const galleryBackBtn = document.getElementById('gallery-back-btn');
+const galleryShowMoreWrap = document.getElementById('gallery-show-more-wrap');
+const galleryShowMoreBtn = document.getElementById('gallery-show-more');
 
-// Filter state — 'all' shows everything; otherwise matches against project.tags + project.tag.
+// View state. galleryFilter === 'all' renders the categories landing view;
+// any other value renders the detail view for that tag.
 let galleryFilter = 'all';
+// Pagination — number of photos rendered so far in the detail view.
+const GALLERY_PAGE_SIZE = 12;
+let galleryDetailVisibleCount = GALLERY_PAGE_SIZE;
 
 // Detect generic / auto-filled titles ("Untitled 3", "IMG 1234", "Photo 5", etc.)
 // Phone photos uploaded via luckyapp default to the filename, which is rarely
@@ -1010,64 +1029,107 @@ function escapeHtml(s) {
         .replace(/'/g, '&#039;');
 }
 
-function buildFilterPills() {
-    if (!galleryFilterPills) return;
-    // Collect every tag across projects (from .tags array if present, else .tag)
-    const counts = new Map();
-    projectData.forEach(p => {
-        const tagsForProject = (Array.isArray(p.tags) && p.tags.length) ? p.tags : [p.tag].filter(Boolean);
+// Compute tag→projects map. Each project may appear under multiple tags
+// (its .tags array). Used by both the category tiles and the detail view.
+function computeTagProjects() {
+    const byTag = new Map();
+    projectData.forEach((project, index) => {
+        const tagsForProject = (Array.isArray(project.tags) && project.tags.length)
+            ? project.tags
+            : [project.tag].filter(Boolean);
         const seen = new Set();
         tagsForProject.forEach(t => {
             if (!t || seen.has(t)) return;
             seen.add(t);
-            counts.set(t, (counts.get(t) || 0) + 1);
+            if (!byTag.has(t)) byTag.set(t, []);
+            byTag.get(t).push({ project, index });
         });
     });
-    // Sort by count desc, then alphabetical
-    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-    const total = projectData.length;
-    const pills = [['all', total], ...sorted];
-    galleryFilterPills.innerHTML = pills.map(([tag, count]) => {
-        const isActive = tag === galleryFilter;
-        const label = tag === 'all' ? 'All' : tag;
+    return byTag;
+}
+
+// LEVEL 1 — Render the category tiles landing view. Each tile uses the
+// first project in that category as the background image. Click → detail.
+function buildCategoryTiles() {
+    if (!galleryCategoriesGrid) return;
+    const byTag = computeTagProjects();
+    // Sort categories by project count (most work first), then alphabetical.
+    const sorted = Array.from(byTag.entries()).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+
+    if (galleryCategoriesCount) {
+        const totalProjects = projectData.length;
+        const totalCategories = sorted.length;
+        galleryCategoriesCount.textContent = `${totalProjects} ${totalProjects === 1 ? 'project' : 'projects'} across ${totalCategories} ${totalCategories === 1 ? 'category' : 'categories'}`;
+    }
+
+    galleryCategoriesGrid.innerHTML = sorted.map(([tag, projects]) => {
+        // Pick the cover photo from the first project in this category that
+        // has a usable image. Prefer the project's chosen cover index.
+        let coverSrc = '/images/banner.jpg';
+        for (const { project } of projects) {
+            const coverIdx = project.cover ?? 0;
+            const coverImg = project.images?.[coverIdx] ?? project.images?.[0];
+            if (coverImg) {
+                coverSrc = getImageSrc(coverImg);
+                break;
+            }
+        }
+        const safeTag = escapeHtml(tag);
+        const count = projects.length;
         return `
-            <button type="button" class="gallery-pill ${isActive ? 'is-active' : ''}" data-tag="${escapeHtml(tag)}" role="tab" aria-selected="${isActive}">
-                <span class="gallery-pill-label">${escapeHtml(label)}</span>
-                <span class="gallery-pill-count">${count}</span>
-            </button>
+            <a href="#tag=${encodeURIComponent(tag)}" class="gallery-category-tile" data-tag="${safeTag}" aria-label="View ${safeTag} projects (${count})">
+                <img src="${escapeHtml(coverSrc)}" alt="" loading="lazy" class="gallery-category-img"
+                     onerror="this.onerror=null;this.src='/images/banner.jpg';this.classList.add('is-fallback');" />
+                <div class="gallery-category-overlay">
+                    <h3 class="gallery-category-title">${safeTag}</h3>
+                    <p class="gallery-category-count">${count} ${count === 1 ? 'project' : 'projects'}</p>
+                </div>
+            </a>
         `;
     }).join('');
 }
 
-function updateFilterCount(visibleCount) {
-    if (!galleryFilterCount) return;
-    const total = projectData.length;
-    if (galleryFilter === 'all') {
-        galleryFilterCount.textContent = `${total} ${total === 1 ? 'project' : 'projects'}`;
-    } else {
-        galleryFilterCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'project' : 'projects'} in ${galleryFilter}`;
-    }
-}
-
+// LEVEL 2 — Render photos for the currently-active category. Honors
+// `galleryDetailVisibleCount` for pagination.
 function buildCollectionGrid() {
     if (!collectionGrid) return;
     collectionGrid.innerHTML = '';
 
-    // Rebuild filter pills each time the data changes (so the remote-fetch swap picks up new tags).
-    buildFilterPills();
+    // Categories landing view — render tiles and bail.
+    if (galleryFilter === 'all') {
+        if (galleryCategoriesView) galleryCategoriesView.hidden = false;
+        if (galleryDetailView) galleryDetailView.hidden = true;
+        if (galleryEmpty) galleryEmpty.hidden = true;
+        if (galleryShowMoreWrap) galleryShowMoreWrap.hidden = true;
+        buildCategoryTiles();
+        return;
+    }
+
+    // Detail view for a specific category.
+    if (galleryCategoriesView) galleryCategoriesView.hidden = true;
+    if (galleryDetailView) galleryDetailView.hidden = false;
 
     const visible = projectData
         .map((project, index) => ({ project, index }))
         .filter(({ project }) => projectMatchesFilter(project, galleryFilter));
 
-    updateFilterCount(visible.length);
+    if (galleryDetailTitle) galleryDetailTitle.textContent = galleryFilter;
+    if (galleryDetailCount) {
+        galleryDetailCount.textContent = `${visible.length} ${visible.length === 1 ? 'project' : 'projects'}`;
+    }
 
-    // Empty state when no matches
     if (galleryEmpty) {
         galleryEmpty.hidden = visible.length > 0;
     }
 
-    visible.forEach(({ project, index }) => {
+    // Pagination — only render up to the current visible count, then show
+    // a "Show more" button if there's more.
+    const sliced = visible.slice(0, galleryDetailVisibleCount);
+    if (galleryShowMoreWrap) {
+        galleryShowMoreWrap.hidden = sliced.length >= visible.length;
+    }
+
+    sliced.forEach(({ project, index }) => {
         const coverIdx = project.cover ?? 0;
         const coverImg = project.images[coverIdx] ?? project.images[0];
         const src = getImageSrc(coverImg);
@@ -1122,29 +1184,58 @@ function buildCollectionGrid() {
     });
 }
 
-// Filter pill clicks (event delegation — pills are rebuilt on every render).
-if (galleryFilterPills) {
-    galleryFilterPills.addEventListener('click', (e) => {
-        const pill = e.target.closest('.gallery-pill[data-tag]');
-        if (!pill) return;
-        const next = pill.dataset.tag;
-        if (next === galleryFilter) return;
-        galleryFilter = next;
-        buildCollectionGrid();
-        // Bring the grid into view so users see the result of their click.
-        collectionGrid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+// Category tile clicks (event delegation). Tiles are <a href="#tag=..."> so
+// they also work via direct link / browser nav; the listener just enhances
+// scroll behavior + avoids a full page jump.
+if (galleryCategoriesGrid) {
+    galleryCategoriesGrid.addEventListener('click', (e) => {
+        const tile = e.target.closest('.gallery-category-tile[data-tag]');
+        if (!tile) return;
+        // Let the hashchange listener pick up the filter swap — the href
+        // already encodes the destination.
     });
 }
 
-// Empty-state "show all" button resets the filter.
+// Back-to-categories button clears the hash, triggering hashchange.
+if (galleryBackBtn) {
+    galleryBackBtn.addEventListener('click', () => {
+        history.pushState('', document.title, window.location.pathname + window.location.search);
+        applyHashFilter();
+        galleryCategoriesView?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
+// "Show more" button — bumps the visible count by one page and re-renders.
+if (galleryShowMoreBtn) {
+    galleryShowMoreBtn.addEventListener('click', () => {
+        galleryDetailVisibleCount += GALLERY_PAGE_SIZE;
+        buildCollectionGrid();
+    });
+}
+
+// Empty-state "browse all categories" button returns to the landing view.
 if (galleryEmptyClear) {
     galleryEmptyClear.addEventListener('click', () => {
-        galleryFilter = 'all';
-        buildCollectionGrid();
+        history.pushState('', document.title, window.location.pathname + window.location.search);
+        applyHashFilter();
     });
 }
 
-buildCollectionGrid();
+// Read the URL hash and update `galleryFilter` accordingly. Shareable links:
+//   /gallery#tag=Hardscaping  →  detail view for Hardscaping
+//   /gallery                  →  categories landing
+function applyHashFilter() {
+    const hash = (window.location.hash || '').replace(/^#/, '');
+    const params = new URLSearchParams(hash);
+    const tag = params.get('tag');
+    galleryFilter = tag || 'all';
+    // Reset pagination when switching categories.
+    galleryDetailVisibleCount = GALLERY_PAGE_SIZE;
+    buildCollectionGrid();
+}
+
+window.addEventListener('hashchange', applyHashFilter);
+applyHashFilter();
 
 // ============================================
 // COLLECTION LIGHTBOX — Before/After & Carousel

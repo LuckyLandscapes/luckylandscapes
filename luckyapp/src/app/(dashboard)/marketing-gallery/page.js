@@ -17,6 +17,7 @@ import { compressImage, bytesPretty } from '@/lib/compressImage';
 import {
   Plus, X, Save, Upload, Trash2, Edit3, Eye, EyeOff, Camera, Loader2,
   ArrowUp, ArrowDown, ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
+  Star,
 } from 'lucide-react';
 
 // Curated tag set. Free-form in the DB so new tags don't need a migration,
@@ -237,6 +238,16 @@ export default function MarketingGalleryPage() {
     setItems(prev => prev.map(x => x.id === item.id ? { ...x, is_published: next } : x));
   };
 
+  const handleToggleFeatured = async (item) => {
+    const next = !item.is_featured;
+    const { error } = await supabase
+      .from('marketing_gallery')
+      .update({ is_featured: next, updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+    if (error) { alert('Update failed: ' + error.message); return; }
+    setItems(prev => prev.map(x => x.id === item.id ? { ...x, is_featured: next } : x));
+  };
+
   const handleMoveSortOrder = async (item, direction) => {
     const idx = items.findIndex(x => x.id === item.id);
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
@@ -259,6 +270,7 @@ export default function MarketingGalleryPage() {
   }, [items, filterTag]);
 
   const publishedCount = items.filter(x => x.is_published).length;
+  const featuredCount = items.filter(x => x.is_featured && x.is_published).length;
 
   if (!isSupabaseConnected()) {
     return (
@@ -298,11 +310,22 @@ export default function MarketingGalleryPage() {
       </header>
 
       <div className="card" style={{ padding: '1rem 1.25rem', marginBottom: '1.25rem', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'center', fontSize: '.88rem' }}>
-        <div>
-          <strong>{publishedCount}</strong>{' '}
-          <span style={{ color: 'var(--text-secondary)' }}>published · </span>
-          <strong>{items.length - publishedCount}</strong>{' '}
-          <span style={{ color: 'var(--text-secondary)' }}>drafts</span>
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>
+            <strong>{publishedCount}</strong>{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>published</span>
+          </span>
+          <span style={{ color: 'var(--text-tertiary)' }}>·</span>
+          <span>
+            <strong>{items.length - publishedCount}</strong>{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>drafts</span>
+          </span>
+          <span style={{ color: 'var(--text-tertiary)' }}>·</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '.25rem' }} title="Featured photos appear in the 'Featured Work' section on the homepage">
+            <Star size={13} style={{ color: '#fbbf24', fill: featuredCount > 0 ? '#fbbf24' : 'none' }} />
+            <strong>{featuredCount}</strong>{' '}
+            <span style={{ color: 'var(--text-secondary)' }}>featured on homepage</span>
+          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '.4rem', marginLeft: 'auto' }}>
           <Tag size={14} style={{ color: 'var(--text-tertiary)' }} />
@@ -335,6 +358,7 @@ export default function MarketingGalleryPage() {
               onTogglePublish={() => handleTogglePublish(item)}
               onMoveUp={idx > 0 ? () => handleMoveSortOrder(item, 'up') : null}
               onMoveDown={idx < filtered.length - 1 ? () => handleMoveSortOrder(item, 'down') : null}
+              onToggleFeatured={() => handleToggleFeatured(item)}
             />
           ))}
         </div>
@@ -376,9 +400,9 @@ function EmptyState({ onUpload, hasItems }) {
   );
 }
 
-function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, onMoveDown }) {
+function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, onMoveDown, onToggleFeatured }) {
   return (
-    <div className="card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    <div className="card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', border: item.is_featured ? '2px solid #fbbf24' : undefined }}>
       <div style={{ position: 'relative', aspectRatio: '4/3', background: 'var(--bg-subtle)' }}>
         <img
           src={item.image_url}
@@ -389,6 +413,11 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
         {!item.is_published && (
           <div style={{ position: 'absolute', top: '.5rem', left: '.5rem', background: 'rgba(0,0,0,.7)', color: 'white', padding: '.25rem .6rem', borderRadius: 'var(--radius-sm)', fontSize: '.7rem', fontWeight: 600 }}>
             DRAFT
+          </div>
+        )}
+        {item.is_featured && (
+          <div style={{ position: 'absolute', top: '.5rem', left: !item.is_published ? '5rem' : '.5rem', background: '#fbbf24', color: '#3a2a05', padding: '.25rem .6rem', borderRadius: 'var(--radius-sm)', fontSize: '.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
+            <Star size={11} style={{ fill: '#3a2a05' }} /> FEATURED
           </div>
         )}
         {item.before_image_url && (
@@ -409,6 +438,14 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
           </div>
         )}
         <div style={{ display: 'flex', gap: '.25rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={onToggleFeatured}
+            title={item.is_featured ? 'Remove from homepage Featured Work' : 'Add to homepage Featured Work'}
+            style={{ color: item.is_featured ? '#fbbf24' : undefined }}
+          >
+            <Star size={14} style={item.is_featured ? { fill: '#fbbf24' } : {}} />
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={onTogglePublish} title={item.is_published ? 'Hide from site' : 'Publish to site'}>
             {item.is_published ? <Eye size={14} /> : <EyeOff size={14} />}
           </button>
@@ -464,6 +501,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
       // Pre-seed the picked category as the primary tag. AI auto-fill later
       // unions in additional tags; user can still add more via "+ more tags".
       tags: category ? [category] : [],
+      featured: false,
       before: false,
       beforeFile: null,
       beforePreview: null,
@@ -600,6 +638,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
         before_image_url: before?.url || null,
         before_image_path: before?.path || null,
         is_published: true,
+        is_featured: !!p.featured,
         sort_order: 0,
       });
       if (error) throw error;
@@ -948,7 +987,20 @@ function PendingUploadRow({ pending, aiAvailable, primaryCategory, onChange, onR
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.85rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', fontSize: '.85rem' }}>
+          <label
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', cursor: 'pointer', color: pending.featured ? '#b45309' : 'inherit' }}
+            title="Featured photos appear in the 'Featured Work' section on the homepage. Pick your best work."
+          >
+            <input
+              type="checkbox"
+              checked={!!pending.featured}
+              onChange={e => onChange({ featured: e.target.checked })}
+              disabled={pending.done || pending.uploading}
+            />
+            <Star size={14} style={pending.featured ? { fill: '#fbbf24', color: '#fbbf24' } : { color: 'var(--text-tertiary)' }} />
+            Feature on homepage
+          </label>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', cursor: 'pointer' }}>
             <input
               type="checkbox"

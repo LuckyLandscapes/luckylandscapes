@@ -35,7 +35,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('marketing_gallery')
-    .select('id, title, description, tags, image_url, image_width, image_height, before_image_url, sort_order, created_at')
+    .select('id, title, description, tags, image_url, image_width, image_height, before_image_url, sort_order, is_featured, created_at')
     .eq('is_published', true)
     .order('sort_order', { ascending: true })
     .order('created_at', { ascending: false });
@@ -58,6 +58,7 @@ export async function GET() {
     height: row.image_height || null,
     beforeImageUrl: row.before_image_url || null,
     isBeforeAfter: !!row.before_image_url,
+    isFeatured: !!row.is_featured,
     createdAt: row.created_at,
   }));
 
