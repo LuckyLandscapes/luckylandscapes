@@ -392,6 +392,46 @@ if (heroVideoWrap) {
 }
 
 // ============================================
+// GSAP — STAT NUMBER COUNTERS
+// ============================================
+// Animates any <span class="stat-number" data-count="N">0</span> from 0 up
+// to N when the element scrolls into view. The HTML on team.html (and any
+// future page using the same pattern) ships the start value 0 so the page
+// is intelligible without JS — the animation just adds polish.
+//
+// `once: true` means the counter fires exactly once per element and never
+// resets on scroll-up. Reduced-motion users skip the tween entirely and get
+// the final value instantly.
+const statNumbers = document.querySelectorAll('.stat-number[data-count]');
+if (statNumbers.length > 0) {
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    statNumbers.forEach(el => {
+        const target = parseFloat(el.dataset.count);
+        if (!Number.isFinite(target)) return;
+        // Decimal targets (e.g. "4.9") render with one decimal place; integer
+        // targets render as whole numbers so "5" doesn't show "5.0".
+        const isDecimal = !Number.isInteger(target);
+        const format = v => isDecimal ? v.toFixed(1) : String(Math.round(v));
+        if (reduceMotion) {
+            el.textContent = format(target);
+            return;
+        }
+        const counter = { value: 0 };
+        gsap.to(counter, {
+            value: target,
+            duration: 1.8,
+            ease: 'power2.out',
+            scrollTrigger: {
+                trigger: el,
+                start: 'top 88%',
+                once: true,
+            },
+            onUpdate: () => { el.textContent = format(counter.value); },
+        });
+    });
+}
+
+// ============================================
 // GSAP — TEAM CARDS
 // ============================================
 const teamCards = document.querySelectorAll('.team-card');
