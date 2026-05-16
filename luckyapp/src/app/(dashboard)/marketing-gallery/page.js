@@ -57,6 +57,31 @@ const CATEGORY_ICON = {
 
 const MARKETING_GALLERY_URL = 'https://luckylandscapes.com/gallery';
 
+// Gemini model options offered in the upload-modal AI picker. Keep in sync
+// with the server-side GEMINI_ALLOWED set in /api/marketing/gallery/suggest.
+// Order = how they appear in the dropdown. Cheapest first.
+const GEMINI_MODEL_OPTIONS = [
+  { id: 'gemini-3.1-flash-lite',   label: 'Flash Lite (cheapest)',   hint: '$0.25 / $1.50 per MTok · fast, accurate enough for captions' },
+  { id: 'gemini-3-flash-preview',  label: 'Flash (smarter)',         hint: '$0.50 / $3.00 per MTok · better writing quality' },
+  { id: 'gemini-3.1-pro-preview',  label: 'Pro (SOTA)',              hint: '$2.00 / $12.00 per MTok · best, slowest, ~$0.005/photo' },
+];
+const GEMINI_DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+const GEMINI_MODEL_STORAGE_KEY = 'lucky_gallery_ai_model';
+
+function readPreferredModel() {
+  if (typeof window === 'undefined') return GEMINI_DEFAULT_MODEL;
+  try {
+    const v = window.localStorage.getItem(GEMINI_MODEL_STORAGE_KEY);
+    if (v && GEMINI_MODEL_OPTIONS.some(o => o.id === v)) return v;
+  } catch { /* SSR / private mode */ }
+  return GEMINI_DEFAULT_MODEL;
+}
+
+function writePreferredModel(id) {
+  if (typeof window === 'undefined') return;
+  try { window.localStorage.setItem(GEMINI_MODEL_STORAGE_KEY, id); } catch { /* ignore */ }
+}
+
 // Phone-camera default filenames produce useless titles. When the auto-fill
 // would land on something like "IMG 1234" or "Untitled 3", leave the field
 // blank and force a real title — keeps the public gallery from being a wall
@@ -108,8 +133,10 @@ function fileToBase64(file) {
 }
 
 // Call the AI suggest endpoint. Returns null if not configured (so the UI
-// can hide the auto-fill button) or throws for any other failure.
-async function fetchAiSuggestion(file) {
+// can hide the auto-fill button) or throws for any other failure. Pass the
+// user's preferred model so the server runs the right tier (Flash Lite by
+// default, Pro / Flash on opt-in).
+async function fetchAiSuggestion(file, model) {
   // Compress first so we send the same ~300KB the eventual upload will use —
   // makes the AI call cheaper and faster.
   const compressed = await compressImage(file);
@@ -122,7 +149,7 @@ async function fetchAiSuggestion(file) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ imageBase64: base64 }),
+    body: JSON.stringify({ imageBase64: base64, model: model || undefined }),
   });
   if (res.status === 503) {
     // Not configured — caller treats this as "feature disabled".
@@ -420,6 +447,12 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   // null = not yet checked; true/false = result of last suggest call
   const [aiAvailable, setAiAvailable] = useState(null);
   const [bulkAiLoading, setBulkAiLoading] = useState(false);
+  const [aiModel, setAiModel] = useState(() => readPreferredModel());
+
+  const handleModelChange = (id) => {
+    setAiModel(id);
+    writePreferredModel(id);
+  };
 
   const addFiles = (files) => {
     const arr = Array.from(files || []);
@@ -479,7 +512,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
     if (!p || p.done || p.uploading || p.aiLoading) return;
     updateAt(i, { aiLoading: true, error: null });
     try {
-      const suggestion = await fetchAiSuggestion(p.file);
+      const suggestion = await fetchAiSuggestion(p.file, aiModel);
       if (suggestion === null) {
         setAiAvailable(false);
         updateAt(i, { aiLoading: false, error: 'AI auto-fill is not configured (set ANTHROPIC_API_KEY in Vercel).' });
@@ -513,7 +546,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
         if (item.done || item.hasTitle) continue;
         updateAt(item.idx, { aiLoading: true, error: null });
         try {
-          const suggestion = await fetchAiSuggestion(item.file);
+          const suggestion = await fetchAiSuggestion(item.file, aiModel);
           if (suggestion === null) {
             stillAvailable = false;
             setAiAvailable(false);
@@ -697,20 +730,37 @@ function UploadModal({ orgId, onClose, onUploaded }) {
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {aiAvailable !== false && pending.length > 1 && (
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={runAiSuggestAll}
-                    disabled={bulkAiLoading || pending.every(p => p.done || p.title)}
-                    style={{ gap: '.4rem' }}
-                  >
-                    {bulkAiLoading ? (
-                      <><Loader2 size={14} className="spin" /> Analyzing photos…</>
-                    ) : (
-                      <><Sparkles size={14} /> Auto-fill all with AI</>
-                    )}
-                  </button>
+              {aiAvailable !== false && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '.75rem', padding: '.6rem .75rem', background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.78rem', color: 'var(--text-secondary)', minWidth: 0 }}>
+                    <Sparkles size={14} style={{ flexShrink: 0, color: 'var(--accent)' }} />
+                    <span style={{ fontWeight: 600 }}>AI model:</span>
+                    <select
+                      value={aiModel}
+                      onChange={e => handleModelChange(e.target.value)}
+                      disabled={bulkAiLoading}
+                      title={GEMINI_MODEL_OPTIONS.find(o => o.id === aiModel)?.hint || ''}
+                      style={{ padding: '.25rem .4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'var(--bg-base, var(--bg-subtle))', color: 'var(--text-primary)', fontSize: '.78rem', maxWidth: '220px' }}
+                    >
+                      {GEMINI_MODEL_OPTIONS.map(opt => (
+                        <option key={opt.id} value={opt.id}>{opt.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  {pending.length > 1 && (
+                    <button
+                      className="btn btn-secondary btn-sm"
+                      onClick={runAiSuggestAll}
+                      disabled={bulkAiLoading || pending.every(p => p.done || p.title)}
+                      style={{ gap: '.35rem' }}
+                    >
+                      {bulkAiLoading ? (
+                        <><Loader2 size={13} className="spin" /> Analyzing…</>
+                      ) : (
+                        <><Sparkles size={13} /> Auto-fill all</>
+                      )}
+                    </button>
+                  )}
                 </div>
               )}
               {pending.map((p, i) => (

@@ -41,34 +41,74 @@ If the photo is unclear, blurry, or doesn't show landscaping work, return:
 // or throws on failure.
 // ─────────────────────────────────────────────────────────────────────────
 
-async function suggestViaGemini({ apiKey, base64, mediaType }) {
-  // Gemini 2.0 Flash — free tier 1500 RPD. responseMimeType forces strict JSON
-  // output so we don't have to extract from prose / code fences.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{
-        parts: [
-          { inline_data: { mime_type: mediaType, data: base64 } },
-          { text: PROMPT },
-        ],
-      }],
-      generationConfig: {
-        temperature: 0.4,
-        maxOutputTokens: 400,
-        responseMimeType: 'application/json',
-      },
-    }),
+// Allowed Gemini models the client can request. Keep this list in sync with
+// GEMINI_MODEL_OPTIONS on the client page so the dropdown only offers
+// models the server will accept. Google ages models out — when one is
+// deprecated, swap the entry here (the client uses the same option keys).
+const GEMINI_ALLOWED = new Set([
+  'gemini-3.1-flash-lite',   // cheapest current — $0.25/$1.50 per MTok
+  'gemini-3-flash-preview',  // smarter — $0.50/$3.00 per MTok
+  'gemini-3.1-pro-preview',  // SOTA reasoning — $2.00/$12.00 per MTok
+  'gemini-2.5-flash',        // last-gen stable backup
+  'gemini-flash-latest',     // alias — always points at the newest Flash
+]);
+const GEMINI_DEFAULT = 'gemini-3.1-flash-lite';
+// Fallback chain when the requested model 404s (only happens if Google
+// pulls a model mid-session). Cheapest → most expensive so we don't
+// silently upgrade users into a pricier tier.
+const GEMINI_FALLBACK_ORDER = [
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+];
+
+async function suggestViaGemini({ apiKey, base64, mediaType, requestedModel }) {
+  // responseMimeType forces strict JSON output so we don't have to extract
+  // from prose / code fences.
+  const body = JSON.stringify({
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: mediaType, data: base64 } },
+        { text: PROMPT },
+      ],
+    }],
+    generationConfig: {
+      temperature: 0.4,
+      maxOutputTokens: 400,
+      responseMimeType: 'application/json',
+    },
   });
-  if (!res.ok) {
+
+  // Build the model attempt list: user's pick first, then fallback chain
+  // (skipping the picked model and any duplicates).
+  const primary = (requestedModel && GEMINI_ALLOWED.has(requestedModel)) ? requestedModel : GEMINI_DEFAULT;
+  const seen = new Set();
+  const attempts = [primary, ...GEMINI_FALLBACK_ORDER].filter(m => {
+    if (seen.has(m)) return false;
+    seen.add(m);
+    return true;
+  });
+
+  let lastErr = null;
+  for (const model of attempts) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      return { rawText: text, usage: data?.usageMetadata || null, provider: `gemini:${model}` };
+    }
     const errText = await res.text();
-    throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+    lastErr = `Gemini ${model} ${res.status}: ${errText.slice(0, 300)}`;
+    // Only retry on 404 (deprecated / unknown model). Other errors are
+    // structural (bad request, quota) — no point trying another model.
+    if (res.status !== 404) break;
   }
-  const data = await res.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  return { rawText: text, usage: data?.usageMetadata || null, provider: 'gemini' };
+  throw new Error(lastErr || 'Gemini: all models failed');
 }
 
 async function suggestViaAnthropic({ apiKey, base64, mediaType }) {
@@ -175,9 +215,14 @@ export async function POST(request) {
     return NextResponse.json({ error: 'image_too_large' }, { status: 413 });
   }
 
+  // Optional model override from the client. Server validates against the
+  // allowed set inside the provider helper so callers can't burn cash on
+  // arbitrary models they don't have access to.
+  const requestedModel = typeof body?.model === 'string' ? body.model.trim() : '';
+
   try {
     const aiResult = provider === 'gemini'
-      ? await suggestViaGemini({ apiKey: geminiKey, base64, mediaType })
+      ? await suggestViaGemini({ apiKey: geminiKey, base64, mediaType, requestedModel })
       : await suggestViaAnthropic({ apiKey: anthropicKey, base64, mediaType });
 
     const out = extractAndValidate(aiResult.rawText);
