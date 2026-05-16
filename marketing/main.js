@@ -862,13 +862,19 @@ function buildGalleryGrid() {
             chipHtml = '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>';
         }
 
+        const title = prettyTitle(project);
+        const titleHtml = title ? `<h3 class="collection-card-title">${escapeHtml(title)}</h3>` : '';
+        const tagText = escapeHtml(project.tag || 'Project');
+        const altText = escapeHtml(title || project.tag || 'Lucky Landscapes project');
+
         card.innerHTML = `
             ${chipHtml}
-            <img src="${src}" alt="${project.title}" loading="lazy" class="collection-card-img" />
+            <img src="${escapeHtml(src)}" alt="${altText}" loading="lazy" class="collection-card-img"
+                 onerror="this.onerror=null;this.src='/images/banner.jpg';this.classList.add('is-fallback');" />
             <div class="collection-card-overlay">
                 <div class="collection-card-bottom">
-                    <span class="collection-card-title">${project.title}</span>
-                    <span class="collection-card-tag">${project.tag}</span>
+                    <span class="collection-card-tag">${tagText}</span>
+                    ${titleHtml}
                 </div>
                 <span class="collection-card-badge">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -896,6 +902,10 @@ buildGalleryGrid();
 
 const MARKETING_GALLERY_URL = 'https://app.luckylandscapes.com/api/marketing/gallery';
 
+// Snapshot the original hardcoded projectData so re-runs (HMR, route changes)
+// always merge against the same baseline rather than the already-merged copy.
+const staticProjectDataBackup = projectData.slice();
+
 async function loadMarketingGalleryFromLuckyapp() {
     try {
         const res = await fetch(MARKETING_GALLERY_URL, { cache: 'no-store' });
@@ -905,21 +915,34 @@ async function loadMarketingGalleryFromLuckyapp() {
         if (remote.length === 0) return;
         // Convert API shape → projectData shape (preserve before/after handling).
         const converted = remote.map(item => {
-            const tag = (Array.isArray(item.tags) && item.tags[0]) || 'Project';
+            // Prefer the second tag if first is "Construction" or generic — show
+            // the more specific service name on the card chip.
+            const tags = Array.isArray(item.tags) ? item.tags : [];
+            const tag = tags[0] || 'Project';
             const isBA = !!item.beforeImageUrl;
             return {
                 title: item.title || 'Untitled project',
                 tag,
+                tags,                          // keep the full list for filtering
                 desc: item.description || '',
-                cover: 0,
+                cover: isBA ? 1 : 0,           // for before/after, show the "after" as the cover
                 images: isBA ? [item.beforeImageUrl, item.imageUrl] : [item.imageUrl],
                 beforeAfter: isBA,
+                source: 'remote',
             };
         });
-        projectData = converted;
-        // Reset the homepage curation to the first 6 remote items — the
-        // hardcoded indices were tied to the fallback list.
-        homepageFeatured = Array.from({ length: Math.min(6, converted.length) }, (_, i) => i);
+        // Tag the static entries so filtering / styling can distinguish.
+        const staticTagged = staticProjectDataBackup.map(p => ({
+            ...p,
+            tags: p.tags || [p.tag].filter(Boolean),
+            source: 'static',
+        }));
+        // Remote photos first (Riley's latest work leads), then the static portfolio.
+        projectData = [...converted, ...staticTagged];
+        // Refresh the homepage curation — first 6 remote items, padded with
+        // earliest static entries if there are fewer than 6 remote photos.
+        const featuredCount = Math.min(6, projectData.length);
+        homepageFeatured = Array.from({ length: featuredCount }, (_, i) => i);
         // Rebuild any gallery surfaces that have already mounted.
         if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
         if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
@@ -941,12 +964,110 @@ loadMarketingGalleryFromLuckyapp();
 //   • Image Carousel — for projects with 2+ images (series viewer)
 
 const collectionGrid = document.getElementById('collection-grid');
+const galleryFilterPills = document.getElementById('gallery-filter-pills');
+const galleryFilterCount = document.getElementById('gallery-filter-count');
+const galleryEmpty = document.getElementById('gallery-empty');
+const galleryEmptyClear = document.getElementById('gallery-empty-clear');
+
+// Filter state — 'all' shows everything; otherwise matches against project.tags + project.tag.
+let galleryFilter = 'all';
+
+// Detect generic / auto-filled titles ("Untitled 3", "IMG 1234", "Photo 5", etc.)
+// Phone photos uploaded via luckyapp default to the filename, which is rarely
+// human-friendly. When detected, the public site hides the title row entirely
+// and lets the tag chip + the photo carry the card.
+function isGenericTitle(t) {
+    if (!t) return true;
+    const cleaned = String(t).trim();
+    if (!cleaned) return true;
+    return /^(untitled|img|image|photo|dsc|pxl|screenshot)[\s_-]*\d*$/i.test(cleaned);
+}
+
+function prettyTitle(project) {
+    const t = (project.title || '').trim();
+    if (isGenericTitle(t)) return '';
+    return t;
+}
+
+// Local placeholder used when a remote (Supabase) image fails to load —
+// keeps the card from looking broken while still communicating the project.
+const FALLBACK_CARD_IMG = '/images/banner.jpg';
+
+function projectMatchesFilter(project, filter) {
+    if (filter === 'all') return true;
+    if (project.tag === filter) return true;
+    if (Array.isArray(project.tags) && project.tags.includes(filter)) return true;
+    return false;
+}
+
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function buildFilterPills() {
+    if (!galleryFilterPills) return;
+    // Collect every tag across projects (from .tags array if present, else .tag)
+    const counts = new Map();
+    projectData.forEach(p => {
+        const tagsForProject = (Array.isArray(p.tags) && p.tags.length) ? p.tags : [p.tag].filter(Boolean);
+        const seen = new Set();
+        tagsForProject.forEach(t => {
+            if (!t || seen.has(t)) return;
+            seen.add(t);
+            counts.set(t, (counts.get(t) || 0) + 1);
+        });
+    });
+    // Sort by count desc, then alphabetical
+    const sorted = Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const total = projectData.length;
+    const pills = [['all', total], ...sorted];
+    galleryFilterPills.innerHTML = pills.map(([tag, count]) => {
+        const isActive = tag === galleryFilter;
+        const label = tag === 'all' ? 'All' : tag;
+        return `
+            <button type="button" class="gallery-pill ${isActive ? 'is-active' : ''}" data-tag="${escapeHtml(tag)}" role="tab" aria-selected="${isActive}">
+                <span class="gallery-pill-label">${escapeHtml(label)}</span>
+                <span class="gallery-pill-count">${count}</span>
+            </button>
+        `;
+    }).join('');
+}
+
+function updateFilterCount(visibleCount) {
+    if (!galleryFilterCount) return;
+    const total = projectData.length;
+    if (galleryFilter === 'all') {
+        galleryFilterCount.textContent = `${total} ${total === 1 ? 'project' : 'projects'}`;
+    } else {
+        galleryFilterCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'project' : 'projects'} in ${galleryFilter}`;
+    }
+}
 
 function buildCollectionGrid() {
     if (!collectionGrid) return;
     collectionGrid.innerHTML = '';
 
-    projectData.forEach((project, index) => {
+    // Rebuild filter pills each time the data changes (so the remote-fetch swap picks up new tags).
+    buildFilterPills();
+
+    const visible = projectData
+        .map((project, index) => ({ project, index }))
+        .filter(({ project }) => projectMatchesFilter(project, galleryFilter));
+
+    updateFilterCount(visible.length);
+
+    // Empty state when no matches
+    if (galleryEmpty) {
+        galleryEmpty.hidden = visible.length > 0;
+    }
+
+    visible.forEach(({ project, index }) => {
         const coverIdx = project.cover ?? 0;
         const coverImg = project.images[coverIdx] ?? project.images[0];
         const src = getImageSrc(coverImg);
@@ -971,13 +1092,24 @@ function buildCollectionGrid() {
             chipHtml = '<div class="gallery-progress-chip"><span class="gallery-progress-dot"></span> In Progress</div>';
         }
 
+        const title = prettyTitle(project);
+        const titleHtml = title ? `<h3 class="collection-card-title">${escapeHtml(title)}</h3>` : '';
+        const tagText = escapeHtml(project.tag || 'Project');
+        const desc = (project.desc || '').trim();
+        const descHtml = desc
+            ? `<p class="collection-card-desc">${escapeHtml(desc.length > 140 ? desc.slice(0, 137) + '…' : desc)}</p>`
+            : '';
+        const altText = escapeHtml(title || project.tag || 'Lucky Landscapes project');
+
         card.innerHTML = `
             ${chipHtml}
-            <img src="${src}" alt="${project.title}" loading="lazy" class="collection-card-img" />
+            <img src="${escapeHtml(src)}" alt="${altText}" loading="lazy" class="collection-card-img"
+                 onerror="this.onerror=null;this.src='${FALLBACK_CARD_IMG}';this.classList.add('is-fallback');" />
             <div class="collection-card-overlay">
                 <div class="collection-card-bottom">
-                    <span class="collection-card-title">${project.title}</span>
-                    <span class="collection-card-tag">${project.tag}</span>
+                    <span class="collection-card-tag">${tagText}</span>
+                    ${titleHtml}
+                    ${descHtml}
                 </div>
                 <span class="collection-card-badge">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
@@ -987,6 +1119,28 @@ function buildCollectionGrid() {
         `;
 
         collectionGrid.appendChild(card);
+    });
+}
+
+// Filter pill clicks (event delegation — pills are rebuilt on every render).
+if (galleryFilterPills) {
+    galleryFilterPills.addEventListener('click', (e) => {
+        const pill = e.target.closest('.gallery-pill[data-tag]');
+        if (!pill) return;
+        const next = pill.dataset.tag;
+        if (next === galleryFilter) return;
+        galleryFilter = next;
+        buildCollectionGrid();
+        // Bring the grid into view so users see the result of their click.
+        collectionGrid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+}
+
+// Empty-state "show all" button resets the filter.
+if (galleryEmptyClear) {
+    galleryEmptyClear.addEventListener('click', () => {
+        galleryFilter = 'all';
+        buildCollectionGrid();
     });
 }
 
@@ -1037,9 +1191,13 @@ function openCollectionLightbox(projectIndex) {
     if (!clCurrentProject || !clLightbox) return;
 
     // Populate info
-    clTitle.textContent = clCurrentProject.title;
+    // Hide the title element when it's generic ("Untitled 3", "IMG_1234", etc.)
+    // so the lightbox doesn't show "Untitled 1" alongside the tag.
+    const lbTitle = prettyTitle(clCurrentProject);
+    clTitle.textContent = lbTitle;
+    clTitle.style.display = lbTitle ? '' : 'none';
     clTag.textContent = clCurrentProject.tag;
-    clDesc.textContent = clCurrentProject.desc;
+    clDesc.textContent = clCurrentProject.desc || '';
 
     // Preload all images
     clCurrentProject.images.forEach(img => preloadImage(getImageSrc(img)));

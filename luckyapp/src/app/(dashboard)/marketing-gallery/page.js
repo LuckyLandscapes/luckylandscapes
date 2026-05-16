@@ -39,6 +39,25 @@ const GALLERY_TAGS = [
 
 const MARKETING_GALLERY_URL = 'https://luckylandscapes.com/gallery';
 
+// Phone-camera default filenames produce useless titles. When the auto-fill
+// would land on something like "IMG 1234" or "Untitled 3", leave the field
+// blank and force a real title — keeps the public gallery from being a wall
+// of "Untitled" cards.
+const GENERIC_TITLE_RE = /^(untitled|img|image|photo|dsc|pxl|screenshot)[\s_-]*\d*$/i;
+
+function looksGenericTitle(t) {
+  if (!t) return true;
+  const cleaned = String(t).trim();
+  if (!cleaned) return true;
+  return GENERIC_TITLE_RE.test(cleaned);
+}
+
+function smartTitleFromFilename(filename) {
+  const stem = filename.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim();
+  if (looksGenericTitle(stem)) return '';
+  return stem;
+}
+
 // Upload + capture image dimensions in one pass. Re-decodes the compressed
 // blob so the dimensions match what's actually stored (compressImage may
 // have downscaled). Returns { file, width, height }.
@@ -337,7 +356,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
     const next = arr.map(file => ({
       file,
       preview: URL.createObjectURL(file),
-      title: file.name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim(),
+      title: smartTitleFromFilename(file.name),  // blank for IMG_1234 / Untitled N
       description: '',
       tags: [],
       before: false,
@@ -377,7 +396,11 @@ function UploadModal({ orgId, onClose, onUploaded }) {
     const p = pending[i];
     if (!p || p.done || p.uploading) return;
     if (!p.title.trim()) {
-      updateAt(i, { error: 'Title required.' });
+      updateAt(i, { error: 'Add a real title — this shows on the public website.' });
+      return;
+    }
+    if (looksGenericTitle(p.title)) {
+      updateAt(i, { error: 'Title looks generic (e.g. "Untitled 3"). Use something descriptive — your customers will see this.' });
       return;
     }
     updateAt(i, { uploading: true, error: null });
@@ -522,12 +545,23 @@ function PendingUploadRow({ pending, onChange, onRemove, onToggleTag, onBeforeFi
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '.5rem', minWidth: 0 }}>
         <input
           type="text"
-          placeholder="Title (e.g. Retaining Wall — Maple St)"
+          placeholder="Title (e.g. Maple St Retaining Wall, Backyard Fire Pit)"
           value={pending.title}
-          onChange={e => onChange({ title: e.target.value })}
+          onChange={e => onChange({ title: e.target.value, error: null })}
           disabled={pending.done || pending.uploading}
-          style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.9rem', fontWeight: 600 }}
+          style={{
+            padding: '.5rem .7rem',
+            border: '1px solid ' + (pending.title && looksGenericTitle(pending.title) ? 'var(--status-warning, #d97706)' : 'var(--border)'),
+            borderRadius: 'var(--radius-md)',
+            fontSize: '.9rem',
+            fontWeight: 600,
+          }}
         />
+        {pending.title && looksGenericTitle(pending.title) && (
+          <div style={{ fontSize: '.72rem', color: 'var(--status-warning, #d97706)', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+            ⚠ This shows on luckylandscapes.com — pick something descriptive your customers will recognize.
+          </div>
+        )}
         <textarea
           placeholder="Short description (optional)"
           value={pending.description}
@@ -623,6 +657,9 @@ function EditModal({ item, onClose, onSaved }) {
 
   const handleSave = async () => {
     if (!title.trim()) { alert('Title required.'); return; }
+    if (looksGenericTitle(title) && !confirm('That title looks generic ("Untitled 3" etc.) — your customers will see it on luckylandscapes.com. Save anyway?')) {
+      return;
+    }
     setSaving(true);
     const { error } = await supabase
       .from('marketing_gallery')
