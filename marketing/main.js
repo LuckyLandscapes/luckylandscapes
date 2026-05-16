@@ -700,10 +700,18 @@ if (window.innerWidth > 768) {
 //   The gallery grid AND lightbox are auto-generated from it.
 //   Each image can optionally have a mobile variant (for <1024px).
 //   If no mobile variant is provided, the desktop image is used.
-// `projectData` is a mutable seed array. On page load we fetch
-// /api/marketing/gallery from luckyapp and, if it returns photos, swap them
-// into this array in place. The hardcoded entries below are the FALLBACK —
-// they're what visitors see if luckyapp is down or unreachable.
+// `projectData` is the in-memory portfolio that drives the homepage Featured
+// Work grid + the /gallery page (categories landing + per-category detail).
+//
+// On page load we fetch /api/marketing/gallery from luckyapp. If it returns
+// any published photos, the entire array is REPLACED with the remote items
+// (no merging). The hardcoded entries below are the bootstrap + outage
+// fallback — they're what visitors see while the fetch is in flight, OR
+// when luckyapp is unreachable, OR when luckyapp has zero published photos.
+//
+// IMPORTANT: do not delete the static entries even after Riley has imported
+// the legacy portfolio. They're the resilience layer that keeps the public
+// site working during luckyapp outages or a temporary Supabase issue.
 // See loadMarketingGalleryFromLuckyapp() below for the wire-up.
 let projectData = [
     {
@@ -822,10 +830,12 @@ function getImageSrc(img) {
     return (isMobile && img.mobile) ? img.mobile : img.desktop;
 }
 
-// Curated projects for the homepage (indices into projectData).
-// The hardcoded indices match the static fallback list above. When remote
-// gallery data loads, loadMarketingGalleryFromLuckyapp() resets this to
-// the first N items so we always show the freshest 6 photos Riley uploaded.
+// Indices into projectData for the homepage "Featured Work" grid (max 6).
+// These hardcoded indices ONLY apply while the static fallback is showing
+// (luckyapp unreachable, or no photos uploaded yet). As soon as remote data
+// arrives, loadMarketingGalleryFromLuckyapp() rebuilds this list from the
+// remote items, prioritizing any photo Riley starred as featured in the
+// luckyapp manage view.
 let homepageFeatured = [1, 5, 6, 3, 2, 4];
 
 function buildGalleryGrid() {
@@ -893,51 +903,76 @@ buildGalleryGrid();
 // MARKETING GALLERY — REMOTE FETCH FROM LUCKYAPP
 // ============================================
 // Pulls live photos from /api/marketing/gallery (managed in luckyapp via
-// the Marketing Gallery page). Falls back to the static projectData above
-// if the fetch fails or returns no items — site never breaks.
+// the Marketing Gallery page) and REPLACES the static projectData seed when
+// any photos come back. The static portfolio above is only the bootstrap +
+// outage fallback — it is never merged on top of remote data.
 //
-// Endpoint shape: { items: [{ title, description, tags, imageUrl, beforeImageUrl, isBeforeAfter }] }
+// Why replace instead of merge: the /import-legacy endpoint copies the same
+// 9 hardcoded projects into Supabase as one-time seed data. If we merged
+// remote + static, every imported project would render twice on the public
+// site. With remote-wins, luckyapp is the single source of truth as soon as
+// it has any photos, and the static fallback only shows when:
+//   • luckyapp is unreachable (network error, DNS, server down), or
+//   • luckyapp returns 0 published items (fresh install / nothing imported).
+//
+// Endpoint shape: { items: [{ title, description, tags, imageUrl,
+//                              beforeImageUrl, isBeforeAfter, isFeatured,
+//                              projectName, width, height, createdAt }] }
+// Items arrive pre-sorted by (sort_order ASC, created_at DESC), so the
+// conversion below preserves that order — Riley's drag-to-reorder in the
+// manage view is what controls public display order.
+//
 // Vercel edge caches the response for 60s + stale-while-revalidate 5min,
 // so updates land on the site in about a minute without us doing anything.
 
 const MARKETING_GALLERY_URL = 'https://app.luckylandscapes.com/api/marketing/gallery';
 
-// Snapshot the original hardcoded projectData so re-runs (HMR, route changes)
-// always merge against the same baseline rather than the already-merged copy.
-const staticProjectDataBackup = projectData.slice();
+// Convert the remote API response into the projectData shape the rendering
+// code already understands. Single rows become single cards; rows sharing
+// a `projectName` collapse into ONE card whose lightbox carousels through
+// every photo in that project (preserves arrival order).
+function buildProjectsFromRemoteItems(remote) {
+    const projects = [];
+    const projectByName = new Map();
 
-async function loadMarketingGalleryFromLuckyapp() {
-    try {
-        const res = await fetch(MARKETING_GALLERY_URL, { cache: 'no-store' });
-        if (!res.ok) return;
-        const json = await res.json();
-        const remote = Array.isArray(json?.items) ? json.items : [];
-        if (remote.length === 0) return;
-
-        // Two-pass conversion:
-        // 1) Group rows by projectName so multiple photos from one job collapse
-        //    into a single "project card" with N photos in its lightbox.
-        //    Rows without projectName stay as individual cards.
-        // 2) Map each group/single into the projectData shape the gallery
-        //    rendering code already understands.
-        const groups = new Map();
-        const singles = [];
-        remote.forEach(item => {
-            if (item.projectName) {
-                if (!groups.has(item.projectName)) groups.set(item.projectName, []);
-                groups.get(item.projectName).push(item);
-            } else {
-                singles.push(item);
+    remote.forEach(item => {
+        if (item.projectName) {
+            // Multi-photo project — append into the existing group or start one.
+            let group = projectByName.get(item.projectName);
+            if (!group) {
+                group = {
+                    title: item.projectName,
+                    tag: null,
+                    tags: [],
+                    desc: '',
+                    cover: 0,
+                    images: [],
+                    imageDescs: [],
+                    beforeAfter: false,
+                    featured: false,
+                    source: 'remote',
+                };
+                projectByName.set(item.projectName, group);
+                projects.push(group);
             }
-        });
-
-        const fromSingle = (item) => {
-            const tags = Array.isArray(item.tags) ? item.tags : [];
-            const tag = tags[0] || 'Project';
+            group.images.push(item.imageUrl);
+            group.imageDescs.push(item.description || '');
+            if (!group.desc && item.description) group.desc = item.description;
+            if (item.isFeatured) group.featured = true;
+            if (Array.isArray(item.tags)) {
+                item.tags.forEach(t => {
+                    if (t && !group.tags.includes(t)) group.tags.push(t);
+                });
+            }
+            if (!group.tag && group.tags.length) group.tag = group.tags[0];
+        } else {
+            // Standalone photo — single-card project. Before/after pairs put
+            // the "before" first so the lightbox slider initializes correctly.
+            const tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
             const isBA = !!item.beforeImageUrl;
-            return {
+            projects.push({
                 title: item.title || 'Untitled project',
-                tag,
+                tag: tags[0] || 'Project',
                 tags,
                 desc: item.description || '',
                 cover: isBA ? 1 : 0,
@@ -946,66 +981,73 @@ async function loadMarketingGalleryFromLuckyapp() {
                 beforeAfter: isBA,
                 featured: !!item.isFeatured,
                 source: 'remote',
-            };
-        };
+            });
+        }
+    });
 
-        const fromGroup = (projectName, members) => {
-            // Featured if ANY member is featured. Tags = union across the group.
-            const featured = members.some(m => m.isFeatured);
-            const tagsUnion = Array.from(new Set(members.flatMap(m => Array.isArray(m.tags) ? m.tags : [])));
-            const tag = tagsUnion[0] || 'Project';
-            // Description = first non-empty member description; per-photo
-            // descriptions also stored on imageDescs for the lightbox to
-            // swap as the user navigates.
-            const desc = members.map(m => m.description).find(d => d && d.trim()) || '';
-            return {
-                title: projectName,
-                tag,
-                tags: tagsUnion,
-                desc,
-                cover: 0,
-                images: members.map(m => m.imageUrl),
-                imageDescs: members.map(m => m.description || ''),
-                beforeAfter: false,  // groups don't use the slider — they use the carousel
-                featured,
-                source: 'remote',
-            };
-        };
-
-        const converted = [
-            ...Array.from(groups.entries()).map(([name, members]) => fromGroup(name, members)),
-            ...singles.map(fromSingle),
-        ];
-        // Tag the static entries so filtering / styling can distinguish.
-        // Static portfolio entries are always considered featured — they were
-        // hand-picked curated photos before the marketing-gallery system existed.
-        const staticTagged = staticProjectDataBackup.map(p => ({
-            ...p,
-            tags: p.tags || [p.tag].filter(Boolean),
-            featured: true,
-            source: 'static',
-        }));
-        // Remote photos first (Riley's latest work leads), then the static portfolio.
-        projectData = [...converted, ...staticTagged];
-        // Homepage curation: prefer items the owner explicitly starred as
-        // featured. Fall back to newest items if fewer than 6 are starred.
-        const featuredIdx = [];
-        const nonFeaturedIdx = [];
-        projectData.forEach((p, i) => {
-            if (p.featured) featuredIdx.push(i);
-            else nonFeaturedIdx.push(i);
-        });
-        homepageFeatured = [...featuredIdx, ...nonFeaturedIdx].slice(0, 6);
-        // Rebuild any gallery surfaces that have already mounted.
-        if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
-        if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
-    } catch (err) {
-        // Network error / luckyapp down — keep the static fallback. Silent.
-        console.warn('[gallery] remote fetch failed, using static fallback', err);
-    }
+    return projects;
 }
 
-// Fire-and-forget on page load; static gallery shows immediately, then swaps in.
+// Pick up to 6 indices for the homepage "Featured Work" grid. Items the
+// owner explicitly starred (`featured: true`) come first in their original
+// order; the rest fill any remaining slots so the section never goes empty.
+function computeHomepageFeatured(projects) {
+    const featuredIdx = [];
+    const fillIdx = [];
+    projects.forEach((p, i) => {
+        if (p.featured) featuredIdx.push(i);
+        else fillIdx.push(i);
+    });
+    return [...featuredIdx, ...fillIdx].slice(0, 6);
+}
+
+async function loadMarketingGalleryFromLuckyapp() {
+    let res;
+    try {
+        res = await fetch(MARKETING_GALLERY_URL, { cache: 'no-store' });
+    } catch (err) {
+        console.warn('[gallery] remote fetch failed (network) — using static fallback', err);
+        return;
+    }
+    if (!res.ok) {
+        console.warn('[gallery] remote fetch returned', res.status, '— using static fallback');
+        return;
+    }
+
+    let json;
+    try {
+        json = await res.json();
+    } catch (err) {
+        console.warn('[gallery] remote response was not JSON — using static fallback', err);
+        return;
+    }
+
+    const remote = Array.isArray(json?.items) ? json.items : [];
+    if (remote.length === 0) {
+        console.info('[gallery] luckyapp returned 0 published photos — using static fallback');
+        return;
+    }
+
+    const converted = buildProjectsFromRemoteItems(remote);
+    if (converted.length === 0) return;  // belt-and-suspenders: keep static
+
+    // REPLACE — not merge. Luckyapp is the source of truth.
+    projectData = converted;
+    homepageFeatured = computeHomepageFeatured(projectData);
+
+    // Rebuild any gallery surfaces that have already mounted with the
+    // static seed. Safe to re-call; both functions clear their containers.
+    if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
+    if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
+
+    console.info(
+        `[gallery] loaded ${converted.length} project${converted.length === 1 ? '' : 's'} ` +
+        `from ${remote.length} luckyapp row${remote.length === 1 ? '' : 's'}`
+    );
+}
+
+// Fire-and-forget on page load; static gallery shows immediately, then
+// swaps in if luckyapp responds with photos.
 loadMarketingGalleryFromLuckyapp();
 
 // ============================================
