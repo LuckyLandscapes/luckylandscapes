@@ -37,6 +37,24 @@ const GALLERY_TAGS = [
   'Custom Build',
 ];
 
+// Visual hint per category — drives the icon shown in the wizard tile picker
+// AND the published gallery card hover state if/when we ever add it.
+// Plain emoji so we don't need to import 12 lucide icons.
+const CATEGORY_ICON = {
+  'Hardscaping': '🧱',
+  'Landscaping': '🌳',
+  'Lawn Care': '🌿',
+  'Garden Beds': '🌺',
+  'Retaining Walls': '⛰️',
+  'Fencing': '🪵',
+  'Outdoor Living': '🪑',
+  'Construction': '🔨',
+  'Seasonal Cleanup': '🍂',
+  'Maintenance': '✂️',
+  'Before & After': '↔️',
+  'Custom Build': '🎨',
+};
+
 const MARKETING_GALLERY_URL = 'https://luckylandscapes.com/gallery';
 
 // Phone-camera default filenames produce useless titles. When the auto-fill
@@ -390,6 +408,11 @@ function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, on
 }
 
 function UploadModal({ orgId, onClose, onUploaded }) {
+  // Two-step wizard: first the user picks a category (the photo's primary
+  // tag), then they drop photos for that category. Forcing the category
+  // upfront keeps the per-row form simple — no 12-pill tag picker per file —
+  // and guarantees every uploaded photo has at least one meaningful tag.
+  const [category, setCategory] = useState(null);
   // Per-file form state. After picking files we generate one "pending"
   // entry per file with editable title/tags/description before uploading.
   const [pending, setPending] = useState([]); // { file, preview, title, description, tags, before, beforeFile, beforePreview, error, uploading, done, aiLoading }
@@ -405,7 +428,9 @@ function UploadModal({ orgId, onClose, onUploaded }) {
       preview: URL.createObjectURL(file),
       title: smartTitleFromFilename(file.name),  // blank for IMG_1234 / Untitled N
       description: '',
-      tags: [],
+      // Pre-seed the picked category as the primary tag. AI auto-fill later
+      // unions in additional tags; user can still add more via "+ more tags".
+      tags: category ? [category] : [],
       before: false,
       beforeFile: null,
       beforePreview: null,
@@ -414,6 +439,16 @@ function UploadModal({ orgId, onClose, onUploaded }) {
       error: null,
     }));
     setPending(prev => [...prev, ...next]);
+  };
+
+  const handleChangeCategory = () => {
+    // Only allow swapping category if nothing has been uploaded yet.
+    if (pending.some(p => p.done)) {
+      alert('Some photos in this batch are already uploaded. Close this dialog and start a new batch to pick a different category.');
+      return;
+    }
+    setCategory(null);
+    setPending([]);
   };
 
   const updateAt = (i, patch) => {
@@ -552,13 +587,81 @@ function UploadModal({ orgId, onClose, onUploaded }) {
 
   const allDone = pending.length > 0 && pending.every(p => p.done);
 
+  // STEP 1 — Category picker. No photos chosen yet. We show a visual
+  // tile grid; clicking a tile advances the wizard.
+  if (!category) {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
+          <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)' }}>
+            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <Upload size={22} /> Upload to Gallery
+            </h2>
+            <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
+          </header>
+          <div style={{ padding: '1.5rem 1.5rem 2rem', overflow: 'auto', flex: 1 }}>
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 .35rem', fontSize: '1.15rem' }}>What kind of project is this?</h3>
+              <p style={{ margin: 0, color: 'var(--text-secondary)', fontSize: '.85rem' }}>
+                Pick a category — your photos will be tagged automatically.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '.75rem' }}>
+              {GALLERY_TAGS.filter(t => t !== 'Before & After').map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setCategory(tag)}
+                  className="category-tile"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '.6rem',
+                    padding: '1.25rem .75rem',
+                    background: 'var(--bg-elevated)',
+                    border: '2px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                    cursor: 'pointer',
+                    transition: 'all .15s ease',
+                    fontFamily: 'inherit',
+                    color: 'var(--text-primary)',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--accent)'; e.currentTarget.style.background = 'var(--bg-subtle)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--bg-elevated)'; }}
+                >
+                  <span style={{ fontSize: '2rem', lineHeight: 1 }} aria-hidden="true">{CATEGORY_ICON[tag] || '📷'}</span>
+                  <span style={{ fontSize: '.88rem', fontWeight: 600, textAlign: 'center' }}>{tag}</span>
+                </button>
+              ))}
+            </div>
+            <p style={{ marginTop: '1.5rem', fontSize: '.78rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+              You'll be able to add more tags per photo after uploading.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // STEP 2 — File picker + per-file metadata. Category is locked in;
+  // shown as a header chip with a "Change" link.
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)' }}>
-          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
-            <Upload size={22} /> Upload to Gallery
-          </h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem', flexWrap: 'wrap' }}>
+            <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+              <Upload size={22} /> Upload to Gallery
+            </h2>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '.4rem', padding: '.3rem .65rem', background: 'var(--accent)', color: 'white', borderRadius: 'var(--radius-full)', fontSize: '.78rem', fontWeight: 600 }}>
+              <span aria-hidden="true">{CATEGORY_ICON[category] || '📷'}</span>
+              <span>{category}</span>
+            </div>
+            <button type="button" onClick={handleChangeCategory} className="btn btn-ghost btn-sm" style={{ fontSize: '.75rem', padding: '.25rem .5rem' }}>
+              Change
+            </button>
+          </div>
           <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </header>
 
@@ -578,7 +681,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
               onClick={() => fileInputRef.current?.click()}
             >
               <Camera size={40} style={{ color: 'var(--text-tertiary)' }} />
-              <h3 style={{ marginTop: '1rem' }}>Drop photos here, or click to choose</h3>
+              <h3 style={{ marginTop: '1rem' }}>Drop {category.toLowerCase()} photos here</h3>
               <p style={{ color: 'var(--text-secondary)', fontSize: '.85rem', marginTop: '.25rem' }}>
                 JPG, PNG, or HEIC. Auto-compressed to ~300KB before upload.
               </p>
@@ -615,6 +718,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
                   key={i}
                   pending={p}
                   aiAvailable={aiAvailable}
+                  primaryCategory={category}
                   onChange={patch => updateAt(i, patch)}
                   onRemove={() => removeAt(i)}
                   onToggleTag={tag => toggleTagAt(i, tag)}
@@ -627,7 +731,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
                 onClick={() => fileInputRef.current?.click()}
                 style={{ borderStyle: 'dashed', padding: '1rem' }}
               >
-                <Plus size={16} /> Add more photos
+                <Plus size={16} /> Add more {category.toLowerCase()} photos
               </button>
               <input
                 ref={fileInputRef}
@@ -663,8 +767,12 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   );
 }
 
-function PendingUploadRow({ pending, aiAvailable, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
+function PendingUploadRow({ pending, aiAvailable, primaryCategory, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
   const showAiButton = aiAvailable !== false && !pending.done;
+  const [showMoreTags, setShowMoreTags] = useState(false);
+  // Extra tags = anything beyond the wizard-picked category. Used to drive
+  // the "+ N more" chip count without re-expanding the picker every time.
+  const extraTags = (pending.tags || []).filter(t => t !== primaryCategory);
   return (
     <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-lg)', padding: '1rem', display: 'flex', gap: '1rem', position: 'relative', opacity: pending.done ? 0.6 : 1 }}>
       <div style={{ flexShrink: 0, width: 120, height: 90, borderRadius: 'var(--radius-md)', overflow: 'hidden', background: 'var(--bg-subtle)' }}>
@@ -717,28 +825,79 @@ function PendingUploadRow({ pending, aiAvailable, onChange, onRemove, onToggleTa
           rows={2}
           style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem', resize: 'vertical' }}
         />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem' }}>
-          {GALLERY_TAGS.map(tag => (
+        {/* Compact tag row — shows the picked category as a chip, plus
+            optional extra tags. "+ more tags" expands the full picker. */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '.35rem' }}>
+          {primaryCategory && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: '.3rem',
+              padding: '.2rem .6rem', borderRadius: 'var(--radius-full)',
+              background: 'var(--accent)', color: 'white',
+              fontSize: '.7rem', fontWeight: 600,
+            }}>
+              <span aria-hidden="true">{CATEGORY_ICON[primaryCategory] || '🏷️'}</span>
+              {primaryCategory}
+            </span>
+          )}
+          {extraTags.map(tag => (
+            <span key={tag} style={{
+              display: 'inline-flex', alignItems: 'center', gap: '.25rem',
+              padding: '.2rem .55rem', borderRadius: 'var(--radius-full)',
+              background: 'var(--bg-subtle)', color: 'var(--text-secondary)',
+              fontSize: '.7rem', fontWeight: 500,
+            }}>
+              {tag}
+              {!pending.done && !pending.uploading && (
+                <button
+                  type="button"
+                  onClick={() => onToggleTag(tag)}
+                  style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'inherit', padding: 0, display: 'inline-flex', alignItems: 'center' }}
+                  aria-label={`Remove ${tag}`}
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </span>
+          ))}
+          {!pending.done && !pending.uploading && (
             <button
-              key={tag}
               type="button"
-              onClick={() => onToggleTag(tag)}
-              disabled={pending.done || pending.uploading}
+              onClick={() => setShowMoreTags(s => !s)}
               style={{
-                padding: '.2rem .55rem',
-                borderRadius: 'var(--radius-full)',
-                border: '1px solid ' + (pending.tags.includes(tag) ? 'var(--accent)' : 'var(--border)'),
-                background: pending.tags.includes(tag) ? 'var(--accent)' : 'var(--bg-subtle)',
-                color: pending.tags.includes(tag) ? 'white' : 'var(--text-secondary)',
-                fontSize: '.7rem',
-                fontWeight: 500,
+                padding: '.2rem .55rem', borderRadius: 'var(--radius-full)',
+                border: '1px dashed var(--border)', background: 'transparent',
+                color: 'var(--text-tertiary)', fontSize: '.7rem', fontWeight: 500,
                 cursor: 'pointer',
               }}
             >
-              {tag}
+              {showMoreTags ? '− hide tags' : '+ more tags'}
             </button>
-          ))}
+          )}
         </div>
+        {showMoreTags && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.3rem', paddingTop: '.25rem', borderTop: '1px dashed var(--border)' }}>
+            {GALLERY_TAGS.filter(t => t !== primaryCategory).map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onToggleTag(tag)}
+                disabled={pending.done || pending.uploading}
+                style={{
+                  padding: '.2rem .55rem',
+                  borderRadius: 'var(--radius-full)',
+                  border: '1px solid ' + (pending.tags.includes(tag) ? 'var(--accent)' : 'var(--border)'),
+                  background: pending.tags.includes(tag) ? 'var(--accent)' : 'var(--bg-subtle)',
+                  color: pending.tags.includes(tag) ? 'white' : 'var(--text-secondary)',
+                  fontSize: '.7rem',
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', fontSize: '.85rem' }}>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: '.35rem', cursor: 'pointer' }}>
             <input
