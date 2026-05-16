@@ -931,6 +931,12 @@ const MARKETING_GALLERY_URL = 'https://app.luckylandscapes.com/api/marketing/gal
 // code already understands. Single rows become single cards; rows sharing
 // a `projectName` collapse into ONE card whose lightbox carousels through
 // every photo in that project (preserves arrival order).
+//
+// Cover photo within a group: any row with `isCover: true` wins. If none
+// of the group's rows are flagged (e.g. legacy data pre-migration 042),
+// fall back to the first photo. Cover is stored as an INDEX into the
+// `images` array (not a separate URL) so all the existing rendering code
+// — homepage grid, gallery cards, lightbox — keeps working unchanged.
 function buildProjectsFromRemoteItems(remote) {
     const projects = [];
     const projectByName = new Map();
@@ -955,8 +961,10 @@ function buildProjectsFromRemoteItems(remote) {
                 projectByName.set(item.projectName, group);
                 projects.push(group);
             }
+            const idxInGroup = group.images.length;
             group.images.push(item.imageUrl);
             group.imageDescs.push(item.description || '');
+            if (item.isCover) group.cover = idxInGroup;
             if (!group.desc && item.description) group.desc = item.description;
             if (item.isFeatured) group.featured = true;
             if (Array.isArray(item.tags)) {

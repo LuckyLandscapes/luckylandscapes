@@ -16,9 +16,19 @@ import { supabase, isSupabaseConnected } from '@/lib/supabase';
 import { compressImage, bytesPretty } from '@/lib/compressImage';
 import {
   Plus, X, Save, Upload, Trash2, Edit3, Eye, EyeOff, Camera, Loader2,
-  ArrowUp, ArrowDown, ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
-  Star, Download,
+  ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
+  Star, Crown, Download, GripVertical, FolderOpen, Image as ImageIcon,
 } from 'lucide-react';
+import {
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor, TouchSensor,
+  useSensor, useSensors, closestCenter, pointerWithin, rectIntersection,
+  useDroppable,
+} from '@dnd-kit/core';
+import {
+  SortableContext, useSortable, arrayMove,
+  sortableKeyboardCoordinates, rectSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // Curated tag set. Free-form in the DB so new tags don't need a migration,
 // but the UI offers these for consistency. The public site groups photos
@@ -183,6 +193,68 @@ async function uploadGalleryImage(file, orgId) {
   };
 }
 
+// Query the current max sort_order for this org so new uploads append to
+// the bottom of the manage list (and the public site) instead of getting
+// the default 0 and burying themselves above existing entries.
+async function fetchMaxSortOrder(orgId) {
+  const { data } = await supabase
+    .from('marketing_gallery')
+    .select('sort_order')
+    .eq('org_id', orgId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data?.sort_order ?? -10;  // so first upload lands at 0
+}
+
+// Group photos into sections for the manage UI. Each unique project_name
+// becomes one section; photos with no project_name go into the final
+// 'ungrouped' section so they never disappear. Sections are auto-ordered
+// by the lowest sort_order of any item they contain (so dragging an item
+// into a section also brings the section to the corresponding position),
+// with ungrouped always last.
+//
+// Within each section, items are sorted by sort_order ASC. This is the
+// in-section display order AND the order the public site uses for the
+// lightbox carousel.
+function groupItemsIntoSections(items) {
+  const map = new Map();      // project_name → items[]
+  const ungrouped = [];
+  for (const it of items) {
+    const name = (it.project_name || '').trim();
+    if (name) {
+      if (!map.has(name)) map.set(name, []);
+      map.get(name).push(it);
+    } else {
+      ungrouped.push(it);
+    }
+  }
+  for (const arr of map.values()) {
+    arr.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  }
+  ungrouped.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+
+  const projectSections = Array.from(map.entries()).map(([name, sectionItems]) => ({
+    id: `section:${name}`,
+    name,
+    isUngrouped: false,
+    items: sectionItems,
+    minSort: sectionItems.length ? (sectionItems[0].sort_order ?? 0) : Number.MAX_SAFE_INTEGER,
+  }));
+  projectSections.sort((a, b) => a.minSort - b.minSort);
+
+  // Ungrouped always last, even when empty (renders as a drop zone so
+  // dragging a photo out of a project has somewhere to land).
+  projectSections.push({
+    id: 'ungrouped',
+    name: 'Ungrouped Photos',
+    isUngrouped: true,
+    items: ungrouped,
+    minSort: Number.MAX_SAFE_INTEGER,
+  });
+  return projectSections;
+}
+
 export default function MarketingGalleryPage() {
   const { user, loading: authLoading } = useAuth();
   const orgId = user?.orgId;
@@ -252,9 +324,9 @@ export default function MarketingGalleryPage() {
   const handleImportLegacy = async () => {
     const ok = confirm(
       'Import the hardcoded legacy portfolio?\n\n' +
-      'This re-uploads all the original gallery photos from luckylandscapes.com into your Marketing Gallery, splitting multi-photo projects into individual cards. ' +
+      'This re-uploads all the original gallery photos from luckylandscapes.com into your Marketing Gallery. Multi-photo projects collapse into one card on the public site (via project_name); the first photo of each becomes the cover. ' +
       'Idempotent — safe to run multiple times (existing entries are skipped). ' +
-      'After import, you can delete the static fallback from marketing/main.js.'
+      'No duplicates with the static fallback — the public site now uses remote-replaces-static.'
     );
     if (!ok) return;
     setImporting(true);
@@ -284,26 +356,287 @@ export default function MarketingGalleryPage() {
     }
   };
 
-  const handleMoveSortOrder = async (item, direction) => {
-    const idx = items.findIndex(x => x.id === item.id);
+  // Persist a new global photo ordering — figures out which rows actually
+  // changed (sort_order or project_name) and updates only those. Optimistic:
+  // local state is already updated by the caller; this just syncs the DB.
+  // Replaces the old swap-with-neighbor logic that was broken whenever rows
+  // shared sort_order (which was every row before migration 042 renumbered).
+  const persistReorder = async (newOrderedItems, opts = {}) => {
+    if (!newOrderedItems?.length) return;
+    const beforeById = new Map(items.map(x => [x.id, x]));
+    const updates = [];
+    newOrderedItems.forEach((it, idx) => {
+      const before = beforeById.get(it.id);
+      const desiredSort = idx * 10;
+      const desiredProjectName = it.project_name || null;
+      const desiredIsCover = !!it.is_cover;
+      const changed = !before
+        || before.sort_order !== desiredSort
+        || (before.project_name || null) !== desiredProjectName
+        || !!before.is_cover !== desiredIsCover;
+      if (changed) {
+        updates.push({
+          id: it.id,
+          sort_order: desiredSort,
+          project_name: desiredProjectName,
+          is_cover: desiredIsCover,
+        });
+      }
+    });
+    if (updates.length === 0) return;
+    // Optimistic local state update so the UI doesn't flicker waiting on the
+    // round trip. We trust the renumbering above; if the DB rejects (RLS,
+    // unique-index conflict), loadItems() pulls truth back.
+    setItems(newOrderedItems.map((it, idx) => ({
+      ...it,
+      sort_order: idx * 10,
+      project_name: it.project_name || null,
+      is_cover: !!it.is_cover,
+    })));
+    // Two-phase persistence to satisfy the partial unique index
+    // idx_marketing_gallery_one_cover_per_project. Without ordering, a
+    // parallel set of updates could briefly leave two rows matching
+    // (org_id, project_name) WHERE is_cover=true and fail one of them.
+    // Phase 1 clears covers (and applies any unrelated reorder changes);
+    // phase 2 sets covers, by which point no other cover exists for that
+    // project. Both phases run in parallel within themselves.
+    const stamp = new Date().toISOString();
+    const buildUpdate = (u) => supabase
+      .from('marketing_gallery')
+      .update({
+        sort_order: u.sort_order,
+        project_name: u.project_name,
+        is_cover: u.is_cover,
+        updated_at: stamp,
+      })
+      .eq('id', u.id);
+    const phase1 = updates.filter(u => !u.is_cover);
+    const phase2 = updates.filter(u => u.is_cover);
+    const r1 = await Promise.allSettled(phase1.map(buildUpdate));
+    const r2 = await Promise.allSettled(phase2.map(buildUpdate));
+    const results = [...r1, ...r2];
+    const failed = results.filter(r => r.status === 'rejected' || r.value?.error);
+    if (failed.length) {
+      console.error('[marketing-gallery] reorder persistence failed', failed);
+      if (!opts.silentFailure) alert(`Reorder partially failed (${failed.length} of ${updates.length} updates). Reloading…`);
+      await loadItems();
+    }
+  };
+
+  // Set one photo as the cover for its project. The DB has a partial unique
+  // index that allows only one cover per (org_id, project_name), so we
+  // explicitly clear the old cover first, then set the new one. Standalone
+  // photos (no project_name) ignore this — they're their own card.
+  const handleSetCover = async (item) => {
+    if (!item.project_name) return;  // no-op for ungrouped photos
+    const siblings = items.filter(x =>
+      x.project_name === item.project_name && x.id !== item.id && x.is_cover
+    );
+    // Optimistic local update
+    setItems(prev => prev.map(x => {
+      if (x.id === item.id) return { ...x, is_cover: true };
+      if (x.project_name === item.project_name && x.is_cover) return { ...x, is_cover: false };
+      return x;
+    }));
+    // Clear other covers first (matters when index conflict could fire),
+    // then set the new one.
+    if (siblings.length) {
+      const { error: clearErr } = await supabase
+        .from('marketing_gallery')
+        .update({ is_cover: false, updated_at: new Date().toISOString() })
+        .in('id', siblings.map(s => s.id));
+      if (clearErr) { alert('Cover update failed: ' + clearErr.message); await loadItems(); return; }
+    }
+    const { error } = await supabase
+      .from('marketing_gallery')
+      .update({ is_cover: true, updated_at: new Date().toISOString() })
+      .eq('id', item.id);
+    if (error) { alert('Cover update failed: ' + error.message); await loadItems(); }
+  };
+
+  // Move an entire project section up or down in the global display order.
+  // Implementation: swap two adjacent sections' positions in the section list,
+  // then renumber every photo's sort_order across the new flat list. Cheap
+  // enough at our scale (<100 photos total) and guarantees the order sticks.
+  const handleMoveSection = (sectionId, direction) => {
+    const idx = sections.findIndex(s => s.id === sectionId);
+    if (idx < 0) return;
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= items.length) return;
-    const other = items[swapIdx];
-    const a = item.sort_order, b = other.sort_order;
-    // If sort orders are equal, manufacture distinct values
-    const newA = a === b ? swapIdx : b;
-    const newB = a === b ? idx : a;
-    await Promise.all([
-      supabase.from('marketing_gallery').update({ sort_order: newA }).eq('id', item.id),
-      supabase.from('marketing_gallery').update({ sort_order: newB }).eq('id', other.id),
-    ]);
-    await loadItems();
+    if (swapIdx < 0 || swapIdx >= sections.length) return;
+    const newSections = sections.slice();
+    [newSections[idx], newSections[swapIdx]] = [newSections[swapIdx], newSections[idx]];
+    const flat = newSections.flatMap(s => s.items);
+    persistReorder(flat);
   };
 
   const filtered = useMemo(() => {
     if (!filterTag) return items;
     return items.filter(x => Array.isArray(x.tags) && x.tags.includes(filterTag));
   }, [items, filterTag]);
+
+  // Group items into sections for the manage UI. Sections are auto-ordered
+  // by the minimum sort_order of their items — so dragging a photo within
+  // section A to a lower sort_order also brings A's section up in the list
+  // (the inverse of the section-reorder buttons, which directly swap two
+  // sections). Ungrouped photos always render in a final section so they
+  // don't visually disappear.
+  const sections = useMemo(() => groupItemsIntoSections(filtered), [filtered]);
+  const itemToSection = useMemo(() => {
+    const m = new Map();
+    sections.forEach(s => s.items.forEach(it => m.set(it.id, s.id)));
+    return m;
+  }, [sections]);
+
+  // ============================================================
+  // Drag-and-drop wiring (replaces the broken Up/Down arrows).
+  // ============================================================
+  // Touch sensor with a 200ms delay so taps on buttons aren't misread as
+  // drag-starts on Riley's phone. Pointer for mouse, Keyboard for a11y.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+  const [activeDragId, setActiveDragId] = useState(null);
+  // Snapshot of the dragged item's state at drag-start. Needed because
+  // handleDragOver mutates items mid-drag (cross-section moves clear
+  // is_cover), so by handleDragEnd we've lost the original project_name +
+  // cover info needed to auto-promote a replacement cover.
+  const [dragStartSnapshot, setDragStartSnapshot] = useState(null);
+  const activeDragItem = activeDragId ? items.find(x => x.id === activeDragId) : null;
+  // Custom collision detection: prefer photo collisions over section
+  // collisions so dragging a photo over another photo doesn't fall through
+  // to the section's empty space. Falls back to closest section header
+  // when the drag isn't directly over a photo (drop on empty section).
+  const collisionDetectionStrategy = (args) => {
+    const pointerCollisions = pointerWithin(args);
+    if (pointerCollisions.length) {
+      const photoHit = pointerCollisions.find(c => !String(c.id).startsWith('section:'));
+      if (photoHit) return [photoHit];
+      return pointerCollisions;
+    }
+    // No pointer hit — use bounding-rect intersection as fallback.
+    const rectCollisions = rectIntersection(args);
+    if (rectCollisions.length) return rectCollisions;
+    // Last resort — nearest center across sortable items.
+    return closestCenter(args);
+  };
+
+  const containerIdForOverId = (id) => {
+    if (id == null) return null;
+    if (typeof id === 'string' && id.startsWith('section:')) return id;
+    return itemToSection.get(id) || null;
+  };
+
+  // Live cross-section move: as the user drags a photo across into a different
+  // section, splice it into that section's items in local state. Sort order
+  // and DB persistence wait until drop (handleDragEnd). This keeps the
+  // dragged element under the cursor instead of snapping back when it
+  // crosses a section boundary.
+  const handleDragOver = ({ active, over }) => {
+    if (!over) return;
+    const activeContainer = containerIdForOverId(active.id);
+    const overContainer = containerIdForOverId(over.id);
+    if (!activeContainer || !overContainer || activeContainer === overContainer) return;
+    setItems(prev => {
+      const activeItem = prev.find(x => x.id === active.id);
+      if (!activeItem) return prev;
+      const targetProjectName = overContainer === 'ungrouped'
+        ? null
+        : overContainer.slice('section:'.length);
+      // Update the item's project_name and (if leaving a project) clear its
+      // cover flag. The over-target's existing cover stays put.
+      const wasCover = !!activeItem.is_cover && (activeItem.project_name || null) !== targetProjectName;
+      return prev.map(x => x.id === active.id
+        ? { ...x, project_name: targetProjectName, is_cover: wasCover ? false : x.is_cover }
+        : x);
+    });
+  };
+
+  const handleDragStart = ({ active }) => {
+    setActiveDragId(active.id);
+    const it = items.find(x => x.id === active.id);
+    if (it) {
+      setDragStartSnapshot({
+        id: it.id,
+        projectName: it.project_name || null,
+        wasCover: !!it.is_cover,
+      });
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragId(null);
+    setDragStartSnapshot(null);
+  };
+
+  const handleDragEnd = async ({ active, over }) => {
+    const snapshot = dragStartSnapshot;
+    setActiveDragId(null);
+    setDragStartSnapshot(null);
+    if (!over) return;
+    const activeContainer = containerIdForOverId(active.id);
+    const overContainer = containerIdForOverId(over.id);
+    if (!activeContainer || !overContainer) return;
+
+    // Recompute the full ordered item list given the drop position.
+    let newItems = items.slice();
+    if (activeContainer === overContainer) {
+      // Within-section reorder: drop on another photo in the same section.
+      if (active.id === over.id) return;
+      const sec = sections.find(s => s.id === activeContainer);
+      if (!sec) return;
+      const oldIdx = sec.items.findIndex(it => it.id === active.id);
+      const newIdx = sec.items.findIndex(it => it.id === over.id);
+      if (oldIdx < 0 || newIdx < 0 || oldIdx === newIdx) return;
+      const newSecItems = arrayMove(sec.items, oldIdx, newIdx);
+      // Reassemble global order using the updated section
+      const newSections = sections.map(s => s.id === sec.id ? { ...s, items: newSecItems } : s);
+      newItems = newSections.flatMap(s => s.items);
+    } else {
+      // Cross-section drop: handleDragOver already moved the item into the
+      // new container in local state. Now we need to position it at the
+      // drop point (over a specific photo) or at end (over the section).
+      const movedItem = items.find(x => x.id === active.id);
+      if (!movedItem) return;
+      // Build the new sections from current items state, then place the
+      // moved item correctly within the over-section.
+      const intermediate = groupItemsIntoSections(items);
+      const targetSec = intermediate.find(s => s.id === overContainer);
+      if (!targetSec) return;
+      // Remove from wherever it currently sits and reinsert at drop position.
+      const without = targetSec.items.filter(it => it.id !== active.id);
+      let insertAt = without.length;  // default: end
+      if (!String(over.id).startsWith('section:')) {
+        const overIdx = without.findIndex(it => it.id === over.id);
+        if (overIdx >= 0) insertAt = overIdx;
+      }
+      const newTargetItems = [...without.slice(0, insertAt), movedItem, ...without.slice(insertAt)];
+      const newSections = intermediate.map(s => s.id === targetSec.id ? { ...s, items: newTargetItems } : s);
+      newItems = newSections.flatMap(s => s.items);
+    }
+
+    // If the drop moved a cover photo out of its project, auto-promote the
+    // first remaining photo in the source project as the new cover (so we
+    // don't leave a project with no cover). Uses the drag-start snapshot
+    // because handleDragOver already mutated items.is_cover to false when
+    // the drag crossed the section boundary — we'd lose the original cover
+    // info otherwise. The partial unique index permits a coverless project
+    // (it's a `WHERE is_cover=true` upper bound), but UX-wise every project
+    // should have one so the public site has a card thumbnail.
+    if (snapshot?.wasCover && snapshot.projectName) {
+      const movedItemNow = newItems.find(x => x.id === active.id);
+      const nowIn = movedItemNow?.project_name || null;
+      if (nowIn !== snapshot.projectName) {
+        const orphans = newItems.filter(x => (x.project_name || null) === snapshot.projectName);
+        if (orphans.length && !orphans.some(o => o.is_cover)) {
+          newItems = newItems.map(x => x.id === orphans[0].id ? { ...x, is_cover: true } : x);
+        }
+      }
+    }
+
+    await persistReorder(newItems);
+  };
 
   const publishedCount = items.filter(x => x.is_published).length;
   const featuredCount = items.filter(x => x.is_featured && x.is_published).length;
@@ -392,20 +725,41 @@ export default function MarketingGalleryPage() {
       ) : filtered.length === 0 ? (
         <EmptyState onUpload={() => setUploadOpen(true)} hasItems={items.length > 0} />
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '1rem' }}>
-          {filtered.map((item, idx) => (
-            <GalleryItemCard
-              key={item.id}
-              item={item}
-              onEdit={() => setEditingId(item.id)}
-              onDelete={() => handleDelete(item)}
-              onTogglePublish={() => handleTogglePublish(item)}
-              onMoveUp={idx > 0 ? () => handleMoveSortOrder(item, 'up') : null}
-              onMoveDown={idx < filtered.length - 1 ? () => handleMoveSortOrder(item, 'down') : null}
-              onToggleFeatured={() => handleToggleFeatured(item)}
-            />
-          ))}
-        </div>
+        <>
+          <div style={{ fontSize: '.78rem', color: 'var(--text-tertiary)', marginBottom: '.75rem', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+            <GripVertical size={13} />
+            Drag photos to reorder within a project, or drop into another project section to move them. Tap ★ to set a photo as the project cover.
+          </div>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={collisionDetectionStrategy}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
+          >
+            {sections.map((section, sIdx) => (
+              <ProjectSection
+                key={section.id}
+                section={section}
+                sectionIdx={sIdx}
+                totalSections={sections.length}
+                onMoveSectionUp={() => handleMoveSection(section.id, 'up')}
+                onMoveSectionDown={() => handleMoveSection(section.id, 'down')}
+                onEdit={(item) => setEditingId(item.id)}
+                onDelete={handleDelete}
+                onTogglePublish={handleTogglePublish}
+                onToggleFeatured={handleToggleFeatured}
+                onSetCover={handleSetCover}
+              />
+            ))}
+            <DragOverlay dropAnimation={null}>
+              {activeDragItem ? (
+                <PhotoCardChrome item={activeDragItem} isDragging />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
+        </>
       )}
 
       {uploadOpen && (
@@ -444,78 +798,271 @@ function EmptyState({ onUpload, hasItems }) {
   );
 }
 
-function GalleryItemCard({ item, onEdit, onDelete, onTogglePublish, onMoveUp, onMoveDown, onToggleFeatured }) {
+// One project section — a header (with move-up/down arrows for the section)
+// plus a SortableContext containing the photo cards in that project. Empty
+// sections render a "drop here" placeholder so dragging a photo out of a
+// project still has a target. The section's container is itself droppable
+// so drops on whitespace land in the right section.
+function ProjectSection({
+  section, sectionIdx, totalSections,
+  onMoveSectionUp, onMoveSectionDown,
+  onEdit, onDelete, onTogglePublish, onToggleFeatured, onSetCover,
+}) {
+  const itemIds = section.items.map(it => it.id);
+  // The container itself is a droppable so empty sections accept drops and
+  // gaps within a section route to the right place.
+  const { setNodeRef, isOver } = useDroppable({ id: section.id });
+  // 'ungrouped' has no section-reorder arrows; it's always the last group.
+  const showSectionArrows = !section.isUngrouped && section.items.length > 0;
   return (
-    <div className="card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative', border: item.is_featured ? '2px solid #fbbf24' : undefined }}>
+    <div
+      className="card"
+      style={{
+        marginBottom: '1.25rem',
+        padding: 0,
+        overflow: 'hidden',
+        border: section.isUngrouped ? '1px dashed var(--border)' : '1px solid var(--border)',
+      }}
+    >
+      <header
+        style={{
+          display: 'flex', alignItems: 'center', gap: '.6rem',
+          padding: '.7rem 1rem',
+          borderBottom: section.items.length ? '1px solid var(--border)' : 'none',
+          background: section.isUngrouped ? 'transparent' : 'var(--bg-elevated)',
+        }}
+      >
+        {section.isUngrouped
+          ? <ImageIcon size={17} style={{ color: 'var(--text-tertiary)' }} />
+          : <FolderOpen size={17} style={{ color: 'var(--accent)' }} />
+        }
+        <h3 style={{ margin: 0, fontSize: '.98rem', fontWeight: 600 }}>
+          {section.name}
+        </h3>
+        <span style={{ color: 'var(--text-tertiary)', fontSize: '.82rem' }}>
+          · {section.items.length} {section.items.length === 1 ? 'photo' : 'photos'}
+        </span>
+        {showSectionArrows && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '.25rem' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onMoveSectionUp}
+              disabled={sectionIdx === 0}
+              title="Move this project up in the website's display order"
+              style={{ padding: '.3rem .55rem' }}
+            >
+              ↑ Move up
+            </button>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onMoveSectionDown}
+              // -2 because the last section is always Ungrouped, which we
+              // don't reorder against — moving down past the last project
+              // section is a no-op.
+              disabled={sectionIdx >= totalSections - 2}
+              title="Move this project down in the website's display order"
+              style={{ padding: '.3rem .55rem' }}
+            >
+              ↓ Move down
+            </button>
+          </div>
+        )}
+      </header>
+      <SortableContext items={itemIds} strategy={rectSortingStrategy}>
+        <div
+          ref={setNodeRef}
+          style={{
+            padding: section.items.length ? '1rem' : '0',
+            background: isOver ? 'rgba(59, 130, 246, 0.06)' : 'transparent',
+            transition: 'background .12s ease',
+            display: 'grid',
+            gridTemplateColumns: section.items.length
+              ? 'repeat(auto-fill, minmax(220px, 1fr))'
+              : '1fr',
+            gap: '1rem',
+            minHeight: section.items.length ? undefined : 0,
+          }}
+        >
+          {section.items.length === 0 ? (
+            <div
+              style={{
+                margin: '1rem',
+                padding: '1.5rem',
+                textAlign: 'center',
+                color: 'var(--text-tertiary)',
+                fontSize: '.82rem',
+                border: '2px dashed var(--border)',
+                borderRadius: 'var(--radius-md)',
+                background: isOver ? 'rgba(59, 130, 246, 0.08)' : 'var(--bg-subtle)',
+              }}
+            >
+              {section.isUngrouped
+                ? 'Drop a photo here to remove it from its project.'
+                : `Drop a photo here to move it into "${section.name}".`}
+            </div>
+          ) : (
+            section.items.map(item => (
+              <SortablePhotoCard
+                key={item.id}
+                item={item}
+                isInProject={!section.isUngrouped}
+                onEdit={() => onEdit(item)}
+                onDelete={() => onDelete(item)}
+                onTogglePublish={() => onTogglePublish(item)}
+                onToggleFeatured={() => onToggleFeatured(item)}
+                onSetCover={() => onSetCover(item)}
+              />
+            ))
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  );
+}
+
+// Sortable wrapper around the visual card. The drag handle is on the
+// GripVertical button only, so clicks on Edit/Delete/Cover/etc. don't get
+// hijacked as drag-start events. On touch devices the TouchSensor needs a
+// long-press anywhere on the card; the visible grip just signals draggability.
+function SortablePhotoCard({ item, isInProject, onEdit, onDelete, onTogglePublish, onToggleFeatured, onSetCover }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.35 : 1,
+  };
+  return (
+    <div ref={setNodeRef} style={style}>
+      <PhotoCardChrome
+        item={item}
+        isInProject={isInProject}
+        dragAttributes={attributes}
+        dragListeners={listeners}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onTogglePublish={onTogglePublish}
+        onToggleFeatured={onToggleFeatured}
+        onSetCover={onSetCover}
+      />
+    </div>
+  );
+}
+
+// Pure visual card — used both inline (wrapped by SortablePhotoCard) and as
+// the floating preview in the DragOverlay during a drag. Splitting visuals
+// from the dnd-kit wiring keeps the overlay matching the live card exactly.
+function PhotoCardChrome({
+  item, isInProject, isDragging,
+  dragAttributes, dragListeners,
+  onEdit, onDelete, onTogglePublish, onToggleFeatured, onSetCover,
+}) {
+  return (
+    <div
+      className="card"
+      style={{
+        overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative',
+        border: item.is_cover ? '2px solid #fbbf24'
+              : item.is_featured ? '2px solid #fbbf24'
+              : undefined,
+        boxShadow: isDragging ? '0 8px 24px rgba(0,0,0,0.25)' : undefined,
+        cursor: isDragging ? 'grabbing' : undefined,
+      }}
+    >
       <div style={{ position: 'relative', aspectRatio: '4/3', background: 'var(--bg-subtle)' }}>
         <img
           src={item.image_url}
           alt={item.title}
           loading="lazy"
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          draggable={false}
         />
+        {/* Drag handle pinned to the top-left so it's always reachable.
+            Listeners are attached only here so taps on the body don't drag.
+            Pointer-events: none on the icon so the button (not the SVG)
+            receives the drag-start. */}
+        <button
+          type="button"
+          {...(dragAttributes || {})}
+          {...(dragListeners || {})}
+          aria-label="Drag to reorder"
+          title="Drag to reorder (or drop into another project)"
+          style={{
+            position: 'absolute', top: '.4rem', left: '.4rem',
+            background: 'rgba(0,0,0,.55)', color: 'white',
+            border: 'none', borderRadius: 'var(--radius-sm)',
+            padding: '.3rem', cursor: 'grab', display: 'inline-flex',
+            touchAction: 'none',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <GripVertical size={14} style={{ pointerEvents: 'none' }} />
+        </button>
         {!item.is_published && (
-          <div style={{ position: 'absolute', top: '.5rem', left: '.5rem', background: 'rgba(0,0,0,.7)', color: 'white', padding: '.25rem .6rem', borderRadius: 'var(--radius-sm)', fontSize: '.7rem', fontWeight: 600 }}>
+          <div style={{ position: 'absolute', top: '.4rem', left: '2.4rem', background: 'rgba(0,0,0,.7)', color: 'white', padding: '.2rem .55rem', borderRadius: 'var(--radius-sm)', fontSize: '.68rem', fontWeight: 600 }}>
             DRAFT
           </div>
         )}
-        {item.is_featured && (
-          <div style={{ position: 'absolute', top: '.5rem', left: !item.is_published ? '5rem' : '.5rem', background: '#fbbf24', color: '#3a2a05', padding: '.25rem .6rem', borderRadius: 'var(--radius-sm)', fontSize: '.7rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '.25rem' }}>
-            <Star size={11} style={{ fill: '#3a2a05' }} /> FEATURED
+        {item.is_cover && isInProject && (
+          <div style={{ position: 'absolute', top: '.4rem', right: '.4rem', background: '#fbbf24', color: '#3a2a05', padding: '.2rem .55rem', borderRadius: 'var(--radius-sm)', fontSize: '.68rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
+            <Crown size={11} style={{ fill: '#3a2a05' }} /> COVER
           </div>
         )}
-        {item.before_image_url && (
-          <div style={{ position: 'absolute', top: '.5rem', right: '.5rem', background: 'var(--accent)', color: 'white', padding: '.25rem .6rem', borderRadius: 'var(--radius-sm)', fontSize: '.7rem', fontWeight: 600 }}>
-            BEFORE/AFTER
+        {item.before_image_url && !item.is_cover && (
+          <div style={{ position: 'absolute', top: '.4rem', right: '.4rem', background: 'var(--accent)', color: 'white', padding: '.2rem .55rem', borderRadius: 'var(--radius-sm)', fontSize: '.68rem', fontWeight: 600 }}>
+            B/A
+          </div>
+        )}
+        {item.is_featured && (
+          <div style={{ position: 'absolute', bottom: '.4rem', left: '.4rem', background: '#fbbf24', color: '#3a2a05', padding: '.2rem .5rem', borderRadius: 'var(--radius-sm)', fontSize: '.66rem', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '.2rem' }}>
+            <Star size={10} style={{ fill: '#3a2a05' }} /> Homepage
           </div>
         )}
       </div>
-      <div style={{ padding: '.85rem 1rem', display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
-        <h4 style={{ margin: 0, fontSize: '.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.title}</h4>
-        {item.project_name && (
-          <div style={{ fontSize: '.72rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '.3rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            <ImagePlus size={11} style={{ flexShrink: 0, color: 'var(--accent)' }} />
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              Project: <strong>{item.project_name}</strong>
-            </span>
-          </div>
-        )}
+      <div style={{ padding: '.7rem .85rem .85rem', display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+        <h4 style={{ margin: 0, fontSize: '.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {item.title}
+        </h4>
         {Array.isArray(item.tags) && item.tags.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.25rem' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.2rem' }}>
             {item.tags.slice(0, 4).map(t => (
-              <span key={t} style={{ background: 'var(--bg-subtle)', color: 'var(--text-secondary)', padding: '.15rem .5rem', borderRadius: 'var(--radius-full)', fontSize: '.7rem', fontWeight: 500 }}>
+              <span key={t} style={{ background: 'var(--bg-subtle)', color: 'var(--text-secondary)', padding: '.1rem .45rem', borderRadius: 'var(--radius-full)', fontSize: '.65rem', fontWeight: 500 }}>
                 {t}
               </span>
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', gap: '.25rem', marginTop: '.25rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '.2rem', marginTop: '.15rem', flexWrap: 'wrap' }}>
+          {/* ★ Cover button — only meaningful for grouped projects; for
+              ungrouped photos we hide it (each is already its own card). */}
+          {isInProject && onSetCover && (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={onSetCover}
+              disabled={item.is_cover}
+              title={item.is_cover ? 'Already the project cover' : 'Make this the project cover on the website'}
+              style={{ color: item.is_cover ? '#fbbf24' : undefined, padding: '.35rem .45rem' }}
+            >
+              <Crown size={13} style={item.is_cover ? { fill: '#fbbf24' } : {}} />
+            </button>
+          )}
           <button
             className="btn btn-ghost btn-sm"
             onClick={onToggleFeatured}
             title={item.is_featured ? 'Remove from homepage Featured Work' : 'Add to homepage Featured Work'}
-            style={{ color: item.is_featured ? '#fbbf24' : undefined }}
+            style={{ color: item.is_featured ? '#fbbf24' : undefined, padding: '.35rem .45rem' }}
           >
-            <Star size={14} style={item.is_featured ? { fill: '#fbbf24' } : {}} />
+            <Star size={13} style={item.is_featured ? { fill: '#fbbf24' } : {}} />
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={onTogglePublish} title={item.is_published ? 'Hide from site' : 'Publish to site'}>
-            {item.is_published ? <Eye size={14} /> : <EyeOff size={14} />}
+          <button className="btn btn-ghost btn-sm" onClick={onTogglePublish} title={item.is_published ? 'Hide from site' : 'Publish to site'} style={{ padding: '.35rem .45rem' }}>
+            {item.is_published ? <Eye size={13} /> : <EyeOff size={13} />}
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={onEdit} title="Edit">
-            <Edit3 size={14} />
+          <button className="btn btn-ghost btn-sm" onClick={onEdit} title="Edit metadata" style={{ padding: '.35rem .45rem' }}>
+            <Edit3 size={13} />
           </button>
-          {onMoveUp && (
-            <button className="btn btn-ghost btn-sm" onClick={onMoveUp} title="Move up">
-              <ArrowUp size={14} />
-            </button>
-          )}
-          {onMoveDown && (
-            <button className="btn btn-ghost btn-sm" onClick={onMoveDown} title="Move down">
-              <ArrowDown size={14} />
-            </button>
-          )}
-          <button className="btn btn-ghost btn-sm" onClick={onDelete} title="Delete" style={{ marginLeft: 'auto', color: 'var(--status-danger)' }}>
-            <Trash2 size={14} />
+          <button className="btn btn-ghost btn-sm" onClick={onDelete} title="Delete" style={{ marginLeft: 'auto', color: 'var(--status-danger)', padding: '.35rem .45rem' }}>
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -688,7 +1235,13 @@ function UploadModal({ orgId, onClose, onUploaded }) {
     }
   };
 
-  const uploadOne = async (i) => {
+  // Per-batch counter so each uploaded photo gets a unique, increasing
+  // sort_order (max + 10, +20, +30…). The counter is initialized once at
+  // uploadAll start; passing 0 for direct single-photo uploads triggers a
+  // fresh lookup. After migration 042, existing rows are spaced by 10, so
+  // new uploads landing at max+10 always appear at the BOTTOM of the manage
+  // grid (and the public site) — Riley then drags them where he wants.
+  const uploadOne = async (i, presetSortOrder) => {
     const p = pending[i];
     if (!p || p.done || p.uploading) return;
     if (!p.title.trim()) {
@@ -701,11 +1254,13 @@ function UploadModal({ orgId, onClose, onUploaded }) {
     }
     updateAt(i, { uploading: true, error: null });
     try {
+      const sortOrder = presetSortOrder ?? (await fetchMaxSortOrder(orgId) + 10);
       const main = await uploadGalleryImage(p.file, orgId);
       let before = null;
       if (p.before && p.beforeFile) {
         before = await uploadGalleryImage(p.beforeFile, orgId);
       }
+      const trimmedProject = projectName.trim() || null;
       const { error } = await supabase.from('marketing_gallery').insert({
         org_id: orgId,
         title: p.title.trim(),
@@ -720,8 +1275,12 @@ function UploadModal({ orgId, onClose, onUploaded }) {
         before_image_path: before?.path || null,
         is_published: true,
         is_featured: !!p.featured,
-        project_name: projectName.trim() || null,
-        sort_order: 0,
+        // First photo of a new multi-photo project becomes its cover.
+        // For the first upload in a batch we know it's `i === 0`; for later
+        // uploads we let Riley pick via the ★ Cover button after the fact.
+        is_cover: !!trimmedProject && i === 0,
+        project_name: trimmedProject,
+        sort_order: sortOrder,
       });
       if (error) throw error;
       updateAt(i, { uploading: false, done: true });
@@ -732,9 +1291,15 @@ function UploadModal({ orgId, onClose, onUploaded }) {
   };
 
   const uploadAll = async () => {
+    // Query the current max once, then increment locally so all photos in
+    // this batch get sequential sort_orders. Without this, every parallel
+    // upload would query the same max and collide on the same value.
+    const baseMax = await fetchMaxSortOrder(orgId);
+    let next = baseMax + 10;
     for (let i = 0; i < pending.length; i++) {
       if (pending[i].done) continue;
-      await uploadOne(i);
+      await uploadOne(i, next);
+      next += 10;
     }
     await onUploaded();
   };
@@ -790,7 +1355,7 @@ function UploadModal({ orgId, onClose, onUploaded }) {
               ))}
             </div>
             <p style={{ marginTop: '1.5rem', fontSize: '.78rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-              You'll be able to add more tags per photo after uploading.
+              You&apos;ll be able to add more tags per photo after uploading.
             </p>
           </div>
         </div>

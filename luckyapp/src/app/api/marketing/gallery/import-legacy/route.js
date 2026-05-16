@@ -187,7 +187,21 @@ export async function POST(request) {
   }
   const orgId = member.org_id;
 
+  // Find the current max sort_order so imported items append to the bottom
+  // of whatever's already there (Riley's existing uploads stay where they are).
+  const { data: maxRow } = await supabase
+    .from('marketing_gallery')
+    .select('sort_order')
+    .eq('org_id', orgId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  let sortCursor = ((maxRow?.sort_order ?? -10) + 10);  // first imported = max + 10
+
   // Build the per-row plan up front so we can report exactly what we'll do.
+  // Each row gets a unique sort_order spaced by 10 so the manage page's
+  // drag-and-drop has room to drop between any pair without renumbering.
+  // First photo of each multi-photo project is flagged as cover.
   const plan = [];
   for (const project of LEGACY_PORTFOLIO) {
     const projSlug = slug(project.title);
@@ -210,14 +224,18 @@ export async function POST(request) {
         tags,
         featured: !!project.featured,
         projectName: null,
+        isCover: false,  // standalone card; cover flag is moot
+        sortOrder: sortCursor,
         mainSourceUrl: MARKETING_SITE_ORIGIN + afterUrl,
         beforeSourceUrl: MARKETING_SITE_ORIGIN + beforeUrl,
         mainKey: `${orgId}/legacy/${projSlug}/after.${extFromUrl(afterUrl)}`,
         beforeKey: `${orgId}/legacy/${projSlug}/before.${extFromUrl(beforeUrl)}`,
       });
+      sortCursor += 10;
     } else {
       // Each image → its own row. Title becomes "<Project> #N" if >1 image,
-      // else just the project title.
+      // else just the project title. The FIRST image in a multi-photo project
+      // is flagged as the cover so it represents the project on the website.
       project.images.forEach((relUrl, idx) => {
         const ext = extFromUrl(relUrl);
         const photoSlug = slug(relUrl.split('/').pop().replace(/\.[^.]+$/, ''));
@@ -230,9 +248,12 @@ export async function POST(request) {
           tags,
           featured: !!project.featured,
           projectName: groupName,
+          isCover: !!groupName && idx === 0,  // first photo of a grouped project = cover
+          sortOrder: sortCursor,
           mainSourceUrl: MARKETING_SITE_ORIGIN + relUrl,
           mainKey: `${orgId}/legacy/${projSlug}/${photoSlug}.${ext}`,
         });
+        sortCursor += 10;
       });
     }
   }
@@ -288,8 +309,9 @@ export async function POST(request) {
         before_image_path: beforePath,
         is_published: true,
         is_featured: item.featured,
+        is_cover: item.isCover,
         project_name: item.projectName,
-        sort_order: 0,
+        sort_order: item.sortOrder,
       });
       if (insErr) throw new Error(`insert: ${insErr.message}`);
 
