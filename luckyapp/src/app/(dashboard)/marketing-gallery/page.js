@@ -17,7 +17,7 @@ import { compressImage, bytesPretty } from '@/lib/compressImage';
 import {
   Plus, X, Save, Upload, Trash2, Edit3, Eye, EyeOff, Camera, Loader2,
   ArrowUp, ArrowDown, ExternalLink, ImagePlus, Tag, RefreshCw, Globe, Sparkles,
-  Star,
+  Star, Download,
 } from 'lucide-react';
 
 // Curated tag set. Free-form in the DB so new tags don't need a migration,
@@ -248,6 +248,42 @@ export default function MarketingGalleryPage() {
     setItems(prev => prev.map(x => x.id === item.id ? { ...x, is_featured: next } : x));
   };
 
+  const [importing, setImporting] = useState(false);
+  const handleImportLegacy = async () => {
+    const ok = confirm(
+      'Import the hardcoded legacy portfolio?\n\n' +
+      'This re-uploads all the original gallery photos from luckylandscapes.com into your Marketing Gallery, splitting multi-photo projects into individual cards. ' +
+      'Idempotent — safe to run multiple times (existing entries are skipped). ' +
+      'After import, you can delete the static fallback from marketing/main.js.'
+    );
+    if (!ok) return;
+    setImporting(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not signed in.');
+      const res = await fetch('/api/marketing/gallery/import-legacy', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert('Import failed: ' + (data?.error || res.status));
+        return;
+      }
+      const { summary, failed = [] } = data || {};
+      let msg = `Imported ${summary?.imported || 0} photos · skipped ${summary?.skipped || 0} (already there) · failed ${summary?.failed || 0}`;
+      if (failed.length) {
+        msg += '\n\nFailures:\n' + failed.slice(0, 5).map(f => `  • ${f.title}: ${f.error}`).join('\n');
+      }
+      alert(msg);
+      await loadItems();
+    } catch (err) {
+      alert('Import failed: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const handleMoveSortOrder = async (item, direction) => {
     const idx = items.findIndex(x => x.id === item.id);
     const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
@@ -300,6 +336,14 @@ export default function MarketingGalleryPage() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: '.5rem', alignItems: 'center' }}>
+          <button
+            className="btn btn-ghost"
+            onClick={handleImportLegacy}
+            disabled={importing}
+            title="One-time import of the hardcoded legacy portfolio (idempotent — safe to re-run)"
+          >
+            {importing ? <><Loader2 size={16} className="spin" /> Importing…</> : <><Download size={16} /> Import legacy</>}
+          </button>
           <button className="btn btn-ghost" onClick={loadItems} title="Reload">
             <RefreshCw size={16} /> Refresh
           </button>
