@@ -2,14 +2,22 @@ import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/stripeServer';
 
 // AI auto-fill for marketing gallery uploads. Riley uploads a photo, clicks
-// "Auto-fill from photo", and Claude Haiku 4.5 vision returns a suggested
-// title, description, and tag set so he doesn't have to write metadata by
-// hand for every photo. Output is plain JSON the client can drop straight
-// into the upload-form fields; the user can still edit before submitting.
+// "Auto-fill from photo", and a vision model returns a suggested title,
+// description, and tag set so he doesn't have to write metadata by hand for
+// every photo. Output is plain JSON the client drops straight into the form;
+// the user can still edit before submitting.
 //
-// Cost: ~$0.001–$0.003 per photo with Haiku 4.5. 100 photos/year < $0.30.
-// Auth: requires a valid Supabase session token so a leaked public URL can't
-// be used to burn API credits. Token comes in as a Bearer header.
+// PROVIDERS (auto-detected by env var):
+// • GEMINI_API_KEY — Google Gemini 2.0 Flash, FREE tier 1500 req/day,
+//   15 req/min. Get a key at https://aistudio.google.com/app/apikey.
+//   PREFERRED when both keys are set.
+// • ANTHROPIC_API_KEY — Claude Haiku 4.5 via api.anthropic.com.
+//   ~$0.001-0.003/photo (100 photos ≈ $0.15). NOT covered by Claude Max
+//   subscription — that's separate from the API. Used only if Gemini key
+//   is missing.
+//
+// Auth: requires a valid Supabase session token so a leaked URL can't be
+// used to burn API credit. Token comes in as a Bearer header.
 
 const TAG_OPTIONS = [
   'Hardscaping', 'Landscaping', 'Lawn Care', 'Garden Beds',
@@ -28,18 +36,106 @@ const PROMPT = `You're writing photo captions for a landscaping company's public
 If the photo is unclear, blurry, or doesn't show landscaping work, return:
 {"title": "", "description": "", "tags": []}`;
 
+// ─────────────────────────────────────────────────────────────────────────
+// Provider implementations — each returns { title, description, tags, usage }
+// or throws on failure.
+// ─────────────────────────────────────────────────────────────────────────
+
+async function suggestViaGemini({ apiKey, base64, mediaType }) {
+  // Gemini 2.0 Flash — free tier 1500 RPD. responseMimeType forces strict JSON
+  // output so we don't have to extract from prose / code fences.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{
+        parts: [
+          { inline_data: { mime_type: mediaType, data: base64 } },
+          { text: PROMPT },
+        ],
+      }],
+      generationConfig: {
+        temperature: 0.4,
+        maxOutputTokens: 400,
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  return { rawText: text, usage: data?.usageMetadata || null, provider: 'gemini' };
+}
+
+async function suggestViaAnthropic({ apiKey, base64, mediaType }) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 400,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+          { type: 'text', text: PROMPT },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Anthropic ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const data = await res.json();
+  const text = data?.content?.[0]?.text || '';
+  return { rawText: text, usage: data?.usage || null, provider: 'anthropic' };
+}
+
+function extractAndValidate(rawText) {
+  const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) return { error: 'no_json', raw: rawText.slice(0, 200) };
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonMatch[0]);
+  } catch {
+    return { error: 'invalid_json_response', raw: rawText.slice(0, 200) };
+  }
+  const tagSet = new Set(TAG_OPTIONS);
+  const cleanTags = Array.isArray(parsed.tags)
+    ? parsed.tags.filter(t => typeof t === 'string' && tagSet.has(t)).slice(0, 3)
+    : [];
+  return {
+    title: typeof parsed.title === 'string' ? parsed.title.trim().slice(0, 80) : '',
+    description: typeof parsed.description === 'string' ? parsed.description.trim().slice(0, 240) : '',
+    tags: cleanTags,
+  };
+}
+
 export async function POST(request) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  // Gemini wins when both are set — free tier covers Lucky's volume easily.
+  const provider = geminiKey ? 'gemini' : (anthropicKey ? 'anthropic' : null);
+  if (!provider) {
     return NextResponse.json(
-      { error: 'not_configured', message: 'AI auto-fill is not configured. Set ANTHROPIC_API_KEY in Vercel env vars to enable.' },
+      {
+        error: 'not_configured',
+        message: 'AI auto-fill is not configured. Set GEMINI_API_KEY (free at aistudio.google.com) or ANTHROPIC_API_KEY in Vercel env vars to enable.',
+      },
       { status: 503 }
     );
   }
 
-  // Auth — verify a valid Supabase session token. Bare-public would let any
-  // visitor burn the org's API credit by hitting this endpoint with random
-  // images.
+  // Auth — verify a valid Supabase session token.
   const authHeader = request.headers.get('Authorization') || '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
   if (!token) {
@@ -65,8 +161,7 @@ export async function POST(request) {
   if (!raw) {
     return NextResponse.json({ error: 'missing_image' }, { status: 400 });
   }
-  // Accept data URLs and raw base64. Detect media type from the data URL when
-  // present so HEIC / PNG / etc. get a proper media_type on the Claude call.
+  // Accept data URLs and raw base64. Detect media type from the data URL.
   let mediaType = 'image/jpeg';
   let base64 = raw;
   const m = raw.match(/^data:(image\/[a-z0-9+.-]+);base64,(.+)$/i);
@@ -74,72 +169,31 @@ export async function POST(request) {
     mediaType = m[1].toLowerCase();
     base64 = m[2];
   }
-  // Hard cap to keep requests inside Vercel's 4.5MB body limit + Claude's
-  // 5MB image limit. Phone photos compressed by the client land ~300KB.
+  // Hard cap to keep requests inside Vercel's 4.5MB body limit + provider
+  // image limits. Phone photos compressed client-side land ~300KB.
   if (base64.length > 5_500_000) {
     return NextResponse.json({ error: 'image_too_large' }, { status: 413 });
   }
 
   try {
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: PROMPT },
-          ],
-        }],
-      }),
-    });
+    const aiResult = provider === 'gemini'
+      ? await suggestViaGemini({ apiKey: geminiKey, base64, mediaType })
+      : await suggestViaAnthropic({ apiKey: anthropicKey, base64, mediaType });
 
-    if (!aiRes.ok) {
-      const errText = await aiRes.text();
-      console.error('[gallery/suggest] Claude API error', aiRes.status, errText.slice(0, 500));
-      return NextResponse.json(
-        { error: 'ai_failed', status: aiRes.status, detail: errText.slice(0, 300) },
-        { status: 502 }
-      );
+    const out = extractAndValidate(aiResult.rawText);
+    if (out.error) {
+      return NextResponse.json({ ...out, provider: aiResult.provider }, { status: 502 });
     }
-
-    const data = await aiRes.json();
-    const text = data?.content?.[0]?.text || '';
-
-    // Tolerate stray prose around the JSON (Claude usually obeys but be safe).
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
-      return NextResponse.json({ error: 'no_json', raw: text.slice(0, 200) }, { status: 502 });
-    }
-
-    let parsed;
-    try {
-      parsed = JSON.parse(jsonMatch[0]);
-    } catch {
-      return NextResponse.json({ error: 'invalid_json_response', raw: text.slice(0, 200) }, { status: 502 });
-    }
-
-    // Validate tags against the allowed set.
-    const tagSet = new Set(TAG_OPTIONS);
-    const cleanTags = Array.isArray(parsed.tags)
-      ? parsed.tags.filter(t => typeof t === 'string' && tagSet.has(t)).slice(0, 3)
-      : [];
-
     return NextResponse.json({
-      title: typeof parsed.title === 'string' ? parsed.title.trim().slice(0, 80) : '',
-      description: typeof parsed.description === 'string' ? parsed.description.trim().slice(0, 240) : '',
-      tags: cleanTags,
-      usage: data?.usage || null,
+      ...out,
+      provider: aiResult.provider,
+      usage: aiResult.usage,
     });
   } catch (err) {
     console.error('[gallery/suggest] request failed', err);
-    return NextResponse.json({ error: 'request_failed', message: err.message }, { status: 500 });
+    return NextResponse.json(
+      { error: 'request_failed', provider, message: err.message },
+      { status: 502 }
+    );
   }
 }
