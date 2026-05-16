@@ -700,7 +700,12 @@ if (window.innerWidth > 768) {
 //   The gallery grid AND lightbox are auto-generated from it.
 //   Each image can optionally have a mobile variant (for <1024px).
 //   If no mobile variant is provided, the desktop image is used.
-const projectData = [
+// `projectData` is a mutable seed array. On page load we fetch
+// /api/marketing/gallery from luckyapp and, if it returns photos, swap them
+// into this array in place. The hardcoded entries below are the FALLBACK —
+// they're what visitors see if luckyapp is down or unreachable.
+// See loadMarketingGalleryFromLuckyapp() below for the wire-up.
+let projectData = [
     {
         title: 'Custom Built Deck',
         tag: 'Construction',
@@ -817,9 +822,11 @@ function getImageSrc(img) {
     return (isMobile && img.mobile) ? img.mobile : img.desktop;
 }
 
-// Curated projects for the homepage (indices into projectData)
-// Covers hardscaping, landscaping, before/after, outdoor living, maintenance, curb appeal
-const homepageFeatured = [1, 5, 6, 3, 2, 4];
+// Curated projects for the homepage (indices into projectData).
+// The hardcoded indices match the static fallback list above. When remote
+// gallery data loads, loadMarketingGalleryFromLuckyapp() resets this to
+// the first N items so we always show the freshest 6 photos Riley uploaded.
+let homepageFeatured = [1, 5, 6, 3, 2, 4];
 
 function buildGalleryGrid() {
     if (!galleryGrid) return;
@@ -875,6 +882,55 @@ function buildGalleryGrid() {
 }
 
 buildGalleryGrid();
+
+// ============================================
+// MARKETING GALLERY — REMOTE FETCH FROM LUCKYAPP
+// ============================================
+// Pulls live photos from /api/marketing/gallery (managed in luckyapp via
+// the Marketing Gallery page). Falls back to the static projectData above
+// if the fetch fails or returns no items — site never breaks.
+//
+// Endpoint shape: { items: [{ title, description, tags, imageUrl, beforeImageUrl, isBeforeAfter }] }
+// Vercel edge caches the response for 60s + stale-while-revalidate 5min,
+// so updates land on the site in about a minute without us doing anything.
+
+const MARKETING_GALLERY_URL = 'https://app.luckylandscapes.com/api/marketing/gallery';
+
+async function loadMarketingGalleryFromLuckyapp() {
+    try {
+        const res = await fetch(MARKETING_GALLERY_URL, { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = await res.json();
+        const remote = Array.isArray(json?.items) ? json.items : [];
+        if (remote.length === 0) return;
+        // Convert API shape → projectData shape (preserve before/after handling).
+        const converted = remote.map(item => {
+            const tag = (Array.isArray(item.tags) && item.tags[0]) || 'Project';
+            const isBA = !!item.beforeImageUrl;
+            return {
+                title: item.title || 'Untitled project',
+                tag,
+                desc: item.description || '',
+                cover: 0,
+                images: isBA ? [item.beforeImageUrl, item.imageUrl] : [item.imageUrl],
+                beforeAfter: isBA,
+            };
+        });
+        projectData = converted;
+        // Reset the homepage curation to the first 6 remote items — the
+        // hardcoded indices were tied to the fallback list.
+        homepageFeatured = Array.from({ length: Math.min(6, converted.length) }, (_, i) => i);
+        // Rebuild any gallery surfaces that have already mounted.
+        if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
+        if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
+    } catch (err) {
+        // Network error / luckyapp down — keep the static fallback. Silent.
+        console.warn('[gallery] remote fetch failed, using static fallback', err);
+    }
+}
+
+// Fire-and-forget on page load; static gallery shows immediately, then swaps in.
+loadMarketingGalleryFromLuckyapp();
 
 // ============================================
 // GALLERY PAGE — Project Collections

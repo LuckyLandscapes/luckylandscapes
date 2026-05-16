@@ -33,6 +33,7 @@ import {
   ScrollText,
   Calculator,
   Route,
+  Globe,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
@@ -57,6 +58,7 @@ const ownerNavItems = [
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
   { href: '/calculator', label: 'Calculator', icon: Calculator, roles: ['owner', 'admin'] },
   { href: '/routing', label: 'Route Planner', icon: Route, roles: ['owner', 'admin'] },
+  { href: '/marketing-gallery', label: 'Website Gallery', icon: Globe, roles: ['owner', 'admin'] },
   { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
   { href: '/finance', label: 'Finance', icon: Wallet, roles: ['owner', 'admin'] },
   { href: '/reports', label: 'P&L Report', icon: BarChart3, roles: ['owner', 'admin'] },

@@ -1922,7 +1922,8 @@ textarea {
     .hero-content .hero-badge,
     .hero-content .hero-title,
     .hero-content .hero-sub,
-    .hero-content .hero-buttons {
+    .hero-content .hero-buttons,
+    .hero-content .hero-social-proof {
         animation: none !important;
         opacity: 1 !important;
         transform: none !important;
@@ -1992,7 +1993,8 @@ textarea {
 .hero-content.revealed .hero-badge,
 .hero-content.revealed .hero-title,
 .hero-content.revealed .hero-sub,
-.hero-content.revealed .hero-buttons {
+.hero-content.revealed .hero-buttons,
+.hero-content.revealed .hero-social-proof {
     opacity: 1 !important;
     transform: none !important;
     animation: none !important;
@@ -2013,6 +2015,10 @@ textarea {
 
 .hero-content .hero-buttons {
     animation: fadeInUp .8s var(--ease-out) .8s both;
+}
+
+.hero-content .hero-social-proof {
+    animation: fadeInUp .8s var(--ease-out) 1s both;
 }
 
 @keyframes fadeInUp {
@@ -5346,6 +5352,138 @@ body.promo-active .mobile-menu {
     margin-left: auto;
     flex-shrink: 0;
     opacity: .6;
+}
+
+/* ============================================
+   FEATURED REVIEW (Sparrow Spaulding)
+   Bigger, gold-bordered card above the 3-up grid.
+   Optimized for above-the-fold conversion.
+   ============================================ */
+.review-featured {
+    background: var(--white);
+    border-radius: var(--radius-xl);
+    padding: 2.5rem 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .08);
+    border: 2px solid #FBBC05;
+    max-width: 780px;
+    margin: 0 auto 2.5rem;
+    text-align: left;
+    position: relative;
+}
+
+.review-featured-badge {
+    display: inline-block;
+    background: linear-gradient(135deg, #FBBC05, #f59e0b);
+    color: var(--white);
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    padding: .35rem .8rem;
+    border-radius: var(--radius-full);
+    margin-bottom: 1rem;
+}
+
+.review-featured-text {
+    font-size: 1.25rem;
+    color: var(--forest-deep);
+    line-height: 1.55;
+    margin: .75rem 0 1.5rem;
+    font-style: italic;
+    font-weight: 400;
+}
+
+.review-featured-text strong {
+    color: var(--clover-dark, var(--clover));
+    font-weight: 700;
+    font-style: normal;
+}
+
+.review-featured-text em {
+    color: var(--clover-dark, var(--clover));
+    font-style: italic;
+    font-weight: 700;
+}
+
+@media (max-width: 640px) {
+    .review-featured {
+        padding: 1.75rem 1.25rem;
+    }
+
+    .review-featured-text {
+        font-size: 1.05rem;
+    }
+}
+
+/* ============================================
+   HERO SOCIAL PROOF
+   Glass pill under the hero buttons. One quote,
+   author + Google rating. Anchored to #reviews
+   so a tap scrolls to the full reviews section.
+   ============================================ */
+.hero-social-proof {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .35rem;
+    margin-top: 2rem;
+    padding: .75rem 1.25rem;
+    background: rgba(255, 255, 255, .14);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, .25);
+    border-radius: var(--radius-xl);
+    text-decoration: none;
+    color: var(--white);
+    max-width: 480px;
+    transition: all var(--t-normal) var(--ease-out);
+    cursor: pointer;
+}
+
+.hero-social-proof:hover {
+    background: rgba(255, 255, 255, .22);
+    border-color: rgba(255, 255, 255, .4);
+    transform: translateY(-2px);
+}
+
+.hero-social-proof-stars {
+    color: #FBBC05;
+    font-size: .95rem;
+    letter-spacing: .15rem;
+    text-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
+
+.hero-social-proof-quote {
+    font-size: .9rem;
+    font-style: italic;
+    color: var(--white);
+    line-height: 1.4;
+    text-align: center;
+}
+
+.hero-social-proof-quote strong {
+    color: var(--lucky-text);
+    font-weight: 700;
+    font-style: normal;
+}
+
+.hero-social-proof-meta {
+    font-size: .72rem;
+    color: rgba(255, 255, 255, .75);
+    font-weight: 500;
+    letter-spacing: .03em;
+}
+
+@media (max-width: 640px) {
+    .hero-social-proof {
+        margin-top: 1.5rem;
+        padding: .65rem 1rem;
+        max-width: 92vw;
+    }
+
+    .hero-social-proof-quote {
+        font-size: .82rem;
+    }
 }
 
 .btn-secondary {
