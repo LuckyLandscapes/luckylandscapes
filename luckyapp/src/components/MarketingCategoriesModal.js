@@ -149,10 +149,20 @@ export default function MarketingCategoriesModal({ orgId, items, onClose, onChan
   };
 
   const handlePickCover = async (cat, photo) => {
-    await handleSaveMeta(cat, {
+    const patch = {
       cover_image_url: photo.image_url,
       cover_image_path: photo.image_path || null,
-    });
+    };
+    // If they're picking a cover for a hidden category, they almost certainly
+    // want it shown — offer one-click enable so the cover actually appears on
+    // luckylandscapes.com instead of silently being saved to a hidden row.
+    if (!cat.is_visible) {
+      const enable = confirm(
+        `"${cat.name}" is currently hidden from luckylandscapes.com/gallery, so this cover won't show until you make it visible.\n\nMake "${cat.name}" visible now?`
+      );
+      if (enable) patch.is_visible = true;
+    }
+    await handleSaveMeta(cat, patch);
     setPickerOpenFor(null);
   };
 
@@ -205,6 +215,17 @@ export default function MarketingCategoriesModal({ orgId, items, onClose, onChan
     onChanged?.();
   };
 
+  // Visibility roll-up — drives the banner shown above the list. The whole
+  // point of the modal: cover + sort + display-name changes ONLY affect the
+  // public site for VISIBLE categories. Hidden categories get filtered out
+  // server-side (`is_visible = true` in the /api/marketing/gallery query)
+  // and the marketing site falls back to auto-derive mode where all the
+  // metadata edits are ignored. So if Riley sets a cover on a hidden row,
+  // his change is saved to the DB but invisible — confusing UX without this
+  // banner explicitly calling it out.
+  const visibleCount = categories.filter(c => c.is_visible).length;
+  const totalCount = categories.length;
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 760, maxHeight: '92vh', display: 'flex', flexDirection: 'column' }}>
@@ -214,11 +235,64 @@ export default function MarketingCategoriesModal({ orgId, items, onClose, onChan
               Manage Categories
             </h2>
             <p style={{ margin: '.2rem 0 0', fontSize: '.78rem', color: 'var(--text-secondary)' }}>
-              Only visible categories appear on luckylandscapes.com/gallery. Drag to reorder.
+              Drag to reorder. Click the eye to toggle visibility.
             </p>
           </div>
           <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
         </header>
+
+        {/* Visibility banner — warning when nothing is visible, info otherwise.
+            Click "Show all" to one-shot enable everything if Riley wants the
+            classic-fast-path. */}
+        {totalCount > 0 && (
+          <div
+            style={{
+              margin: '1rem 1.5rem 0',
+              padding: '.75rem .9rem',
+              borderRadius: 'var(--radius-md)',
+              border: '1px solid ' + (visibleCount === 0 ? '#f59e0b' : 'var(--border)'),
+              background: visibleCount === 0 ? 'rgba(245, 158, 11, 0.08)' : 'var(--bg-elevated)',
+              display: 'flex', alignItems: 'center', gap: '.6rem',
+              fontSize: '.82rem',
+            }}
+          >
+            <Eye size={16} style={{ color: visibleCount === 0 ? '#f59e0b' : 'var(--accent)', flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              {visibleCount === 0 ? (
+                <>
+                  <strong>0 of {totalCount} categories visible.</strong> Nothing appears on luckylandscapes.com/gallery right now — click the eye icon on any row to enable it.{' '}
+                  <span style={{ color: 'var(--text-tertiary)' }}>Covers and order only apply once a category is visible.</span>
+                </>
+              ) : (
+                <>
+                  <strong>{visibleCount} of {totalCount} visible</strong> on luckylandscapes.com/gallery.{' '}
+                  <span style={{ color: 'var(--text-tertiary)' }}>Changes appear within ~60 seconds.</span>
+                </>
+              )}
+            </div>
+            {visibleCount === 0 && totalCount > 0 && (
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={async () => {
+                  if (!confirm(`Make all ${totalCount} categories visible? You can hide individual ones afterward.`)) return;
+                  // Optimistic — flip the toggle locally first, then persist.
+                  setCategories(prev => prev.map(c => ({ ...c, is_visible: true })));
+                  const { error } = await supabase
+                    .from('marketing_categories')
+                    .update({ is_visible: true, updated_at: new Date().toISOString() })
+                    .eq('org_id', orgId)
+                    .eq('is_visible', false);
+                  if (error) { alert('Failed: ' + error.message); await loadCategories(); return; }
+                  onChanged?.();
+                }}
+                style={{ background: '#f59e0b', color: 'white', padding: '.35rem .7rem', borderRadius: 'var(--radius-sm)', fontSize: '.75rem', fontWeight: 600, border: 'none', cursor: 'pointer', flexShrink: 0 }}
+              >
+                Show all
+              </button>
+            )}
+          </div>
+        )}
 
         <div style={{ padding: '1rem 1.5rem', overflow: 'auto', flex: 1 }}>
           {/* Add new category */}
@@ -415,10 +489,28 @@ function SortableCategoryRow({ cat, photoCount, isEditing, onStartEdit, onStopEd
                 <span style={{ fontSize: '.7rem', color: 'var(--text-tertiary)' }}>(tag: {cat.name})</span>
               )}
             </div>
-            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>
-              {photoCount} {photoCount === 1 ? 'photo' : 'photos'}
-              {!cat.is_visible && ' · hidden'}
-              {!cat.cover_image_url && ' · auto-cover'}
+            <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)', display: 'inline-flex', alignItems: 'center', gap: '.4rem', flexWrap: 'wrap' }}>
+              <span>{photoCount} {photoCount === 1 ? 'photo' : 'photos'}</span>
+              {!cat.is_visible && (
+                <span
+                  title="This category is hidden from the public site. Click the eye icon to show it."
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: '.2rem',
+                    padding: '.05rem .4rem',
+                    borderRadius: 'var(--radius-sm)',
+                    background: 'rgba(245, 158, 11, 0.18)',
+                    color: '#b45309',
+                    fontWeight: 700,
+                    fontSize: '.66rem',
+                    letterSpacing: '.02em',
+                  }}
+                >
+                  <EyeOff size={10} /> HIDDEN
+                </span>
+              )}
+              {!cat.cover_image_url && cat.is_visible && (
+                <span style={{ color: 'var(--text-tertiary)' }}>· auto-cover</span>
+              )}
             </span>
           </>
         )}
@@ -441,10 +533,22 @@ function SortableCategoryRow({ cat, photoCount, isEditing, onStartEdit, onStopEd
           <button
             className="btn btn-ghost btn-sm"
             onClick={onToggleVisible}
-            title={cat.is_visible ? 'Hide from public gallery landing' : 'Show on public gallery landing'}
-            style={{ padding: '.3rem', color: cat.is_visible ? 'var(--accent)' : 'var(--text-tertiary)' }}
+            title={cat.is_visible
+              ? 'Hide from luckylandscapes.com/gallery (saved metadata stays)'
+              : 'Show on luckylandscapes.com/gallery — your cover + sort will apply here'}
+            style={{
+              padding: '.3rem .45rem',
+              gap: '.25rem',
+              // When off, color orange to signal "this is the action that
+              // makes your changes appear on the public site". The HIDDEN
+              // badge above already explains why.
+              color: cat.is_visible ? 'var(--accent)' : '#b45309',
+              background: cat.is_visible ? undefined : 'rgba(245, 158, 11, 0.12)',
+              fontWeight: cat.is_visible ? undefined : 700,
+              fontSize: '.7rem',
+            }}
           >
-            {cat.is_visible ? <Eye size={13} /> : <EyeOff size={13} />}
+            {cat.is_visible ? <Eye size={13} /> : <><EyeOff size={13} /> Show</>}
           </button>
           <button
             className="btn btn-ghost btn-sm"
