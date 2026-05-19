@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
+import QuickMileageModal from './QuickMileageModal';
 
 const LEAF_TAP_COUNT = 5;
 const LEAF_TAP_WINDOW_MS = 2000;
@@ -53,6 +54,7 @@ const ownerNavItems = [
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
   { href: '/crew-dashboard', label: 'Time Clock', icon: Clock, roles: ['owner', 'admin'] },
   { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['owner', 'admin'] },
+  { type: 'action', actionKey: 'logMileage', label: 'Log Mileage', icon: Car, roles: ['owner', 'admin'] },
   { label: 'Tools', type: 'section', roles: ['owner', 'admin'] },
   { href: '/catalog', label: 'Catalog', icon: Palette, roles: ['owner', 'admin'] },
   { href: '/measure', label: 'Measure', icon: Ruler, roles: ['owner', 'admin'] },
@@ -76,6 +78,7 @@ const workerNavItems = [
   { href: '/crew-dashboard', label: 'My Dashboard', icon: HardHat, roles: ['worker'] },
   { href: '/crew-schedule', label: 'My Schedule', icon: CalendarDays, roles: ['worker'] },
   { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['worker'] },
+  { type: 'action', actionKey: 'logMileage', label: 'Log Mileage', icon: Car, roles: ['worker'] },
 ];
 
 // Bottom nav for owners/admins
@@ -99,6 +102,7 @@ export default function Sidebar() {
   const { theme, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
+  const [mileageOpen, setMileageOpen] = useState(false);
   const leafTapsRef = useRef([]);
 
   const handleLeafTap = () => {
@@ -112,6 +116,7 @@ export default function Sidebar() {
 
   const sidebarActions = {
     logReceipt: () => { setReceiptOpen(true); setMobileOpen(false); },
+    logMileage: () => { setMileageOpen(true); setMobileOpen(false); },
   };
 
   const draftQuotes = quotes.filter(q => q.status === 'draft').length;
@@ -290,6 +295,7 @@ export default function Sidebar() {
 
       {/* Global quick-receipt modal — reachable from anywhere */}
       <QuickReceiptModal open={receiptOpen} onClose={() => setReceiptOpen(false)} />
+      <QuickMileageModal open={mileageOpen} onClose={() => setMileageOpen(false)} />
     </>
   );
 }
