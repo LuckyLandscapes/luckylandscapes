@@ -256,6 +256,18 @@ The gate logic and UI live in [`(dashboard)/jobs/[id]/page.js`](luckyapp/src/app
 
 **Workflow gap not yet closed:** there's no "New Job" button — jobs are still created via `convertQuoteToJob`. For sub work, current workflow is: create a quote for the GC → convert to job → edit the job to flip `workAuthorization` to `'subcontract'`. A future enhancement would be a direct "Create Job" button on `/jobs` that skips the quote step entirely.
 
+### Standalone (blank) invoices — bill anyone without a job behind it
+The Create Invoice modal on [`(dashboard)/invoices/page.js`](luckyapp/src/app/(dashboard)/invoices/page.js) has two modes via a segmented control at the top:
+
+- **From a completed job** (existing flow, unchanged) — picks a job, pulls items + customer + deposit credit from the linked quote, sets `jobId` on the invoice.
+- **Blank invoice** (new) — picks ANY customer (GCs sorted to top of the picker), adds free-form line items (description / qty / rate / line total), no `jobId` or `quoteId`. Built specifically for **subcontract day billing** (e.g. invoicing Jeremiah as 5 days × $750), but works for any ad-hoc charge.
+
+**Day billing convention:** Qty = number of days, Rate = day rate, line total auto-computes. There's an "Add day-rate line" button that pre-fills a row with `name: 'Subcontract labor — day rate'` so Riley doesn't reinvent the format each time. Hint text under the line items spells it out.
+
+**Schema:** zero changes. `invoices.job_id` / `quote_id` were already nullable FKs from migration `007` (`ON DELETE SET NULL`); the schema always supported standalone invoices, only the UI required a job. Every downstream consumer — [`/invoices/[id]/page.js`](luckyapp/src/app/(dashboard)/invoices/[id]/page.js), [`/api/invoices/public/[token]/route.js`](luckyapp/src/app/api/invoices/public/[token]/route.js), [`/api/stripe/create-payment-intent`](luckyapp/src/app/api/stripe/create-payment-intent/route.js), [`/api/stripe/webhook`](luckyapp/src/app/api/stripe/webhook/route.js), [`/pay/[token]`](luckyapp/src/app/pay/[token]/page.js) — already handles a null `jobId` (the detail page wraps the Job card in `{job && ...}`; the Stripe + pay surfaces never read `jobId`). Mark Paid, auto-dunning, A/R aging, cash-basis P&L all work identically because they key off `invoices.amount_paid` / `payments.invoice_id`, never `jobs.id`.
+
+**Mode default:** opens to `'job'` when there's at least one completed-but-unbilled job; otherwise `'blank'`. User can toggle either way.
+
 ### Job profitability — per-job margin + reality check on completion
 The job detail page banner at [`(dashboard)/jobs/[id]/page.js`](luckyapp/src/app/(dashboard)/jobs/[id]/page.js) shows revenue − materials − equipment − labor − other = profit, **plus a margin %** color-coded by tier:
 - `≥30%` → on target (green, matches `docs/finances.md` gross margin target)

@@ -6,8 +6,10 @@ import Link from 'next/link';
 import {
   Receipt, Plus, Search, Filter, DollarSign, Clock, CheckCircle2,
   AlertCircle, FileText, ChevronRight, X, CalendarDays, Loader2, CheckCircle,
+  Briefcase, Trash2,
 } from 'lucide-react';
 import { computeQuoteDeposit } from '@/lib/deposit';
+import { customerTypeMeta } from '@/app/(dashboard)/customers/page';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -30,10 +32,65 @@ export default function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [mode, setMode] = useState('job'); // 'job' = from completed job, 'blank' = standalone
   const [selectedJobId, setSelectedJobId] = useState('');
+  const [blankCustomerId, setBlankCustomerId] = useState('');
+  const [blankCustomerSearch, setBlankCustomerSearch] = useState('');
+  const [blankItems, setBlankItems] = useState([
+    { name: '', quantity: 1, unitPrice: 0 },
+  ]);
+  const [blankDueDate, setBlankDueDate] = useState(() =>
+    new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]
+  );
+  const [blankNotes, setBlankNotes] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
   const [toast, setToast] = useState(null);
+
+  const resetBlankForm = () => {
+    setBlankCustomerId('');
+    setBlankCustomerSearch('');
+    setBlankItems([{ name: '', quantity: 1, unitPrice: 0 }]);
+    setBlankDueDate(new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]);
+    setBlankNotes('');
+  };
+
+  // Sort customers GC → business → homeowner so subcontract clients (e.g. Jeremiah)
+  // are at the top of the picker for the most common use case.
+  const sortedCustomers = useMemo(() => {
+    const rank = { general_contractor: 0, business: 1, homeowner: 2 };
+    const q = blankCustomerSearch.trim().toLowerCase();
+    return [...customers]
+      .filter(c => {
+        if (!q) return true;
+        const name = `${c.firstName || ''} ${c.lastName || ''}`.toLowerCase();
+        return name.includes(q) || (c.email || '').toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        const ra = rank[a.customerType] ?? 3;
+        const rb = rank[b.customerType] ?? 3;
+        if (ra !== rb) return ra - rb;
+        return `${a.firstName || ''} ${a.lastName || ''}`.localeCompare(`${b.firstName || ''} ${b.lastName || ''}`);
+      });
+  }, [customers, blankCustomerSearch]);
+
+  const blankSubtotal = useMemo(() => {
+    return blankItems.reduce((s, item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.unitPrice) || 0;
+      return s + qty * rate;
+    }, 0);
+  }, [blankItems]);
+
+  const updateBlankItem = (idx, patch) => {
+    setBlankItems(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  };
+  const addBlankItem = (preset = {}) => {
+    setBlankItems(prev => [...prev, { name: '', quantity: 1, unitPrice: 0, ...preset }]);
+  };
+  const removeBlankItem = (idx) => {
+    setBlankItems(prev => prev.length === 1 ? prev : prev.filter((_, i) => i !== idx));
+  };
 
   const showToast = (type, message) => {
     setToast({ type, message });
@@ -66,21 +123,27 @@ export default function InvoicesPage() {
   const overdueCount = invoices.filter(i => i.status === 'overdue').length;
 
   const handleOpenCreateModal = () => {
-    if (jobs.length === 0) {
-      showToast('error', 'You don\'t have any jobs yet. Schedule a job from a quote first.');
-      return;
-    }
-    if (invoiceableJobs.length === 0) {
-      const completedCount = jobs.filter(j => j.status === 'completed').length;
-      if (completedCount === 0) {
-        showToast('error', 'No jobs are marked complete yet. Mark a job complete on its detail page before creating an invoice.');
-      } else {
-        showToast('error', 'Every completed job already has an invoice.');
-      }
-      return;
-    }
     setCreateError(null);
+    // Default to 'job' mode when there's a completed job to bill; otherwise 'blank'
+    // so the modal opens directly into the usable flow.
+    setMode(invoiceableJobs.length > 0 ? 'job' : 'blank');
     setShowCreateModal(true);
+  };
+
+  const handleCloseCreateModal = () => {
+    if (creating) return;
+    setShowCreateModal(false);
+    setSelectedJobId('');
+    resetBlankForm();
+    setCreateError(null);
+  };
+
+  const nextInvoiceNumber = () => {
+    const maxNum = invoices.reduce((max, inv) => {
+      const m = String(inv.invoiceNumber || '').match(/(\d+)$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 1000);
+    return `INV-${String(maxNum + 1).padStart(4, '0')}`;
   };
 
   const handleCreateInvoice = async () => {
@@ -96,12 +159,7 @@ export default function InvoicesPage() {
       // Job revenue is the canonical billable amount; quote total is the fallback.
       const billable = Number(job?.revenue || job?.total || quote?.total || 0);
 
-      // Robust invoice number: parse trailing digits off existing INV-#### numbers.
-      const maxNum = invoices.reduce((max, inv) => {
-        const m = String(inv.invoiceNumber || '').match(/(\d+)$/);
-        return m ? Math.max(max, parseInt(m[1], 10)) : max;
-      }, 1000);
-      const invoiceNumber = `INV-${String(maxNum + 1).padStart(4, '0')}`;
+      const invoiceNumber = nextInvoiceNumber();
 
       const items = quote?.items?.length
         ? quote.items
@@ -164,12 +222,64 @@ export default function InvoicesPage() {
     }
   };
 
+  const handleCreateBlankInvoice = async () => {
+    if (!blankCustomerId) {
+      setCreateError('Pick a customer before creating the invoice.');
+      return;
+    }
+    const cleanedItems = blankItems
+      .map(it => ({
+        name: (it.name || '').trim(),
+        quantity: Number(it.quantity) || 0,
+        unitPrice: Number(it.unitPrice) || 0,
+      }))
+      .filter(it => it.name && (it.quantity * it.unitPrice) > 0)
+      .map(it => ({ ...it, total: +(it.quantity * it.unitPrice).toFixed(2) }));
+
+    if (cleanedItems.length === 0) {
+      setCreateError('Add at least one line item with a description and an amount.');
+      return;
+    }
+
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const subtotal = cleanedItems.reduce((s, it) => s + it.total, 0);
+      const invoiceNumber = nextInvoiceNumber();
+
+      const newInvoice = await addInvoice({
+        jobId: null,
+        quoteId: null,
+        customerId: blankCustomerId,
+        invoiceNumber,
+        status: 'unpaid',
+        subtotal,
+        taxRate: 0,
+        tax: 0,
+        total: subtotal,
+        amountPaid: 0,
+        items: cleanedItems,
+        dueDate: blankDueDate,
+        paidDate: null,
+        notes: blankNotes.trim() || '',
+      });
+
+      handleCloseCreateModal();
+      showToast('success', `Invoice ${newInvoice?.invoiceNumber || invoiceNumber} created`);
+    } catch (err) {
+      console.error('Error creating blank invoice:', err);
+      setCreateError(err?.message || 'Could not create the invoice. Check your connection and try again.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="page animate-fade-in">
       <div className="page-header">
         <div className="page-header-left">
           <h1>Invoices</h1>
-          <p>Track payments and billing for completed jobs.</p>
+          <p>Bill completed jobs or send a blank invoice to anyone (subcontract days, ad-hoc charges, etc.).</p>
         </div>
         <div className="page-header-actions">
           <button className="btn btn-primary" onClick={handleOpenCreateModal}>
@@ -286,7 +396,7 @@ export default function InvoicesPage() {
                     <div>
                       <Receipt size={48} style={{ opacity: 0.3, marginBottom: '12px' }} />
                       <p style={{ fontWeight: 600, marginBottom: '4px' }}>No invoices yet</p>
-                      <p style={{ fontSize: '0.82rem' }}>Complete a job and create your first invoice.</p>
+                      <p style={{ fontSize: '0.82rem' }}>Click <strong>Create Invoice</strong> above — bill a completed job or send a blank invoice to anyone.</p>
                     </div>
                   ) : 'No invoices match your filters.'}
                 </td>
@@ -298,56 +408,248 @@ export default function InvoicesPage() {
 
       {/* Create Invoice Modal */}
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => !creating && setShowCreateModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+        <div className="modal-overlay" onClick={handleCloseCreateModal}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
             <div className="modal-header">
               <h2><Receipt size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Create Invoice</h2>
-              <button className="btn btn-icon btn-ghost" onClick={() => setShowCreateModal(false)}><X size={20} /></button>
+              <button className="btn btn-icon btn-ghost" onClick={handleCloseCreateModal}><X size={20} /></button>
             </div>
             <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Select Completed Job <span className="required">*</span></label>
-                {invoiceableJobs.length === 0 ? (
-                  <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', fontSize: '0.85rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
-                    No completed jobs without invoices.
-                  </div>
-                ) : (
-                  <div className="quote-picker-list">
-                    {invoiceableJobs.map(job => {
-                      const customer = job.customerId ? getCustomer(job.customerId) : null;
-                      const quote = job.quoteId ? getQuote(job.quoteId) : null;
-                      const billable = Number(job.revenue || job.total || quote?.total || 0);
-                      const depositPaid = quote?.depositPaidAt
-                        ? computeQuoteDeposit(quote)
-                        : 0;
-                      const isSelected = selectedJobId === job.id;
-                      return (
-                        <button
-                          key={job.id}
-                          className={`quote-picker-item ${isSelected ? 'active' : ''}`}
-                          onClick={() => setSelectedJobId(job.id)}
-                        >
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{job.title}</div>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
-                              {customer ? `${customer.firstName} ${customer.lastName || ''}` : 'No customer'}
-                              {quote ? ` • Quote #${quote.quoteNumber}` : ''}
-                            </div>
-                            {depositPaid > 0 && (
-                              <div style={{ fontSize: '0.72rem', color: 'var(--status-success)', marginTop: '2px', fontWeight: 600 }}>
-                                ✓ Deposit credit: {formatCurrency(depositPaid)} → balance {formatCurrency(Math.max(0, billable - depositPaid))}
-                              </div>
-                            )}
-                          </div>
-                          <div style={{ fontWeight: 800, color: 'var(--lucky-green-light)', fontSize: '0.95rem' }}>
-                            {formatCurrency(billable)}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              {/* Mode switcher */}
+              <div className="tabs" style={{ marginBottom: 'var(--space-lg)' }}>
+                <button
+                  type="button"
+                  className={`tab ${mode === 'job' ? 'active' : ''}`}
+                  onClick={() => { setMode('job'); setCreateError(null); }}
+                  disabled={creating}
+                >
+                  <Briefcase size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                  From a completed job
+                </button>
+                <button
+                  type="button"
+                  className={`tab ${mode === 'blank' ? 'active' : ''}`}
+                  onClick={() => { setMode('blank'); setCreateError(null); }}
+                  disabled={creating}
+                >
+                  <FileText size={14} style={{ marginRight: '6px', verticalAlign: 'middle' }} />
+                  Blank invoice
+                </button>
               </div>
+
+              {mode === 'job' && (
+                <div className="form-group">
+                  <label className="form-label">Select Completed Job <span className="required">*</span></label>
+                  {invoiceableJobs.length === 0 ? (
+                    <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', fontSize: '0.85rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                      No completed jobs without invoices. Switch to <strong>Blank invoice</strong> above to bill anyone directly (subcontract days, ad-hoc charges, etc.).
+                    </div>
+                  ) : (
+                    <div className="quote-picker-list">
+                      {invoiceableJobs.map(job => {
+                        const customer = job.customerId ? getCustomer(job.customerId) : null;
+                        const quote = job.quoteId ? getQuote(job.quoteId) : null;
+                        const billable = Number(job.revenue || job.total || quote?.total || 0);
+                        const depositPaid = quote?.depositPaidAt
+                          ? computeQuoteDeposit(quote)
+                          : 0;
+                        const isSelected = selectedJobId === job.id;
+                        return (
+                          <button
+                            key={job.id}
+                            className={`quote-picker-item ${isSelected ? 'active' : ''}`}
+                            onClick={() => setSelectedJobId(job.id)}
+                          >
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700, fontSize: '0.85rem' }}>{job.title}</div>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)' }}>
+                                {customer ? `${customer.firstName} ${customer.lastName || ''}` : 'No customer'}
+                                {quote ? ` • Quote #${quote.quoteNumber}` : ''}
+                              </div>
+                              {depositPaid > 0 && (
+                                <div style={{ fontSize: '0.72rem', color: 'var(--status-success)', marginTop: '2px', fontWeight: 600 }}>
+                                  ✓ Deposit credit: {formatCurrency(depositPaid)} → balance {formatCurrency(Math.max(0, billable - depositPaid))}
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ fontWeight: 800, color: 'var(--lucky-green-light)', fontSize: '0.95rem' }}>
+                              {formatCurrency(billable)}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {mode === 'blank' && (
+                <>
+                  <div className="form-group">
+                    <label className="form-label">Customer <span className="required">*</span></label>
+                    {customers.length === 0 ? (
+                      <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', fontSize: '0.85rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                        No customers yet. Add one from the <Link href="/customers" style={{ color: 'var(--lucky-green-light)', fontWeight: 700 }}>Customers</Link> page first.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="search-input-wrap" style={{ marginBottom: 'var(--space-sm)' }}>
+                          <Search size={16} />
+                          <input
+                            className="search-input"
+                            placeholder="Search customers (GCs shown first)..."
+                            value={blankCustomerSearch}
+                            onChange={e => setBlankCustomerSearch(e.target.value)}
+                          />
+                        </div>
+                        <div className="quote-picker-list" style={{ maxHeight: '220px', overflowY: 'auto' }} data-menu-scroll>
+                          {sortedCustomers.slice(0, 50).map(c => {
+                            const meta = customerTypeMeta(c.customerType);
+                            const isSelected = blankCustomerId === c.id;
+                            const displayName = `${c.firstName || ''} ${c.lastName || ''}`.trim() || 'Unnamed';
+                            return (
+                              <button
+                                key={c.id}
+                                className={`quote-picker-item ${isSelected ? 'active' : ''}`}
+                                onClick={() => setBlankCustomerId(c.id)}
+                              >
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 700, fontSize: '0.85rem' }}>
+                                    {displayName}
+                                    {c.customerType && c.customerType !== 'homeowner' && (
+                                      <span className={`tag ${meta.tone || ''}`} style={{ fontSize: '0.65rem' }}>{meta.short}</span>
+                                    )}
+                                  </div>
+                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                                    {c.email || c.phone || '—'}
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                          {sortedCustomers.length === 0 && (
+                            <div style={{ padding: 'var(--space-md)', fontSize: '0.82rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>
+                              No customers match your search.
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Line Items <span className="required">*</span></label>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '-4px', marginBottom: 'var(--space-sm)' }}>
+                      Billing by day? Use Qty = number of days and Rate = day rate (e.g. 5 × $750 = $3,750).
+                    </p>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+                      {blankItems.map((item, idx) => {
+                        const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 70px 110px auto auto',
+                              gap: '6px',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <input
+                              className="form-input"
+                              placeholder="Description (e.g. Subcontract labor — May 11-15)"
+                              value={item.name}
+                              onChange={e => updateBlankItem(idx, { name: e.target.value })}
+                            />
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="0"
+                              step="any"
+                              placeholder="Qty"
+                              value={item.quantity}
+                              onChange={e => updateBlankItem(idx, { quantity: e.target.value })}
+                              style={{ textAlign: 'right' }}
+                            />
+                            <input
+                              className="form-input"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="Rate"
+                              value={item.unitPrice}
+                              onChange={e => updateBlankItem(idx, { unitPrice: e.target.value })}
+                              style={{ textAlign: 'right' }}
+                            />
+                            <div style={{ minWidth: '80px', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem' }}>
+                              {formatCurrency(lineTotal)}
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-icon btn-ghost"
+                              onClick={() => removeBlankItem(idx)}
+                              disabled={blankItems.length === 1}
+                              title={blankItems.length === 1 ? 'At least one line required' : 'Remove line'}
+                              style={{ opacity: blankItems.length === 1 ? 0.3 : 1 }}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                      <button type="button" className="btn btn-secondary btn-sm" onClick={() => addBlankItem()}>
+                        <Plus size={14} /> Add line
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => addBlankItem({ name: 'Subcontract labor — day rate', quantity: 1, unitPrice: 0 })}
+                        title="Pre-fills a day-rate line you just fill in"
+                      >
+                        <CalendarDays size={14} /> Add day-rate line
+                      </button>
+                    </div>
+                    <div style={{
+                      marginTop: 'var(--space-md)',
+                      padding: 'var(--space-md)',
+                      background: 'var(--bg-elevated)',
+                      borderRadius: 'var(--radius-md)',
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    }}>
+                      <span style={{ fontWeight: 700 }}>Invoice Total</span>
+                      <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--lucky-green-light)' }}>
+                        {formatCurrency(blankSubtotal)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+                    <div className="form-group">
+                      <label className="form-label">Due Date</label>
+                      <input
+                        type="date"
+                        className="form-input"
+                        value={blankDueDate}
+                        onChange={e => setBlankDueDate(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label">Notes (shown on the invoice & pay page)</label>
+                    <textarea
+                      className="form-input"
+                      rows={2}
+                      placeholder="Optional. e.g. Payable Net 30 — Venmo @luckylandscapes or call to arrange."
+                      value={blankNotes}
+                      onChange={e => setBlankNotes(e.target.value)}
+                    />
+                  </div>
+                </>
+              )}
+
               {createError && (
                 <div style={{
                   marginTop: 'var(--space-md)',
@@ -363,10 +665,20 @@ export default function InvoicesPage() {
               )}
             </div>
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={() => setShowCreateModal(false)} disabled={creating}>Cancel</button>
-              <button className="btn btn-primary" onClick={handleCreateInvoice} disabled={!selectedJobId || creating}>
-                {creating ? <><Loader2 size={16} className="spin" /> Creating...</> : <><Receipt size={16} /> Create Invoice</>}
-              </button>
+              <button className="btn btn-secondary" onClick={handleCloseCreateModal} disabled={creating}>Cancel</button>
+              {mode === 'job' ? (
+                <button className="btn btn-primary" onClick={handleCreateInvoice} disabled={!selectedJobId || creating}>
+                  {creating ? <><Loader2 size={16} className="spin" /> Creating...</> : <><Receipt size={16} /> Create Invoice</>}
+                </button>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={handleCreateBlankInvoice}
+                  disabled={!blankCustomerId || blankSubtotal <= 0 || creating}
+                >
+                  {creating ? <><Loader2 size={16} className="spin" /> Creating...</> : <><Receipt size={16} /> Create Invoice ({formatCurrency(blankSubtotal)})</>}
+                </button>
+              )}
             </div>
           </div>
         </div>
