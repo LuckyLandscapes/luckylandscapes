@@ -47,6 +47,18 @@ prefix is a sort key, not a uniqueness guarantee.
 | 032 | `032_selected_materials.sql` | Adds `selected_materials` JSONB to quotes + contracts (visual material approval, no prices) |
 | 033 | `033_subcontract_support.sql` | `customers.customer_type` (homeowner/business/general_contractor); `jobs.work_authorization` (contract/subcontract/verbal) + work-order proof + site contact for sub work |
 | 034 | `034_payroll_classification.sql` | `team_members.payroll_classification` (`w2_employee` / `1099_contractor` / `owner_excluded`). Drives whether the /team page applies employer-side payroll burden (FICA + FUTA + SUTA + WC). Org-level WC config lives in the existing `organizations.settings` JSONB — no schema change there. |
+| 035 | `035_deposit_options.sql` | `deposit_type` + `deposit_percentage` on quotes + contracts (percentage-of-total deposit mode alongside the legacy materials+delivery sum) |
+| 036 | `036_quote_total_includes_delivery.sql` | One-shot backfill: `quotes.total = total + delivery_fee` so `quote.total` is the customer-facing grand total |
+| 037 | `037_team_member_dob.sql` | `team_members.date_of_birth` for FLSA child-labor compliance flags |
+| 038 | `038_backfill_payment_rows.sql` | One-shot backfill: synthesize a `payments` row for every invoice with `amount_paid > 0` and no payment history (fixes legacy "Mark Paid") |
+| 039 | `039_marketing_gallery.sql` | `marketing_gallery` table + public `marketing-gallery` Storage bucket (drives luckylandscapes.com/gallery) |
+| 040 | `040_marketing_gallery_featured.sql` | `is_featured` on `marketing_gallery` (homepage "Featured Work" curation) |
+| 041 | `041_marketing_gallery_project_grouping.sql` | `project_name` on `marketing_gallery` (photos sharing a value collapse into one project card) |
+| 042 | `042_marketing_gallery_cover_and_sort.sql` | `is_cover` + partial unique index (one cover per project) + one-shot `sort_order` respacing |
+| 043 | `043_marketing_categories.sql` | `marketing_categories` table — per-org category metadata (visibility, cover, display name, icon, sort); backfill all-hidden |
+| 044 | `044_marketing_images.sql` | `marketing_images` table — per-org overrides for fixed image slots on the marketing site (service-page feature images). Reuses the `marketing-gallery` bucket under `<orgId>/slots/`. |
+
+> **Prefix 028 was deliberately skipped.** The list jumps 027 → 029.
 
 > **Files 001 and 002 overlap.** Both create base tables. Run 001 first — its
 > `CREATE TABLE IF NOT EXISTS` statements prevent conflicts when 002 runs.

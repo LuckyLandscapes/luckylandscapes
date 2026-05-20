@@ -1110,6 +1110,57 @@ async function loadMarketingGalleryFromLuckyapp() {
 loadMarketingGalleryFromLuckyapp();
 
 // ============================================
+// EDITABLE IMAGE SLOTS (luckyapp-managed)
+// ============================================
+// Certain page graphics (the service-page "Why Lucky Landscapes" feature
+// images) are tagged <img data-ll-img="<slot_key>">. Riley swaps them from
+// luckyapp's "Website Images" page; this fetches the override map and replaces
+// the src/alt at load. The bundled image is the fallback — if luckyapp is
+// unreachable or a slot has no override, the static image stays. Same
+// resilience model as the gallery loader above.
+const MARKETING_IMAGES_URL = 'https://app.luckylandscapes.com/api/marketing/images';
+
+async function loadMarketingImagesFromLuckyapp() {
+    const els = document.querySelectorAll('[data-ll-img]');
+    if (!els.length) return;  // page has no editable slots — nothing to do
+
+    let res;
+    try {
+        res = await fetch(MARKETING_IMAGES_URL, { cache: 'no-store' });
+    } catch (err) {
+        console.warn('[images] remote fetch failed (network) — using static images', err);
+        return;
+    }
+    if (!res.ok) {
+        console.warn('[images] remote fetch returned', res.status, '— using static images');
+        return;
+    }
+
+    let json;
+    try {
+        json = await res.json();
+    } catch (err) {
+        console.warn('[images] remote response was not JSON — using static images', err);
+        return;
+    }
+
+    const slots = (json && json.slots) || {};
+    let applied = 0;
+    els.forEach(el => {
+        const key = el.getAttribute('data-ll-img');
+        const slot = key && slots[key];
+        if (slot && slot.url) {
+            el.src = slot.url;
+            if (slot.alt) el.alt = slot.alt;
+            applied++;
+        }
+    });
+    if (applied) console.info(`[images] applied ${applied} luckyapp image override${applied === 1 ? '' : 's'}`);
+}
+
+loadMarketingImagesFromLuckyapp();
+
+// ============================================
 // GALLERY PAGE — Project Collections
 // ============================================
 // Uses projectData (defined above) to render collection cards on the gallery page.
