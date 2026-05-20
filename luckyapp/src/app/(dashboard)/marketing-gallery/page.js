@@ -278,6 +278,9 @@ export default function MarketingGalleryPage() {
   const [loading, setLoading] = useState(true);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  // Holds the section being edited at the PROJECT level (rename + shared
+  // description applied to every photo in it). Null = no project edit open.
+  const [editingProject, setEditingProject] = useState(null);
   const [filterTag, setFilterTag] = useState('');
   // Categories drive the public site's gallery landing tiles. Loaded
   // once at mount, refreshed after the Manage Categories modal closes or
@@ -487,6 +490,44 @@ export default function MarketingGalleryPage() {
       .update({ is_cover: true, updated_at: new Date().toISOString() })
       .eq('id', item.id);
     if (error) { alert('Cover update failed: ' + error.message); await loadItems(); }
+  };
+
+  // Project-level save: rename a whole project and/or set its shared
+  // description on EVERY photo in the section at once. Matched by photo id
+  // (not the old name string) so a mid-edit typo can't orphan rows.
+  // `applyDescription` lets the caller rename without overwriting per-photo
+  // descriptions when they didn't touch the description field.
+  const handleSaveProject = async (section, { name, description, applyDescription }) => {
+    const newName = (name || '').trim();
+    if (!newName) { alert('Project name required.'); return { ok: false }; }
+    const ids = section.items.map(it => it.id);
+    if (!ids.length) return { ok: false };
+
+    // Cover-uniqueness guard: if we're merging into a name that ALREADY has a
+    // cover among photos NOT in this section, the partial unique index
+    // (org_id, project_name) WHERE is_cover would reject a second cover. Clear
+    // is_cover on the photos we're moving first so the existing cover wins.
+    const targetHasExternalCover = items.some(it =>
+      !ids.includes(it.id) && (it.project_name || '') === newName && it.is_cover
+    );
+    if (targetHasExternalCover) {
+      const { error: clearErr } = await supabase
+        .from('marketing_gallery')
+        .update({ is_cover: false, updated_at: new Date().toISOString() })
+        .in('id', ids);
+      if (clearErr) { alert('Save failed: ' + clearErr.message); return { ok: false }; }
+    }
+
+    const patch = { project_name: newName, updated_at: new Date().toISOString() };
+    if (applyDescription) patch.description = (description || '').trim() || null;
+
+    const { error } = await supabase
+      .from('marketing_gallery')
+      .update(patch)
+      .in('id', ids);
+    if (error) { alert('Save failed: ' + error.message); return { ok: false }; }
+    await loadItems();
+    return { ok: true };
   };
 
   // Move an entire project section up or down in the global display order.
@@ -799,6 +840,7 @@ export default function MarketingGalleryPage() {
                 totalSections={sections.length}
                 onMoveSectionUp={() => handleMoveSection(section.id, 'up')}
                 onMoveSectionDown={() => handleMoveSection(section.id, 'down')}
+                onEditProject={() => setEditingProject(section)}
                 onEdit={(item) => setEditingId(item.id)}
                 onDelete={handleDelete}
                 onTogglePublish={handleTogglePublish}
@@ -832,6 +874,20 @@ export default function MarketingGalleryPage() {
           onCategoriesChanged={loadCategories}
           onClose={() => setEditingId(null)}
           onSaved={async () => { setEditingId(null); await loadItems(); }}
+        />
+      )}
+
+      {editingProject && (
+        <EditProjectModal
+          // Re-resolve the section from current items so the photo count /
+          // names are fresh even if something changed under it.
+          section={editingProject}
+          onClose={() => setEditingProject(null)}
+          onSave={async (payload) => {
+            const res = await handleSaveProject(editingProject, payload);
+            if (res?.ok) setEditingProject(null);
+            return res;
+          }}
         />
       )}
 
@@ -871,7 +927,7 @@ function EmptyState({ onUpload, hasItems }) {
 // so drops on whitespace land in the right section.
 function ProjectSection({
   section, sectionIdx, totalSections,
-  onMoveSectionUp, onMoveSectionDown,
+  onMoveSectionUp, onMoveSectionDown, onEditProject,
   onEdit, onDelete, onTogglePublish, onToggleFeatured, onSetCover,
 }) {
   const itemIds = section.items.map(it => it.id);
@@ -910,6 +966,15 @@ function ProjectSection({
         </span>
         {showSectionArrows && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: '.25rem' }}>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              onClick={onEditProject}
+              title="Rename this project and edit its shared description (applies to every photo)"
+              style={{ padding: '.3rem .55rem', gap: '.3rem' }}
+            >
+              <Edit3 size={13} /> Edit project
+            </button>
             <button
               type="button"
               className="btn btn-ghost btn-sm"
@@ -2163,6 +2228,167 @@ function EditModal({ item, categories: dynamicCategories, onCategoriesChanged, o
                 <Plus size={13} /> Add
               </button>
             </div>
+          </div>
+        </div>
+        <footer style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? <><Loader2 size={16} className="spin" /> Saving…</> : <><Save size={16} /> Save</>}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+// Project-level editor. Renames a whole project (every photo at once) and
+// edits the ONE description the project shares on the public site. The AI
+// hint->write flow mirrors the upload modal: type a few words, get polished
+// copy. Description is only written to the photos if the user actually
+// engaged the field, so a pure rename never clobbers per-photo descriptions.
+function EditProjectModal({ section, onClose, onSave }) {
+  const items = section?.items || [];
+  // Current shared description: prefill when every photo already agrees;
+  // start blank (and warn) when they diverge.
+  const distinctDescs = Array.from(new Set(items.map(it => (it.description || '').trim()).filter(Boolean)));
+  const descsVary = distinctDescs.length > 1;
+  const initialDesc = distinctDescs.length === 1 ? distinctDescs[0] : '';
+
+  const [name, setName] = useState(section?.name || '');
+  const [description, setDescription] = useState(initialDesc);
+  const [touchedDesc, setTouchedDesc] = useState(false);
+  const [hint, setHint] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiUnavailable, setAiUnavailable] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const orgId = items[0]?.org_id;
+  const existingProjectNames = useExistingProjectNames(orgId);
+  // The category gives the AI context; use the most common first tag.
+  const category = items[0]?.tags?.[0] || '';
+  const photoCount = items.length;
+  const cover = items.find(it => it.is_cover) || items[0];
+
+  // Warn when the typed name matches a DIFFERENT existing project — saving
+  // would merge the two. Allowed (and handled by the cover guard), but worth
+  // flagging so it isn't a surprise.
+  const trimmedName = name.trim();
+  const willMerge = trimmedName
+    && trimmedName.toLowerCase() !== (section?.name || '').toLowerCase()
+    && existingProjectNames.some(n => n.toLowerCase() === trimmedName.toLowerCase());
+
+  const updateDescription = (val) => { setDescription(val); setTouchedDesc(true); };
+
+  const writeDescription = async () => {
+    if (aiLoading || !hint.trim()) return;
+    setAiLoading(true);
+    try {
+      const suggestion = await fetchAiSuggestion(null, {
+        model: readPreferredModel(),
+        mode: 'project',
+        hint: hint.trim(),
+        projectName: trimmedName,
+        category,
+      });
+      if (suggestion === null) { setAiUnavailable(true); return; }
+      if (suggestion.description) updateDescription(suggestion.description);
+    } catch (err) {
+      console.error('[edit-project-desc] failed', err);
+      alert("Couldn't write the description: " + (err.message || 'unknown error'));
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!trimmedName) { alert('Project name required.'); return; }
+    setSaving(true);
+    await onSave({ name: trimmedName, description, applyDescription: touchedDesc });
+    setSaving(false);
+  };
+
+  if (!section) return null;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 1.5rem', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '.5rem' }}>
+            <FolderOpen size={20} style={{ color: 'var(--accent)' }} /> Edit Project
+          </h2>
+          <button className="btn btn-icon btn-ghost" onClick={onClose}><X size={18} /></button>
+        </header>
+        <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '.75rem' }}>
+            {cover?.image_url && (
+              <img src={cover.image_url} alt="" style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
+            )}
+            <p style={{ margin: 0, fontSize: '.82rem', color: 'var(--text-secondary)' }}>
+              Changes apply to all <strong>{photoCount}</strong> {photoCount === 1 ? 'photo' : 'photos'} in this project.
+            </p>
+          </div>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '.3rem' }}>
+            <span style={{ fontSize: '.8rem', fontWeight: 600 }}>Project name</span>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              list="edit-project-name-list"
+              style={{ padding: '.6rem .8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}
+            />
+            <datalist id="edit-project-name-list">
+              {existingProjectNames.map(n => <option key={n} value={n} />)}
+            </datalist>
+            {willMerge && (
+              <span style={{ fontSize: '.72rem', color: 'var(--status-warning, #d97706)' }}>
+                ⚠ A project named “{trimmedName}” already exists — saving will merge these {photoCount} photos into it.
+              </span>
+            )}
+          </label>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
+            <span style={{ fontSize: '.8rem', fontWeight: 600 }}>
+              Shared description <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(every photo in the project uses this)</span>
+            </span>
+            {descsVary && !touchedDesc && (
+              <span style={{ fontSize: '.72rem', color: 'var(--status-warning, #d97706)' }}>
+                ⚠ These photos currently have different descriptions. Type or write one below to unify them — otherwise they’re left as-is.
+              </span>
+            )}
+            {aiUnavailable ? (
+              <span style={{ fontSize: '.72rem', color: 'var(--text-tertiary)' }}>
+                AI auto-fill isn’t configured — type the description manually.
+              </span>
+            ) : (
+              <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                <input
+                  type="text"
+                  placeholder="Type a few words — e.g. ‘mulch refresh on established beds’"
+                  value={hint}
+                  onChange={e => setHint(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); writeDescription(); } }}
+                  style={{ flex: 1, padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem' }}
+                />
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={writeDescription}
+                  disabled={aiLoading || !hint.trim()}
+                  title="Turn your notes into a polished description for the whole project"
+                  style={{ flexShrink: 0, gap: '.35rem', whiteSpace: 'nowrap' }}
+                >
+                  {aiLoading ? <><Loader2 size={13} className="spin" /> Writing…</> : <><Sparkles size={13} /> Write</>}
+                </button>
+              </div>
+            )}
+            <textarea
+              value={description}
+              onChange={e => updateDescription(e.target.value)}
+              rows={4}
+              placeholder="The shared project description. Type it yourself or use the AI writer above."
+              style={{ padding: '.6rem .8rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', resize: 'vertical', fontSize: '.9rem' }}
+            />
           </div>
         </div>
         <footer style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end', gap: '.5rem' }}>
