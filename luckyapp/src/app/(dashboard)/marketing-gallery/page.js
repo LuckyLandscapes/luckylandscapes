@@ -72,11 +72,12 @@ const MARKETING_GALLERY_URL = 'https://luckylandscapes.com/gallery';
 
 // Gemini model options offered in the upload-modal AI picker. Keep in sync
 // with the server-side GEMINI_ALLOWED set in /api/marketing/gallery/suggest.
-// Order = how they appear in the dropdown. Cheapest first.
+// GA / generally-available models ONLY — preview models are gated on
+// free-tier keys and silently fail, which is what made "half the models not
+// work". Order = how they appear in the dropdown.
 const GEMINI_MODEL_OPTIONS = [
-  { id: 'gemini-3.1-flash-lite',   label: 'Flash Lite (cheapest)',   hint: '$0.25 / $1.50 per MTok · fast, accurate enough for captions' },
-  { id: 'gemini-3-flash-preview',  label: 'Flash (smarter)',         hint: '$0.50 / $3.00 per MTok · better writing quality' },
-  { id: 'gemini-3.1-pro-preview',  label: 'Pro (SOTA)',              hint: '$2.00 / $12.00 per MTok · best, slowest, ~$0.005/photo' },
+  { id: 'gemini-3.1-flash-lite', label: 'Fast (default)',     hint: 'Quick and reliable — great for photo titles and tags' },
+  { id: 'gemini-2.5-flash',      label: 'Better writing',     hint: 'Slower, but writes nicer project descriptions' },
 ];
 const GEMINI_DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 const GEMINI_MODEL_STORAGE_KEY = 'lucky_gallery_ai_model';
@@ -146,14 +147,20 @@ function fileToBase64(file) {
 }
 
 // Call the AI suggest endpoint. Returns null if not configured (so the UI
-// can hide the auto-fill button) or throws for any other failure. Pass the
-// user's preferred model so the server runs the right tier (Flash Lite by
-// default, Pro / Flash on opt-in).
-async function fetchAiSuggestion(file, model) {
-  // Compress first so we send the same ~300KB the eventual upload will use —
-  // makes the AI call cheaper and faster.
-  const compressed = await compressImage(file);
-  const base64 = await fileToBase64(compressed);
+// can hide the auto-fill button) or throws for any other failure.
+//   file  — the photo to analyze, or null for a text-only project description.
+//   opts  — { model, mode: 'photo'|'project', hint, projectName, category }.
+//           `hint` is anything the user already typed; the server expands it
+//           into proper copy instead of ignoring it.
+async function fetchAiSuggestion(file, opts = {}) {
+  const { model, mode = 'photo', hint = '', projectName = '', category = '' } = opts;
+  let base64;
+  if (file) {
+    // Compress first so we send the same ~300KB the eventual upload will use —
+    // makes the AI call cheaper and faster.
+    const compressed = await compressImage(file);
+    base64 = await fileToBase64(compressed);
+  }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) throw new Error('Not signed in.');
   const res = await fetch('/api/marketing/gallery/suggest', {
@@ -162,7 +169,14 @@ async function fetchAiSuggestion(file, model) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${session.access_token}`,
     },
-    body: JSON.stringify({ imageBase64: base64, model: model || undefined }),
+    body: JSON.stringify({
+      imageBase64: base64 || undefined,
+      model: model || undefined,
+      mode,
+      hint: hint || undefined,
+      projectName: projectName || undefined,
+      category: category || undefined,
+    }),
   });
   if (res.status === 503) {
     // Not configured — caller treats this as "feature disabled".
@@ -1166,6 +1180,14 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
   // batch gets the same project_name and they group into ONE card on the
   // public site. Leave empty and each photo is its own card.
   const [projectName, setProjectName] = useState('');
+  // When a project name is set, the whole project shares ONE description
+  // instead of a per-photo blurb. `projectHint` is the few words Riley types;
+  // "Write description" expands it (via AI) into `projectDescription`, which
+  // is then written to every photo in the batch on upload.
+  const [projectHint, setProjectHint] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [projectDescLoading, setProjectDescLoading] = useState(false);
+  const inProject = !!projectName.trim();
   // Per-file form state. After picking files we generate one "pending"
   // entry per file with editable title/tags/description before uploading.
   const [pending, setPending] = useState([]); // { file, preview, title, description, tags, before, beforeFile, beforePreview, error, uploading, done, aiLoading }
@@ -1240,10 +1262,15 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
     if (!p || p.done || p.uploading || p.aiLoading) return;
     updateAt(i, { aiLoading: true, error: null });
     try {
-      const suggestion = await fetchAiSuggestion(p.file, aiModel);
+      const suggestion = await fetchAiSuggestion(p.file, {
+        model: aiModel,
+        mode: 'photo',
+        hint: p.description.trim(),  // expand whatever Riley already typed
+        category,
+      });
       if (suggestion === null) {
         setAiAvailable(false);
-        updateAt(i, { aiLoading: false, error: 'AI auto-fill is not configured (set ANTHROPIC_API_KEY in Vercel).' });
+        updateAt(i, { aiLoading: false, error: 'AI auto-fill is not configured (set GEMINI_API_KEY or ANTHROPIC_API_KEY in Vercel).' });
         return;
       }
       setAiAvailable(true);
@@ -1252,7 +1279,9 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
       updateAt(i, {
         aiLoading: false,
         title: suggestion.title || p.title,
-        description: suggestion.description || p.description,
+        // In a project the description is shared (written once at project
+        // level), so per-photo auto-fill only touches title + tags.
+        ...(inProject ? {} : { description: suggestion.description || p.description }),
         tags: mergedTags,
       });
     } catch (err) {
@@ -1274,18 +1303,19 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
         if (item.done || item.hasTitle) continue;
         updateAt(item.idx, { aiLoading: true, error: null });
         try {
-          const suggestion = await fetchAiSuggestion(item.file, aiModel);
+          const suggestion = await fetchAiSuggestion(item.file, { model: aiModel, mode: 'photo', category });
           if (suggestion === null) {
             stillAvailable = false;
             setAiAvailable(false);
-            updateAt(item.idx, { aiLoading: false, error: 'AI auto-fill is not configured (set ANTHROPIC_API_KEY in Vercel).' });
+            updateAt(item.idx, { aiLoading: false, error: 'AI auto-fill is not configured (set GEMINI_API_KEY or ANTHROPIC_API_KEY in Vercel).' });
             break;
           }
           const mergedTags = Array.from(new Set([...item.tags, ...(suggestion.tags || [])]));
           updateAt(item.idx, {
             aiLoading: false,
             title: suggestion.title || '',
-            description: suggestion.description || '',
+            // Description is shared at project level in project mode.
+            ...(inProject ? {} : { description: suggestion.description || '' }),
             tags: mergedTags,
           });
         } catch (err) {
@@ -1294,6 +1324,35 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
       }
     } finally {
       setBulkAiLoading(false);
+    }
+  };
+
+  // Project mode: turn Riley's typed notes (+ a representative photo) into one
+  // polished description shared by every photo in the project.
+  const writeProjectDescription = async () => {
+    if (projectDescLoading) return;
+    setProjectDescLoading(true);
+    try {
+      const sample = pending.find(p => !p.done) || pending[0];
+      const suggestion = await fetchAiSuggestion(sample?.file || null, {
+        model: aiModel,
+        mode: 'project',
+        hint: projectHint.trim(),
+        projectName: projectName.trim(),
+        category,
+      });
+      if (suggestion === null) {
+        setAiAvailable(false);
+        alert('AI auto-fill is not configured (set GEMINI_API_KEY or ANTHROPIC_API_KEY in Vercel).');
+        return;
+      }
+      setAiAvailable(true);
+      if (suggestion.description) setProjectDescription(suggestion.description);
+    } catch (err) {
+      console.error('[ai-project-desc] failed', err);
+      alert("Couldn't write the description: " + (err.message || 'unknown error'));
+    } finally {
+      setProjectDescLoading(false);
     }
   };
 
@@ -1323,10 +1382,14 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
         before = await uploadGalleryImage(p.beforeFile, orgId);
       }
       const trimmedProject = projectName.trim() || null;
+      // Project photos share one description; standalone photos keep their own.
+      const rowDescription = trimmedProject
+        ? (projectDescription.trim() || null)
+        : (p.description.trim() || null);
       const { error } = await supabase.from('marketing_gallery').insert({
         org_id: orgId,
         title: p.title.trim(),
-        description: p.description.trim() || null,
+        description: rowDescription,
         tags: p.tags,
         image_url: main.url,
         image_path: main.path,
@@ -1573,6 +1636,54 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
             </p>
           </div>
 
+          {/* Shared project description — only when a project name is set.
+              Riley types a few words, AI expands them into proper copy, and
+              the same description is written to every photo in the project. */}
+          {inProject && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', background: 'var(--bg-elevated)', padding: '.85rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+              <label htmlFor="upload-project-desc-hint" style={{ fontSize: '.78rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '.4rem' }}>
+                <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+                Project description <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>(shared by every photo in this project)</span>
+              </label>
+              <div style={{ display: 'flex', gap: '.5rem', alignItems: 'flex-start' }}>
+                <textarea
+                  id="upload-project-desc-hint"
+                  placeholder="Type a few words — e.g. 'flagstone patio with a seating wall and fire pit, Belgard pavers, 3-day build'. The AI turns it into proper copy."
+                  value={projectHint}
+                  onChange={e => setProjectHint(e.target.value)}
+                  rows={2}
+                  style={{ flex: 1, padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem', resize: 'vertical', background: 'var(--bg-base, var(--bg-subtle))' }}
+                />
+                {aiAvailable !== false && (
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={writeProjectDescription}
+                    disabled={projectDescLoading || (!projectHint.trim() && pending.length === 0)}
+                    title="Turn your notes into a polished description for the whole project"
+                    style={{ flexShrink: 0, gap: '.35rem', whiteSpace: 'nowrap' }}
+                  >
+                    {projectDescLoading ? (
+                      <><Loader2 size={13} className="spin" /> Writing…</>
+                    ) : (
+                      <><Sparkles size={13} /> Write description</>
+                    )}
+                  </button>
+                )}
+              </div>
+              <textarea
+                placeholder="The finished description appears here — edit it however you like before uploading."
+                value={projectDescription}
+                onChange={e => setProjectDescription(e.target.value)}
+                rows={3}
+                style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem', resize: 'vertical' }}
+              />
+              <p style={{ margin: 0, fontSize: '.7rem', color: 'var(--text-tertiary)' }}>
+                Written to every photo in this project so the card reads the same throughout. Per-photo titles stay separate.
+              </p>
+            </div>
+          )}
+
           {pending.length === 0 ? (
             <div
               onDragOver={e => { e.preventDefault(); }}
@@ -1642,6 +1753,7 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
                   key={i}
                   pending={p}
                   aiAvailable={aiAvailable}
+                  projectMode={inProject}
                   primaryCategory={category}
                   availableTags={stepOneTiles.map(t => t.name)}
                   onChange={patch => updateAt(i, patch)}
@@ -1692,7 +1804,7 @@ function UploadModal({ orgId, categories: dynamicCategories, onCategoriesChanged
   );
 }
 
-function PendingUploadRow({ pending, aiAvailable, primaryCategory, availableTags, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
+function PendingUploadRow({ pending, aiAvailable, projectMode, primaryCategory, availableTags, onChange, onRemove, onToggleTag, onBeforeFile, onAiSuggest }) {
   const showAiButton = aiAvailable !== false && !pending.done;
   const [showMoreTags, setShowMoreTags] = useState(false);
   // Extra tags = anything beyond the wizard-picked category. Used to drive
@@ -1726,7 +1838,9 @@ function PendingUploadRow({ pending, aiAvailable, primaryCategory, availableTags
               className="btn btn-secondary"
               onClick={onAiSuggest}
               disabled={pending.aiLoading || pending.uploading}
-              title="Use AI to suggest a title, description, and tags from the photo"
+              title={projectMode
+                ? 'Use AI to suggest a title and tags from the photo (description is shared at project level)'
+                : 'Use AI to suggest a title, description, and tags from the photo'}
               style={{ flexShrink: 0, padding: '.45rem .7rem', fontSize: '.78rem', gap: '.3rem' }}
             >
               {pending.aiLoading ? (
@@ -1742,14 +1856,21 @@ function PendingUploadRow({ pending, aiAvailable, primaryCategory, availableTags
             ⚠ This shows on luckylandscapes.com — pick something descriptive your customers will recognize.
           </div>
         )}
-        <textarea
-          placeholder="Short description (optional)"
-          value={pending.description}
-          onChange={e => onChange({ description: e.target.value })}
-          disabled={pending.done || pending.uploading}
-          rows={2}
-          style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem', resize: 'vertical' }}
-        />
+        {projectMode ? (
+          <div style={{ fontSize: '.72rem', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '.3rem', padding: '.1rem 0' }}>
+            <Sparkles size={12} style={{ color: 'var(--accent)' }} />
+            Description is shared across the project — set it above.
+          </div>
+        ) : (
+          <textarea
+            placeholder="Short description (optional) — or type a few words and hit Auto-fill to expand them"
+            value={pending.description}
+            onChange={e => onChange({ description: e.target.value })}
+            disabled={pending.done || pending.uploading}
+            rows={2}
+            style={{ padding: '.5rem .7rem', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '.85rem', resize: 'vertical' }}
+          />
+        )}
         {/* Compact tag row — shows the picked category as a chip, plus
             optional extra tags. "+ more tags" expands the full picker. */}
         <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '.35rem' }}>
