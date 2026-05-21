@@ -120,6 +120,10 @@ async function process(file) {
   const before = await readFile(file, 'utf8');
   let html = before;
 
+  // Normalize a leftover starter-template default that shipped in the hand-authored
+  // <head> of every page. Idempotent — a no-op once fixed.
+  html = html.replace(/content="MyWebSite"/g, 'content="Lucky Landscapes"');
+
   // Remove any prior injection (current sentinel + any legacy versions).
   html = html.replace(SENTINEL_RE, '\n');
   for (const re of SENTINEL_LEGACY_RES) html = html.replace(re, '\n');

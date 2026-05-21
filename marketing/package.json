@@ -1,7 +1,7 @@
 {
   "name": "luckylandscapes",
   "version": "1.0.0",
-  "description": "Lucky Landscapes — Professional landscaping services in Southeast Nebraska",
+  "description": "Lucky Landscapes — Landscaping & hardscaping in Lincoln, NE",
   "main": "main.js",
   "scripts": {
     "dev": "vite",

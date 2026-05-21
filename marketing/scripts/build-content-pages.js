@@ -518,10 +518,8 @@ function areaSchema(area) {
                 description: area.description,
                 address: {
                     '@type': 'PostalAddress',
-                    streetAddress: '109 South Canopy Street',
                     addressLocality: 'Lincoln',
                     addressRegion: 'NE',
-                    postalCode: '68508',
                     addressCountry: 'US',
                 },
                 geo: { '@type': 'GeoCoordinates', latitude: 40.8136, longitude: -96.7026 },

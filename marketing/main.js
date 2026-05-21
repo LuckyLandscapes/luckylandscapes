@@ -1988,7 +1988,7 @@ if (qzCategoryBtns.length > 0) {
         const container = document.getElementById('confetti-container');
         if (!container) return;
         container.innerHTML = '';
-        const colors = ['#6B8E4E', '#8FAF72', '#B5CFA0', '#5A7A40', '#41a100', '#F7F5F0', '#FFD700'];
+        const colors = ['#6B8E4E', '#8FAF72', '#B5CFA0', '#5A7A40', '#E0B84C', '#F7F5F0', '#FFD700'];
         for (let i = 0; i < 60; i++) {
             const piece = document.createElement('div');
             piece.className = 'confetti-piece';

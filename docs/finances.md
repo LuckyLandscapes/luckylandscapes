@@ -20,7 +20,7 @@
 | Vehicles | $800/month | TODO |
 | Insurance | TODO | TODO |
 | Software / subscriptions | $288/month | TODO |
-| Marketing | ($2500/month + $500/month ) | TODO |
+| Marketing | $3,000/month | **This is Macoy's pay** (1099 via WE Media), covering ALL marketing + dev: website, SEO, content, photo/video, social. **NOT paid ad spend** — currently $0 goes to Google Ads / Local Services Ads / any paid traffic. Organic SEO + Google Business Profile + reviews + word-of-mouth referrals are the *entire* lead engine, which makes that work the only growth lever besides referrals. |
 | Owner draw / $48,000 | TODO | TODO |
 | Other overhead | shop rent $3500/month,  | TODO |
 
