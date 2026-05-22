@@ -81,8 +81,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/areas/south-lincoln">South Lincoln</a>
                     <a href="/areas/waverly">Waverly</a>
                     <a href="/areas/beatrice">Beatrice</a>
-                    <a href="/areas/seward">Seward</a>
-                    <a href="/areas/fairbury">Fairbury</a>
                 </div>
                 <div class="footer-nav">
                     <h4>Services</h4>

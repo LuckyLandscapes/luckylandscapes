@@ -73,8 +73,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/areas/south-lincoln">South Lincoln</a>
                     <a href="/areas/waverly">Waverly</a>
                     <a href="/areas/beatrice">Beatrice</a>
-                    <a href="/areas/seward">Seward</a>
-                    <a href="/areas/fairbury">Fairbury</a>
                 </div>
                 <div class="footer-nav">
                     <h4>Services</h4>
@@ -336,48 +334,6 @@ const AREAS = [
             { q: 'Do you do regular lawn maintenance in Beatrice?', a: 'No — the drive (45 min each way) doesn\'t work for weekly mowing. We focus on one-time and large project work. If you need recurring lawn service, a local Beatrice crew will serve you better.' },
             { q: 'What\'s the typical project minimum?', a: '$1,000. Most real landscape and hardscape projects are well above that. Travel costs are baked into normal pricing — no separate charges.' },
             { q: 'How long does a project visit usually take?', a: 'For a quote, we\'ll typically come out for 30-45 minutes to walk the property and discuss options. We come prepared with rough pricing for common project types so you get useful numbers, not a vague follow-up.' },
-        ],
-    },
-    {
-        slug: 'seward',
-        title: 'Seward NE Landscaping & Hardscape Projects — Lucky Landscapes',
-        description: 'Landscape design, hardscaping, and large project work in Seward, NE (68434). $1,000 minimum — Lincoln-based crew for patios, walls, and full property transformations.',
-        h1: 'Landscaping in <em class="highlight">Seward, NE</em>',
-        sub: 'Seward is about a 25-minute drive northwest of Lincoln — close enough to be worth the trip for real projects. Hardscape, design-build, garden beds, and full property cleanups for the Fourth of July City.',
-        zips: ['68434'],
-        intro: `<p>Seward is a great town to build in. Between the historic square, the Concordia University neighborhoods, and the older homes on the tree-lined streets near the courthouse, there\'s a lot of property here that deserves more than a builder-grade landscape — and a lot of homeowners who actually care about getting it right.</p>
-        <p>We don\'t do mowing in Seward — at 25 minutes out, weekly small-lot mows don\'t pencil out, and you\'ll be better served by a crew in town for that. But for a paver patio, retaining wall, garden bed overhaul, or a full property cleanup, we\'re happy to make the drive. We bring the same crew, the same base-prep standards, and the same Lincoln pricing — no inflated travel charges bolted on.</p>`,
-        whyHere: [
-            { icon: '🧱', title: 'Hardscape that fits the square', text: 'Seward\'s historic core has a brick-and-limestone character worth matching. For older homes near the courthouse we pick paver styles that look like they belong; for newer builds out toward the highway we lean cleaner and modern.' },
-            { icon: '🎓', title: 'Built for established yards', text: 'A lot of Seward homes around Concordia have mature trees and decades-old beds. We design around what\'s already great — re-edging, re-mulching, and replacing only what\'s tired — instead of bulldozing a yard that took 30 years to fill in.' },
-            { icon: '💰', title: '$1,000 minimum project size', text: 'The drive means we focus on real projects out here — no mowing, no $200 visits. But for any full patio, wall, bed install, or big cleanup, you get the same pricing our Lincoln customers do.' },
-        ],
-        services: ['hardscaping', 'landscape-design', 'garden-beds', 'property-cleanup'],
-        faqs: [
-            { q: 'Do you mow lawns in Seward?', a: 'No — at 25 minutes each way, recurring weekly mowing doesn\'t make sense, and a local Seward crew will serve you better and cheaper for that. We focus on project work: hardscape, design-build, garden beds, and large cleanups.' },
-            { q: 'What\'s the minimum project size for Seward?', a: '$1,000. Most real landscape and hardscape projects clear that easily — a small paver patio alone is usually several times that. Travel is baked into our normal pricing, so there\'s no separate trip fee on top.' },
-            { q: 'Can you work on the older homes near the square and Concordia?', a: 'Absolutely — that\'s some of our favorite work. Older Seward properties often have great bones (mature trees, established grades) and just need the hardscape and beds brought up to the same level. We match materials to the home\'s era rather than installing the same generic patio everywhere.' },
-        ],
-    },
-    {
-        slug: 'fairbury',
-        title: 'Fairbury NE Landscaping & Hardscape Projects — Lucky Landscapes',
-        description: 'Landscape design, hardscaping, and large project work in Fairbury, NE (68352). $1,000 minimum, big projects only — Lincoln-based crew willing to travel for the right job.',
-        h1: 'Landscaping in <em class="highlight">Fairbury, NE</em>',
-        sub: 'Fairbury is about a 50-mile drive from Lincoln — a real haul, so we save it for bigger projects. Hardscape, design-build, and full landscape transformations in Jefferson County.',
-        zips: ['68352'],
-        intro: `<p>Let\'s be straight about the distance: Fairbury is roughly an hour from our Lincoln base, down in Jefferson County. That\'s too far for us to do mowing or small one-off visits — the windshield time alone would cost you more than the work. So we don\'t pretend otherwise.</p>
-        <p>What we will drive out for is a real project. A paver patio, a retaining wall, a full landscape redesign, a big garden-bed install around an acreage — anything north of $1,000 where the scope justifies the trip. Fairbury has a lot of properties with room to work and the kind of history (the Rock Island Depot, the Oregon Trail country around town) that pairs well with hardscape done right. If you\'ve been getting quoted by out-of-town contractors who show up once and then vanish, we\'d rather earn one big project and do it properly than nickel-and-dime you on drive-by visits.</p>`,
-        whyHere: [
-            { icon: '🧱', title: 'Project work only — and that\'s the honest deal', text: 'At ~50 miles out, recurring service makes no sense. We come to Fairbury for patios, walls, walkways, and full redesigns — one trip, one real project, done to the same standard as anything we build in Lincoln.' },
-            { icon: '🚜', title: 'Acreage-ready', text: 'A lot of Jefferson County properties have space most in-town lots don\'t. We bring the equipment for larger excavation, bed installs, and full cleanups that a small local outfit may not be set up for.' },
-            { icon: '💰', title: '$1,000 minimum project size', text: 'The minimum keeps the trip worthwhile and lets us hold our normal Lincoln pricing instead of padding it with travel fees. Most full hardscape or design jobs are well past that anyway.' },
-        ],
-        services: ['hardscaping', 'landscape-design', 'garden-beds'],
-        faqs: [
-            { q: 'Do you really come all the way to Fairbury?', a: 'For the right project, yes. It\'s about an hour each way, so we\'re honest that this only works for bigger jobs — hardscape, design-build, and large bed or cleanup projects at $1,000 and up. We don\'t do mowing or small recurring work this far out.' },
-            { q: 'Why won\'t you mow or do small jobs out here?', a: 'Math. Two hours of round-trip driving for a $50 mow means you\'d be paying for the truck, not the work. A Fairbury-area crew will always beat us on price for routine maintenance. We\'d rather tell you that than overcharge you for a bad fit.' },
-            { q: 'How does the quote visit work given the distance?', a: 'We come prepared. Because we\'re not making a second casual trip, we walk the whole property in one visit (usually 30-45 minutes), talk through options on the spot, and follow up with a written estimate — typically with a few price points so you can see the trade-offs without us having to drive back out.' },
         ],
     },
 ];

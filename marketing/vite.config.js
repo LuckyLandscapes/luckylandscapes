@@ -26,8 +26,6 @@ export default defineConfig({
                 areaSouthLincoln: resolve(__dirname, 'areas/south-lincoln.html'),
                 areaWaverly: resolve(__dirname, 'areas/waverly.html'),
                 areaBeatrice: resolve(__dirname, 'areas/beatrice.html'),
-                areaSeward: resolve(__dirname, 'areas/seward.html'),
-                areaFairbury: resolve(__dirname, 'areas/fairbury.html'),
                 blogIndex: resolve(__dirname, 'blog/index.html'),
                 blogSpringLawn: resolve(__dirname, 'blog/spring-lawn-care-checklist-lincoln-ne.html'),
                 blogPaverCost: resolve(__dirname, 'blog/paver-patio-cost-lincoln-ne.html'),
