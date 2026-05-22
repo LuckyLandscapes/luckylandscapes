@@ -72,7 +72,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
                     <a href="/areas/south-lincoln">South Lincoln</a>
                     <a href="/areas/waverly">Waverly</a>
-                    <a href="/areas/beatrice">Beatrice</a>
                 </div>
                 <div class="footer-nav">
                     <h4>Services</h4>
@@ -313,27 +312,6 @@ const AREAS = [
             { q: 'Why is there a $500 minimum for Waverly?', a: 'It\'s a 15-minute drive from our Lincoln base. The minimum makes the trip worthwhile and lets us keep our hourly pricing the same as in-town. Most real landscape projects are well above that anyway.' },
             { q: 'Do you mow lawns in Waverly?', a: 'For larger acreages or as part of a multi-service contract, yes. We don\'t do single small-lot weekly mows in Waverly because the drive doesn\'t pencil out — but if you\'re bundling with cleanup or hardscape, we can include it.' },
             { q: 'How quickly can you start a project in Waverly?', a: 'Most cleanup and lawn jobs we can be on-site within the same week. Hardscape and design projects typically start 1-3 weeks out depending on the season and scope.' },
-        ],
-    },
-    {
-        slug: 'beatrice',
-        title: 'Beatrice NE Landscaping & Hardscape Projects — Lucky Landscapes',
-        description: 'Landscape design, hardscaping, and large project work in Beatrice, NE (68310). $1,000 minimum — Lincoln-based crew willing to travel for the right job.',
-        h1: 'Landscaping in <em class="highlight">Beatrice, NE</em>',
-        sub: 'Beatrice is a 45-minute drive from Lincoln — far enough that we focus on bigger projects out here. Hardscape, design-build, and full property transformations.',
-        zips: ['68310'],
-        intro: `<p>We don\'t do mowing in Beatrice — the drive is too long for small recurring jobs to make sense. But for a paver patio, retaining wall, full landscape redesign, or any project north of $1,000, we\'re happy to travel.</p>
-        <p>Beatrice has a lot of properties with mature trees, large lots, and the kind of yards that benefit from a real landscape investment. If you\'ve been getting the runaround from out-of-town contractors who quote you and then disappear, we\'d love to be your local-ish alternative.</p>`,
-        whyHere: [
-            { icon: '🧱', title: 'Hardscape specialists', text: 'Most of our Beatrice work is hardscaping — patios, walls, fire features, walkways. We bring the same crew and standards we\'d bring to any Lincoln project.' },
-            { icon: '🌲', title: 'Designs for mature properties', text: 'Beatrice yards often have established trees and old beds. We design around them, not over them — keeping mature landscaping intact wherever possible.' },
-            { icon: '💰', title: '$1,000 minimum project size', text: 'Travel time means we focus on real projects out here. No mowing, no $200 cleanups — but for any full project, you get the same Lincoln pricing without inflated travel charges.' },
-        ],
-        services: ['hardscaping', 'landscape-design', 'garden-beds'],
-        faqs: [
-            { q: 'Do you do regular lawn maintenance in Beatrice?', a: 'No — the drive (45 min each way) doesn\'t work for weekly mowing. We focus on one-time and large project work. If you need recurring lawn service, a local Beatrice crew will serve you better.' },
-            { q: 'What\'s the typical project minimum?', a: '$1,000. Most real landscape and hardscape projects are well above that. Travel costs are baked into normal pricing — no separate charges.' },
-            { q: 'How long does a project visit usually take?', a: 'For a quote, we\'ll typically come out for 30-45 minutes to walk the property and discuss options. We come prepared with rough pricing for common project types so you get useful numbers, not a vague follow-up.' },
         ],
     },
 ];
