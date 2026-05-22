@@ -50,6 +50,7 @@ const SERVICE_LABELS = {
 };
 
 const DETAIL_LABELS = {
+  project_budget: 'Estimated budget',
   project_size: 'Project size',
   project_timeline: 'Timeline',
   lawn_frequency: 'Lawn frequency',
@@ -77,6 +78,13 @@ const DETAIL_LABELS = {
 
 // Friendlier display values for select-style fields.
 const VALUE_LABELS = {
+  project_budget: {
+    'under1k':   'Under $1,000',
+    '1k-3k':     '$1,000 – $3,000',
+    '3k-10k':    '$3,000 – $10,000',
+    '10k-30k':   '$10,000 – $30,000',
+    '30k+':      '$30,000+',
+  },
   project_size: {
     'under500sqft':   'Small — under 500 sq ft',
     '500-2000sqft':   'Medium — 500–2,000 sq ft',
@@ -256,6 +264,7 @@ function buildEmailHtml({ body, customerId, photos, fullName, isNew }) {
           <table cellpadding="0" cellspacing="0" border="0" width="100%">
             ${rowFn('Category',  body.categoryLabel)}
             ${rowFn('Type',      body.projectType)}
+            ${rowFn('Budget',    body.project_budget ? pretty('project_budget', body.project_budget) : null)}
             ${rowFn('Size',      body.project_size ? pretty('project_size', body.project_size) : null)}
             ${rowFn('Timeline',  body.project_timeline ? pretty('project_timeline', body.project_timeline) : null)}
           </table>
@@ -426,6 +435,7 @@ export async function POST(request) {
     description,
     address ? `📍 ${address}` : null,
     phone ? `📞 ${phone}` : null,
+    body.project_budget ? `💵 ${pretty('project_budget', body.project_budget)}` : null,
     body.project_size ? `Size: ${pretty('project_size', body.project_size)}` : null,
     photoCount ? `📸 ${photoCount} photo${photoCount > 1 ? 's' : ''}` : null,
   ].filter(Boolean).join('\n');

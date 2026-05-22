@@ -41,7 +41,6 @@ async function walkHtml(dir) {
 // regenerating content pages doesn't reintroduce .html URLs.
 const BUILD_SCRIPTS = [
     join(__dirname, 'build-content-pages.js'),
-    join(__dirname, 'rewrite-quote.js'),
 ];
 
 function cleanUrls(text) {

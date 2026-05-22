@@ -1696,6 +1696,28 @@ textarea {
     border-color: var(--clover);
 }
 
+/* Monogram avatar — used for crew members without a headshot yet (no 404s). */
+.team-card-monogram {
+    width: 90px;
+    height: 90px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    font-size: 1.9rem;
+    letter-spacing: .5px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--clover), var(--forest));
+    border: 3px solid var(--gray-100);
+    transition: border-color var(--t-normal);
+}
+
+.team-card:hover .team-card-monogram {
+    border-color: var(--clover);
+}
+
 .team-card-glow {
     position: absolute;
     inset: -6px;
@@ -7482,6 +7504,66 @@ body.promo-active .mobile-menu {
        Includes iPhone home-indicator safe area so footer fully clears the bar. */
     body {
         padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    }
+}
+
+/* ═══════════════════════════════════════════════════════
+   FOUR-LEAF GUARANTEE BAND
+   ═══════════════════════════════════════════════════════ */
+.guarantee-section {
+    padding: 4.5rem 0;
+    background: linear-gradient(135deg, var(--forest-deep), var(--forest), var(--clover-dark));
+    color: #fff;
+}
+
+.guarantee-header {
+    text-align: center;
+    max-width: 680px;
+    margin: 0 auto 2.5rem;
+}
+
+.guarantee-sub {
+    color: rgba(255, 255, 255, .82);
+    font-size: 1.05rem;
+    margin-top: .75rem;
+}
+
+.guarantee-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
+}
+
+.guarantee-card {
+    background: rgba(255, 255, 255, .08);
+    border: 1px solid rgba(255, 255, 255, .15);
+    border-radius: 1rem;
+    padding: 1.75rem 1.25rem;
+    text-align: center;
+}
+
+.guarantee-leaf {
+    font-size: 1.9rem;
+    display: block;
+    margin-bottom: .6rem;
+}
+
+.guarantee-card h3 {
+    color: #fff;
+    font-size: 1.08rem;
+    margin: 0 0 .4rem;
+}
+
+.guarantee-card p {
+    color: rgba(255, 255, 255, .78);
+    font-size: .92rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+@media (max-width: 768px) {
+    .guarantee-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 

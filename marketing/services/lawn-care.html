@@ -54,8 +54,8 @@
             "priceSpecification": {
               "@type": "PriceSpecification",
               "priceCurrency": "USD",
-              "minPrice": "35",
-              "maxPrice": "75",
+              "minPrice": "50",
+              "maxPrice": "150",
               "unitText": "per visit"
             },
             "availability": "https://schema.org/InStock",
@@ -88,17 +88,32 @@
             {
               "@type": "Question",
               "name": "How often should my lawn be mowed in Lincoln, NE?",
-              "acceptedAnswer": { "@type": "Answer", "text": "During the growing season (April–October), we recommend weekly mowing for most lawns in Lincoln. Cool-season grasses like bluegrass and fescue grow quickly in spring and fall. We adjust our schedule based on conditions so your lawn always looks its best." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Lincoln lawns are cool-season grass — Kentucky bluegrass, fine fescue, perennial rye, sometimes a tall fescue blend — and they do most of their growing in the spring and fall flushes. During those stretches weekly is the right call; bi-weekly lets the grass get tall enough that you're cutting off more than the healthy one-third per pass and stressing it. In the July–August heat lull, growth slows and we'll stretch the interval rather than charge you for a mow the lawn didn't need." }
             },
             {
               "@type": "Question",
-              "name": "Is lawn care available year-round?",
-              "acceptedAnswer": { "@type": "Answer", "text": "Yes. During winter we offer seasonal cleanups, snow-related yard prep, and early-spring services. Our complete care packages run year-round." }
+              "name": "What height do you mow at, and why does it matter?",
+              "acceptedAnswer": { "@type": "Answer", "text": "We keep cool-season lawns at about 3.5 inches and never take off more than a third of the blade in one cut. Taller grass shades its own roots, holds soil moisture, and crowds out crabgrass — a 2-inch lawn in spring becomes a 1-inch, scorched lawn under summer drought. We also sharpen blades at the start of the season and keep them sharp; a dull blade tears the grass instead of cutting it and leaves a yellow-brown haze across the whole yard for a week." }
+            },
+            {
+              "@type": "Question",
+              "name": "When does pre-emergent need to go down in Lincoln?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Before the soil hits 55°F — in Lincoln that's usually the first or second week of April. Pre-emergent stops crabgrass before it ever germinates, but it only works if it's down ahead of that soil-temperature window. Miss it and you're fighting crabgrass all summer with far less effective post-emergent products. One catch: if we're overseeding an area that spring, we skip pre-emergent there, because it blocks your new grass seed from germinating too. You pick one or the other per area." }
+            },
+            {
+              "@type": "Question",
+              "name": "Do I need to aerate, and how often?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Lincoln's heavy clay compacts hard, which chokes off the oxygen, water, and fertilizer your roots need. Core aeration — the kind that pulls actual soil plugs, not spike shoes — once every 2–3 years fixes that. We usually pair it with overseeding so the holes give new seed a protected spot to germinate. Most established lawns don't need it annually; if your soil is like concrete by midsummer or water puddles instead of soaking in, you're overdue." }
+            },
+            {
+              "@type": "Question",
+              "name": "When is the best time to overseed a thin lawn?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Late August through mid-September, not spring. Fall gives new seed warm soil, cool nights, and zero competition from dying summer weeds — survival runs around 85%. Spring overseeding survives closer to 50% in a normal year because the seedlings have only weeks before summer heat hits, and you have to give up pre-emergent to do it. If a bare spot can't wait, we'll do a light spring fill and a heavier fall pass; if it can wait, fall every time." }
             },
             {
               "@type": "Question",
               "name": "How much does lawn mowing cost in Lincoln, NE?",
-              "acceptedAnswer": { "@type": "Answer", "text": "Pricing depends on lawn size and services needed. Most residential lawns in Lincoln run $35–$75 per visit. We offer discounts for recurring weekly or bi-weekly plans." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Most residential mows in Lincoln land between $50 and $150 a visit depending on lot size, how much trimming and edging it takes, and obstacles like beds, trees, and slopes. Recurring weekly or bi-weekly plans price better per visit than one-offs because we're already routing through your neighborhood. Every quote is a fixed number you see before we start — no per-visit surprises." }
             }
           ]
         }
@@ -195,13 +210,12 @@
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/team" class="nav-link">Our Team</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
             </div>
-            <button class="nav-toggle" id="nav-toggle" aria-label="Open menu">
-                <span></span><span></span><span></span>
-            </button>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><span></span><span></span><span></span></button>
         </div>
     </nav>
     <div class="mobile-menu-overlay" id="mobile-overlay"></div>
@@ -209,6 +223,7 @@
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/team" class="mobile-link">Our Team</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -249,36 +264,55 @@
             <div class="container">
                 <div class="svc-features-header reveal">
                     <p class="section-label">What We Offer</p>
-                    <h2 class="section-title">Lawn Care That<br />Goes the Extra Mile</h2>
-                    <p class="section-subtitle mx-auto">We don't just mow — we maintain, protect, and transform your
-                        lawn with care and precision.</p>
+                    <h2 class="section-title">Built for Cool-Season<br />Grass and Clay Soil</h2>
+                    <p class="section-subtitle mx-auto">Lincoln lawns are bluegrass, fescue, and rye sitting on heavy
+                        clay. We mow, time, and feed them for what they actually are — not the generic schedule a
+                        national franchise runs everywhere.</p>
                 </div>
 
                 <div class="svc-features-grid stagger-children">
                     <div class="svc-feature-card">
                         <div class="svc-feature-icon">🌿</div>
-                        <h3>Regular Mowing</h3>
-                        <p>Weekly or bi-weekly service with crisp edges, clean lines, and attention to detail that makes
-                            your lawn the envy of the neighborhood.</p>
+                        <h3>Weekly &amp; Bi-Weekly Mowing</h3>
+                        <p>Cut at 3.5 inches with sharp blades, never more than a third of the blade per pass, with
+                            trimmed edges and clean lines. Taller grass shades its own roots and crowds out crabgrass —
+                            scalping it in spring is what leaves you with a thin, brown lawn by July.</p>
+                    </div>
+                    <div class="svc-feature-card">
+                        <div class="svc-feature-icon">🚫</div>
+                        <h3>Pre-Emergent &amp; Weed Control</h3>
+                        <p>Crabgrass pre-emergent goes down before the soil hits 55°F — early-to-mid April in Lincoln.
+                            Miss that window and you fight crabgrass all summer. We spot-treat dandelions and clover
+                            after the lawn greens up instead of blasting the whole yard in April.</p>
+                    </div>
+                    <div class="svc-feature-card">
+                        <div class="svc-feature-icon">🌱</div>
+                        <h3>Core Aeration &amp; Overseeding</h3>
+                        <p>Lincoln's clay compacts hard, so we pull real soil plugs every 2–3 years to get air and water
+                            back to the roots — paired with a late-August to September overseed, where new grass
+                            survives at ~85% versus roughly 50% in spring. We seed a tall fescue / bluegrass blend.</p>
+                    </div>
+                    <div class="svc-feature-card">
+                        <div class="svc-feature-icon">🌾</div>
+                        <h3>Fertilization</h3>
+                        <p>A slow-release nitrogen program — about 1 lb of N per 1,000 sq ft — timed to feed roots, not
+                            force a flush of soft top growth. We steer clear of the cheap high-nitrogen "weed and feed"
+                            bags that push blade growth and leave the lawn weaker heading into summer stress.</p>
                     </div>
                     <div class="svc-feature-card">
                         <div class="svc-feature-icon">🍂</div>
-                        <h3>Seasonal Cleanups</h3>
-                        <p>Fall and spring cleanups including leaf removal, debris clearing, and bed prep to keep your
-                            property looking sharp year-round.</p>
-                    </div>
-                    <div class="svc-feature-card">
-                        <div class="svc-feature-icon">🍃</div>
-                        <h3>Leaf Removal</h3>
-                        <p>One-time or recurring leaf blowing and haul-off service to clear your lawn and prevent winter
-                            turf damage.</p>
+                        <h3>Spring &amp; Fall Cleanups</h3>
+                        <p>Spring cleanup once the soil firms up (raking a half-frozen lawn just compacts it and tears
+                            dormant blades), and fall leaf removal hauled off before a wet mat smothers the turf over
+                            winter and invites snow mold. Beds and walkways edged so the whole property reads as cared-for.</p>
                     </div>
                     <div class="svc-feature-card svc-feature-card--featured">
                         <div class="svc-feature-badge">Best Value</div>
                         <div class="svc-feature-icon">🍀</div>
-                        <h3>Complete Lawn Care</h3>
-                        <p>Our all-inclusive year-round package combines mowing, seasonal cleanups, edging, and trimming
-                            into one hassle-free program.</p>
+                        <h3>Full-Season Maintenance Plan</h3>
+                        <p>One recurring plan that folds mowing, edging, pre-emergent timing, the aeration/overseed pass,
+                            and the spring and fall cleanups into a single fixed price. We route your neighborhood
+                            together, so the per-visit cost beats one-off calls and nothing slips through the seasonal cracks.</p>
                     </div>
                 </div>
             </div>
@@ -365,26 +399,68 @@
                     <details class="faq-item" open>
                         <summary class="faq-question">How often should my lawn be mowed in Lincoln, NE?</summary>
                         <div class="faq-answer">
-                            <p>During the growing season (April–October), we recommend weekly mowing for most lawns in
-                                Lincoln. Cool-season grasses like bluegrass and fescue grow quickly in spring and fall.
-                                We adjust our schedule based on conditions so your lawn always looks its best.</p>
+                            <p>Lincoln lawns are cool-season grass — Kentucky bluegrass, fine fescue, perennial rye,
+                                sometimes a tall fescue blend — and they do most of their growing in the spring and fall
+                                flushes. During those stretches weekly is the right call; bi-weekly lets the grass get
+                                tall enough that you're cutting off more than the healthy one-third per pass and
+                                stressing it. In the July–August heat lull, growth slows and we'll stretch the interval
+                                rather than charge you for a mow the lawn didn't need.</p>
                         </div>
                     </details>
                     <details class="faq-item">
-                        <summary class="faq-question">Is lawn care available year-round?</summary>
+                        <summary class="faq-question">What height do you mow at, and why does it matter?</summary>
                         <div class="faq-answer">
-                            <p>Yes! During winter we offer seasonal cleanups, snow-related yard prep, and early-spring
-                                services. Our complete care packages run year-round so you never have to worry about
-                                your property.</p>
+                            <p>We keep cool-season lawns at about 3.5 inches and never take off more than a third of the
+                                blade in one cut. Taller grass shades its own roots, holds soil moisture, and crowds out
+                                crabgrass — a 2-inch lawn in spring becomes a 1-inch, scorched lawn under summer drought.
+                                We also sharpen blades at the start of the season and keep them sharp; a dull blade tears
+                                the grass instead of cutting it and leaves a yellow-brown haze across the whole yard for a
+                                week.</p>
                         </div>
                     </details>
                     <details class="faq-item">
-                        <summary class="faq-question">How much does lawn mowing cost?</summary>
+                        <summary class="faq-question">When does pre-emergent need to go down in Lincoln?</summary>
                         <div class="faq-answer">
-                            <p>Pricing depends on lawn size and services needed. Most residential lawns in Lincoln run
-                                $35–$75 per visit. We offer discounts for recurring weekly or bi-weekly plans. <a
-                                    href="/quote?category=lawn">Get a free quote</a> for your specific property.
-                            </p>
+                            <p>Before the soil hits 55°F — in Lincoln that's usually the first or second week of April.
+                                Pre-emergent stops crabgrass before it ever germinates, but it only works if it's down
+                                ahead of that soil-temperature window. Miss it and you're fighting crabgrass all summer
+                                with far less effective post-emergent products. One catch: if we're overseeding an area
+                                that spring, we skip pre-emergent there, because it blocks your new grass seed from
+                                germinating too. You pick one or the other per area.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">Do I need to aerate, and how often?</summary>
+                        <div class="faq-answer">
+                            <p>Lincoln's heavy clay compacts hard, which chokes off the oxygen, water, and fertilizer
+                                your roots need. Core aeration — the kind that pulls actual soil plugs, not spike shoes —
+                                once every 2–3 years fixes that. We usually pair it with overseeding so the holes give
+                                new seed a protected spot to germinate. Most established lawns don't need it annually; if
+                                your soil is like concrete by midsummer or water puddles instead of soaking in, you're
+                                overdue.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">When is the best time to overseed a thin lawn?</summary>
+                        <div class="faq-answer">
+                            <p>Late August through mid-September, not spring. Fall gives new seed warm soil, cool nights,
+                                and zero competition from dying summer weeds — survival runs around 85%. Spring
+                                overseeding survives closer to 50% in a normal year because the seedlings have only weeks
+                                before summer heat hits, and you have to give up pre-emergent to do it. If a bare spot
+                                can't wait, we'll do a light spring fill and a heavier fall pass; if it can wait, fall
+                                every time. <a href="/blog/when-to-overseed-lawn-lincoln-ne">More on overseeding timing
+                                    here</a>.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">How much does lawn mowing cost in Lincoln, NE?</summary>
+                        <div class="faq-answer">
+                            <p>Most residential mows in Lincoln land between $50 and $150 a visit depending on lot size,
+                                how much trimming and edging it takes, and obstacles like beds, trees, and slopes.
+                                Recurring weekly or bi-weekly plans price better per visit than one-offs because we're
+                                already routing through your neighborhood. Every quote is a fixed number you see before
+                                we start — no per-visit surprises. <a href="/quote?category=lawn">Get a free quote</a>
+                                for your specific property.</p>
                         </div>
                     </details>
                 </div>
@@ -392,6 +468,67 @@
         </section>
 
         <!-- CTA -->
+        <section class="reviews-section">
+            <div class="container">
+                <div class="reviews-header reveal">
+                    <p class="section-label">What Our Customers Say</p>
+                    <h2 class="section-title">Rated 5.0 Across Lincoln, NE</h2>
+                    <div class="reviews-overall">
+                        <div class="reviews-stars">★★★★★</div>
+                        <span class="reviews-rating-text">5.0 · 7 Google Reviews</span>
+                    </div>
+                </div>
+                <div class="reviews-grid stagger-children">
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Riley and his crew will create the <strong>yard of your dreams</strong>. My flower beds look amazing!"</p>
+                        <div class="review-author">
+                            <div class="review-avatar">SS</div>
+                            <div><p class="review-name">Sparrow Spaulding</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"They were hard working and did a <strong>great job on our retaining wall</strong>. Great price."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">JC</div>
+                            <div><p class="review-name">Jeff Chapelle</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Reasonable price. Great experience overall. Quality work — <strong>10/10 recommendation</strong>."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">DG</div>
+                            <div><p class="review-name">Darcie Gallagher-Brandt</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="reviews-cta" style="text-align:center; margin-top:2.5rem;">
+                    <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank" rel="noopener" class="btn btn-secondary">See All Google Reviews</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="guarantee-section">
+            <div class="container">
+                <div class="guarantee-header reveal">
+                    <p class="section-label section-label--light">Our Promise</p>
+                    <h2 class="section-title section-title--light">Don't Leave Your Yard to Luck</h2>
+                    <p class="guarantee-sub">That's our job. Every project we take on is backed by the Four-Leaf Guarantee.</p>
+                </div>
+                <div class="guarantee-grid stagger-children">
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>On Time, Every Time</h3><p>We tell you when we'll be there — and we show up.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Fixed Price, No Surprises</h3><p>A written quote with no hidden fees bolted on at the end.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Fully Insured</h3><p>Your property is protected from the first day to the last.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Not Done 'Til You're Happy</h3><p>We walk the finished job with you. If it's not right, we fix it.</p></div>
+                </div>
+            </div>
+        </section>
+
         <section class="svc-cta">
             <div class="container">
                 <div class="svc-cta-content reveal">
@@ -431,13 +568,24 @@
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
+                    <a href="/blog/">Blog</a>
                     <a href="/team">Our Team</a>
                     <a href="/#contact">Contact</a>
                 </div>
                 <div class="footer-nav">
+                    <h4>Service Areas</h4>
+                    <a href="/areas/east-lincoln">East Lincoln</a>
+                    <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
+                    <a href="/areas/south-lincoln">South Lincoln</a>
+                    <a href="/areas/waverly">Waverly</a>
+                    <a href="/areas/beatrice">Beatrice</a>
+                    <a href="/areas/seward">Seward</a>
+                    <a href="/areas/fairbury">Fairbury</a>
+                </div>
+                <div class="footer-nav">
                     <h4>Services</h4>
                     <a href="/services/lawn-care">Lawn Care</a>
-                    <a href="/services/garden-beds">Garden & Beds</a>
+                    <a href="/services/garden-beds">Garden &amp; Beds</a>
                     <a href="/services/hardscaping">Hardscaping</a>
                     <a href="/services/fencing">Fencing</a>
                     <a href="/services/property-cleanup">Property Cleanup</a>
@@ -449,34 +597,10 @@
                     <p>rileykopf@luckylandscapes.com</p>
                     <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
-                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                            </svg></a>
-                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                                <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-                            </svg></a>
-                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-                            </svg></a>
-                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path
-                                    d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" />
-                                <polygon points="10 15 16 12 10 9 10 15" />
-                            </svg></a>
+                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>
+                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg></a>
+                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" /></svg></a>
+                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" /><polygon points="10 15 16 12 10 9 10 15" /></svg></a>
                     </div>
                 </div>
             </div>
@@ -491,6 +615,12 @@
     </footer>
 
     <script type="module" src="/main.js"></script>
+    <!-- Sticky Mobile CTA Bar -->
+    <div class="sticky-mobile-cta" id="sticky-mobile-cta">
+        <a href="/quote" class="btn btn-primary">Free Quote</a>
+        <a href="tel:+14024055475" class="sticky-phone-link">📞 (402) 405-5475</a>
+    </div>
+
 </body>
 
 </html>

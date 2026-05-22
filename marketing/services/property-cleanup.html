@@ -50,6 +50,13 @@
           "offers": {
             "@type": "Offer",
             "priceCurrency": "USD",
+            "priceSpecification": {
+              "@type": "PriceSpecification",
+              "priceCurrency": "USD",
+              "minPrice": "200",
+              "maxPrice": "2500",
+              "unitText": "per project"
+            },
             "availability": "https://schema.org/InStock",
             "url": "https://luckylandscapes.com/quote?category=cleanup"
           },
@@ -80,17 +87,27 @@
             {
               "@type": "Question",
               "name": "What items do you haul away?",
-              "acceptedAnswer": { "@type": "Answer", "text": "We handle yard waste, brush, furniture, appliances, construction debris, and general junk. Basically if it fits in our trucks, we'll take it. The only things we can't take are hazardous materials (paint, chemicals, etc.) and certain electronics. Call us if you're unsure." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Yard waste, brush, branches, old furniture, appliances, construction debris, and general junk all go in our dump trailer. If it fits and it's not hazardous, we'll take it. What we can't haul: paint, chemicals, fuels, and certain electronics — those have special disposal rules. If you're not sure about something, send a photo when you request a quote and we'll tell you straight." }
+            },
+            {
+              "@type": "Question",
+              "name": "How much can you haul in one trip?",
+              "acceptedAnswer": { "@type": "Answer", "text": "We run a 6x12 dump trailer rated to about 12,000 lbs, so a surprising amount of brush, debris, or junk goes in a single load — far more than a pickup bed or a few trips to the curb. Bigger cleanouts just mean more loads to the transfer station; we'll estimate how many it'll take when we see the pile and roll that into one flat price." }
+            },
+            {
+              "@type": "Question",
+              "name": "How do you price a property cleanup?",
+              "acceptedAnswer": { "@type": "Answer", "text": "Flat rate per job, not by the hour, so you know the number before we start and there's no meter running while we work. The price reflects the labor to load it, how many dump-trailer loads it takes, and the dump fee — figure roughly $100 per load at the transfer station. You approve a fixed quote up front; that's the price." }
             },
             {
               "@type": "Question",
               "name": "How quickly can you schedule a cleanup in Lincoln, NE?",
-              "acceptedAnswer": { "@type": "Answer", "text": "Most cleanup jobs can be scheduled within the same week. For urgent needs, we often accommodate next-day service. Get a free quote and let us know your timeline." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Most cleanup jobs get scheduled within the same week, and we can often do next-day for urgent situations — a property showing, a code-enforcement letter, a move-out deadline. Cleanups are also some of the easiest work to slot between bigger projects, so tell us your deadline when you request a quote and we'll usually hit it." }
             },
             {
               "@type": "Question",
               "name": "Do you offer recurring cleanup services?",
-              "acceptedAnswer": { "@type": "Answer", "text": "Yes. We offer one-time cleanups as well as recurring services for properties that need regular maintenance — rental properties, commercial lots, or simply keeping up with seasonal debris. We'll customize a schedule that works for you." }
+              "acceptedAnswer": { "@type": "Answer", "text": "Yes. Beyond one-time cleanouts we set up recurring service for rental turnovers, commercial lots, and anyone who'd rather not let seasonal debris pile up — spring brush, fall leaves, storm drop. We'll build a schedule around how fast your property actually accumulates, so it's handled before it becomes a weekend you dread." }
             }
           ]
         }
@@ -186,19 +203,20 @@
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/team" class="nav-link">Our Team</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
             </div>
-            <button class="nav-toggle" id="nav-toggle"
-                aria-label="Open menu"><span></span><span></span><span></span></button>
+            <button class="nav-toggle" id="nav-toggle" aria-label="Open menu"><span></span><span></span><span></span></button>
         </div>
     </nav>
     <div class="mobile-menu-overlay" id="mobile-overlay"></div>
     <div class="mobile-menu" id="mobile-menu">
         <a href="/#about" class="mobile-link">About</a>
-        <a href="/quote" class="mobile-link">Services</a>
+        <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/team" class="mobile-link">Our Team</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -237,35 +255,55 @@
             <div class="container">
                 <div class="svc-features-header reveal">
                     <p class="section-label">What We Handle</p>
-                    <h2 class="section-title">Cleanup Services<br />for Any Situation</h2>
-                    <p class="section-subtitle mx-auto">No job too messy. We bring the crew, the equipment, and a can-do
-                        attitude.</p>
+                    <h2 class="section-title">One Crew, One Trailer,<br />One Flat Price</h2>
+                    <p class="section-subtitle mx-auto">We show up with a 12,000-lb dump trailer and the people to fill
+                        it, quote the whole job as a single flat number, and most weeks we can be out there within a few
+                        days. No hourly meter, no "we'll see how it goes."</p>
                 </div>
                 <div class="svc-features-grid stagger-children">
                     <div class="svc-feature-card">
                         <div class="svc-feature-icon">🚛</div>
-                        <h3>Junk Removal</h3>
-                        <p>Old furniture, construction debris, brush piles — we load it up and haul it away so you can
-                            enjoy a clean property.</p>
+                        <h3>Junk &amp; Debris Hauling</h3>
+                        <p>Old furniture, appliances, construction debris, brush piles — we load it into a 6x12 dump
+                            trailer rated to 12,000 lbs and haul it to the transfer station. One trailer swallows what
+                            would be a dozen runs to the curb. Hazardous stuff like paint and chemicals is the only thing
+                            we leave behind.</p>
+                    </div>
+                    <div class="svc-feature-card">
+                        <div class="svc-feature-icon">🌲</div>
+                        <h3>Brush &amp; Overgrowth Clearing</h3>
+                        <p>Overgrown fence lines, volunteer saplings, years of tangled brush — we cut it down, drag it
+                            out, and haul it off in the same visit. The kind of corner that's been bugging you every time
+                            you mow, gone in an afternoon instead of a month of weekends.</p>
                     </div>
                     <div class="svc-feature-card">
                         <div class="svc-feature-icon">🍃</div>
                         <h3>Leaf Removal</h3>
-                        <p>One-time blowing and haul-off service to clear your lawn before winter sets in and protect
-                            your turf.</p>
+                        <p>Fall leaf blow-out and haul-off before a wet mat sits on the lawn all winter, smothers the
+                            turf, and breeds snow mold you'll be staring at come spring. We clear the lawn, beds, and
+                            corners and take every bag with us — nothing left at the curb for you to deal with.</p>
                     </div>
                     <div class="svc-feature-card">
-                        <div class="svc-feature-icon">🏡</div>
-                        <h3>Full Yard Cleanup</h3>
-                        <p>Overgrown property? We restore neglected yards back to a manageable, attractive state —
-                            quickly and affordably.</p>
+                        <div class="svc-feature-icon">🏚️</div>
+                        <h3>Full Property Restoration</h3>
+                        <p>Neglected rental, inherited house, or a yard that got away from you — we take an overgrown,
+                            cluttered property back to mowable and presentable in one coordinated push. A common first
+                            step before a listing, a sale, or handing the place to a regular maintenance schedule.</p>
+                    </div>
+                    <div class="svc-feature-card">
+                        <div class="svc-feature-icon">⛈️</div>
+                        <h3>Storm Damage Cleanup</h3>
+                        <p>After a Nebraska wind or hail event, we clear downed limbs, scattered debris, and blown-in
+                            mess so your property is safe to walk and mow again. We prioritize storm calls because a yard
+                            full of broken branches isn't something that should wait two weeks.</p>
                     </div>
                     <div class="svc-feature-card svc-feature-card--featured">
                         <div class="svc-feature-badge">Same Week</div>
                         <div class="svc-feature-icon">⚡</div>
-                        <h3>Quick-Turn Service</h3>
-                        <p>Need it done fast? Most cleanup jobs can be scheduled within the same week. We work on your
-                            timeline.</p>
+                        <h3>Fast, Deadline-Friendly Turnaround</h3>
+                        <p>Most cleanups are scheduled within the same week, with next-day often possible for a showing,
+                            a move-out, or a code-enforcement letter with a clock on it. Cleanups slot neatly between our
+                            bigger projects, so tell us your deadline and we'll usually beat it.</p>
                     </div>
                 </div>
             </div>
@@ -349,31 +387,114 @@
                     <details class="faq-item" open>
                         <summary class="faq-question">What items do you haul away?</summary>
                         <div class="faq-answer">
-                            <p>We handle yard waste, brush, furniture, appliances, construction debris, and general
-                                junk. Basically if it fits in our trucks, we'll take it. The only things we can't take
-                                are hazardous materials (paint, chemicals, etc.) and certain electronics. Call us if
-                                you're unsure!</p>
+                            <p>Yard waste, brush, branches, old furniture, appliances, construction debris, and general
+                                junk all go in our dump trailer. If it fits and it's not hazardous, we'll take it. What
+                                we can't haul: paint, chemicals, fuels, and certain electronics — those have special
+                                disposal rules. If you're not sure about something, send a photo when you request a quote
+                                and we'll tell you straight.</p>
                         </div>
                     </details>
                     <details class="faq-item">
-                        <summary class="faq-question">How quickly can you schedule a cleanup?</summary>
+                        <summary class="faq-question">How much can you haul in one trip?</summary>
                         <div class="faq-answer">
-                            <p>Most cleanup jobs can be scheduled within the same week. For urgent needs, we often
-                                accommodate next-day service. <a href="/quote?category=cleanup">Get a free
-                                    quote</a> and let us know your timeline.</p>
+                            <p>We run a 6x12 dump trailer rated to about 12,000 lbs, so a surprising amount of brush,
+                                debris, or junk goes in a single load — far more than a pickup bed or a few trips to the
+                                curb. Bigger cleanouts just mean more loads to the transfer station; we'll estimate how
+                                many it'll take when we see the pile and roll that into one flat price.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">How do you price a property cleanup?</summary>
+                        <div class="faq-answer">
+                            <p>Flat rate per job, not by the hour, so you know the number before we start and there's no
+                                meter running while we work. The price reflects the labor to load it, how many
+                                dump-trailer loads it takes, and the dump fee — figure roughly $100 per load at the
+                                transfer station. You approve a fixed quote up front; that's the price.</p>
+                        </div>
+                    </details>
+                    <details class="faq-item">
+                        <summary class="faq-question">How quickly can you schedule a cleanup in Lincoln, NE?</summary>
+                        <div class="faq-answer">
+                            <p>Most cleanup jobs get scheduled within the same week, and we can often do next-day for
+                                urgent situations — a property showing, a code-enforcement letter, a move-out deadline.
+                                Cleanups are also some of the easiest work to slot between bigger projects, so tell us
+                                your deadline when you request a quote and we'll usually hit it.</p>
                         </div>
                     </details>
                     <details class="faq-item">
                         <summary class="faq-question">Do you offer recurring cleanup services?</summary>
                         <div class="faq-answer">
-                            <p>Yes! We offer one-time cleanups as well as recurring services for properties that need
-                                regular maintenance — rental properties, commercial lots, or simply keeping up with
-                                seasonal debris. We'll customize a schedule that works for you.</p>
+                            <p>Yes. Beyond one-time cleanouts we set up recurring service for rental turnovers,
+                                commercial lots, and anyone who'd rather not let seasonal debris pile up — spring brush,
+                                fall leaves, storm drop. We'll build a schedule around how fast your property actually
+                                accumulates, so it's handled before it becomes a weekend you dread. <a
+                                    href="/quote?category=cleanup">Get a free quote</a> to get on the schedule.</p>
                         </div>
                     </details>
                 </div>
             </div>
         </section>
+        <section class="reviews-section">
+            <div class="container">
+                <div class="reviews-header reveal">
+                    <p class="section-label">What Our Customers Say</p>
+                    <h2 class="section-title">Rated 5.0 Across Lincoln, NE</h2>
+                    <div class="reviews-overall">
+                        <div class="reviews-stars">★★★★★</div>
+                        <span class="reviews-rating-text">5.0 · 7 Google Reviews</span>
+                    </div>
+                </div>
+                <div class="reviews-grid stagger-children">
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Riley and his crew will create the <strong>yard of your dreams</strong>. My flower beds look amazing!"</p>
+                        <div class="review-author">
+                            <div class="review-avatar">SS</div>
+                            <div><p class="review-name">Sparrow Spaulding</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"They were hard working and did a <strong>great job on our retaining wall</strong>. Great price."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">JC</div>
+                            <div><p class="review-name">Jeff Chapelle</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                    <div class="review-card">
+                        <div class="review-stars">★★★★★</div>
+                        <p class="review-text">"Reasonable price. Great experience overall. Quality work — <strong>10/10 recommendation</strong>."</p>
+                        <div class="review-author">
+                            <div class="review-avatar">DG</div>
+                            <div><p class="review-name">Darcie Gallagher-Brandt</p><p class="review-date">Google review</p></div>
+                            <svg class="review-google-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                        </div>
+                    </div>
+                </div>
+                <div class="reviews-cta" style="text-align:center; margin-top:2.5rem;">
+                    <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank" rel="noopener" class="btn btn-secondary">See All Google Reviews</a>
+                </div>
+            </div>
+        </section>
+
+        <section class="guarantee-section">
+            <div class="container">
+                <div class="guarantee-header reveal">
+                    <p class="section-label section-label--light">Our Promise</p>
+                    <h2 class="section-title section-title--light">Don't Leave Your Yard to Luck</h2>
+                    <p class="guarantee-sub">That's our job. Every project we take on is backed by the Four-Leaf Guarantee.</p>
+                </div>
+                <div class="guarantee-grid stagger-children">
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>On Time, Every Time</h3><p>We tell you when we'll be there — and we show up.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Fixed Price, No Surprises</h3><p>A written quote with no hidden fees bolted on at the end.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Fully Insured</h3><p>Your property is protected from the first day to the last.</p></div>
+                    <div class="guarantee-card"><span class="guarantee-leaf">🍀</span><h3>Not Done 'Til You're Happy</h3><p>We walk the finished job with you. If it's not right, we fix it.</p></div>
+                </div>
+            </div>
+        </section>
+
 
         <section class="svc-cta">
             <div class="container">
@@ -402,21 +523,39 @@
         <div class="container">
             <div class="footer-top">
                 <div class="footer-brand">
-                    <a href="/" class="footer-logo"><img src="/images/Icon.png" alt="Lucky Landscapes" /><span
-                            class="footer-logo-text">Lucky <span>Landscapes</span></span></a>
+                    <a href="/" class="footer-logo">
+                        <img src="/images/Icon.png" alt="Lucky Landscapes" />
+                        <span class="footer-logo-text">Lucky <span>Landscapes</span></span>
+                    </a>
                     <p class="footer-tagline">Creating outdoor spaces you'll feel lucky to have.</p>
                 </div>
                 <div class="footer-nav">
-                    <h4>Quick Links</h4><a href="/#about">About</a><a href="/#services">Services</a><a
-                        href="/gallery">Gallery</a><a href="/team">Our Team</a><a href="/#contact">Contact</a>
+                    <h4>Quick Links</h4>
+                    <a href="/#about">About</a>
+                    <a href="/#services">Services</a>
+                    <a href="/gallery">Gallery</a>
+                    <a href="/blog/">Blog</a>
+                    <a href="/team">Our Team</a>
+                    <a href="/#contact">Contact</a>
                 </div>
                 <div class="footer-nav">
-                    <h4>Services</h4><a href="/services/lawn-care">Lawn Care</a><a
-                        href="/services/garden-beds">Garden & Beds</a><a
-                        href="/services/hardscaping">Hardscaping</a><a
-                        href="/services/fencing">Fencing</a><a
-                        href="/services/property-cleanup">Property Cleanup</a><a
-                        href="/services/landscape-design">Landscape Design</a>
+                    <h4>Service Areas</h4>
+                    <a href="/areas/east-lincoln">East Lincoln</a>
+                    <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
+                    <a href="/areas/south-lincoln">South Lincoln</a>
+                    <a href="/areas/waverly">Waverly</a>
+                    <a href="/areas/beatrice">Beatrice</a>
+                    <a href="/areas/seward">Seward</a>
+                    <a href="/areas/fairbury">Fairbury</a>
+                </div>
+                <div class="footer-nav">
+                    <h4>Services</h4>
+                    <a href="/services/lawn-care">Lawn Care</a>
+                    <a href="/services/garden-beds">Garden &amp; Beds</a>
+                    <a href="/services/hardscaping">Hardscaping</a>
+                    <a href="/services/fencing">Fencing</a>
+                    <a href="/services/property-cleanup">Property Cleanup</a>
+                    <a href="/services/landscape-design">Landscape Design</a>
                 </div>
                 <div class="footer-contact">
                     <h4>Contact</h4>
@@ -424,45 +563,29 @@
                     <p>rileykopf@luckylandscapes.com</p>
                     <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
-                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
-                            </svg></a>
-                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
-                                <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
-                                <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
-                            </svg></a>
-                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" />
-                            </svg></a>
-                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube"><svg
-                                xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
-                                fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                stroke-linejoin="round">
-                                <path
-                                    d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" />
-                                <polygon points="10 15 16 12 10 9 10 15" />
-                            </svg></a>
+                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>
+                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg></a>
+                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" /></svg></a>
+                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" /><polygon points="10 15 16 12 10 9 10 15" /></svg></a>
                     </div>
                 </div>
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2026 Lucky Landscapes. All rights reserved.</p>
-                <div class="footer-bottom-links"><a href="/privacy">Privacy Policy</a><a href="/terms">Terms
-                        of Service</a></div>
+                <div class="footer-bottom-links">
+                    <a href="/privacy">Privacy Policy</a>
+                    <a href="/terms">Terms of Service</a>
+                </div>
             </div>
         </div>
     </footer>
     <script type="module" src="/main.js"></script>
+    <!-- Sticky Mobile CTA Bar -->
+    <div class="sticky-mobile-cta" id="sticky-mobile-cta">
+        <a href="/quote" class="btn btn-primary">Free Quote</a>
+        <a href="tel:+14024055475" class="sticky-phone-link">📞 (402) 405-5475</a>
+    </div>
+
 </body>
 
 </html>

@@ -2166,7 +2166,7 @@ if (qzCategoryBtns.length > 0) {
 
             trackEvent('quote_submit', {
                 category,
-                project_size: data.project_size || 'unspecified',
+                project_budget: data.project_budget || 'unspecified',
                 timeline: data.project_timeline || 'unspecified',
                 has_address: !!data.address,
                 has_photos: !!data.photoCount,

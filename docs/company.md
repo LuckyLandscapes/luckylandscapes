@@ -19,7 +19,7 @@ Lucky Landscapes LLC
 
 ## Service area
 - **Primary:** Lincoln, Nebraska
-- **Secondary / will-travel-for:** Beatrice, Surrounding small towns up to an hour away, will travel for large projects.
+- **Secondary / will-travel-for:** Waverly, Emerald, etc. we have family and a couple people we have done work for in plymouth, beatrice, but these are lower areas and im not sure if marketing these would hurt SEO. 
 - **Hard no:** None
 
 ## Customers

@@ -20,7 +20,7 @@ Be honest — this is what shapes every "right move."
 - **Time:** Macoy can work 80+ hours a week, but doesn't do field work, riley works maybe 45 hours a week.
 - **Cash:** we have no savings, 2k in the bank, 5k in line of credit, we have no assets. willing to go into debt further for assets like a truck or trailer.
 - **People:** we can hire lots of highschoolers want to work for us.
-- **Skills the team doesn't have yet:** we are not good at irrigation or lighting.
+- **Skills the team doesn't have yet:** doing irrigation. 
 - **Personal / life constraints:** Riley has church on Saturdays.
 
 ## Competitive landscape
