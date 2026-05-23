@@ -315,6 +315,84 @@ const AREAS = [
 ];
 
 // =====================================================================
+// CONTENT COMPONENT HELPERS
+// Reusable building blocks for richer post bodies. Defined BEFORE the POSTS
+// array so post `body` template literals can call them inline, e.g.
+//   ${callout({ type: 'warning', title: '…', body: '<p>…</p>' })}
+//   ${table({ headers: [...], rows: [[...]] })}
+// =====================================================================
+
+function slugify(s) {
+    return String(s)
+        .replace(/<[^>]+>/g, '')
+        .replace(/&[a-z]+;/gi, '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
+const CALLOUT_ICONS = { tip: '💡', warning: '⚠️', info: 'ℹ️', cost: '💲', local: '📍' };
+
+// Styled aside box. `type` ∈ tip|warning|info|cost|local. `body` is raw HTML.
+function callout({ type = 'tip', title = '', body = '' }) {
+    const icon = CALLOUT_ICONS[type] || CALLOUT_ICONS.tip;
+    return `
+        <aside class="callout callout--${type}">
+            <span class="callout-icon" aria-hidden="true">${icon}</span>
+            <div class="callout-body">${title ? `<p class="callout-title">${title}</p>` : ''}${body}</div>
+        </aside>`;
+}
+
+// Responsive data/comparison table. On mobile it stacks into labeled rows via
+// the data-label attributes (styled in styles.css).
+function table({ caption = '', headers = [], rows = [] }) {
+    const head = headers.map(h => `<th>${h}</th>`).join('');
+    const body = rows.map(r => `<tr>${r.map((c, i) => {
+        const label = headers[i] ? headers[i].replace(/<[^>]+>/g, '') : '';
+        return `<td data-label="${label}">${c}</td>`;
+    }).join('')}</tr>`).join('');
+    return `
+        <div class="post-table-wrap">
+            <table class="post-table">${caption ? `
+                <caption>${caption}</caption>` : ''}
+                <thead><tr>${head}</tr></thead>
+                <tbody>${body}</tbody>
+            </table>
+        </div>`;
+}
+
+// Word count + estimated reading time (220 wpm) from a post body's text.
+function postStats(post) {
+    const text = String(post.body || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    const words = text ? text.split(' ').length : 0;
+    const minutes = Math.max(1, Math.round(words / 220));
+    return { words, minutes };
+}
+
+// Inject id="" anchors on every <h2> in a body and return the table-of-contents
+// entries. Anchors power the sticky TOC + jump links. Slugs are de-duped.
+function buildToc(body) {
+    const toc = [];
+    const seen = {};
+    const html = body.replace(/<h2(\s[^>]*?)?>([\s\S]*?)<\/h2>/g, (m, attrs, inner) => {
+        const text = inner.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+        let id = slugify(text) || 'section';
+        if (seen[id] != null) { seen[id] += 1; id = `${id}-${seen[id]}`; } else { seen[id] = 0; }
+        toc.push({ id, text });
+        return `<h2 id="${id}"${attrs || ''}>${inner}</h2>`;
+    });
+    return { html, toc };
+}
+
+// Format an ISO date (YYYY-MM-DD) as "Month D, YYYY" without timezone drift.
+function fmtDate(iso) {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('en-US', {
+        year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC',
+    });
+}
+
+// =====================================================================
 // BLOG POSTS
 // =====================================================================
 
@@ -325,8 +403,15 @@ const POSTS = [
         description: 'A practical spring lawn care checklist for Lincoln, Nebraska homeowners. What to do in March, April, and May — and what to skip.',
         h1: 'The Spring <em class="highlight">Lawn Care Checklist</em> for Lincoln, NE',
         sub: 'A practical month-by-month guide. Skip the influencer YouTube videos shot in Florida — this is what actually works for cool-season grasses in Nebraska.',
-        date: '2026-04-15',
+        date: '2026-03-18',
         category: 'Lawn Care',
+        image: '/images/lawncare/2.webp',
+        imageAlt: 'Freshly mowed and edged Lincoln, NE lawn in early spring',
+        takeaways: [
+            'Late March: do nothing but plan — walking dormant, semi-frozen turf does more harm than the cleanup helps.',
+            'Pre-emergent crabgrass control must go down before the soil hits 55°F — usually the first or second week of April here.',
+            'First mow at 3.5″ once the grass is 4–5″ tall; save fertilizing and overseeding for early May, not before.',
+        ],
         body: `
         <p>Lincoln lawns are mostly cool-season grass — Kentucky bluegrass, fine fescue, perennial ryegrass, sometimes a tall fescue blend. That\'s great news because cool-season grass loves spring. The window from late March to early June is when your lawn does most of its visible growing for the entire year.</p>
         <p>It\'s also when the most damage gets done by overzealous homeowners. Below is what we actually do — and skip — on the lawns we maintain.</p>
@@ -372,18 +457,30 @@ const POSTS = [
         description: 'Real 2026 pricing for paver patios in Lincoln, Nebraska. Materials, labor, and what affects the final number — from a local landscaping crew.',
         h1: 'How Much Does a <em class="highlight">Paver Patio</em> Cost in Lincoln, NE?',
         sub: 'Honest, current pricing — not the lowballed range you\'ll see on national-chain calculators.',
-        date: '2026-04-22',
+        date: '2026-04-13',
         category: 'Hardscaping',
+        image: '/images/bricklaying/1.webp',
+        imageAlt: 'Newly installed paver patio in Lincoln, Nebraska',
+        takeaways: [
+            'A small standard-paver patio runs $20–$28 per sq ft installed in 2026; premium outdoor-living spaces run $45–$70+.',
+            'Price swings most on material, base depth, demolition, pattern, and access — not the pavers themselves.',
+            'A bid far below the rest almost always cut the base, fabric, or polymeric sand — and the patio heaves by year 3.',
+        ],
         body: `
         <p>The internet will tell you a paver patio costs "$10–$25 per square foot." That\'s technically true and totally useless. The real answer for Lincoln, Nebraska in 2026 looks more like this:</p>
 
         <h2>The short version</h2>
-        <ul>
-            <li><strong>Small basic patio (under 200 sq ft, simple shape, standard concrete pavers):</strong> $20–$28 per sq ft installed. So a 150 sq ft patio is roughly <strong>$3,000–$4,200</strong>.</li>
-            <li><strong>Mid-size patio (200–400 sq ft, mid-grade interlocking or natural stone, some demolition):</strong> $28–$40 per sq ft. So a 300 sq ft patio is roughly <strong>$8,400–$12,000</strong>.</li>
-            <li><strong>Premium patio (500+ sq ft, custom shapes, premium materials, integrated seat walls or fire features):</strong> $45–$70+ per sq ft. So a 600 sq ft outdoor living space is <strong>$27,000–$42,000+</strong>.</li>
-        </ul>
+        ${table({
+            caption: 'Installed paver patio pricing — Lincoln, NE (2026)',
+            headers: ['Patio tier', 'Installed price', 'Example total'],
+            rows: [
+                ['<strong>Small / basic</strong><br><span class="post-table-note">Under 200 sq ft, simple shape, standard concrete pavers</span>', '$20–$28 / sq ft', '150 sq ft ≈ <strong>$3,000–$4,200</strong>'],
+                ['<strong>Mid-size</strong><br><span class="post-table-note">200–400 sq ft, interlocking or natural stone, some demolition</span>', '$28–$40 / sq ft', '300 sq ft ≈ <strong>$8,400–$12,000</strong>'],
+                ['<strong>Premium</strong><br><span class="post-table-note">500+ sq ft, custom shapes, seat walls or fire features</span>', '$45–$70+ / sq ft', '600 sq ft ≈ <strong>$27,000–$42,000+</strong>'],
+            ],
+        })}
         <p>Those are real Lincoln numbers based on what we actually charge in 2026, not ranges scraped from Texas blogs.</p>
+        ${callout({ type: 'warning', title: 'The cheap-bid trap', body: '<p>If a quote comes in 30% under everyone else, the contractor saved that money somewhere you can\'t see — usually a shallower base, no geotextile fabric, or cheap joint sand. The patio looks identical the first season, then heaves after a hard freeze. Always ask a low bidder about base depth, fabric, and polymeric sand.</p>' })}
 
         <h2>Why the range is so wide</h2>
         <p>Six factors swing the price more than anything else:</p>
@@ -433,8 +530,15 @@ const POSTS = [
         description: 'When to overseed your lawn in Lincoln, Nebraska — and why fall almost always beats spring for cool-season grasses. Practical guide from a local crew.',
         h1: 'When to <em class="highlight">Overseed</em> Your Lawn in Lincoln, NE',
         sub: 'Most homeowners overseed in spring. Most homeowners are wrong. Here\'s when to actually do it — and how to make it work either way.',
-        date: '2026-04-08',
+        date: '2026-03-09',
         category: 'Lawn Care',
+        image: '/images/LawnRestore/after.webp',
+        imageAlt: 'Thick, restored cool-season lawn after overseeding in Lincoln',
+        takeaways: [
+            'Fall (Aug 20–Sep 20) beats spring for overseeding cool-season grass: roughly 85% survival vs. ~50%.',
+            'If you overseed in spring, you give up pre-emergent crabgrass control on that area — you can only pick one.',
+            'Whenever you do it: core-aerate first, use a tall fescue / Kentucky bluegrass blend, and keep the top inch of soil damp for two weeks.',
+        ],
         body: `
         <p>If you\'ve got thin patches in your yard, the gut reaction is to throw seed down the next nice spring weekend. That\'s the most common time people overseed in Lincoln. It\'s also the wrong time — usually.</p>
 
@@ -481,6 +585,13 @@ const POSTS = [
         sub: 'The base under your pool is doing more work than the pool itself. Here\'s how we actually build it — and what big-box installers leave out.',
         date: '2026-05-12',
         category: 'Hardscaping',
+        image: '/images/bricklaying/2.webp',
+        imageAlt: 'Leveled, compacted aggregate base prepared for an above-ground pool',
+        takeaways: [
+            'Level matters more than anything: target within 1/2″ across the whole pool, not the manufacturer\'s 1″ maximum.',
+            'Build on compacted 1/4-minus screenings with a thin concrete-sand top — never play sand or mason sand.',
+            'Strip the sod and topsoil first, and set a 16″ patio block under each leg as cheap insurance against sinking.',
+        ],
         body: `
         <p>A 24-foot above-ground pool full of water weighs north of 60,000 pounds. That entire weight sits on a thin liner, which sits on whatever you put under it. If the base is uneven, bumpy, or the wrong material, the pool wall pulls sideways, the legs sink unevenly, and the liner tears or wrinkles where it shouldn\'t.</p>
         <p>The pool manual gives you a one-paragraph prep instruction that assumes you know what "level" actually means at this scale. Most homeowners and big-box delivery crews don\'t. So here\'s the real guide for Lincoln, Nebraska — what materials to use, how deep to go, and what we do on every pool prep we get hired for.</p>
@@ -551,8 +662,15 @@ const POSTS = [
         description: 'A month-by-month fall yard cleanup checklist for Lincoln, Nebraska. Leaf strategy, final mow height, the most important fertilizer feeding of the year, and when to schedule.',
         h1: 'The Fall <em class="highlight">Yard Cleanup Checklist</em> for Lincoln, NE',
         sub: 'September through November, in order. What actually matters for cool-season lawns in Nebraska — and the one fall task that does more for your grass than everything you did in spring combined.',
-        date: '2026-05-21',
+        date: '2026-04-07',
         category: 'Lawn Care',
+        image: '/images/lawncare/4.webp',
+        imageAlt: 'Autumn leaf cleanup on a maintained Lincoln, NE property',
+        takeaways: [
+            'Fall is the most important season for a Lincoln lawn — and the one most people half-do.',
+            'The single highest-value task all year is the mid-October nitrogen feeding; skip it and you lose next spring\'s color.',
+            'Mulch-mow light leaves, rake heavy mats before they smother the grass, and drop the final cut to 2.5–3″.',
+        ],
         body: `
         <p>Fall is the most important season for a Lincoln lawn, and it\'s the one most people half-do. The grass out here is cool-season — Kentucky bluegrass, fescue, perennial rye — which means it\'s actively building roots in the fall while everyone\'s assuming the growing year is over. What you do (and don\'t do) from September through November sets up how your lawn looks the entire next year.</p>
         <p>Here\'s the order we work in on the properties we maintain. It\'s built around Lincoln\'s actual frost timing — our average first frost is mid-October, give or take, and the season is functionally over by Thanksgiving.</p>
@@ -613,8 +731,15 @@ const POSTS = [
         description: 'An honest buyer\'s guide to hiring a landscaper in Lincoln, Nebraska. The exact questions to ask about insurance, base depth, and written quotes — plus the red flags that tell you to walk.',
         h1: 'How to <em class="highlight">Choose a Landscaper</em> in Lincoln, NE',
         sub: 'A straight buyer\'s guide — the questions that actually separate a crew that will still be standing behind the work in five years from one that won\'t.',
-        date: '2026-05-21',
+        date: '2026-01-14',
         category: 'Hardscaping',
+        image: '/images/landscapedesign/1.webp',
+        imageAlt: 'Finished professional landscape and hardscape installation in Lincoln',
+        takeaways: [
+            'The best and worst landscaping look identical for the first season — judge on the questions you ask, not the finished photo.',
+            'For hardscape, the make-or-break question is base depth plus geotextile fabric. A vague answer is your answer.',
+            'Get the scope in writing, confirm insurance, and treat a bid far below the rest as a warning sign, not a bargain.',
+        ],
         body: `
         <p>Hiring a landscaper is weirdly hard to get right, because the worst work and the best work look identical for the first season. A patio built on four inches of base looks exactly like one built on eight — until the third winter, when one of them starts heaving. A bed planted in compacted clay looks the same as one planted in amended soil — until July, when half of it dies.</p>
         <p>So you can\'t judge on the finished photo. You have to judge on the questions you ask before anyone breaks ground. Here\'s what we\'d ask if we were hiring someone — and we say this knowing it holds us to the same standard.</p>
@@ -662,10 +787,29 @@ const POSTS = [
         description: 'An honest mulch-vs-rock comparison for Lincoln, Nebraska landscape beds. Real local pricing, weed control, heat, soil health, and exactly when each one makes sense.',
         h1: '<em class="highlight">Mulch vs. Rock</em> for Your Landscape Beds in Lincoln, NE',
         sub: 'The "rock is maintenance-free" pitch is half-true and half-marketing. Here\'s the honest trade-off for Lincoln yards — cost, weeds, heat, and what it does to your plants.',
-        date: '2026-05-21',
+        date: '2026-02-24',
         category: 'Garden Beds',
+        image: '/images/mulchgardenbeds/1.webp',
+        imageAlt: 'Fresh hardwood mulch in a planted Lincoln, NE garden bed',
+        takeaways: [
+            'Mulch is far cheaper to install; rock costs more up front but can win over 10 years because it never decomposes.',
+            '"Rock is maintenance-free" is a myth — debris collects between the stones, weeds root in it, and the fabric eventually fails.',
+            'Heat is the real decider: rock bakes plants and foundations, while mulch cools the soil and feeds it. Beds with plants → mulch.',
+        ],
         body: `
         <p>This is the most common bed question we get in Lincoln, and the honest answer is "it depends" — but not in the wishy-washy way contractors usually mean. Mulch and rock are good at genuinely different things, and the wrong choice in the wrong spot will cost you money, kill plants, or both. Here\'s the real breakdown.</p>
+        ${table({
+            caption: 'Mulch vs. rock at a glance — Lincoln, NE beds',
+            headers: ['Factor', 'Mulch', 'Landscape rock'],
+            rows: [
+                ['Upfront cost', '<strong>Lower</strong> — ~$35–$50/yd, fast to spread', 'Higher — heavy, slow, needs fabric'],
+                ['10-year cost', 'Recurring — re-mulch most years', '<strong>Often lower</strong> — never decomposes'],
+                ['Maintenance', 'Annual refresh', 'Lower, but not "none" — debris + weeds collect'],
+                ['Soil health', '<strong>Improves it</strong> as it breaks down', 'Nothing; fabric starves the soil'],
+                ['Heat on plants', '<strong>Cools &amp; insulates</strong>', 'Absorbs &amp; radiates — can bake plants'],
+                ['Best for', 'Planted beds, hot exposures, foundations', 'Drainage runs, dry/low-plant strips, fence lines'],
+            ],
+        })}
 
         <h2>Upfront cost: rock costs more to install</h2>
         <p>Rock is the more expensive install, often by a wide margin. Real Lincoln numbers for 2026:</p>
@@ -730,6 +874,504 @@ const POSTS = [
             { q: 'When is rock the right choice?', a: 'Low- or no-plant areas: dry strips along a fence, side yards, around downspouts, and drainage swales where you want water to shed. Rock is excellent for drainage and high-wind spots where mulch blows away.' },
         ],
         related: ['garden-beds', 'landscape-design'],
+    },
+    {
+        slug: 'retaining-wall-cost-lincoln-ne',
+        title: 'How Much Does a Retaining Wall Cost in Lincoln, NE? (2026)',
+        description: 'Real 2026 retaining wall pricing for Lincoln, Nebraska — block, boulder, poured concrete, and timber, per square foot of wall face. What drives the cost and when you need an engineer.',
+        h1: 'How Much Does a <em class="highlight">Retaining Wall</em> Cost in Lincoln, NE?',
+        sub: 'Priced by the square foot of wall face — not by the running foot. Here\'s what block, boulder, and poured walls actually cost in Lincoln, and the height where the price jumps.',
+        date: '2026-05-05',
+        category: 'Hardscaping',
+        image: '/images/retainingwall/1.webp',
+        imageAlt: 'Segmental block retaining wall built in Lincoln, Nebraska',
+        takeaways: [
+            'Retaining walls are priced by the square foot of wall FACE (height × length), not by the running foot — a taller wall costs far more per foot of length.',
+            'Budget $25–$60+ per sq ft of face installed in 2026 depending on material; segmental block is the everyday workhorse.',
+            'At about 4 feet of exposed height, an engineered design is typically required — the single biggest cost cliff.',
+            'Most of the cost you can\'t see is drainage: gravel backfill, drain tile, and a deep base. Skip it and the wall bows out within a few winters.',
+        ],
+        body: `
+        <p>Like patios, retaining walls get advertised with a per-square-foot range that sounds simple and tells you almost nothing. The real Lincoln answer depends on what you're building the wall out of, how tall it is, and — more than anything — what's happening behind it where you can't see. Here's how the pricing actually works.</p>
+
+        <h2>First, how retaining walls are priced</h2>
+        <p>This trips up almost every homeowner: a retaining wall is priced by the <strong>square foot of wall face</strong>, not by its length. The face is height × length. So a wall 30 feet long and 3 feet tall is 90 square feet of face — and it costs far more than a 30-foot wall that's only 1 foot tall, even though both are "30 feet of wall."</p>
+        <p>That's because the work that makes a wall last — excavation, base, drainage, backfill — scales with height, not length. A taller wall holds back more soil and water, so it needs a deeper base, more gravel behind it, and (past a point) engineering.</p>
+
+        <h2>Cost by wall type in Lincoln (2026)</h2>
+        ${table({
+            caption: 'Installed retaining wall pricing per sq ft of wall face — Lincoln, NE (2026)',
+            headers: ['Wall type', 'Installed / sq ft of face', 'Best for'],
+            rows: [
+                ['<strong>Segmental block (SRW)</strong><br><span class="post-table-note">Versa-Lok, Belgard, etc.</span>', '$25–$45', 'Most residential walls — modular, clean, proven'],
+                ['<strong>Natural boulder / outcropping</strong>', '$30–$55', 'Rustic look, gradual slopes, larger lots'],
+                ['<strong>Poured concrete</strong>', '$40–$60+', 'Tall or structural walls, modern look'],
+                ['<strong>Treated timber</strong>', '$18–$30', 'Budget / short walls — shorter lifespan'],
+                ['<strong>Mortared natural stone</strong>', '$50–$80+', 'High-end, fully custom appearance'],
+            ],
+        })}
+        <p>To put that in real numbers: that 90-square-foot block wall above lands somewhere around <strong>$2,250–$4,000</strong> installed. A 40-foot, 4-foot-tall block wall (160 sq ft of face) that needs engineering can run <strong>$6,000–$10,000+</strong>.</p>
+
+        <h2>The 4-foot rule — the biggest cost cliff</h2>
+        <p>Once a wall holds back more than about <strong>4 feet of exposed height</strong>, it generally has to be engineered — a licensed engineer designs the reinforcement (often geogrid that ties the wall back into the hillside), and the city may require a permit. Below 4 feet, a good contractor builds to manufacturer spec without a stamped plan.</p>
+        <p>This is why two walls that look similar can be priced thousands apart: a 3'10" wall and a 4'2" wall are different animals. If your slope needs more than 4 feet of retention, it's often cheaper and stronger to <strong>terrace it</strong> into two shorter walls than to engineer one tall one — and it usually looks better, too.</p>
+        ${callout({ type: 'warning', title: 'Drainage is the whole game', body: '<p>The number one reason retaining walls fail in Lincoln is water, not weight. Water builds up behind the wall, freezes, expands, and pushes the wall out. A real wall has clean gravel backfill, a perforated drain tile at the base daylighting to the side, and a compacted base below frost. A wall built straight against backfilled clay with no drainage will bow and lean within a few seasons — and rebuilding costs more than building it right did.</p>' })}
+
+        <h2>What else moves the price</h2>
+        <ul>
+            <li><strong>Excavation and access.</strong> Tight backyards where we can't get a skid steer in mean hand-digging and hauling — that adds labor fast.</li>
+            <li><strong>What's behind and on top of the wall.</strong> Holding back a driveway or a structure (a "surcharge load") requires more reinforcement than holding back an empty slope.</li>
+            <li><strong>Caps, steps, and curves.</strong> Finished cap stones, integrated steps, and tight radius curves all add material and labor over a straight wall.</li>
+            <li><strong>Tear-out.</strong> Removing a failing timber or block wall before rebuilding adds demolition and disposal.</li>
+        </ul>
+
+        <h2>What you need for a real quote</h2>
+        <ol>
+            <li>Rough length of the wall and how tall it needs to be at its highest point.</li>
+            <li>What it's holding back (a slope, a driveway, a patio) and what's at the top.</li>
+            <li>Photos of the area and the access route from the street or driveway.</li>
+        </ol>
+        <p>With that we can give you a written estimate, usually with a block option and an upgrade option so you can see the trade-off. Most of our wall work is tied to a larger project — a patio that needs grade held, or a sloped lot in <a href="/areas/south-lincoln">south Lincoln</a> with drainage issues — and the same crew that builds the wall does the <a href="/services/hardscaping">hardscaping</a> around it.</p>
+        `,
+        faqs: [
+            { q: 'How much does a retaining wall cost in Lincoln, NE?', a: 'In 2026, segmental block walls — the most common residential choice — run about $25–$45 per square foot of wall face installed. A 30-foot wall that is 3 feet tall (90 sq ft of face) lands roughly $2,250–$4,000. Taller engineered walls run $40–$60+ per sq ft.' },
+            { q: 'Why are retaining walls priced by the square foot of face, not by length?', a: 'Because the cost is driven by height, not length. A taller wall holds back more soil and water, so it needs a deeper base, more gravel backfill, drainage, and sometimes engineering. Wall face (height × length) captures that; running length alone does not.' },
+            { q: 'When does a retaining wall need to be engineered in Nebraska?', a: 'Generally once the wall retains more than about 4 feet of exposed height. Past that, a licensed engineer designs the reinforcement and the city may require a permit. Below 4 feet, a good contractor builds to manufacturer spec. Terracing a tall slope into two shorter walls often avoids the engineering cost.' },
+        ],
+        related: ['hardscaping', 'landscape-design'],
+    },
+    {
+        slug: 'fence-cost-lincoln-ne',
+        title: 'How Much Does a Fence Cost in Lincoln, NE? (2026 Pricing)',
+        description: 'What it costs to fence a yard in Lincoln, Nebraska in 2026 — wood privacy, vinyl, chain link, and ornamental steel, priced per linear foot. Gates, permits, and posts set for Nebraska frost.',
+        h1: 'How Much Does a <em class="highlight">Fence</em> Cost in Lincoln, NE?',
+        sub: 'Priced per linear foot by material. Here\'s what wood, vinyl, chain link, and ornamental steel run in Lincoln — plus the post-depth detail that decides whether your fence survives a Nebraska winter.',
+        date: '2026-05-18',
+        category: 'Fencing',
+        image: '/images/fencing/1.jpg',
+        imageAlt: 'Wood privacy fence installed in a Lincoln, Nebraska backyard',
+        takeaways: [
+            'Fencing is priced per linear foot installed; in 2026 Lincoln, budget roughly $18–$60+ per foot depending on material.',
+            'A typical 150-foot backyard fence runs about $3,000 (chain link) to $9,000+ (vinyl or ornamental steel).',
+            'Posts must be set below Nebraska\'s ~40″ frost line in concrete, or the fence heaves and leans — this is where cheap installs cut corners.',
+            'Gates, sloped ground, tearing out an old fence, and rocky clay digging all add to the base per-foot price.',
+        ],
+        body: `
+        <p>Fencing is one of the easier landscape projects to price, because it mostly comes down to two numbers: how many linear feet you're enclosing and what material you choose. Everything else — gates, slope, tear-out — adds to that base. Here are real Lincoln numbers for 2026.</p>
+
+        <h2>Cost by fence type</h2>
+        ${table({
+            caption: 'Installed fence pricing per linear foot — Lincoln, NE (2026)',
+            headers: ['Fence type', 'Installed / linear ft', '150 ft fenced yard'],
+            rows: [
+                ['<strong>Chain link (4–6 ft)</strong>', '$18–$30', '≈ $2,700–$4,500'],
+                ['<strong>Wood privacy (cedar, 6 ft)</strong>', '$28–$45', '≈ $4,200–$6,750'],
+                ['<strong>Vinyl privacy</strong>', '$40–$60', '≈ $6,000–$9,000'],
+                ['<strong>Ornamental steel / aluminum</strong>', '$35–$60+', '≈ $5,250–$9,000+'],
+            ],
+        })}
+        <p>Wood is the most popular privacy fence in Lincoln because it's the best balance of price, looks, and longevity. Vinyl costs more up front but never needs staining. Chain link is the budget workhorse for pets and property lines. Ornamental steel is the premium look — and the only one that doesn't block a view.</p>
+
+        <h2>The detail that decides if your fence survives: post depth</h2>
+        <p>This is the single most important thing about a fence in Nebraska, and it's invisible once the job's done. Lincoln's frost line is roughly <strong>40 inches</strong>. If fence posts aren't set in concrete <em>below</em> that depth, the freeze-thaw cycle grabs them and heaves them upward over a few winters — and your straight fence starts leaning, gates stop latching, and panels pull apart.</p>
+        ${callout({ type: 'warning', title: 'Ask any fence bidder how deep they set posts', body: '<p>The right answer for Lincoln is at least 36–42 inches, in concrete, with the corner and gate posts set deepest because they take the most load. A crew that sets posts 18–24 inches "because it\'s faster" will save you money today and cost you a leaning fence in three years. This is the fence equivalent of skimping on a patio base.</p>' })}
+
+        <h2>What adds to the base price</h2>
+        <ul>
+            <li><strong>Gates.</strong> A standard walk gate adds roughly $150–$350; a double drive gate is more. Gates need the heaviest posts and the most hardware.</li>
+            <li><strong>Slope and grade.</strong> A fence that has to "step down" a hill or rack to follow a slope takes more time than a flat run.</li>
+            <li><strong>Tear-out of an old fence.</strong> Pulling and hauling the existing fence and old concrete footings adds labor and disposal.</li>
+            <li><strong>Hard digging.</strong> Lincoln's heavy clay is workable; rocky fill or tree roots along the line slow the post holes down.</li>
+            <li><strong>Corners and ends.</strong> A long straight run is cheaper per foot than a yard chopped into lots of short segments and corners.</li>
+        </ul>
+
+        <h2>Permits, property lines, and 811</h2>
+        <p>Two things to handle before anyone digs in Lincoln:</p>
+        <ul>
+            <li><strong>Call 811 first — always.</strong> Nebraska law requires a free utility locate before digging. We schedule this on every fence job so a post hole doesn't hit a gas or fiber line. Never let anyone skip it.</li>
+            <li><strong>Know your zoning and property line.</strong> Lincoln has height limits (typically lower in front yards than side/rear) and your fence needs to sit on your side of the line. If you're in an HOA, check for approval requirements before ordering material. We'll walk the line with you, but the survey pins are the source of truth.</li>
+        </ul>
+
+        <h2>Getting a quote</h2>
+        <p>For a fast estimate we need the approximate perimeter you want enclosed (a rough sketch or even pacing it off is fine), the material and height you're after, how many gates, and whether there's an existing fence to remove. With that we can usually turn around a written, itemized quote within a day. See our <a href="/services/fencing">fencing page</a> for the styles we install, or <a href="/quote">request an estimate</a> and we'll come measure.</p>
+        `,
+        faqs: [
+            { q: 'How much does it cost to fence a yard in Lincoln, NE?', a: 'In 2026, expect roughly $18–$30 per linear foot for chain link, $28–$45 for a 6-foot cedar privacy fence, $40–$60 for vinyl, and $35–$60+ for ornamental steel — installed. A typical 150-foot backyard runs about $3,000 (chain link) to $9,000+ (vinyl or ornamental).' },
+            { q: 'How deep should fence posts be set in Nebraska?', a: 'At least 36–42 inches, in concrete, to get below Lincoln\'s roughly 40-inch frost line. Posts set shallower get heaved upward by the freeze-thaw cycle, and the fence leans within a few winters. Corner and gate posts should be set deepest.' },
+            { q: 'Do I need a permit to build a fence in Lincoln?', a: 'Most standard residential fences do not require a building permit, but you must follow city zoning (height limits differ between front and rear yards) and keep the fence on your side of the property line. You must call 811 for a free utility locate before digging, and HOA neighborhoods may require approval.' },
+        ],
+        related: ['fencing', 'property-cleanup'],
+    },
+    {
+        slug: 'landscaping-cost-lincoln-ne',
+        title: 'How Much Does Landscaping Cost in Lincoln, NE? (2026 Guide)',
+        description: 'A real budgeting guide to landscaping costs in Lincoln, Nebraska for 2026 — from a few-hundred-dollar bed refresh to a full design-build. What drives the number and how to phase a big project.',
+        h1: 'How Much Does <em class="highlight">Landscaping</em> Cost in Lincoln, NE?',
+        sub: 'From a $400 mulch refresh to a $50,000 backyard transformation — here\'s how to think about a landscaping budget in Lincoln, and where the money actually goes.',
+        date: '2026-01-27',
+        category: 'Landscape Design',
+        image: '/images/landscapedesign/2.webp',
+        imageAlt: 'Completed full-yard landscape design-build project in Lincoln, Nebraska',
+        takeaways: [
+            'There is no single "landscaping" price — it ranges from a few hundred dollars (bed refresh) to $50k+ (full design-build).',
+            'A useful rule of thumb: many homeowners invest 5–10% of their home\'s value into landscaping over time.',
+            'Labor and site prep — not the plants — are usually the biggest line items on any real project.',
+            'A large project can be phased over 2–3 seasons to spread the cost without losing the overall design.',
+        ],
+        body: `
+        <p>"How much does landscaping cost?" is a little like asking how much a car costs — the honest answer is "what kind, and how much of it?" A weekend bed refresh and a full backyard rebuild are both "landscaping," and they're two orders of magnitude apart. So instead of a fake single number, here's how to actually budget for it in Lincoln.</p>
+
+        <h2>Ballpark ranges by project</h2>
+        ${table({
+            caption: 'Typical Lincoln, NE landscaping project ranges (2026)',
+            headers: ['Project', 'Typical Lincoln range'],
+            rows: [
+                ['Bed refresh — mulch, edge, cleanup', '$300–$1,500'],
+                ['Front-yard bed redesign + planting', '$2,000–$8,000'],
+                ['Paver patio or walkway', '$3,000–$15,000'],
+                ['Retaining wall', '$3,000–$12,000+'],
+                ['Privacy fence', '$3,000–$9,000'],
+                ['New lawn (sod or seed)', '$1,500–$8,000'],
+                ['Full backyard design-build', '$15,000–$60,000+'],
+            ],
+        })}
+        <p>Most homeowners we work with aren't doing one of these in isolation — they're combining a couple (say, a patio plus the beds around it) into one project, which is usually more cost-effective than hiring out each piece separately a year apart.</p>
+
+        <h2>The 5–10% rule of thumb</h2>
+        <p>A common guideline from the landscape industry: plan to invest roughly <strong>5–10% of your home's value</strong> in landscaping over the years you own it. On a $350,000 Lincoln home, that's $17,500–$35,000 of cumulative outdoor investment — not all at once, but across patios, beds, trees, and lawn over time. Done well, quality landscaping is one of the few home improvements that both improves daily life and holds resale value.</p>
+
+        <h2>Where the money actually goes</h2>
+        <p>Homeowners often assume plants and materials are the big cost. On most real projects, they're not — <strong>labor and site prep are</strong>. A few things that move the number more than the plant list:</p>
+        <ul>
+            <li><strong>Site prep and access.</strong> Demolition, hauling out old material, fixing grade, and how easily a crew can get equipment into the yard. A locked-gate backyard with wheelbarrow-only access costs more than an open lot.</li>
+            <li><strong>Drainage and grading.</strong> If water doesn't move the right way, that gets solved first — and it's underground work you don't "see" in the finished yard. (See our guide on <a href="/blog/wet-yard-drainage-lincoln-ne">fixing a soggy yard</a>.)</li>
+            <li><strong>Material grade.</strong> Standard concrete pavers vs. natural stone, builder-grade plants vs. mature specimens — same design, very different invoice.</li>
+            <li><strong>Hardscape vs. softscape.</strong> Patios, walls, and fences (hardscape) cost far more per square foot than beds and lawn (softscape). A design that's heavy on hardscape costs more.</li>
+        </ul>
+
+        <h2>Design-build vs. piecing it out</h2>
+        <p>You can hire separate people for design, hardscape, planting, and lawn — or hire one crew to design and build the whole thing. For anything beyond a single element, design-build usually wins: one plan that accounts for drainage, sun, and how the spaces connect, built by one accountable crew, with materials ordered once. Piecing it out tends to produce a yard that looks like three projects that don't quite talk to each other — and you pay mobilization costs every time a new crew shows up.</p>
+
+        <h2>How to phase a big project</h2>
+        ${callout({ type: 'tip', title: 'You don\'t have to do it all at once', body: '<p>For a large transformation, we\'ll design the whole yard up front, then build it in phases over two or three seasons — hardscape and grading first (the stuff that\'s disruptive and structural), then beds and plantings, then finishing touches. You spread the cost over time, but because every phase follows the same master plan, the finished yard still looks like one intentional design instead of a patchwork.</p>' })}
+
+        <h2>Getting a real number for your yard</h2>
+        <p>The ranges above are for budgeting. The only way to get a real price is to walk the actual yard — slope, soil, access, and what you want all change it. We do free on-site estimates across Lincoln and put everything in writing, itemized, so you can see exactly where the budget goes and decide what to do now vs. later. Start with our <a href="/services/landscape-design">landscape design</a> process or <a href="/quote">request an estimate</a>.</p>
+        `,
+        faqs: [
+            { q: 'How much does landscaping cost in Lincoln, NE?', a: 'It depends entirely on scope. A bed refresh runs $300–$1,500, a paver patio $3,000–$15,000, and a full backyard design-build $15,000–$60,000+. A common rule of thumb is to invest 5–10% of your home\'s value in landscaping over time.' },
+            { q: 'What is the most expensive part of a landscaping project?', a: 'Usually labor and site prep — not the plants. Demolition, grading, drainage, equipment access, and hardscape (patios, walls, fences) drive the cost far more than the plant list. Hardscape costs much more per square foot than beds and lawn.' },
+            { q: 'Can I split a big landscaping project into phases?', a: 'Yes, and it is common. We design the whole yard up front, then build it over two or three seasons — structural work like grading and hardscape first, then planting and finishing. Phasing spreads the cost while keeping the finished result coherent because every phase follows one master plan.' },
+        ],
+        related: ['landscape-design', 'hardscaping'],
+    },
+    {
+        slug: 'sod-vs-seed-lincoln-ne',
+        title: 'Sod vs. Seed for a New Lawn in Lincoln, NE',
+        description: 'Sod vs. seed for a new or rebuilt lawn in Lincoln, Nebraska — a real cost comparison, timeline, and which one actually wins for your yard, slope, and budget.',
+        h1: '<em class="highlight">Sod vs. Seed</em> for a New Lawn in Lincoln, NE',
+        sub: 'Sod is an instant lawn for more money; seed is a cheaper lawn that makes you wait. Here\'s the honest cost-and-timeline trade-off for Lincoln yards.',
+        date: '2026-03-30',
+        category: 'Lawn Care',
+        image: '/images/LawnRestore/before.webp',
+        imageAlt: 'Bare graded soil being prepared for a new lawn in Lincoln, Nebraska',
+        takeaways: [
+            'Sod gives you a finished lawn in a day for roughly 4–6× the cost of seed; seed is cheaper but takes a full season to fill in.',
+            'For cool-season grass in Lincoln, the best seeding window is late August–September — not spring.',
+            'Sod can be laid almost any frost-free month and is the better call on slopes (it won\'t wash out) and high-traffic yards.',
+            'Either way, the result lives or dies on soil prep — grading and loosening compacted clay matters more than the grass itself.',
+        ],
+        body: `
+        <p>When you're starting a lawn from scratch — a new build, a yard you tore up for a project, or a lawn that's beyond saving — you've got two real options: roll out sod or sow seed. Both end in a lawn. They get there very differently, and the right pick depends on your budget, your timeline, and your yard.</p>
+
+        <h2>The cost and timeline, side by side</h2>
+        ${table({
+            caption: 'Sod vs. seed for a new lawn — Lincoln, NE (2026)',
+            headers: ['', 'Sod', 'Seed'],
+            rows: [
+                ['Installed cost', '$1.00–$2.00 / sq ft', '$0.15–$0.40 / sq ft'],
+                ['5,000 sq ft yard', '≈ $5,000–$10,000', '≈ $750–$2,000'],
+                ['Usable lawn', '~2–3 weeks to root', '~1 full season to fill in'],
+                ['Best install window', 'Any frost-free month', 'Late Aug–Sept (or early spring)'],
+                ['On slopes', '<strong>Wins</strong> — no wash-out', 'Risky — seed washes away'],
+                ['Variety choice', 'Limited to grower\'s blends', '<strong>Wide</strong> — any blend you want'],
+            ],
+        })}
+        <p>The cost gap is the headline: sod is roughly four to six times the price of seed for the same area. You're paying a sod farm to have already spent a year growing it. What you buy with that money is <em>time</em> — a green, usable lawn almost immediately instead of months of watching dirt.</p>
+
+        <h2>When sod is worth it</h2>
+        <ul>
+            <li><strong>You want a lawn now.</strong> Selling the house, hosting in six weeks, or just done looking at mud — sod is instant.</li>
+            <li><strong>You've got a slope.</strong> Seed on any real grade washes into the gutter with the first hard Nebraska rain. Sod holds the soil from day one.</li>
+            <li><strong>High-traffic or pets.</strong> Sod is walkable in a couple weeks; seed needs to be roped off far longer.</li>
+            <li><strong>It's the wrong season to seed.</strong> Need a lawn in June? Seeding then fights summer heat. Sod doesn't care about the calendar (as long as you can water it).</li>
+        </ul>
+
+        <h2>When seed is the smarter call</h2>
+        <ul>
+            <li><strong>Budget matters and you can wait.</strong> The savings on a big yard are thousands of dollars.</li>
+            <li><strong>You want a specific grass blend.</strong> Seed lets you choose exactly the right tall fescue / bluegrass mix for your sun, shade, and traffic. (See <a href="/blog/best-grass-seed-nebraska">the best grass seed for Nebraska</a>.)</li>
+            <li><strong>It's late August or September.</strong> That's the prime seeding window in Lincoln — warm soil, cool air, dying weeds. A fall seeding establishes beautifully. Our <a href="/blog/when-to-overseed-lawn-lincoln-ne">overseeding guide</a> covers the timing in detail.</li>
+        </ul>
+
+        ${callout({ type: 'tip', title: 'Whichever you choose, the soil prep is what matters', body: '<p>Both sod and seed fail on bad ground. Lincoln\'s heavy clay needs to be graded so water runs away from the house, then loosened (and often amended with compost) so roots can actually penetrate. Sod laid on hard, unprepped clay roots poorly and stays thin; seed on the same ground washes and struggles. Spend the effort below the surface and either option thrives — skip it and neither will.</p>' })}
+
+        <h2>What we usually recommend in Lincoln</h2>
+        <p>For most homeowners on a normal timeline, a quality <strong>fall seeding</strong> gives the best lawn for the money. For slopes, quick turnarounds, or anyone who just wants it done, <strong>sod</strong> earns its premium. And sometimes the answer is both — sod the visible front yard and the slope, seed the big flat backyard. Want a recommendation for your specific yard and budget? <a href="/quote">Get a quote</a> and we'll walk it with you.</p>
+        `,
+        faqs: [
+            { q: 'Is sod or seed cheaper for a new lawn in Lincoln?', a: 'Seed is far cheaper — roughly $0.15–$0.40 per sq ft installed vs. $1.00–$2.00 for sod. On a 5,000 sq ft yard that\'s about $750–$2,000 for seed vs. $5,000–$10,000 for sod. With sod you\'re paying for instant results and time saved.' },
+            { q: 'When is the best time to seed a lawn in Lincoln, NE?', a: 'Late August through September. The soil is still warm, the air has cooled, and annual weeds are dying off, so cool-season grass establishes with little competition before frost. Early spring is a workable second choice; summer seeding fights heat and usually fails.' },
+            { q: 'Is sod better than seed on a slope?', a: 'Yes. Seed on any real slope washes away with the first hard rain before it can root. Sod holds the soil in place from the day it\'s laid, so for graded or sloped areas it\'s almost always the better choice despite the higher cost.' },
+        ],
+        related: ['lawn-care', 'landscape-design'],
+    },
+    {
+        slug: 'best-grass-seed-nebraska',
+        title: 'The Best Grass Seed for Nebraska Lawns (Lincoln Guide)',
+        description: 'Which grass actually thrives in Lincoln, Nebraska — the best cool-season grass types and seed blends for sun, shade, and high traffic, from a local lawn crew.',
+        h1: 'The Best <em class="highlight">Grass Seed</em> for Nebraska Lawns',
+        sub: 'Lincoln sits in the cool-season grass zone, so the lawn videos shot down South will steer you wrong. Here\'s what actually thrives in Nebraska — and the blend we use.',
+        date: '2026-02-10',
+        category: 'Lawn Care',
+        image: '/images/lawncare/5.webp',
+        imageAlt: 'Healthy cool-season turf grass on a Lincoln, NE lawn',
+        takeaways: [
+            'Lincoln is cool-season grass country: Kentucky bluegrass, turf-type tall fescue, fine fescue, and perennial ryegrass.',
+            'A turf-type tall fescue / Kentucky bluegrass blend is the best all-around choice for most Lincoln yards.',
+            'Match the seed to the spot: fine fescue for shade, tall fescue for heat and traffic, bluegrass for the deep-green showpiece look.',
+            'Skip cheap big-box "contractor mix" — it\'s padded with annual ryegrass and weed seed that thins out fast.',
+        ],
+        body: `
+        <p>Half the lawn advice online is useless in Nebraska because it's written for a different climate. Bermuda, zoysia, and St. Augustine are warm-season grasses for the South — plant them here and they go brown and dormant the moment it cools off, if they survive the winter at all. Lincoln is firmly in the <strong>cool-season grass zone</strong>, which narrows the real options to four grasses worth knowing.</p>
+
+        <h2>The four grasses that work in Lincoln</h2>
+        ${table({
+            caption: 'Cool-season grasses for Lincoln, NE lawns',
+            headers: ['Grass type', 'Strengths', 'Best for'],
+            rows: [
+                ['<strong>Turf-type tall fescue</strong>', 'Heat &amp; drought tolerant, deep roots, fast to establish', 'Sun, heat, foot traffic — most Lincoln yards'],
+                ['<strong>Kentucky bluegrass</strong>', 'Dark green, dense, self-repairs', 'Showpiece lawns in full sun (slow to start)'],
+                ['<strong>Fine fescue</strong>', 'Shade tolerant, low water &amp; fertilizer', 'Shady spots under trees'],
+                ['<strong>Perennial ryegrass</strong>', 'Germinates fast (5–10 days)', 'Quick cover as part of a blend'],
+            ],
+        })}
+
+        <h2>The blend we recommend for most yards</h2>
+        <p>For a typical Lincoln lawn that gets sun and real use, our go-to is a <strong>turf-type tall fescue / Kentucky bluegrass blend, roughly 70/30</strong>. The tall fescue gives you fast establishment, deep roots, and genuine drought and heat tolerance for July and August. The bluegrass fills in between the fescue clumps over time, knits the lawn together (it spreads by rhizomes, so it self-repairs), and delivers the dark green color people actually want to look at.</p>
+        <p>You get the toughness of fescue and the looks and recovery of bluegrass — without the weaknesses of either one alone.</p>
+
+        <h2>Match the seed to the spot</h2>
+        <ul>
+            <li><strong>Hot, sunny, high-traffic areas</strong> — lean heavier on tall fescue. It takes the heat and bounces back from foot traffic better than bluegrass.</li>
+            <li><strong>Shade under mature trees</strong> (common in <a href="/areas/east-lincoln">east Lincoln</a>) — work fine fescue into the mix. Bluegrass and tall fescue both thin out in real shade; fine fescue tolerates it.</li>
+            <li><strong>A front-yard showpiece in full sun</strong> — you can push the bluegrass percentage up for that dense, dark, golf-course look, as long as you're patient through a slow establishment.</li>
+        </ul>
+
+        ${callout({ type: 'warning', title: 'Avoid the cheap big-box "contractor mix"', body: '<p>The bargain bags of "sun &amp; shade contractor mix" are cheap for a reason: they\'re padded with annual ryegrass (which dies after one season), coarse K-31 pasture-type fescue, and a surprising amount of inert filler and weed seed. They green up fast and look fine for a few months, then thin out and leave you reseeding. Spend a little more on a quality named blend — it\'s the cheapest part of a lawn and the one you live with the longest.</p>' })}
+
+        <h2>Where to buy it locally</h2>
+        <p>Lincoln nurseries and garden centers — Campbell's, Earl May, and the like — carry quality named blends and can point you to the right one for sun or shade. We use Lebanon Pro–grade seed for our customer overseeds; a 50-pound bag runs roughly $80–$110 and covers about 7,500 square feet at a normal overseed rate. Whatever you buy, check the label for the named-variety percentages and a low "weed seed / other crop" number.</p>
+
+        <h2>Putting it down</h2>
+        <p>The best seed in the world fails if it goes down at the wrong time or onto bad soil. In Lincoln, seed in <strong>late August through September</strong> for the best results, core-aerate first so seed reaches the soil, and keep the top inch damp until it germinates. The full timing playbook is in our <a href="/blog/when-to-overseed-lawn-lincoln-ne">overseeding guide</a>, and if you're starting from bare dirt, weigh <a href="/blog/sod-vs-seed-lincoln-ne">sod vs. seed</a> first. Want us to handle the whole thing? <a href="/quote">Get a quote</a>.</p>
+        `,
+        faqs: [
+            { q: 'What is the best grass seed for a lawn in Lincoln, Nebraska?', a: 'A turf-type tall fescue / Kentucky bluegrass blend (about 70/30) is the best all-around choice for most Lincoln yards. The fescue brings heat tolerance, drought resistance, and fast establishment; the bluegrass fills in, self-repairs, and gives the deep green color. Use fine fescue for shady areas.' },
+            { q: 'Can I grow Bermuda or zoysia grass in Nebraska?', a: 'Those are warm-season grasses suited to the South. In Lincoln they go dormant and brown as soon as it cools and often struggle to survive winter. Stick with cool-season grasses — Kentucky bluegrass, tall fescue, fine fescue, and perennial ryegrass.' },
+            { q: 'Is cheap contractor grass-seed mix worth it?', a: 'Usually not. Bargain "contractor" or "sun & shade" mixes are padded with annual ryegrass that dies after a season, coarse pasture fescue, and filler or weed seed. They look fine briefly, then thin out. A quality named blend costs a little more and lasts far longer.' },
+        ],
+        related: ['lawn-care', 'landscape-design'],
+    },
+    {
+        slug: 'wet-yard-drainage-lincoln-ne',
+        title: 'How to Fix a Wet, Soggy Yard in Lincoln, NE',
+        description: 'Standing water and soggy spots in your Lincoln, Nebraska yard — what causes them and how to fix them. French drains, regrading, dry wells, and swales, with real local costs.',
+        h1: 'How to Fix a <em class="highlight">Wet, Soggy Yard</em> in Lincoln, NE',
+        sub: 'Lincoln\'s heavy clay soil and flat lots are a recipe for standing water. Here are the fixes that actually work — and how to match the right one to your problem.',
+        date: '2026-04-20',
+        category: 'Hardscaping',
+        image: '/images/retainingwall/1-3.webp',
+        imageAlt: 'Drainage and grading work on a Lincoln, NE property',
+        takeaways: [
+            'Most Lincoln drainage problems come down to two things: heavy clay that won\'t absorb water, and grade that runs toward the house instead of away from it.',
+            'Fix the grade first — re-sloping so water runs away from the foundation solves a surprising number of "drainage" complaints.',
+            'French drains, dry wells, and swales each solve a different problem; matching the fix to the cause is the whole game.',
+            'Water pooling against your foundation isn\'t cosmetic — it\'s a basement and structural risk worth fixing fast.',
+        ],
+        body: `
+        <p>If you've got a corner of the yard that's a swamp for three days after every rain, a soggy strip that never quite dries, or water creeping toward the foundation, you're fighting Lincoln's two built-in disadvantages: <strong>heavy clay soil</strong> that drains slowly, and a lot of <strong>flat or poorly-graded lots</strong> where water has nowhere to go. The good news is every version of this is fixable. The trick is matching the fix to the actual cause.</p>
+
+        <h2>Why Lincoln yards stay wet</h2>
+        <p>Three usual suspects, often in combination:</p>
+        <ul>
+            <li><strong>Clay soil.</strong> Lincoln's clay holds water instead of letting it percolate down. After a big rain it saturates and stays soggy for days.</li>
+            <li><strong>Bad grade.</strong> The ground slopes the wrong way — toward the house, or toward a low spot with no outlet — so water collects instead of running off.</li>
+            <li><strong>Roof water dumped at the foundation.</strong> Downspouts that empty right at the wall concentrate hundreds of gallons exactly where you least want it.</li>
+        </ul>
+
+        <h2>The fixes, cheapest to most involved</h2>
+        ${table({
+            caption: 'Yard drainage fixes — Lincoln, NE (typical 2026 costs)',
+            headers: ['Fix', 'What it solves', 'Typical cost'],
+            rows: [
+                ['Downspout extensions', 'Roof water dumped at the foundation', '$100–$400'],
+                ['Regrading / re-sloping', 'Ground that slopes toward the house', '$500–$3,000'],
+                ['French drain', 'Soggy low spots, subsurface water', '$1,000–$4,000'],
+                ['Dry well', 'Collected water with nowhere to go', '$800–$2,500'],
+                ['Swale', 'Sheet water crossing the yard', '$1,000–$5,000'],
+            ],
+        })}
+
+        <h3>1. Downspout extensions (do this first)</h3>
+        <p>The cheapest fix and shockingly often the only one you need. Getting roof water 6–10 feet away from the foundation — with buried, pop-up, or surface extensions — solves a huge share of "wet basement" and "soggy foundation bed" complaints for a couple hundred dollars. Always rule this out before paying for anything bigger.</p>
+
+        <h3>2. Regrading / re-sloping</h3>
+        <p>The gold standard: the ground around your house should fall away from the foundation about 6 inches over the first 10 feet. If it doesn't — or if there's a low birdbath spot in the lawn — reshaping the grade so water sheds where you want it fixes the problem at the source instead of managing the symptom. This is the first thing we look at on any drainage call.</p>
+
+        <h3>3. French drain</h3>
+        <p>A perforated pipe in a gravel-filled trench, wrapped in fabric, that collects subsurface water and carries it somewhere safe to daylight. The right tool for a chronically soggy low area or water seeping along a slope. Done right it's invisible (gravel or turf over the top) and lasts decades; done wrong (no fabric, wrong slope) it clogs with silt and quits.</p>
+
+        <h3>4. Dry well</h3>
+        <p>A buried gravel-and-basin reservoir that gives collected water somewhere to sit and slowly soak away — useful when there's no lower point on the property to drain to. Often paired with a French drain or downspout line as the destination.</p>
+
+        <h3>5. Swale</h3>
+        <p>A shallow, gently-shaped channel — often planted, so it just looks like part of the landscape — that guides sheet water across or around the yard to where you want it. Great for moving water that runs across a lawn during heavy rain without an ugly ditch.</p>
+
+        ${callout({ type: 'warning', title: 'Water at the foundation is not a cosmetic problem', body: '<p>A soggy spot in the back forty is annoying. Water pooling against the foundation is a basement-flooding and structural risk — over time it can cause hydrostatic pressure, cracks, and seepage that cost far more than the drainage fix. If water is collecting against the house, treat it as urgent, not a someday project.</p>' })}
+
+        <h2>Getting it diagnosed</h2>
+        <p>Drainage is the one area where a site visit really matters — we need to see where the water comes from, where it pools, and where it could go. We'll walk it after a rain if we can, identify the actual cause, and recommend the least-invasive fix that solves it rather than the most expensive one. It often ties into a regrading or <a href="/services/hardscaping">hardscaping</a> project, but plenty of drainage work stands alone. <a href="/quote">Request an estimate</a> and we'll take a look.</p>
+        `,
+        faqs: [
+            { q: 'Why is my yard always wet and soggy in Lincoln?', a: 'Usually a combination of Lincoln\'s heavy clay soil, which drains slowly, and grade that runs toward the house or into a low spot with no outlet. Downspouts dumping roof water at the foundation make it worse. Identifying which of these is the main cause determines the right fix.' },
+            { q: 'What is the cheapest way to fix yard drainage?', a: 'Downspout extensions — getting roof water 6–10 feet from the foundation for $100–$400 — solve a large share of drainage complaints and should always be ruled out first. After that, regrading so the ground slopes away from the house fixes the problem at its source.' },
+            { q: 'Do I need a French drain or regrading?', a: 'Regrading fixes water that pools because the ground slopes the wrong way; a French drain handles chronically soggy low spots and subsurface water that grading alone can\'t move. They\'re often used together. A site visit after a rain is the best way to tell which your yard needs.' },
+        ],
+        related: ['hardscaping', 'property-cleanup'],
+    },
+    {
+        slug: 'native-drought-tolerant-plants-nebraska',
+        title: 'Native & Drought-Tolerant Plants for Nebraska Yards',
+        description: 'The best native and low-water plants for Lincoln, Nebraska landscapes — tough perennials, grasses, and shrubs that survive our heat, wind, clay, and cold with less work.',
+        h1: '<em class="highlight">Native &amp; Drought-Tolerant</em> Plants for Nebraska Yards',
+        sub: 'Plants that evolved on the prairie don\'t need babying. Here are the natives and tough perennials we plant in Lincoln for color that survives heat, wind, clay, and a Zone 5 winter.',
+        date: '2026-04-28',
+        category: 'Garden Beds',
+        image: '/images/gardenbed/2.webp',
+        imageAlt: 'Native perennial planting in a Lincoln, Nebraska garden bed',
+        takeaways: [
+            'Lincoln is USDA Zone 5b — plants have to take 95°F summers, prairie wind, clay soil, and sub-zero winters.',
+            'Native prairie plants are the lowest-maintenance, lowest-water option, and they feed pollinators on top of it.',
+            'Group plants by water need, and put the toughest, driest-loving ones on hot south- and west-facing exposures.',
+            'Even drought-tolerant plants need regular water their first year to establish — "low-water" kicks in from year two.',
+        ],
+        body: `
+        <p>The toughest, lowest-maintenance plants you can put in a Lincoln yard are the ones that were already growing here before the city was. Nebraska's prairie natives evolved to handle exactly what kills fussy nursery plants: blazing summer heat, relentless wind, dense clay soil, drought, and brutal winters. Plant them and you get color, pollinators, and resilience — with a fraction of the watering and replacing.</p>
+
+        <h2>Know what you're planting into</h2>
+        <p>Lincoln is <strong>USDA hardiness Zone 5b</strong>. A plant here has to survive winter lows around -15°F, summer highs near 100°F, wind that dries everything out, and heavy clay that drains slowly. "Drought-tolerant" and "native" plants are simply the ones built for that — once established, they shrug off the conditions that make you replace annuals every year.</p>
+
+        <h2>Native perennials that thrive here</h2>
+        ${table({
+            caption: 'Tough Nebraska-native perennials & grasses',
+            headers: ['Plant', 'Type', 'Why it works here'],
+            rows: [
+                ['Purple coneflower (Echinacea)', 'Perennial', 'Tough, long bloom, pollinator magnet'],
+                ['Black-eyed Susan (Rudbeckia)', 'Perennial', 'Spreads, blooms for months, deer-resistant'],
+                ['Butterfly milkweed (Asclepias)', 'Perennial', 'Monarch host plant, loves poor dry soil'],
+                ['Blazing star (Liatris)', 'Perennial', 'Vertical purple spikes, totally drought-proof'],
+                ['Little bluestem', 'Grass', 'Native bunchgrass, blue-green → copper fall color'],
+                ['Switchgrass (Panicum)', 'Grass', 'Tall screen, holds soil, great winter interest'],
+                ['False indigo (Baptisia)', 'Perennial', 'Shrub-sized, deep roots, basically permanent'],
+            ],
+        })}
+
+        <h2>Tough non-native standbys</h2>
+        <p>You don't have to go strictly native to get low-water and bulletproof. These adapted perennials handle Lincoln conditions beautifully and mix well with the natives above:</p>
+        <ul>
+            <li><strong>Daylily</strong> — nearly indestructible, blooms in poor soil, spreads slowly.</li>
+            <li><strong>Sedum / stonecrop</strong> ('Autumn Joy' and friends) — succulent leaves store water; fall color when little else is blooming.</li>
+            <li><strong>Russian sage &amp; catmint</strong> — silvery, aromatic, long-blooming, and they laugh at heat and drought.</li>
+            <li><strong>Yarrow</strong> — ferny foliage, flat flower heads, thrives on neglect.</li>
+            <li><strong>Ornamental grasses</strong> (feather reed grass, fountain grass) — movement, texture, and structure that lasts into winter.</li>
+        </ul>
+
+        <h2>Drought-tolerant shrubs</h2>
+        <p>For backbone and year-round structure: <strong>ninebark</strong> (great foliage color), <strong>fragrant sumac</strong> (tough groundcover-to-shrub), <strong>juniper</strong> (evergreen, takes any abuse), and <strong>potentilla</strong> (small, long-blooming, bombproof). These anchor a bed so it doesn't disappear in winter.</p>
+
+        ${callout({ type: 'tip', title: 'Right plant, right place — and group by water need', body: '<p>The secret to a low-water yard isn\'t just picking tough plants — it\'s putting them where they want to be. Cluster the driest-loving plants (milkweed, sedum, blazing star, Russian sage) on hot south- and west-facing exposures where rock or pavement radiates heat. Save the spots with a little more moisture for plants that appreciate it. Grouping by water need means you can water generously where it helps and not at all where it doesn\'t.</p>' })}
+
+        ${callout({ type: 'info', title: 'Even "no-water" plants need water year one', body: '<p>Drought tolerance is a property of an <em>established</em> plant. The first growing season, every one of these needs regular water to grow the deep root system that makes it tough later. Water well through the first year; from year two on, most of these get by on rainfall plus the occasional deep soak in a heat wave.</p>' })}
+
+        <h2>Designing it so it looks intentional</h2>
+        <p>Native and low-water doesn't have to mean wild and weedy. Repeating a few species in drifts, pairing fine-textured grasses with bold flowers, and giving the bed a clean edge reads as designed, not neglected. If you're reworking beds, this is exactly the kind of thing our <a href="/services/landscape-design">landscape design</a> process maps out — what goes where, grouped by sun and water, so it thrives and looks great. And whatever you plant, mulch the beds: see <a href="/blog/mulch-vs-rock-lincoln-ne">mulch vs. rock</a> for why mulch beats rock around living plants. <a href="/quote">Get a quote</a> for a planting plan.</p>
+        `,
+        faqs: [
+            { q: 'What are the best low-maintenance plants for a Lincoln, NE yard?', a: 'Nebraska prairie natives are the toughest and lowest-water options: purple coneflower, black-eyed Susan, butterfly milkweed, blazing star, little bluestem, and switchgrass. Adapted standbys like daylily, sedum, Russian sage, catmint, and yarrow are also nearly bulletproof here.' },
+            { q: 'What USDA hardiness zone is Lincoln, Nebraska?', a: 'Lincoln is in USDA Zone 5b, with winter lows around -15°F. Plants also have to handle summer highs near 100°F, drying wind, and heavy clay soil — which is why native and drought-tolerant species do so well once established.' },
+            { q: 'Do drought-tolerant plants still need watering?', a: 'Yes, especially the first growing season. Drought tolerance comes from a deep, established root system, which takes a year to develop. Water regularly through year one; from year two on, most natives and low-water plants get by on rainfall plus occasional deep watering in heat waves.' },
+        ],
+        related: ['garden-beds', 'landscape-design'],
+    },
+    {
+        slug: 'winterizing-landscape-lincoln-ne',
+        title: 'Winterizing Your Landscape in Lincoln, NE',
+        description: 'How to put your Lincoln, Nebraska yard to bed for winter — sprinkler blowout, protecting plants, the final lawn feeding, and the hardscape steps that prevent freeze damage.',
+        h1: '<em class="highlight">Winterizing</em> Your Landscape in Lincoln, NE',
+        sub: 'Lincoln winters swing from 60° to below zero in a week. A few hours of fall prep prevents cracked pipes, heaved plants, and a slow green-up next spring.',
+        date: '2026-05-22',
+        category: 'Lawn Care',
+        image: '/images/lawncare/6.webp',
+        imageAlt: 'Lincoln, NE landscape prepared and put to bed for winter',
+        takeaways: [
+            'Blow out your irrigation system before the first hard freeze — a cracked backflow or line is the most expensive winter mistake.',
+            'The fall nitrogen feeding (mid-October) is the highest-value lawn task of the year and sets next spring\'s color.',
+            'Mulch beds 2–3″ to buffer Lincoln\'s freeze-thaw swings, which heave shallow-rooted plants right out of the ground.',
+            'Drain and disconnect hoses, protect young tree trunks from sunscald and rodents, and water evergreens until the ground freezes.',
+        ],
+        body: `
+        <p>Winter in Lincoln doesn't ease in — it lurches. You'll get a 60° afternoon and a single-digit night in the same week. That freeze-thaw whiplash, not just the cold, is what damages a landscape: it cracks water lines, heaves plants out of the soil, and splits tree bark. A few hours of prep in the fall prevents a spring full of expensive surprises. Here's the checklist we run.</p>
+
+        <h2>1. Blow out the irrigation system (most important)</h2>
+        <p>If you have an in-ground sprinkler system, this is non-negotiable in Nebraska. Any water left in the lines, valves, or backflow preventer freezes, expands, and cracks the components — and a split backflow assembly is a few hundred dollars plus a soggy spring repair. The system has to be cleared with compressed air ("blown out") before the first hard freeze.</p>
+        ${callout({ type: 'warning', title: 'Don\'t guess at the blowout', body: '<p>A proper blowout needs a real air compressor (a small pancake compressor won\'t move enough volume) and care not to over-pressurize and damage heads. If you don\'t have the right equipment, hire it out — it\'s an inexpensive service and far cheaper than replacing a frozen backflow. The above-ground backflow assembly is the part most likely to freeze and the most expensive to replace.</p>' })}
+
+        <h2>2. The last lawn feeding of the year</h2>
+        <p>If you do one fertilizer application all year, make it the fall one. A slow-release nitrogen feeding in <strong>mid-October</strong>, while the grass is still green, gets stored in the roots over winter and powers a thick, early green-up next spring — without the soft, disease-prone growth a spring feeding causes. It's the single highest-value thing you can do for a cool-season lawn, and it's covered in full in our <a href="/blog/fall-cleanup-checklist-lincoln-ne">fall cleanup checklist</a>.</p>
+
+        <h2>3. Put the beds to bed</h2>
+        <ul>
+            <li><strong>Refresh mulch to 2–3 inches.</strong> Mulch isn't just looks in winter — it insulates roots and buffers the freeze-thaw swings that physically heave shallow-rooted perennials out of the ground. Keep it off plant stems and tree trunks, though.</li>
+            <li><strong>Cut back what should be cut, leave what shouldn't.</strong> Trim mushy, disease-prone perennials (peonies, hostas, anything with mildew). Leave ornamental grasses, coneflowers, and sedum standing — they hold winter interest, feed birds, and catch insulating snow.</li>
+            <li><strong>Weed one last time.</strong> A weed pulled in November is a few hundred you don't fight in May.</li>
+        </ul>
+
+        <h2>4. Protect trees and shrubs</h2>
+        <ul>
+            <li><strong>Water until the ground freezes.</strong> Evergreens especially keep losing moisture through winter wind. Send everything into winter well-watered — a dry root ball going into a hard freeze is what kills "winter-hardy" plants.</li>
+            <li><strong>Wrap young, thin-barked trees.</strong> Maples, lindens, and fruit trees can split from <em>sunscald</em> — winter sun warms the south side of the trunk, then it refreezes at night and the bark cracks. A light-colored trunk wrap for the first few winters prevents it.</li>
+            <li><strong>Guard against rodents.</strong> Mice and rabbits chew bark at the base of young trees under snow cover. A mesh guard around the trunk stops them from girdling and killing the tree.</li>
+        </ul>
+
+        <h2>5. Hoses, hardscape, and containers</h2>
+        <ul>
+            <li><strong>Disconnect and drain every hose</strong> before the first hard freeze, and shut off and drain exterior spigots so the line behind the wall doesn't freeze and burst.</li>
+            <li><strong>Empty and store ceramic/terracotta pots.</strong> Water left in a glazed pot freezes and cracks it. Empty them or flip and cover them.</li>
+            <li><strong>Leave the snow shovel away from the pavers' sealer schedule</strong> — don't seal a patio late in fall; let it wait for spring when there's time to cure. Do clear leaves off hardscape so they don't stain.</li>
+        </ul>
+
+        ${callout({ type: 'tip', title: 'A few "don\'ts"', body: '<p>Don\'t fertilize too late (a December feeding does nothing and can hurt). Don\'t pile mulch into a "volcano" against trunks — it traps moisture and invites rot and rodents. And don\'t cut everything in the beds to the ground; the standing stems of grasses and seed-head perennials protect their own crowns and look good against the snow.</p>' })}
+
+        <h2>Want it handled before the freeze?</h2>
+        <p>Fall and winter prep bunches up right before the first hard freeze every year, and the calendar is unforgiving once the ground locks up. We handle full fall-to-winter prep across Lincoln — final feeding, mulch, bed cutback, tree protection, and haul-off — usually bundled with a <a href="/blog/fall-cleanup-checklist-lincoln-ne">fall cleanup</a>. <a href="/quote">Get on the schedule</a> before the rush.</p>
+        `,
+        faqs: [
+            { q: 'How do I winterize my yard in Lincoln, Nebraska?', a: 'Blow out the irrigation system before the first hard freeze, give the lawn its fall nitrogen feeding in mid-October, refresh bed mulch to 2–3 inches, water trees and evergreens until the ground freezes, protect young tree trunks from sunscald and rodents, and drain and disconnect all hoses and exterior spigots.' },
+            { q: 'When should I blow out my sprinkler system in Nebraska?', a: 'Before the first hard freeze — typically by mid-to-late October in Lincoln. Water left in the lines and backflow preventer freezes and cracks the components. Use a real air compressor or hire the service; it\'s inexpensive compared to replacing a frozen backflow assembly.' },
+            { q: 'Why do my plants get pushed out of the ground over winter?', a: 'It\'s called frost heave. Lincoln\'s repeated freeze-thaw cycles expand and contract the soil, which physically lifts shallow-rooted perennials out of the ground and exposes their roots. A 2–3 inch mulch layer insulates the soil and buffers those swings, preventing most heaving.' },
+        ],
+        related: ['lawn-care', 'garden-beds'],
     },
 ];
 
@@ -822,6 +1464,8 @@ function areaSchema(area) {
 
 function postSchema(post) {
     const url = `https://luckylandscapes.com/blog/${post.slug}`;
+    const { words, minutes } = postStats(post);
+    const image = post.image ? `https://luckylandscapes.com${post.image}` : 'https://luckylandscapes.com/images/og-card.png';
     return {
         '@context': 'https://schema.org',
         '@graph': [
@@ -838,8 +1482,11 @@ function postSchema(post) {
                     logo: { '@type': 'ImageObject', url: 'https://luckylandscapes.com/images/Icon.png' },
                 },
                 description: post.description,
-                image: 'https://luckylandscapes.com/images/og-card.png',
+                image,
                 articleSection: post.category,
+                keywords: [post.category, 'Lincoln NE', 'landscaping'].join(', '),
+                wordCount: words,
+                timeRequired: `PT${minutes}M`,
                 inLanguage: 'en-US',
                 mainEntityOfPage: { '@type': 'WebPage', '@id': url },
                 isPartOf: { '@id': 'https://luckylandscapes.com/blog/#blog' },
@@ -966,8 +1613,36 @@ ${FOUR_LEAF}
 ${pageEnd()}`;
 }
 
+// Blog post card — shared by the index grid and the "more from the blog"
+// related rail. Carries data-* attributes the index uses for live filtering.
+function postCard(p) {
+    const { minutes } = postStats(p);
+    const img = p.image || '/images/banner.jpg';
+    const cleanTitle = p.title.replace(' — Lucky Landscapes', '');
+    const haystack = `${cleanTitle} ${p.description} ${(p.takeaways || []).join(' ')}`
+        .replace(/<[^>]+>/g, '').replace(/"/g, '&quot;');
+    return `
+                <a class="blog-card" href="/blog/${p.slug}" data-title="${cleanTitle.replace(/"/g, '&quot;')}" data-category="${p.category}" data-date="${p.date}" data-keywords="${haystack}">
+                    <div class="blog-card-media">
+                        <img src="${img}" alt="${(p.imageAlt || cleanTitle).replace(/"/g, '&quot;')}" loading="lazy" width="400" height="260" />
+                        <span class="blog-card-chip">${p.category}</span>
+                    </div>
+                    <div class="blog-card-body">
+                        <p class="blog-card-meta"><time datetime="${p.date}">${fmtDate(p.date)}</time> · ${minutes} min read</p>
+                        <h3 class="blog-card-title">${cleanTitle}</h3>
+                        <p class="blog-card-desc">${p.description}</p>
+                        <span class="blog-card-link">Read more →</span>
+                    </div>
+                </a>`;
+}
+
 function renderPost(post) {
     const canonical = `https://luckylandscapes.com/blog/${post.slug}`;
+    const cleanTitle = post.title.replace(' — Lucky Landscapes', '');
+    const ogImage = post.image ? `https://luckylandscapes.com${post.image}` : 'https://luckylandscapes.com/images/og-card.png';
+    const { minutes } = postStats(post);
+    const { html: bodyHtml, toc } = buildToc(post.body);
+
     const related = (post.related || []).map(s => `
                     <a href="/services/${s}" class="home-service-card">
                         <div class="home-service-icon">${SERVICE_LABELS[s].icon}</div>
@@ -976,7 +1651,34 @@ function renderPost(post) {
                         <span class="home-service-link">Learn More →</span>
                     </a>`).join('');
 
-    const dateFmt = new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    // Related posts: same category first, then most-recent others, excluding self.
+    const relatedPosts = POSTS
+        .filter(p => p.slug !== post.slug)
+        .sort((a, b) => {
+            const sa = a.category === post.category ? 0 : 1;
+            const sb = b.category === post.category ? 0 : 1;
+            if (sa !== sb) return sa - sb;
+            return b.date.localeCompare(a.date);
+        })
+        .slice(0, 3);
+
+    const tocHtml = toc.length >= 3 ? `
+                <aside class="post-toc-wrap">
+                    <details class="post-toc" open>
+                        <summary class="post-toc-title">On this page</summary>
+                        <nav class="post-toc-nav"><ol>${toc.map(t => `
+                            <li><a href="#${t.id}">${t.text}</a></li>`).join('')}
+                        </ol></nav>
+                    </details>
+                </aside>` : '';
+
+    const takeawaysHtml = (post.takeaways || []).length ? `
+                    <div class="key-takeaways">
+                        <p class="key-takeaways-title">The short version</p>
+                        <ul>${post.takeaways.map(t => `
+                            <li>${t}</li>`).join('')}
+                        </ul>
+                    </div>` : '';
 
     const faqsHtml = (post.faqs || []).length ? `
         <section class="faq-section">
@@ -994,32 +1696,65 @@ function renderPost(post) {
             </div>
         </section>` : '';
 
-    return `${head({ title: post.title, description: post.description, canonical, schema: postSchema(post) })}
+    return `${head({ title: post.title, description: post.description, canonical, schema: postSchema(post), image: ogImage })}
 
-        <section class="svc-hero">
-            <div class="svc-hero-bg"></div>
+        <div class="reading-progress" aria-hidden="true"><i id="reading-progress"></i></div>
+
+        <nav class="post-breadcrumb" aria-label="Breadcrumb">
             <div class="container">
-                <div class="svc-hero-content">
-                    <div class="hero-badge">
-                        <img src="/images/Icon.png" alt="" />
-                        <span>${post.category} • Published ${dateFmt}</span>
+                <a href="/">Home</a><span class="post-breadcrumb-sep">/</span><a href="/blog/">Blog</a><span class="post-breadcrumb-sep">/</span><span class="post-breadcrumb-current">${cleanTitle}</span>
+            </div>
+        </nav>
+
+        <header class="post-header">
+            <div class="container post-header-inner">
+                <p class="post-eyebrow"><span class="blog-chip blog-chip--solid">${post.category}</span></p>
+                <h1 class="post-title">${post.h1}</h1>
+                <p class="post-sub">${post.sub}</p>
+                <div class="post-meta">
+                    <span class="post-meta-author"><img src="/images/Icon.png" alt="" class="post-meta-avatar" />Lucky Landscapes crew</span>
+                    <span class="post-meta-dot" aria-hidden="true">·</span>
+                    <time datetime="${post.date}">${fmtDate(post.date)}</time>
+                    <span class="post-meta-dot" aria-hidden="true">·</span>
+                    <span>${minutes} min read</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="container post-hero-img">
+            <img src="${post.image || '/images/banner.jpg'}" alt="${(post.imageAlt || cleanTitle).replace(/"/g, '&quot;')}" width="1200" height="600" fetchpriority="high" />
+        </div>
+
+        <div class="container post-layout">${tocHtml}
+            <article class="post-body" id="post-body">
+                ${takeawaysHtml}
+                <div class="prose">${bodyHtml}
+                </div>
+                <div class="post-author">
+                    <img src="/images/Icon.png" alt="" class="post-author-avatar" />
+                    <div>
+                        <p class="post-author-name">Written by the Lucky Landscapes crew</p>
+                        <p class="post-author-bio">We're an owner-operated landscaping company in Lincoln, NE. Everything here is what we actually do on the job — written by the people doing it, not an AI content farm or a national chain.</p>
                     </div>
-                    <h1>${post.h1}</h1>
-                    <p class="hero-sub">${post.sub}</p>
+                </div>
+                <div class="post-cta">
+                    <p>Got a project in mind?</p>
+                    <a href="/quote" class="btn btn-primary btn-lg">Request a Free Estimate</a>
+                </div>
+            </article>
+        </div>
+${faqsHtml}
+        <section class="related-posts">
+            <div class="container">
+                <div class="related-posts-header reveal">
+                    <p class="section-label">Keep reading</p>
+                    <h2 class="section-title">More From the Blog</h2>
+                </div>
+                <div class="blog-grid blog-grid--related stagger-children">${relatedPosts.map(p => postCard(p)).join('')}
                 </div>
             </div>
         </section>
 
-        <article class="svc-features">
-            <div class="container" style="max-width: 760px; line-height: 1.7;">
-                ${post.body}
-
-                <div style="margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--gray-200); text-align: center;">
-                    <a href="/quote" class="btn btn-primary btn-lg">Request a Free Estimate</a>
-                </div>
-            </div>
-        </article>
-${faqsHtml}
         <section class="home-services-section">
             <div class="home-services-bg"></div>
             <div class="container">
@@ -1031,6 +1766,32 @@ ${faqsHtml}
                 </div>
             </div>
         </section>
+
+        <script>
+        (function () {
+            var fill = document.getElementById('reading-progress');
+            var article = document.getElementById('post-body');
+            var links = [].slice.call(document.querySelectorAll('.post-toc-nav a'));
+            var heads = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); }).filter(Boolean);
+            function progress() {
+                if (!fill) return;
+                var doc = document.documentElement;
+                var end = article ? article.offsetTop + article.offsetHeight : doc.scrollHeight;
+                var max = end - window.innerHeight;
+                var top = window.scrollY || doc.scrollTop || 0;
+                fill.style.width = (max > 0 ? Math.min(100, Math.max(0, (top / max) * 100)) : 0) + '%';
+            }
+            function spy() {
+                if (!heads.length) return;
+                var pos = (window.scrollY || 0) + 130, cur = null;
+                for (var i = 0; i < heads.length; i++) { if (heads[i].offsetTop <= pos) cur = heads[i]; }
+                links.forEach(function (a) { a.classList.toggle('active', !!cur && a.getAttribute('href') === '#' + cur.id); });
+            }
+            window.addEventListener('scroll', function () { progress(); spy(); }, { passive: true });
+            window.addEventListener('resize', progress, { passive: true });
+            progress(); spy();
+        })();
+        </script>
 
 ${pageEnd()}`;
 }
@@ -1058,6 +1819,14 @@ for (const post of POSTS) {
 // BLOG INDEX (/blog/index.html)
 // =====================================================================
 
+const sortedPosts = [...POSTS].sort((a, b) => b.date.localeCompare(a.date));
+const featured = sortedPosts[0];
+const featuredStats = postStats(featured);
+const featuredTitle = featured.title.replace(' — Lucky Landscapes', '');
+const catCounts = {};
+POSTS.forEach(p => { catCounts[p.category] = (catCounts[p.category] || 0) + 1; });
+const blogCats = Object.keys(catCounts).sort((a, b) => catCounts[b] - catCounts[a] || a.localeCompare(b));
+
 const blogIndex = `${head({
     title: 'Lucky Landscapes Blog — Lincoln, NE Landscaping Tips & Pricing',
     description: 'Practical landscaping, lawn care, and hardscape advice for Lincoln, Nebraska homeowners. Real local pricing, seasonal guides, and contractor honesty.',
@@ -1072,12 +1841,13 @@ const blogIndex = `${head({
                 description: 'Practical landscaping, lawn care, and hardscape advice for Lincoln, Nebraska homeowners.',
                 url: 'https://luckylandscapes.com/blog/',
                 publisher: { '@id': 'https://luckylandscapes.com/#business' },
-                blogPost: POSTS.map(p => ({
+                blogPost: [...POSTS].sort((a, b) => b.date.localeCompare(a.date)).map(p => ({
                     '@type': 'BlogPosting',
                     headline: p.title.replace(' — Lucky Landscapes', ''),
                     url: `https://luckylandscapes.com/blog/${p.slug}`,
                     datePublished: p.date,
                     description: p.description,
+                    image: p.image ? `https://luckylandscapes.com${p.image}` : 'https://luckylandscapes.com/images/og-card.png',
                 })),
             },
             {
@@ -1105,20 +1875,151 @@ const blogIndex = `${head({
             </div>
         </section>
 
-        <section class="svc-features">
-            <div class="container" style="max-width: 760px;">
-                ${POSTS.map(p => `
-                <a href="/blog/${p.slug}" style="display:block; padding: 1.5rem; margin-bottom: 1rem; border: 1px solid var(--gray-200); border-radius: 1rem; text-decoration:none; color: inherit; transition: all .2s;">
-                    <p class="section-label" style="margin-bottom:.5rem;">${p.category} • ${new Date(p.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                    <h2 style="font-size: 1.5rem; margin: 0 0 .5rem;">${p.title.replace(' — Lucky Landscapes', '')}</h2>
-                    <p style="color: var(--gray-600); margin:0;">${p.description}</p>
-                </a>`).join('')}
+        <section class="blog-featured-section" id="blog-featured">
+            <div class="container">
+                <a class="blog-featured" href="/blog/${featured.slug}">
+                    <div class="blog-featured-media">
+                        <img src="${featured.image || '/images/banner.jpg'}" alt="${(featured.imageAlt || featuredTitle).replace(/"/g, '&quot;')}" width="760" height="500" fetchpriority="high" />
+                        <span class="blog-featured-flag">★ Latest</span>
+                    </div>
+                    <div class="blog-featured-body">
+                        <p class="blog-card-meta"><span class="blog-card-chip blog-card-chip--inline">${featured.category}</span> <time datetime="${featured.date}">${fmtDate(featured.date)}</time> · ${featuredStats.minutes} min read</p>
+                        <h2 class="blog-featured-title">${featuredTitle}</h2>
+                        <p class="blog-featured-desc">${featured.description}</p>
+                        <span class="blog-card-link">Read the article →</span>
+                    </div>
+                </a>
             </div>
         </section>
+
+        <section class="blog-list-section">
+            <div class="container">
+                <div class="blog-controls">
+                    <div class="blog-search-wrap">
+                        <svg class="blog-search-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>
+                        <input id="blog-search" type="search" class="blog-search" placeholder="Search articles…" aria-label="Search articles" autocomplete="off" />
+                    </div>
+                    <div class="blog-sort-wrap">
+                        <label for="blog-sort" class="blog-sort-label">Sort</label>
+                        <select id="blog-sort" class="blog-sort" aria-label="Sort articles">
+                            <option value="newest">Newest first</option>
+                            <option value="oldest">Oldest first</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="blog-filters" role="group" aria-label="Filter by category">
+                    <button type="button" class="blog-filter active" data-cat="all" aria-pressed="true">All</button>${blogCats.map(c => `
+                    <button type="button" class="blog-filter" data-cat="${c}" aria-pressed="false">${c}</button>`).join('')}
+                </div>
+
+                <p class="blog-count"><span id="blog-count">${POSTS.length} articles</span></p>
+
+                <div class="blog-grid" id="blog-grid">${sortedPosts.map(p => postCard(p)).join('')}
+                </div>
+
+                <div class="blog-empty" id="blog-empty" style="display:none;">
+                    <p>No articles match your search. Try a different keyword or category.</p>
+                </div>
+            </div>
+        </section>
+
+        <script>
+        (function () {
+            var grid = document.getElementById('blog-grid');
+            if (!grid) return;
+            var cards = [].slice.call(grid.querySelectorAll('.blog-card'));
+            var search = document.getElementById('blog-search');
+            var sortSel = document.getElementById('blog-sort');
+            var chips = [].slice.call(document.querySelectorAll('.blog-filter'));
+            var countEl = document.getElementById('blog-count');
+            var emptyEl = document.getElementById('blog-empty');
+            var featuredEl = document.getElementById('blog-featured');
+            var activeCat = 'all', q = '';
+
+            function apply() {
+                var visible = 0;
+                cards.forEach(function (c) {
+                    var okCat = activeCat === 'all' || c.getAttribute('data-category') === activeCat;
+                    var hay = (c.getAttribute('data-title') + ' ' + c.getAttribute('data-keywords') + ' ' + c.getAttribute('data-category')).toLowerCase();
+                    var okQ = !q || hay.indexOf(q) !== -1;
+                    var show = okCat && okQ;
+                    c.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                if (countEl) countEl.textContent = visible + (visible === 1 ? ' article' : ' articles');
+                if (emptyEl) emptyEl.style.display = visible === 0 ? '' : 'none';
+                if (featuredEl) featuredEl.style.display = (activeCat === 'all' && !q) ? '' : 'none';
+            }
+            function sortCards(mode) {
+                cards.slice().sort(function (a, b) {
+                    var da = a.getAttribute('data-date'), db = b.getAttribute('data-date');
+                    return mode === 'oldest' ? da.localeCompare(db) : db.localeCompare(da);
+                }).forEach(function (c) { grid.appendChild(c); });
+            }
+            if (search) search.addEventListener('input', function () { q = this.value.trim().toLowerCase(); apply(); });
+            if (sortSel) sortSel.addEventListener('change', function () { sortCards(this.value); });
+            chips.forEach(function (ch) {
+                ch.addEventListener('click', function () {
+                    chips.forEach(function (x) { x.classList.remove('active'); x.setAttribute('aria-pressed', 'false'); });
+                    this.classList.add('active'); this.setAttribute('aria-pressed', 'true');
+                    activeCat = this.getAttribute('data-cat');
+                    apply();
+                });
+            });
+            apply();
+        })();
+        </script>
 
 ${pageEnd()}`;
 
 await writeFile(join(ROOT, 'blog', 'index.html'), blogIndex);
 console.log('  index ', 'blog/index.html');
 
-console.log(`\n✓ Generated ${AREAS.length} area pages + ${POSTS.length} blog posts + 1 blog index`);
+// =====================================================================
+// SITEMAP (public/sitemap.xml)
+// Auto-generated from the static page list + AREAS + POSTS so adding a
+// blog post or area page can never silently fall out of the sitemap.
+// Don't hand-edit public/sitemap.xml — change this block and re-run.
+// =====================================================================
+
+const SITEMAP_STATIC = [
+    { loc: '/',                              lastmod: '2026-05-21', changefreq: 'weekly',  priority: '1.0' },
+    { loc: '/quote',                         lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/gallery',                       lastmod: '2026-05-05', changefreq: 'weekly',  priority: '0.8' },
+    { loc: '/services/landscape-design',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/services/lawn-care',            lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/services/hardscaping',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/services/fencing',              lastmod: '2026-05-11', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/services/garden-beds',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
+    { loc: '/services/property-cleanup',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
+    { loc: '/team',                          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.5' },
+    { loc: '/careers',                       lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.4' },
+    { loc: '/privacy',                       lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
+    { loc: '/terms',                         lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
+];
+
+const sitemapUrls = [
+    ...SITEMAP_STATIC,
+    // Blog index lastmod tracks the newest post so it updates whenever content does.
+    { loc: '/blog/', lastmod: sortedPosts[0].date, changefreq: 'weekly', priority: '0.7' },
+    ...AREAS.map(a => ({ loc: `/areas/${a.slug}`, lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' })),
+    ...sortedPosts.map(p => ({ loc: `/blog/${p.slug}`, lastmod: p.date, changefreq: 'yearly', priority: '0.6' })),
+];
+
+const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Auto-generated by scripts/build-content-pages.js — do not hand-edit. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${sitemapUrls.map(u => `  <url>
+    <loc>https://luckylandscapes.com${u.loc}</loc>
+    <lastmod>${u.lastmod}</lastmod>
+    <changefreq>${u.changefreq}</changefreq>
+    <priority>${u.priority}</priority>
+  </url>`).join('\n')}
+</urlset>
+`;
+
+await writeFile(join(ROOT, 'public', 'sitemap.xml'), sitemapXml);
+console.log('  sitemap', `public/sitemap.xml (${sitemapUrls.length} urls)`);
+
+console.log(`\n✓ Generated ${AREAS.length} area pages + ${POSTS.length} blog posts + 1 blog index + sitemap`);
