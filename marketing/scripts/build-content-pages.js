@@ -392,6 +392,188 @@ function fmtDate(iso) {
     });
 }
 
+// og:image must be a raster (SVG is unreliable as a social card across platforms),
+// so when a post's on-page hero is a generated .svg we fall back to the brand card.
+function ogImageFor(post) {
+    return post.image && !post.image.endsWith('.svg')
+        ? `https://luckylandscapes.com${post.image}`
+        : 'https://luckylandscapes.com/images/og-card.png';
+}
+
+// =====================================================================
+// HERO ILLUSTRATIONS (generated branded SVG, one per post)
+// Deterministic flat-vector scenes in the brand palette — no photos, no
+// external assets, no licensing. Same output every build (index-based math,
+// no Math.random / dates), so the .svg files don't churn in git.
+// =====================================================================
+
+const THEMES = {
+    bright: { sky: ['#BFE3F2', '#E9F6FB'], sun: 'gold',  hills: ['#B5CFA0', '#8FAF72', '#5A7A40'] },
+    warm:   { sky: ['#F8E7C6', '#FCF5E6'], sun: 'gold',  hills: ['#B5CFA0', '#8FAF72', '#5A7A40'] },
+    autumn: { sky: ['#F4DCAE', '#FBEFD6'], sun: 'amber', hills: ['#CBB073', '#A98C42', '#6F6A38'] },
+    winter: { sky: ['#CAD8E6', '#EDF3F9'], sun: 'pale',  hills: ['#DCE6EE', '#C2D2DE', '#A9BCC9'] },
+    rain:   { sky: ['#BFCAD3', '#DCE5EC'], sun: 'cloud', hills: ['#9FB58A', '#7C9A63', '#52703B'] },
+};
+
+const POST_VISUALS = {
+    'spring-lawn-care-checklist-lincoln-ne':   { theme: 'bright', motif: 'mower' },
+    'paver-patio-cost-lincoln-ne':             { theme: 'warm',   motif: 'pavers' },
+    'when-to-overseed-lawn-lincoln-ne':        { theme: 'bright', motif: 'seed' },
+    'above-ground-pool-base-prep-lincoln-ne':  { theme: 'warm',   motif: 'pool' },
+    'fall-cleanup-checklist-lincoln-ne':       { theme: 'autumn', motif: 'leaves' },
+    'how-to-choose-a-landscaper-lincoln-ne':   { theme: 'warm',   motif: 'checklist' },
+    'mulch-vs-rock-lincoln-ne':                { theme: 'warm',   motif: 'mulchrock' },
+    'retaining-wall-cost-lincoln-ne':          { theme: 'warm',   motif: 'wall' },
+    'fence-cost-lincoln-ne':                   { theme: 'bright', motif: 'fence' },
+    'landscaping-cost-lincoln-ne':             { theme: 'warm',   motif: 'plan' },
+    'sod-vs-seed-lincoln-ne':                  { theme: 'bright', motif: 'sodseed' },
+    'best-grass-seed-nebraska':                { theme: 'bright', motif: 'grass' },
+    'wet-yard-drainage-lincoln-ne':            { theme: 'rain',   motif: 'drainage' },
+    'native-drought-tolerant-plants-nebraska': { theme: 'warm',   motif: 'prairie' },
+    'winterizing-landscape-lincoln-ne':        { theme: 'winter', motif: 'winter' },
+};
+
+function visualFor(slug) {
+    const m = POST_VISUALS[slug] || { theme: 'warm', motif: 'grass' };
+    return { ...THEMES[m.theme], motif: m.motif };
+}
+
+// ---- small reusable shapes ----
+function svgClover(x, y, s, fill, op = 1) {
+    return `<g transform="translate(${x},${y}) scale(${s})" opacity="${op}" fill="${fill}"><circle cx="0" cy="-7" r="7"/><circle cx="-7" cy="0" r="7"/><circle cx="7" cy="0" r="7"/><circle cx="0" cy="7" r="7"/><rect x="-1.5" y="6" width="3" height="15" rx="1.5"/></g>`;
+}
+function svgCloud(x, y) {
+    return `<g fill="#AEB9C2"><ellipse cx="${x}" cy="${y}" rx="72" ry="40"/><ellipse cx="${x - 56}" cy="${y + 12}" rx="50" ry="32"/><ellipse cx="${x + 58}" cy="${y + 14}" rx="54" ry="32"/></g>`;
+}
+function svgBlade(x, y, h, w, fill, lean = 0) {
+    const tx = x + lean;
+    return `<path d="M${x - w},${y} Q${x - w * 0.4},${y - h * 0.55} ${tx},${y - h} Q${x + w * 0.4},${y - h * 0.55} ${x + w},${y} Z" fill="${fill}"/>`;
+}
+function svgLeaf(x, y, s, fill, rot) {
+    return `<g transform="translate(${x},${y}) rotate(${rot})"><path d="M0,${-s} C${s * 0.85},${-s * 0.4} ${s * 0.85},${s * 0.4} 0,${s} C${-s * 0.85},${s * 0.4} ${-s * 0.85},${-s * 0.4} 0,${-s} Z" fill="${fill}"/><line x1="0" y1="${-s}" x2="0" y2="${s}" stroke="#00000022" stroke-width="1.5"/></g>`;
+}
+function svgFlower(x, y, petal, center) {
+    let p = '';
+    for (let k = 0; k < 10; k++) p += `<ellipse cx="0" cy="-16" rx="5" ry="14" fill="${petal}" transform="rotate(${k * 36})"/>`;
+    return `<g transform="translate(${x},${y})"><line x1="0" y1="0" x2="0" y2="74" stroke="#5A7A40" stroke-width="5"/>${p}<circle r="9" fill="${center}"/></g>`;
+}
+
+function svgMotif(motif) {
+    switch (motif) {
+        case 'mower':
+            return `<g opacity="0.5"><polygon points="0,640 1200,610 1200,662 0,700" fill="#C2DDA8"/><polygon points="0,678 1200,652 1200,704 0,724" fill="#7FA85B"/></g>
+  <g transform="translate(470,560)"><line x1="120" y1="20" x2="206" y2="-46" stroke="#3C3C3C" stroke-width="9" stroke-linecap="round"/><rect x="10" y="18" width="132" height="56" rx="10" fill="#5A7A40"/><rect x="24" y="30" width="58" height="20" rx="4" fill="#E0B84C"/><circle cx="38" cy="84" r="20" fill="#2D4A22"/><circle cx="122" cy="84" r="20" fill="#2D4A22"/><circle cx="38" cy="84" r="8" fill="#8FAF72"/><circle cx="122" cy="84" r="8" fill="#8FAF72"/></g>`;
+        case 'pavers': {
+            let rows = '';
+            for (let r = 0; r < 5; r++) {
+                const y = 572 + r * 34, inset = 70 - r * 14, pw = (1060 - inset * 2) / 6, off = (r % 2) * (pw / 2);
+                for (let c = -1; c < 6; c++) rows += `<rect x="${inset + c * pw + off}" y="${y}" width="${pw - 7}" height="28" rx="3" fill="#DAC9A6" stroke="#B59C72" stroke-width="2"/>`;
+            }
+            return rows;
+        }
+        case 'seed': {
+            let s = '';
+            for (let i = 0; i < 46; i++) { const x = 60 + (i * 131 % 1080), y = 600 + (i * 73 % 130); s += `<ellipse cx="${x}" cy="${y}" rx="5" ry="3" fill="#B98A2E" transform="rotate(${i * 40 % 360} ${x} ${y})"/>`; }
+            for (let i = 0; i < 11; i++) s += svgBlade(110 + i * 100, 700, 44 + (i * 53 % 28), 6, '#5A7A40', (i % 3 - 1) * 6);
+            return s;
+        }
+        case 'pool': {
+            let base = '';
+            for (let i = 0; i < 30; i++) base += `<circle cx="${258 + (i * 121 % 690)}" cy="${602 + (i * 53 % 92)}" r="3" fill="#A89B7E"/>`;
+            return `<rect x="240" y="588" width="720" height="118" rx="14" fill="#C9BCA0"/><g opacity="0.5">${base}</g><ellipse cx="600" cy="588" rx="320" ry="86" fill="#B9C3CA"/><ellipse cx="600" cy="580" rx="300" ry="74" fill="#4FA3C7"/><ellipse cx="600" cy="574" rx="300" ry="66" fill="#6FBBD8"/><path d="M330,574 q120,30 270,30 q150,0 270,-30" stroke="#CDEAF4" stroke-width="6" fill="none" opacity="0.7"/>`;
+        }
+        case 'leaves': {
+            const cols = ['#C9772E', '#D89B3A', '#9C5B2A', '#B5832F', '#7C8A3A'];
+            let lv = '';
+            for (let i = 0; i < 12; i++) lv += svgLeaf(90 + (i * 113 % 1040), 180 + (i * 157 % 470), 18, cols[i % cols.length], i * 57 % 360);
+            return lv;
+        }
+        case 'checklist': {
+            let rows = '';
+            for (let i = 0; i < 4; i++) rows += `<g transform="translate(28,${64 + i * 40})"><rect width="26" height="26" rx="6" fill="#fff" stroke="#8FAF72" stroke-width="3"/><path d="M5,13 l6,7 l11,-15" stroke="#5A7A40" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/><rect x="42" y="6" width="${204 - i * 20}" height="12" rx="6" fill="#CFC4A8"/></g>`;
+            return `<g transform="translate(440,498)"><rect x="0" y="20" width="320" height="212" rx="14" fill="#F1ECDD" stroke="#CFC4A8" stroke-width="3"/><rect x="120" y="6" width="80" height="34" rx="8" fill="#5A7A40"/>${rows}</g>`;
+        }
+        case 'mulchrock': {
+            let mulch = '';
+            for (let i = 0; i < 18; i++) { const x = 140 + (i * 153 % 400), y = 600 + (i * 61 % 110); mulch += `<line x1="${x}" y1="${y}" x2="${x + 26}" y2="${y + 8}" stroke="#5E3E22" stroke-width="4" stroke-linecap="round"/>`; }
+            let rock = '';
+            for (let i = 0; i < 22; i++) rock += `<circle cx="${670 + (i * 137 % 400)}" cy="${602 + (i * 71 % 108)}" r="${10 + (i % 3) * 4}" fill="#8E969B"/>`;
+            return `<rect x="120" y="585" width="430" height="135" rx="10" fill="#7A5230"/><g opacity="0.6">${mulch}</g><rect x="650" y="585" width="430" height="135" rx="10" fill="#AEB4B8"/><g>${rock}</g><g transform="translate(600,560)"><rect x="-4" y="0" width="8" height="62" fill="#5A7A40"/><ellipse cx="0" cy="0" rx="26" ry="12" fill="#6B8E4E" transform="rotate(-30)"/><ellipse cx="0" cy="0" rx="26" ry="12" fill="#6B8E4E"/><ellipse cx="0" cy="0" rx="26" ry="12" fill="#6B8E4E" transform="rotate(30)"/></g>`;
+        }
+        case 'wall': {
+            let blocks = '';
+            for (let c = 0; c < 4; c++) { const y = 600 + c * 34, off = (c % 2) * 42; for (let i = 0; i < 8; i++) blocks += `<rect x="${120 + off + i * 84}" y="${y}" width="78" height="30" rx="4" fill="#CDB98E" stroke="#A88F5F" stroke-width="2"/>`; }
+            return `<path d="M600,540 L1130,520 L1130,720 L600,720 Z" fill="#7FA85B"/>${blocks}<g transform="translate(180,575)"><rect x="-4" y="0" width="8" height="26" fill="#5A7A40"/><ellipse cx="0" cy="-4" rx="20" ry="9" fill="#6B8E4E" transform="rotate(-25)"/><ellipse cx="0" cy="-4" rx="20" ry="9" fill="#6B8E4E" transform="rotate(25)"/></g>`;
+        }
+        case 'fence': {
+            let pk = '';
+            for (let i = 0; i < 16; i++) { const x = 70 + i * 72, fill = i % 2 ? '#B98A52' : '#C49560'; pk += `<rect x="${x}" y="560" width="46" height="150" rx="4" fill="${fill}" stroke="#8A6334" stroke-width="2"/><path d="M${x},560 L${x + 23},538 L${x + 46},560 Z" fill="${fill}" stroke="#8A6334" stroke-width="2"/>`; }
+            return `<rect x="40" y="600" width="1130" height="16" fill="#8A6334" opacity="0.55"/><rect x="40" y="668" width="1130" height="16" fill="#8A6334" opacity="0.55"/>${pk}`;
+        }
+        case 'plan': {
+            let grid = '';
+            for (let i = 0; i < 13; i++) grid += `<line x1="${270 + i * 52}" y1="478" x2="${270 + i * 52}" y2="712"/>`;
+            for (let i = 0; i < 5; i++) grid += `<line x1="258" y1="${490 + i * 46}" x2="942" y2="${490 + i * 46}"/>`;
+            return `<g transform="rotate(-4 600 600)"><rect x="250" y="470" width="700" height="250" rx="10" fill="#F6F2E7" stroke="#CFC4A8" stroke-width="3"/><g stroke="#DCD3BA" stroke-width="1.5">${grid}</g><g fill="none" stroke="#6B8E4E" stroke-width="3"><circle cx="370" cy="560" r="34"/><circle cx="370" cy="560" r="18" stroke-dasharray="3 4"/><circle cx="520" cy="640" r="26"/><circle cx="760" cy="560" r="40"/><path d="M760,520 v80 M720,560 h80 M732,532 l56,56 M788,532 l-56,56"/><rect x="600" y="600" width="120" height="80" rx="10" stroke-dasharray="6 5"/></g></g>`;
+        }
+        case 'sodseed': {
+            let rolls = '';
+            for (let i = 0; i < 3; i++) { const y = 590 + i * 44; rolls += `<rect x="120" y="${y}" width="360" height="30" rx="14" fill="#7A5230"/><rect x="120" y="${y - 6}" width="360" height="16" rx="8" fill="#6E9A4E"/><ellipse cx="120" cy="${y + 9}" rx="10" ry="18" fill="#5E3E22"/><ellipse cx="120" cy="${y + 3}" rx="9" ry="9" fill="#5A7A40"/>`; }
+            let seeds = '';
+            for (let i = 0; i < 34; i++) seeds += `<ellipse cx="${670 + (i * 149 % 400)}" cy="${602 + (i * 67 % 108)}" rx="4" ry="2.5" fill="#C9A84E"/>`;
+            let spr = '';
+            for (let i = 0; i < 8; i++) spr += svgBlade(690 + i * 48, 700, 30, 5, '#6E9A4E');
+            return `${rolls}<rect x="650" y="585" width="430" height="135" rx="10" fill="#7A5230"/><g>${seeds}</g>${spr}`;
+        }
+        case 'grass': {
+            const cols = ['#8FAF72', '#6B8E4E', '#5A7A40', '#7FA85B'];
+            let g = '';
+            for (let i = 0; i < 62; i++) g += svgBlade(15 + i * 19.5, 745, 78 + (i * 53 % 72), 7, cols[i % 4], (i % 5 - 2) * 9);
+            return g;
+        }
+        case 'drainage': {
+            let rain = '';
+            for (let i = 0; i < 14; i++) rain += `<line x1="${360 + i * 40}" y1="${210 + (i * 37 % 40)}" x2="${346 + i * 40}" y2="${250 + (i * 37 % 40)}" stroke="#7FA8C4" stroke-width="5" stroke-linecap="round" opacity="0.8"/>`;
+            let grate = '';
+            for (let i = 0; i < 4; i++) grate += `<rect x="${16 + i * 32}" y="14" width="14" height="52" rx="6" fill="#30353A"/>`;
+            return `${svgCloud(560, 150)}${rain}<ellipse cx="540" cy="662" rx="300" ry="58" fill="#6FA3C0" opacity="0.85"/><ellipse cx="540" cy="654" rx="250" ry="42" fill="#8FBFD6" opacity="0.7"/><g transform="translate(820,610)"><rect x="0" y="0" width="150" height="80" rx="10" fill="#5A6168"/>${grate}</g><path d="M540,614 q140,-6 270,16" stroke="#8FBFD6" stroke-width="8" fill="none" opacity="0.7"/>`;
+        }
+        case 'prairie': {
+            let g = '';
+            for (let c = 0; c < 7; c++) { const cx = 90 + c * 165; for (let i = 0; i < 6; i++) g += svgBlade(cx + i * 8 - 20, 722, 92 + ((c * 13 + i * 7) % 50), 6, '#7FA85B', (i - 3) * 9); }
+            g += svgFlower(250, 612, '#9B72B8', '#5A3E1E');
+            g += svgFlower(620, 628, '#E0B84C', '#5A3E1E');
+            g += svgFlower(900, 612, '#9B72B8', '#5A3E1E');
+            return g;
+        }
+        case 'winter': {
+            let flakes = '';
+            for (let i = 0; i < 42; i++) flakes += `<circle cx="${40 + (i * 149 % 1130)}" cy="${120 + (i * 97 % 560)}" r="${2 + i % 3}" fill="#ffffff" opacity="0.9"/>`;
+            return `<path d="M0,600 Q360,565 740,595 T1200,585 L1200,750 L0,750 Z" fill="#F4F8FB"/><g transform="translate(560,470)"><rect x="-12" y="60" width="24" height="150" rx="6" fill="#6B4F32"/><g stroke="#6B4F32" stroke-width="10" stroke-linecap="round" fill="none"><path d="M0,90 q-40,-20 -70,-60"/><path d="M0,110 q40,-16 78,-54"/><path d="M0,140 q-34,-14 -58,-44"/><path d="M0,150 q34,-12 60,-40"/></g></g>${flakes}`;
+        }
+        default:
+            return '';
+    }
+}
+
+function heroSvg(v) {
+    const [sky1, sky2] = v.sky, [h1, h2, h3] = v.hills;
+    const sun = v.sun === 'cloud' ? svgCloud(905, 150)
+        : v.sun === 'pale' ? `<circle cx="950" cy="180" r="60" fill="#F0F5FA"/>`
+        : `<circle cx="955" cy="178" r="92" fill="${v.sun === 'amber' ? '#D89B3A' : '#E0B84C'}" opacity="0.14"/><circle cx="955" cy="178" r="64" fill="${v.sun === 'amber' ? '#D89B3A' : '#E0B84C'}"/>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 750" width="1200" height="750" preserveAspectRatio="xMidYMid slice" role="img">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${sky1}"/><stop offset="1" stop-color="${sky2}"/></linearGradient></defs>
+  <rect width="1200" height="750" fill="url(#sky)"/>
+  ${sun}
+  <path d="M0,470 Q300,410 620,455 T1200,445 L1200,750 L0,750 Z" fill="${h1}"/>
+  <path d="M0,545 Q360,495 700,535 T1200,525 L1200,750 L0,750 Z" fill="${h2}"/>
+  <path d="M0,615 Q400,580 740,610 T1200,600 L1200,750 L0,750 Z" fill="${h3}"/>
+  ${svgMotif(v.motif)}
+  ${svgClover(72, 690, 1.5, '#1E3516', 0.16)}
+</svg>
+`;
+}
+
 // =====================================================================
 // BLOG POSTS
 // =====================================================================
@@ -1465,7 +1647,7 @@ function areaSchema(area) {
 function postSchema(post) {
     const url = `https://luckylandscapes.com/blog/${post.slug}`;
     const { words, minutes } = postStats(post);
-    const image = post.image ? `https://luckylandscapes.com${post.image}` : 'https://luckylandscapes.com/images/og-card.png';
+    const image = ogImageFor(post);
     return {
         '@context': 'https://schema.org',
         '@graph': [
@@ -1639,7 +1821,7 @@ function postCard(p) {
 function renderPost(post) {
     const canonical = `https://luckylandscapes.com/blog/${post.slug}`;
     const cleanTitle = post.title.replace(' — Lucky Landscapes', '');
-    const ogImage = post.image ? `https://luckylandscapes.com${post.image}` : 'https://luckylandscapes.com/images/og-card.png';
+    const ogImage = ogImageFor(post);
     const { minutes } = postStats(post);
     const { html: bodyHtml, toc } = buildToc(post.body);
 
@@ -1802,6 +1984,17 @@ ${pageEnd()}`;
 
 await mkdir(join(ROOT, 'areas'), { recursive: true });
 await mkdir(join(ROOT, 'blog'), { recursive: true });
+await mkdir(join(ROOT, 'public', 'images', 'blog'), { recursive: true });
+
+// Generate a unique branded hero illustration (SVG) per post and point the post
+// at it. Runs BEFORE any rendering so cards / hero / schema all use the new image.
+// Set `usePhoto: true` on a post (with a raster `image`) to keep a real photo instead.
+for (const post of POSTS) {
+    if (post.usePhoto && post.image) continue;
+    await writeFile(join(ROOT, 'public', 'images', 'blog', `${post.slug}.svg`), heroSvg(visualFor(post.slug)));
+    post.image = `/images/blog/${post.slug}.svg`;
+}
+console.log('  svg   ', `${POSTS.filter(p => !p.usePhoto).length} hero illustrations → public/images/blog/`);
 
 for (const area of AREAS) {
     const path = join(ROOT, 'areas', `${area.slug}.html`);
@@ -1847,7 +2040,7 @@ const blogIndex = `${head({
                     url: `https://luckylandscapes.com/blog/${p.slug}`,
                     datePublished: p.date,
                     description: p.description,
-                    image: p.image ? `https://luckylandscapes.com${p.image}` : 'https://luckylandscapes.com/images/og-card.png',
+                    image: ogImageFor(p),
                 })),
             },
             {
