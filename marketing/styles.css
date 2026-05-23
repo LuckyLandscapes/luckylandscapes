@@ -1779,6 +1779,57 @@ textarea {
     z-index: 2;
 }
 
+/* Rest-of-crew roster — collapses crew members without headshots into one full-width
+   card so the page never shows empty avatar placeholders. */
+.team-card--roster {
+    grid-column: 1 / -1;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1.5rem;
+}
+
+.team-roster-head h3 {
+    font-size: 1.15rem;
+    margin-bottom: .2rem;
+}
+
+.team-roster-head p {
+    font-size: .9rem;
+    color: var(--gray-500);
+    line-height: 1.6;
+    max-width: 60ch;
+}
+
+.team-roster-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.25rem 2.5rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--gray-200);
+}
+
+.team-roster-member h4 {
+    font-size: 1rem;
+    margin-bottom: .15rem;
+}
+
+.team-roster-member .team-role {
+    margin-bottom: .3rem;
+}
+
+.team-roster-member p {
+    font-size: .88rem;
+    color: var(--gray-500);
+    line-height: 1.55;
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .team-roster-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Team Values Section */
 .team-values {
     padding: var(--section-pad);
