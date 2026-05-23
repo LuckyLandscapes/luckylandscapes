@@ -4,9 +4,10 @@
  * footer, and the sticky mobile CTA bar) across the hand-authored HTML pages so
  * every page matches the homepage. Run after editing the canonical blocks below.
  *
- *   - Nav + mobile menu: adds Blog AND Our Team so the blog is reachable from
- *     service pages and Team from every page (and fixes the old property-cleanup
- *     mobile "Services" → /quote bug, since the whole menu is replaced).
+ *   - Nav + mobile menu: adds Blog so it's reachable from every page. Our Team
+ *     is intentionally NOT in the nav — it's footer-only (demoted so the site
+ *     doesn't lead with the crew). Also fixes the old property-cleanup mobile
+ *     "Services" → /quote bug, since the whole menu is replaced.
  *   - Footer: adds the "Service Areas" column + Blog quick link + social icons.
  *   - Sticky mobile CTA: injected before </body> if missing.
  *
@@ -36,7 +37,6 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
                 <a href="/blog/" class="nav-link">Blog</a>
-                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
             </div>
@@ -50,7 +50,6 @@ const MOBILE_MENU = `<div class="mobile-menu-overlay" id="mobile-overlay"></div>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
         <a href="/blog/" class="mobile-link">Blog</a>
-        <a href="/team" class="mobile-link">Our Team</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
     </div>`;
