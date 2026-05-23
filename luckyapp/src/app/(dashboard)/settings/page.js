@@ -4,13 +4,18 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { apiFetch } from '@/lib/apiClient';
-import { Save, Building2, DollarSign, Users, X, Mail, Loader2, CheckCircle, AlertCircle, UserPlus, Percent } from 'lucide-react';
+import { Save, Building2, DollarSign, Users, X, Mail, Loader2, CheckCircle, AlertCircle, UserPlus, Percent, Star } from 'lucide-react';
 import {
   DEFAULT_CASH_DISCOUNT_PCT,
   getCashDiscountPct,
   estimateCardFee,
   effectiveCardFeePct,
 } from '@/lib/paymentFees';
+
+// Lucky Landscapes' own Google "write a review" link, offered as a one-tap default
+// on the settings field below. The value is stored per-org in
+// settings.google_review_url, so any other org just pastes their own over it.
+const SUGGESTED_REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJg8Qj3PfGY4cRodZKAhHkCCg';
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -24,10 +29,16 @@ export default function SettingsPage() {
   const [toast, setToast] = useState(null);
   const [cashDiscountInput, setCashDiscountInput] = useState('');
   const [savingDiscount, setSavingDiscount] = useState(false);
+  const [reviewUrlInput, setReviewUrlInput] = useState('');
+  const [savingReview, setSavingReview] = useState(false);
 
   // Sync the input with the stored value when org loads
   useEffect(() => {
     if (org) setCashDiscountInput(String(getCashDiscountPct(org)));
+  }, [org]);
+
+  useEffect(() => {
+    if (org) setReviewUrlInput(org.settings?.google_review_url || '');
   }, [org]);
 
   const tabs = [
@@ -51,6 +62,23 @@ export default function SettingsPage() {
       showToast('error', err?.message || 'Could not save.');
     } finally {
       setSavingDiscount(false);
+    }
+  };
+
+  const handleSaveReviewUrl = async () => {
+    const url = reviewUrlInput.trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      showToast('error', 'Enter a full link starting with https://');
+      return;
+    }
+    setSavingReview(true);
+    try {
+      await updateOrgSettings({ google_review_url: url });
+      showToast('success', url ? 'Google review link saved.' : 'Google review link cleared.');
+    } catch (err) {
+      showToast('error', err?.message || 'Could not save.');
+    } finally {
+      setSavingReview(false);
     }
   };
 
@@ -204,6 +232,32 @@ export default function SettingsPage() {
             <button className="btn btn-primary">
               <Save size={16} /> Save Changes
             </button>
+          </div>
+
+          <div style={{ marginTop: 'var(--space-lg)', paddingTop: 'var(--space-lg)', borderTop: '1px solid var(--border-subtle)' }}>
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Star size={14} /> Google review link
+            </label>
+            <input
+              className="form-input"
+              type="url"
+              placeholder="https://search.google.com/local/writereview?placeid=..."
+              value={reviewUrlInput}
+              onChange={(e) => setReviewUrlInput(e.target.value)}
+            />
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', marginTop: '6px' }}>
+              Powers the one-tap review request on every job and customer page. Paste the Google link that opens straight to leaving a star rating.
+            </p>
+            <div style={{ marginTop: '10px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary btn-sm" onClick={handleSaveReviewUrl} disabled={savingReview}>
+                <Save size={14} /> {savingReview ? 'Saving...' : 'Save review link'}
+              </button>
+              {!reviewUrlInput && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => setReviewUrlInput(SUGGESTED_REVIEW_URL)}>
+                  Use my Lucky Landscapes link
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

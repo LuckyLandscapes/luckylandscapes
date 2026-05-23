@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
+import ReviewRequestCard from '@/components/ReviewRequestCard';
 
 // ─── Job authorization modes ───────────────────────────────
 // 'contract'    — signed customer contract required before start (default)
@@ -701,6 +702,11 @@ export default function JobDetailPage({ params }) {
               </div>
             )}
           </div>
+
+          {/* Review request — surfaced for every linked customer, highlighted once the job is done */}
+          {customer && (
+            <ReviewRequestCard customer={customer} highlight={job.status === 'completed'} />
+          )}
 
           {/* Job Details */}
           <div className="job-detail-section">

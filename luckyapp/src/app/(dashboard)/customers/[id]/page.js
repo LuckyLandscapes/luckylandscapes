@@ -9,6 +9,7 @@ import {
   Clock, CheckCircle2, Send, Plus, Edit3, Trash2, X, AlertTriangle, Save,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import ReviewRequestCard from '@/components/ReviewRequestCard';
 import { CUSTOMER_TYPES, customerTypeMeta } from '../page';
 
 function formatPhoneNumber(value) {
@@ -270,6 +271,9 @@ export default function CustomerDetailPage() {
               )}
             </div>
           </div>
+
+          {/* Ask for a Google review */}
+          <ReviewRequestCard customer={customer} />
 
           {/* Notes Card */}
           {customer.notes && (

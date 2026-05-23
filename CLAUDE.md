@@ -378,6 +378,13 @@ Separate from the gallery (which is the portfolio): fixed page graphics on the m
 - **Marketing site integration.** [`marketing/main.js`](marketing/main.js) `loadMarketingImagesFromLuckyapp()` (search `MARKETING_IMAGES_URL`) runs on every page: if the page has any `[data-ll-img]` element, it fetches the slot map and swaps `el.src`/`el.alt` for any slot with an override. Any failure (network, non-200, non-JSON, missing slot) leaves the bundled static image in place. The service pages all load `/main.js`, so the loader runs there. **CSP:** [`marketing/public/_headers`](marketing/public/_headers) already allows `https://*.supabase.co` (img-src) + `https://app.luckylandscapes.com` (connect-src) from the gallery work — no change needed.
 - **Schema** (migration 044): `marketing_images` table, org-scoped, `UNIQUE (org_id, slot_key)`, full RLS via `team_members WHERE user_id = auth.uid()`, realtime-enabled.
 
+### Review requests — one-tap Google review asks (growth lever for local SEO)
+After Google reclassified Lucky storefront → service-area, their local-pack rank slipped (3rd → ~5th) and website leads dried up. Review velocity is the #1 *controllable* local-pack factor, so [`src/components/ReviewRequestCard.js`](luckyapp/src/components/ReviewRequestCard.js) surfaces a one-tap Google review ask on the **job detail page** ([`(dashboard)/jobs/[id]/page.js`](luckyapp/src/app/(dashboard)/jobs/[id]/page.js), highlighted green once `status === 'completed'`) and the **customer detail page** ([`(dashboard)/customers/[id]/page.js`](luckyapp/src/app/(dashboard)/customers/[id]/page.js), right sidebar).
+
+- **Manual send by design.** Copy / Text (`sms:` to the customer's phone, `?&body=` form for iOS+Android) / Email (`mailto:`) all open Riley's *own* apps so the ask comes from his number — a personal text from the owner converts far better than an automated blast, and he picks the moment. No backend/Resend send involved.
+- **Link is per-org** in `organizations.settings.google_review_url` (no migration — same JSONB as `cash_discount_percent`; set via `updateOrgSettings({ google_review_url })`). Configured once in **Settings → Company Profile**; a "Use my Lucky Landscapes link" button one-taps in the prebuilt `writereview?placeid=…` URL. Until it's set, the card shows a setup prompt instead of broken buttons.
+- The pre-written message reads from `org.name` (falls back to "Lucky Landscapes") and the customer's first name. Emoji-free, warm/casual brand voice.
+
 
 ## When finished with response
 Have a section in your response called "Next Steps" to guide the user on what to do next, and a section called things needed to complete for the changes to work, if none are needed state that.
