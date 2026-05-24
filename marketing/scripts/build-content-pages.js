@@ -2215,4 +2215,62 @@ ${sitemapUrls.map(u => `  <url>
 await writeFile(join(ROOT, 'public', 'sitemap.xml'), sitemapXml);
 console.log('  sitemap', `public/sitemap.xml (${sitemapUrls.length} urls)`);
 
-console.log(`\n✓ Generated ${AREAS.length} area pages + ${POSTS.length} blog posts + 1 blog index + sitemap`);
+// =====================================================================
+// llms.txt (public/llms.txt)
+// Machine-readable site overview for AI assistants (ChatGPT, Perplexity,
+// Claude, agent tools) per the llmstxt.org convention. Auto-generated from
+// the same AREAS + POSTS data as the sitemap so content can never fall out
+// of sync. Don't hand-edit public/llms.txt — change this block and re-run.
+// Note: Google does NOT consume this file; it's a low-cost complement for
+// non-Google AI engines. The real local-AI levers are the Google Business
+// Profile, review velocity, and LocalBusiness/Service schema.
+// =====================================================================
+
+const LLMS_ORIGIN = 'https://luckylandscapes.com';
+
+const LLMS_SERVICES = [
+    { loc: '/services/lawn-care',         name: 'Lawn Care',        desc: 'Mowing, edging, trimming, blowing, bagging, and leaf cleanup — weekly, bi-weekly, monthly, one-time, or seasonal.' },
+    { loc: '/services/garden-beds',       name: 'Garden Beds',      desc: 'New bed installation, mulch and rock refresh, edging, weed barrier, planting, transplanting, and weeding.' },
+    { loc: '/services/hardscaping',       name: 'Hardscaping',      desc: 'Paver patios, retaining walls, walkways, fire pits, bed edging, and above-ground pool base prep.' },
+    { loc: '/services/fencing',           name: 'Fencing',          desc: 'Wood privacy, picket, chain link, prefab ornamental, and custom ornamental iron fencing — install, tear-out, and permits.' },
+    { loc: '/services/property-cleanup',  name: 'Property Cleanup', desc: 'Spring and fall cleanups, leaf and brush removal, storm debris, and haul-away.' },
+    { loc: '/services/landscape-design',  name: 'Landscape Design', desc: 'Custom landscape design and design-build for residential and commercial properties.' },
+];
+
+const llmsAreaLabel = (slug) => slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+const llmsTxt = `# Lucky Landscapes
+
+> Full-service residential and commercial landscaping, hardscaping, and lawn care company based in Lincoln, Nebraska. Locally owned and operated, free estimates, fast quotes.
+
+Lucky Landscapes LLC serves Lincoln, NE and the surrounding Lancaster County area (including Waverly and Emerald). We handle lawn care, garden beds, hardscaping (paver patios, retaining walls, fire pits, above-ground pool base prep), fencing, property cleanup, and landscape design. Pricing is custom per project — homeowners and businesses can request a free quote at ${LLMS_ORIGIN}/quote.
+
+## Services
+
+${LLMS_SERVICES.map(s => `- [${s.name}](${LLMS_ORIGIN}${s.loc}): ${s.desc}`).join('\n')}
+
+## Service Areas
+
+${AREAS.map(a => `- [${llmsAreaLabel(a.slug)}](${LLMS_ORIGIN}/areas/${a.slug}): ${a.description}`).join('\n')}
+
+## Guides, Costs & Seasonal Advice
+
+${sortedPosts.map(p => `- [${p.title}](${LLMS_ORIGIN}/blog/${p.slug}): ${p.description}`).join('\n')}
+
+## Company
+
+- [Get a Free Quote](${LLMS_ORIGIN}/quote): Request a custom estimate for any service.
+- [Project Gallery](${LLMS_ORIGIN}/gallery): Photos of completed landscaping and hardscaping projects around Lincoln.
+- [Our Team](${LLMS_ORIGIN}/team): The people behind Lucky Landscapes.
+- [Careers](${LLMS_ORIGIN}/careers): Open crew and landscaping positions in Lincoln, NE.
+
+## Optional
+
+- [Privacy Policy](${LLMS_ORIGIN}/privacy)
+- [Terms of Service](${LLMS_ORIGIN}/terms)
+`;
+
+await writeFile(join(ROOT, 'public', 'llms.txt'), llmsTxt);
+console.log('  llms  ', `public/llms.txt (${LLMS_SERVICES.length} services, ${AREAS.length} areas, ${sortedPosts.length} posts)`);
+
+console.log(`\n✓ Generated ${AREAS.length} area pages + ${POSTS.length} blog posts + 1 blog index + sitemap + llms.txt`);
