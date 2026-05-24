@@ -692,3 +692,213 @@ export function buildScheduleC({
     mileage: { miles: mileageMiles, rate: mileageRate, deductionStandardMethod: mileageTotal },
   };
 }
+
+// ─── Insurance class-code split (workers' comp + general liability) ──
+// WC premium  = payroll × (wcRatePer100 / 100) × experienceMod, per class code.
+// GL premium  ≈ revenue × (glRatePer1000 / 1000), per class code.
+// Masonry/hardscaping rates run far above lawn care, so without records that
+// prove the split a carrier rates ALL payroll at the highest (masonry) code at
+// audit. Classification is per JOB (jobs.wc_class); payroll is derived from
+// clocked time (segments → job → the job's class) so the split traces back to
+// original time records, which is what makes it audit-defensible.
+//
+// IMPORTANT: this is only as complete as the time-tracking data. A job with
+// revenue but no clocked hours contributes revenue (GL basis) but $0 payroll
+// (WC basis). The /insurance page says this out loud and lets Riley reconcile
+// against actual payroll totals before sending anything to the carrier.
+
+export const DEFAULT_WC_CLASSES = [
+  { key: 'masonry',             label: 'Masonry / Hardscaping', code: '97447', desc: 'Pavers, retaining walls, patios, block, stone, outdoor living.', wcRatePer100: null, glRatePer1000: null },
+  { key: 'landscape_gardening', label: 'Landscape Gardening',   code: '90747', desc: 'Planting, mulch, beds, grading, sod, design installs.',         wcRatePer100: null, glRatePer1000: null },
+  { key: 'lawn_care',           label: 'Lawn Care',             code: '97050', desc: 'Mowing, edging, trimming, routine maintenance.',                wcRatePer100: null, glRatePer1000: null },
+];
+
+export const DEFAULT_WC_CLASS_KEY = 'landscape_gardening';
+
+// Quote-builder category → default class key. Riley can override per job in
+// the job edit modal. Unmatched categories fall back to landscape_gardening,
+// mirroring how NCCI treats the general-landscaping catch-all.
+export const CATEGORY_TO_WC_CLASS = {
+  'Lawn Care':        'lawn_care',
+  'Garden & Beds':    'landscape_gardening',
+  'Hardscaping':      'masonry',
+  'Landscape Design': 'landscape_gardening',
+  'Cleanup':          'lawn_care',
+  'Custom':           'landscape_gardening',
+};
+
+export function wcClassForCategory(category) {
+  return CATEGORY_TO_WC_CLASS[category] || DEFAULT_WC_CLASS_KEY;
+}
+
+// Merge org overrides (organizations.settings.payroll.wcClasses) onto the
+// defaults, matched by stable key. Lets Riley correct code numbers + plug in
+// rates without losing structure. Extra keys (a 4th class he adds later) are
+// appended after the defaults.
+export function getWcClasses(org) {
+  const overrides = org?.settings?.payroll?.wcClasses;
+  if (!Array.isArray(overrides) || overrides.length === 0) return DEFAULT_WC_CLASSES.map(c => ({ ...c }));
+  const byKey = new Map(DEFAULT_WC_CLASSES.map(c => [c.key, { ...c }]));
+  for (const o of overrides) {
+    if (!o?.key) continue;
+    const base = byKey.get(o.key) || { key: o.key, label: o.key, code: '', desc: '', wcRatePer100: null, glRatePer1000: null };
+    byKey.set(o.key, { ...base, ...o });
+  }
+  const ordered = [];
+  for (const c of DEFAULT_WC_CLASSES) { if (byKey.has(c.key)) { ordered.push(byKey.get(c.key)); byKey.delete(c.key); } }
+  for (const c of byKey.values()) ordered.push(c);
+  return ordered;
+}
+
+const UNCLASSIFIED_KEY = '__unclassified__';
+
+// Build the payroll + revenue split by insurance class code over [start, end].
+// Payroll counts clocked job-time dated in range (segments preferred, legacy
+// entries as fallback). Revenue counts completed jobs with completedAt in
+// range. Travel/indirect labor and labor on jobs with no class land in
+// "unallocated". Estimated premiums + WC savings only compute when rates are
+// set on the classes (passed via wcClasses).
+export function buildInsuranceClassReport({
+  jobs = [], timeEntries = [], timeSegments = [], teamMembers = [],
+  wcClasses = DEFAULT_WC_CLASSES, start, end, experienceMod = 1,
+} = {}) {
+  const classByKey = new Map(wcClasses.map(c => [c.key, c]));
+  const jobById = new Map(jobs.map(j => [j.id, j]));
+  const entryById = new Map(timeEntries.map(t => [t.id, t]));
+  const rateById = new Map(teamMembers.map(m => [m.id, Number(m.hourlyRate || 0)]));
+  const rateOf = (id) => rateById.get(id) || 0;
+  const classOfJob = (job) => (job && job.wcClass) ? job.wcClass : UNCLASSIFIED_KEY;
+
+  const buckets = {};
+  const ensure = (key) => {
+    if (!buckets[key]) buckets[key] = { key, payroll: 0, hours: 0, revenue: 0, jobIds: new Set(), memberIds: new Set() };
+    return buckets[key];
+  };
+  for (const c of wcClasses) ensure(c.key);
+
+  let unallocatedPayroll = 0, unallocatedHours = 0;
+
+  // 1. Segment-attributed payroll (job-kind → class; travel → unallocated).
+  for (const seg of timeSegments) {
+    if (!seg.endedAt || !inRange(seg.startedAt, start, end)) continue;
+    const entry = entryById.get(seg.timeEntryId);
+    const memberId = entry?.teamMemberId || entry?.memberId;
+    const hrs = Number(seg.durationMinutes || 0) / 60;
+    const dollars = rateOf(memberId) * hrs;
+    if (seg.kind === 'job' && seg.jobId) {
+      const job = jobById.get(seg.jobId);
+      const b = ensure(classOfJob(job));
+      b.payroll += dollars; b.hours += hrs;
+      if (job) b.jobIds.add(job.id);
+      if (memberId) b.memberIds.add(memberId);
+    } else if (seg.kind === 'travel') {
+      unallocatedPayroll += dollars; unallocatedHours += hrs;
+    }
+    // break = unpaid, ignored
+  }
+
+  // 2. Legacy entries with no segments.
+  const segEntryIds = new Set(timeSegments.map(s => s.timeEntryId));
+  for (const t of timeEntries) {
+    if (!t.clockIn || !t.clockOut || segEntryIds.has(t.id)) continue;
+    if (!inRange(t.clockIn, start, end)) continue;
+    const memberId = t.teamMemberId || t.memberId;
+    const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
+    const paidHours = Math.max(0, totalHours - Number(t.breakMinutes || 0) / 60);
+    const dollars = rateOf(memberId) * paidHours;
+    if (t.jobId) {
+      const job = jobById.get(t.jobId);
+      const b = ensure(classOfJob(job));
+      b.payroll += dollars; b.hours += paidHours;
+      if (job) b.jobIds.add(job.id);
+      if (memberId) b.memberIds.add(memberId);
+    } else {
+      unallocatedPayroll += dollars; unallocatedHours += paidHours;
+    }
+  }
+
+  // 3. Revenue — completed jobs dated in range, by class.
+  for (const j of jobs) {
+    if (j.status !== 'completed' || !inRange(j.completedAt, start, end)) continue;
+    const b = ensure(classOfJob(j));
+    b.revenue += Number(j.revenue || j.total || 0);
+    b.jobIds.add(j.id);
+  }
+
+  // Rows: known classes first (in configured order), then any orphan keys
+  // (a class removed after jobs were tagged), then unclassified last.
+  const rows = [];
+  const seen = new Set();
+  const pushRow = (key) => {
+    const b = buckets[key];
+    if (!b) return;
+    seen.add(key);
+    const def = classByKey.get(key);
+    const wcRate = def && Number(def.wcRatePer100) > 0 ? Number(def.wcRatePer100) : null;
+    const glRate = def && Number(def.glRatePer1000) > 0 ? Number(def.glRatePer1000) : null;
+    rows.push({
+      key,
+      label: def?.label || (key === UNCLASSIFIED_KEY ? 'Unclassified' : key),
+      code: def?.code || '',
+      desc: def?.desc || '',
+      payroll: b.payroll,
+      hours: b.hours,
+      revenue: b.revenue,
+      headcount: b.memberIds.size,
+      jobCount: b.jobIds.size,
+      wcRatePer100: wcRate,
+      glRatePer1000: glRate,
+      estWcPremium: wcRate != null ? (b.payroll / 100) * wcRate * experienceMod : null,
+      estGlPremium: glRate != null ? (b.revenue / 1000) * glRate : null,
+      isUnclassified: key === UNCLASSIFIED_KEY,
+    });
+  };
+  for (const c of wcClasses) pushRow(c.key);
+  for (const k of Object.keys(buckets)) { if (!seen.has(k) && k !== UNCLASSIFIED_KEY) pushRow(k); }
+  if (buckets[UNCLASSIFIED_KEY]) pushRow(UNCLASSIFIED_KEY);
+
+  const totals = {
+    payroll: rows.reduce((s, r) => s + r.payroll, 0) + unallocatedPayroll,
+    hours: rows.reduce((s, r) => s + r.hours, 0) + unallocatedHours,
+    revenue: rows.reduce((s, r) => s + r.revenue, 0),
+  };
+
+  // WC savings: split (each code at its own rate; unallocated + unclassified
+  // payroll at the governing/highest rate — the auditor's default for un-split
+  // time) vs. all-at-highest (no records). Only when every class has a rate.
+  const wcRated = wcClasses.filter(c => Number(c.wcRatePer100) > 0);
+  const maxWcRate = wcRated.length ? Math.max(...wcRated.map(c => Number(c.wcRatePer100))) : null;
+  const wcRatesComplete = wcClasses.length > 0 && wcRated.length === wcClasses.length;
+  let estWcPremiumSplit = null, estWcPremiumAllHighest = null, estWcSavings = null;
+  if (wcRatesComplete) {
+    const leftoverPayroll = unallocatedPayroll + (rows.find(r => r.isUnclassified)?.payroll || 0);
+    estWcPremiumSplit = rows.reduce((s, r) => s + (r.estWcPremium || 0), 0)
+      + (leftoverPayroll / 100) * maxWcRate * experienceMod;
+    estWcPremiumAllHighest = (totals.payroll / 100) * maxWcRate * experienceMod;
+    estWcSavings = estWcPremiumAllHighest - estWcPremiumSplit;
+  }
+
+  const glRated = wcClasses.filter(c => Number(c.glRatePer1000) > 0);
+  const estGlPremiumTotal = rows.reduce((s, r) => s + (r.estGlPremium || 0), 0);
+
+  return {
+    rows,
+    unallocated: { payroll: unallocatedPayroll, hours: unallocatedHours },
+    totals,
+    wc: {
+      anyRate: wcRated.length > 0,
+      ratesComplete: wcRatesComplete,
+      maxRatePer100: maxWcRate,
+      experienceMod,
+      estPremiumSplit: estWcPremiumSplit,
+      estPremiumAllHighest: estWcPremiumAllHighest,
+      estSavings: estWcSavings,
+    },
+    gl: {
+      anyRate: glRated.length > 0,
+      ratesComplete: wcClasses.length > 0 && glRated.length === wcClasses.length,
+      estPremiumTotal: glRated.length > 0 ? estGlPremiumTotal : null,
+    },
+    range: { start, end },
+  };
+}

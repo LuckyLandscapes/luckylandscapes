@@ -43,3 +43,15 @@ Added 2026-05 in migration 033. If you're touching the start-job gate, customer 
 - **Work order uploads:** Reuse the existing `ReceiptUpload` component with `scope="work-order"`. Files land in the `receipts` storage bucket under `<orgId>/work-order/`. Component returns `{ url, path }` — both are stored on the job so storage cleanup works on delete.
 - **Site contact UX:** Surfaced as a separate row inside the Customer card on the job detail page, with a `tel:` link. Crew sees the homeowner's phone without touching the GC's billing info.
 - **Why this exists (mental model):** the GC is the customer for billing; the homeowner is just a site contact. Don't try to model the homeowner as a separate `customers` row — that creates two parallel CRM histories for one job and breaks invoice flow.
+
+# Insurance class-code split — quick map (migration 045)
+
+Added 2026-05. Splits payroll + revenue by insurance class code so Lucky can prove the split at a WC/GL audit and pay the correct (lower) blended premium instead of everything-at-masonry. If you're touching jobs, the payroll model, or the `/insurance` page:
+
+- **Schema:** `jobs.wc_class TEXT` nullable — a stable KEY (`masonry` | `landscape_gardening` | `lawn_care`), NOT a code number. Code numbers + rates live on `organizations.settings.payroll.wcClasses` (existing JSONB, no migration).
+- **Helpers (all in `src/lib/finance.js`):** `DEFAULT_WC_CLASSES`, `CATEGORY_TO_WC_CLASS`, `wcClassForCategory(category)`, `getWcClasses(org)` (merges org overrides onto defaults by key), `buildInsuranceClassReport({ jobs, timeEntries, timeSegments, teamMembers, wcClasses, start, end, experienceMod })`.
+- **Auto-classify:** `convertQuoteToJob` in `src/lib/data.js` sets `wcClass: wcClassForCategory(quote.category)`. `addJob`/`updateJob` already pass `wcClass` through `camelToSnake`, so no other data-layer change is needed.
+- **Payroll basis is GROSS, not burdened** — premium is rated on gross wages. Don't pass `payrollSettings` burden into this report. Revenue per code = completed jobs in range; payroll per code = `time_segments` (kind `job` → the job's class) + legacy entries dated in range.
+- **Per-member burden on the team page is intentionally untouched** — it still uses the single `wcClassCode`/rate from `getPayrollSettings`. This report is a standalone aggregate; don't rewire the burden math to "blend" without a plan.
+- **The codes Riley gave are 5-digit (GL/ISO style).** They're seeded but the disclaimer banner tells him to verify against the policy dec page (landscaping WC is NCCI 0042/9102/5022). Keep that disclaimer.
+- **Report completeness depends on time-tracking data** — unclocked jobs contribute revenue but $0 payroll. The page says this; don't silently "fix" it by faking payroll.

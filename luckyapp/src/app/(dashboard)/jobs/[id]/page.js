@@ -10,11 +10,12 @@ import {
   Flag, Timer, Users, DollarSign, Briefcase, Navigation, Play, CheckCircle2,
   XCircle, ChevronRight, Plus, Trash2, X, Package, Wrench, Fuel, TrendingUp,
   Edit3, Save, Search, Check, AlertTriangle, Receipt, Image as ImageIcon, AlertCircle, CheckCircle,
-  HardHat, FileSignature, MessageSquare,
+  HardHat, FileSignature, MessageSquare, Shield,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import ReviewRequestCard from '@/components/ReviewRequestCard';
+import { getWcClasses } from '@/lib/finance';
 
 // ─── Job authorization modes ───────────────────────────────
 // 'contract'    — signed customer contract required before start (default)
@@ -72,7 +73,8 @@ export default function JobDetailPage({ params }) {
   const router = useRouter();
   const { getJob, getCustomer, getQuote, getTeamMember, updateJob, deleteJob, teamMembers,
     getJobFinancials, addJobExpense, deleteJobExpense, jobExpenses, timeEntries, timeSegments,
-    calendarEvents, invoices, contracts } = useData();
+    calendarEvents, invoices, contracts, org } = useData();
+  const wcClasses = getWcClasses(org);
   const { user, isOwnerOrAdmin, isWorker } = useAuth();
 
   const job = getJob(jobId);
@@ -253,6 +255,7 @@ export default function JobDetailPage({ params }) {
       scheduledTime: job.scheduledTime || '',
       crewNotes: job.crewNotes || '',
       priority: job.priority || 'normal',
+      wcClass: job.wcClass || '',
       assignedTo: job.assignedTo || [],
       workAuthorization: job.workAuthorization || 'contract',
       workOrderUrl: job.workOrderUrl || null,
@@ -359,6 +362,15 @@ export default function JobDetailPage({ params }) {
               return (
                 <span className="tag tag-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={meta.label}>
                   <Icon size={11} /> {meta.short}
+                </span>
+              );
+            })()}
+            {job.wcClass && (() => {
+              const cls = wcClasses.find(c => c.key === job.wcClass);
+              if (!cls) return null;
+              return (
+                <span className="tag" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }} title={`Insurance class${cls.code ? ` ${cls.code}` : ''} — drives the Insurance audit report`}>
+                  <Shield size={11} /> {cls.label}
                 </span>
               );
             })()}
@@ -1016,6 +1028,20 @@ export default function JobDetailPage({ params }) {
                   <option value="high">High</option>
                   <option value="urgent">Urgent</option>
                 </select>
+              </div>
+
+              {/* Insurance class code — drives the payroll/revenue-by-code audit report */}
+              <div className="form-group">
+                <label className="form-label"><Shield size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Insurance Class</label>
+                <select className="form-select" value={editForm.wcClass || ''} onChange={e => setEditForm(prev => ({ ...prev, wcClass: e.target.value || null }))}>
+                  <option value="">Unclassified</option>
+                  {wcClasses.map(c => (
+                    <option key={c.key} value={c.key}>{c.label}{c.code ? ` (${c.code})` : ''}</option>
+                  ))}
+                </select>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', margin: '4px 0 0' }}>
+                  Buckets this job&apos;s payroll &amp; revenue on the Insurance report. Auto-set from the quote category.
+                </p>
               </div>
 
               {/* Crew Notes */}

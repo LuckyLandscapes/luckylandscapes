@@ -35,6 +35,7 @@ import {
   Route,
   Globe,
   Image as ImageIcon,
+  Shield,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
@@ -69,6 +70,7 @@ const ownerNavItems = [
   { href: '/mileage', label: 'Mileage', icon: Car, roles: ['owner', 'admin'] },
   { href: '/contractors', label: 'Contractors', icon: FileSignature, roles: ['owner', 'admin'] },
   { href: '/tax', label: 'Tax Center', icon: ScrollText, roles: ['owner', 'admin'] },
+  { href: '/insurance', label: 'Insurance', icon: Shield, roles: ['owner', 'admin'] },
   { href: '/team', label: 'Team & Payroll', icon: UserCog, roles: ['owner'] },
   { label: 'System', type: 'section' },
   { href: '/settings', label: 'Settings', icon: Settings, roles: ['owner', 'admin'] },

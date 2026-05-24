@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConnected } from './supabase';
 import { useAuth } from './auth';
-import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging, getPayrollSettings } from './finance';
+import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging, getPayrollSettings, wcClassForCategory } from './finance';
 
 const DataContext = createContext(null);
 
@@ -698,6 +698,10 @@ export function DataProvider({ children }) {
       crewNotes: crewNotes || '',
       total: quote.total || 0,
       revenue: quote.total || 0,
+      // Auto-tag the insurance class code from the quote category so the
+      // /insurance payroll-and-revenue-by-code report works without manual
+      // tagging. Editable per job in the job edit modal.
+      wcClass: wcClassForCategory(quote.category),
     };
 
     const job = await addJob(jobData);
