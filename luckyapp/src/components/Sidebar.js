@@ -230,6 +230,7 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
+                data-tour={`nav:${item.href}`}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
                 onClick={() => setMobileOpen(false)}
               >

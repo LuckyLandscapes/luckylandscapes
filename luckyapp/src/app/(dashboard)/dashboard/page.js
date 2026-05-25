@@ -150,7 +150,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="stats-grid">
+      <div className="stats-grid" data-tour="dash-headline">
         <div className="stat-card" style={{ '--accent': 'var(--status-success)', '--accent-bg': 'var(--status-success-bg)' }}>
           <div className="stat-card-header"><div className="stat-card-icon"><DollarSign /></div></div>
           <div className="stat-card-value">{formatCurrency(totalRevenue)}</div>
@@ -192,7 +192,7 @@ export default function DashboardPage() {
           Buried in /finance previously; surfacing it here means cash collection
           is one click from the home screen. */}
       {aging.totalAR > 0 && (
-        <div className="card" style={{ marginBottom: 'var(--space-md)', borderLeft: pastDueTotal > 0 ? '3px solid var(--status-danger)' : '3px solid var(--status-success)' }}>
+        <div className="card" data-tour="dash-aging" style={{ marginBottom: 'var(--space-md)', borderLeft: pastDueTotal > 0 ? '3px solid var(--status-danger)' : '3px solid var(--status-success)' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)', flexWrap: 'wrap', gap: '8px' }}>
             <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: 0 }}>
               <Receipt size={18} style={{ color: pastDueTotal > 0 ? 'var(--status-danger)' : 'var(--status-info)' }} />

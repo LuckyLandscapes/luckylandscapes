@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConnected } from './supabase';
+import { isDemoMode } from './demoMode';
 
 const AuthContext = createContext(null);
 
@@ -49,7 +50,7 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (isSupabaseConnected()) {
+    if (isSupabaseConnected() && !isDemoMode()) {
       setMode('supabase');
 
       // Use ONLY onAuthStateChange — it fires INITIAL_SESSION on mount,

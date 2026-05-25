@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
 import ImportHistoricalExpensesModal from '@/components/ImportHistoricalExpensesModal';
+import { isDemoMode, demoToast } from '@/lib/demoMode';
 
 const CATEGORY_ICONS = {
   vehicle: '🚐',
@@ -128,6 +129,22 @@ export default function FinancePage() {
 
   useEffect(() => {
     let cancelled = false;
+    // Demo mode: never hit the real Stripe endpoint (it would expose the real
+    // org's balance/payouts). Show believable sample payouts instead.
+    if (isDemoMode()) {
+      const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().split('T')[0]; };
+      setPayoutsData({
+        loading: false, error: null, configured: true,
+        balance: { available: 2840.50, pending: 1620.00 },
+        payouts: [
+          { id: 'po_demo_1', amount: 1250.00, status: 'in_transit', arrivalDate: d(1), method: 'standard' },
+          { id: 'po_demo_2', amount: 980.00, status: 'pending', arrivalDate: d(3), method: 'standard' },
+          { id: 'po_demo_3', amount: 3200.00, status: 'paid', arrivalDate: d(-2), method: 'standard' },
+          { id: 'po_demo_4', amount: 2150.00, status: 'paid', arrivalDate: d(-9), method: 'standard' },
+        ],
+      });
+      return () => { cancelled = true; };
+    }
     async function fetchPayouts() {
       try {
         const res = await fetch('/api/stripe/payouts');
@@ -152,6 +169,7 @@ export default function FinancePage() {
   }, []);
 
   const refreshPayouts = async () => {
+    if (isDemoMode()) { demoToast('Live Stripe refresh is disabled in the demo.'); return; }
     setPayoutsData(p => ({ ...p, loading: true }));
     try {
       const res = await fetch('/api/stripe/payouts');
@@ -238,6 +256,11 @@ export default function FinancePage() {
   const [reminderResult, setReminderResult] = useState({}); // { [invoiceId]: { ok, msg } }
 
   const handleSendReminder = async (invoice) => {
+    if (isDemoMode()) {
+      demoToast('Sending reminder emails is disabled in the demo — this would email the customer in the live app.');
+      setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: true, msg: 'Demo — not sent' } }));
+      return;
+    }
     const customer = invoice.customerId ? getCustomer(invoice.customerId) : null;
     if (!customer?.email) {
       setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: false, msg: 'No email on file' } }));
@@ -382,7 +405,7 @@ export default function FinancePage() {
       </div>
 
       {/* Cash Flow — Stripe payouts + expected income from unpaid invoices */}
-      <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
+      <div className="card" data-tour="cashflow" style={{ marginBottom: 'var(--space-md)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
           <h3 style={{ margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Landmark size={18} style={{ color: 'var(--status-success)' }} />

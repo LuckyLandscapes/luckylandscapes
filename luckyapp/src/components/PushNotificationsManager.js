@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { supabase, isSupabaseConnected } from '@/lib/supabase';
+import { isDemoMode } from '@/lib/demoMode';
 
 // Asks for notification permission once per device, then subscribes the
 // browser to web push and persists the subscription to push_subscriptions.
@@ -27,7 +28,7 @@ export default function PushNotificationsManager() {
     if (ranRef.current) return;
     if (typeof window === 'undefined') return;
     if (!user || isWorker) return;
-    if (!isSupabaseConnected()) return; // demo mode — no real subscriptions
+    if (!isSupabaseConnected() || isDemoMode()) return; // demo mode — no real subscriptions
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
     const vapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;

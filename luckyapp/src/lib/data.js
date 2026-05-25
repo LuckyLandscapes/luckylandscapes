@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { supabase, isSupabaseConnected } from './supabase';
 import { useAuth } from './auth';
 import { jobFinancials as computeJobFinancials, buildPnL as computeBuildPnL, buildARAging as computeARAging, getPayrollSettings, wcClassForCategory } from './finance';
+import { isDemoMode } from './demoMode';
 
 const DataContext = createContext(null);
 
@@ -68,7 +69,9 @@ function saveLocal(key, data) {
 export function DataProvider({ children }) {
   const { user } = useAuth();
   const orgId = user?.orgId;
-  const connected = isSupabaseConnected() && !!orgId;
+  // Demo mode forces the localStorage path even though Supabase env vars are
+  // present in production — see src/lib/demoMode.js.
+  const connected = isSupabaseConnected() && !isDemoMode() && !!orgId;
 
   // State
   const [customers, setCustomers] = useState([]);

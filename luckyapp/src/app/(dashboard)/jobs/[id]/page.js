@@ -522,7 +522,7 @@ export default function JobDetailPage({ params }) {
 
         return (
           <>
-            <div className="job-financials-banner" style={{ borderLeft: `4px solid ${marginTier.color}` }}>
+            <div className="job-financials-banner" data-tour="job-profit" style={{ borderLeft: `4px solid ${marginTier.color}` }}>
               <div className="job-financials-item">
                 <span className="job-financials-label">Revenue</span>
                 <span className="job-financials-value" style={{ color: 'var(--status-success)' }}>

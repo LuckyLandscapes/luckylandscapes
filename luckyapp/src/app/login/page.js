@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-import { LogIn, Mail, ArrowLeft, Loader2 } from 'lucide-react';
+import { LogIn, Mail, ArrowLeft, Loader2, PlayCircle } from 'lucide-react';
+import { enterDemoMode } from '@/lib/demoMode';
 
 export default function LoginPage() {
   const { login, resetPassword } = useAuth();
@@ -15,6 +16,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [resetSent, setResetSent] = useState(false);
+  const [demoLoading, setDemoLoading] = useState(false);
+
+  const handleDemo = async () => {
+    setDemoLoading(true);
+    try {
+      await enterDemoMode();
+      // Hard navigation so the auth + data providers re-initialize and pick up
+      // the demo flag (they read it at mount).
+      window.location.href = '/dashboard';
+    } catch {
+      setDemoLoading(false);
+    }
+  };
 
   const switchMode = (newMode) => {
     setMode(newMode);
@@ -95,6 +109,23 @@ export default function LoginPage() {
             </div>
             <div style={{ textAlign: 'center', marginTop: 'var(--space-sm)', fontSize: '0.78rem', color: 'var(--text-tertiary)', opacity: 0.6 }}>
               Need an account? Ask your team admin to add you.
+            </div>
+
+            {/* ──────── LIVE DEMO ──────── */}
+            <div className="login-demo-divider"><span>or</span></div>
+            <button
+              type="button"
+              onClick={handleDemo}
+              disabled={demoLoading}
+              className="btn login-demo-btn"
+              style={{ width: '100%' }}
+            >
+              {demoLoading
+                ? <><Loader2 size={18} className="spin" /> Loading demo…</>
+                : <><PlayCircle size={18} /> See the app — Live Demo</>}
+            </button>
+            <div style={{ textAlign: 'center', marginTop: 'var(--space-xs)', fontSize: '0.74rem', color: 'var(--text-tertiary)', opacity: 0.7 }}>
+              No login needed · sample data · a guided 2-minute tour
             </div>
           </>
         )}
