@@ -1590,7 +1590,7 @@ function areaSchema(area) {
         '@context': 'https://schema.org',
         '@graph': [
             {
-                '@type': ['LocalBusiness', 'LandscapingBusiness'],
+                '@type': ['LocalBusiness', 'HomeAndConstructionBusiness'],
                 '@id': `${url}#business`,
                 name: `Lucky Landscapes — ${areaName}`,
                 parentOrganization: { '@id': 'https://luckylandscapes.com/#business' },

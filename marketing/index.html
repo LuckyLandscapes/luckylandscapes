@@ -37,7 +37,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Lucky Landscapes" />
     <link rel="manifest" href="/favicon/site.webmanifest" />
-    <!-- Structured Data: LocalBusiness graph (LandscapingBusiness + WebSite + Organization).
+    <!-- Structured Data: LocalBusiness graph (HomeAndConstructionBusiness + WebSite + Organization).
          A single @graph keeps these entities tied via @id, which Google uses to build the
          knowledge panel and the local-pack candidate set. NAP (name/address/phone) here MUST
          match the Google Business Profile exactly — any drift hurts local ranking. -->
@@ -46,7 +46,7 @@
       "@context": "https://schema.org",
       "@graph": [
         {
-          "@type": ["LocalBusiness", "LandscapingBusiness", "HomeAndConstructionBusiness"],
+          "@type": ["LocalBusiness", "HomeAndConstructionBusiness"],
           "@id": "https://luckylandscapes.com/#business",
           "name": "Lucky Landscapes",
           "legalName": "Lucky Landscapes LLC",
@@ -88,16 +88,16 @@
             { "@type": "PropertyValue", "propertyID": "Google Maps CID", "value": "2884806323034838689" }
           ],
           "areaServed": [
-            { "@type": "City", "name": "Lincoln", "@id": "https://en.wikipedia.org/wiki/Lincoln,_Nebraska", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Waverly", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Beatrice", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Seward", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Fairbury", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Davey", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Hickman", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Roca", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Emerald", "addressRegion": "NE", "addressCountry": "US" },
-            { "@type": "City", "name": "Bennet", "addressRegion": "NE", "addressCountry": "US" },
+            { "@type": "City", "name": "Lincoln", "@id": "https://en.wikipedia.org/wiki/Lincoln,_Nebraska", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Waverly", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Beatrice", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Seward", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Fairbury", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Davey", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Hickman", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Roca", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Emerald", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
+            { "@type": "City", "name": "Bennet", "containedInPlace": { "@type": "State", "name": "Nebraska" } },
             { "@type": "AdministrativeArea", "name": "Lancaster County, Nebraska" }
           ],
           "serviceArea": {

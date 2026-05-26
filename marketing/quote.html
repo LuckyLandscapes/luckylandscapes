@@ -44,10 +44,10 @@
       "description": "Request a free, personalized landscaping quote from Lucky Landscapes in Lincoln, NE.",
       "url": "https://luckylandscapes.com/quote",
       "provider": {
-        "@type": "LandscapingBusiness",
+        "@type": ["LocalBusiness", "HomeAndConstructionBusiness"],
         "name": "Lucky Landscapes",
         "telephone": "+1-402-405-5475",
-        "areaServed": { "@type": "City", "name": "Lincoln", "addressRegion": "NE" }
+        "areaServed": { "@type": "City", "name": "Lincoln", "containedInPlace": { "@type": "State", "name": "Nebraska" } }
       },
       "potentialAction": {
         "@type": "QuoteAction",
