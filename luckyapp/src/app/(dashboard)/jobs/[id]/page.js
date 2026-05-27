@@ -800,6 +800,37 @@ export default function JobDetailPage({ params }) {
             </div>
           )}
 
+          {/* Linked Invoices — jump straight to the billing doc to edit line items.
+              Jobs don't hold line items themselves; the invoice is what the
+              customer is actually billed, so scope edits happen there. */}
+          {isOwnerOrAdmin && linkedInvoices.length > 0 && (
+            <div className="job-detail-section">
+              <div className="job-detail-section-title"><Receipt size={16} /> Invoices ({linkedInvoices.length})</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+                {linkedInvoices.map(inv => {
+                  const bal = (inv.total || 0) - (inv.amountPaid || 0);
+                  return (
+                    <Link key={inv.id} href={`/invoices/${inv.id}`} className="linked-quote-preview" style={{ textDecoration: 'none' }}>
+                      <div className="linked-quote-preview-header">
+                        <span className="linked-quote-preview-num">{inv.invoiceNumber}</span>
+                        <span className="linked-quote-preview-total">{formatCurrency(inv.total)}</span>
+                      </div>
+                      <div className="linked-quote-preview-items" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <span style={{ textTransform: 'capitalize' }}>{inv.status}</span>
+                        {bal > 0
+                          ? <span>{formatCurrency(bal)} due</span>
+                          : <span style={{ color: 'var(--status-success)' }}>Paid</span>}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+              <p style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)', margin: 'var(--space-sm) 0 0' }}>
+                Open an invoice to edit its line items — that&apos;s what the customer is billed.
+              </p>
+            </div>
+          )}
+
           {/* Quote Site Photos — read-only for the crew */}
           {quote && (
             <div className="job-detail-section job-detail-full-width">

@@ -8,7 +8,7 @@ import {
   ArrowLeft, DollarSign, CheckCircle2, Clock, AlertCircle,
   Receipt, Trash2, X, AlertTriangle, CreditCard, Send,
   Mail, MessageSquare, Loader2, CheckCircle, Copy, Link as LinkIcon, Banknote,
-  Percent,
+  Percent, Pencil, Plus, Save, CalendarDays,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import {
@@ -76,6 +76,63 @@ export default function InvoiceDetailPage() {
   const [sendState, setSendState] = useState({ loading: false, success: false, error: null });
   const [toast, setToast] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [showEditItems, setShowEditItems] = useState(false);
+  const [editItems, setEditItems] = useState([]);
+  const [savingItems, setSavingItems] = useState(false);
+  const [editItemsError, setEditItemsError] = useState(null);
+
+  // These derived values + the smsBody memo must be computed BEFORE the
+  // not-found early return below — a Hook (useMemo) after a conditional return
+  // breaks the rules of Hooks. They're written null-safe so they also hold up
+  // while the invoice is still loading.
+  const balance = (invoice?.total || 0) - (invoice?.amountPaid || 0);
+  const payUrl = invoice?.publicToken && typeof window !== 'undefined'
+    ? `${window.location.origin}/pay/${invoice.publicToken}`
+    : null;
+  const isPaid = invoice?.status === 'paid';
+
+  // Pre-formatted SMS body — copy/paste into any messaging app
+  const smsBody = useMemo(() => {
+    if (!invoice) return '';
+    const firstName = customer?.firstName || 'there';
+    const smsCashOption = computeCashDiscount(balance, cashDiscountPct);
+    const lines = isPaid ? [
+      `Hi ${firstName}! 🍀 Here's your paid receipt from Lucky Landscapes.`,
+      ``,
+      `📄 Invoice ${invoice.invoiceNumber}`,
+      `✅ Paid in full: ${formatCurrency(invoice.total)}`,
+      invoice.paidDate ? `📅 Paid: ${formatDate(invoice.paidDate)}` : null,
+      ``,
+      sendMessage || null,
+      sendMessage ? '' : null,
+      `View your receipt online:`,
+      payUrl,
+      ``,
+      `Questions? Just reply or call (402) 405-5475.`,
+      ``,
+      `Thanks again!`,
+      `— The Lucky Landscapes Team`,
+    ] : [
+      `Hi ${firstName}! 🍀 Thanks again for your business — your invoice from Lucky Landscapes is ready.`,
+      ``,
+      `📄 Invoice ${invoice.invoiceNumber}`,
+      `💰 Balance Due: ${formatCurrency(balance)}`,
+      invoice.dueDate ? `📅 Due: ${formatDate(invoice.dueDate)}` : null,
+      ``,
+      sendMessage || null,
+      sendMessage ? '' : null,
+      `Pay securely online (credit/debit card or bank transfer — takes 30 seconds):`,
+      payUrl,
+      ``,
+      cashDiscountPct > 0 ? `💵 Save ${cashDiscountPct}% (${formatCurrency(smsCashOption.discount)}) by paying cash, check, Venmo, or Zelle — just reply to arrange. New balance would be ${formatCurrency(smsCashOption.cashTotal)}.` : null,
+      cashDiscountPct > 0 ? `` : null,
+      `Questions? Just reply or call (402) 405-5475.`,
+      ``,
+      `Thanks!`,
+      `— The Lucky Landscapes Team`,
+    ];
+    return lines.filter(l => l !== null).join('\n');
+  }, [invoice, customer, balance, sendMessage, payUrl, isPaid, cashDiscountPct]);
 
   // While `deleting` is true the row may already be gone from local state
   // (the data layer updates before router.push lands). Don't flash the
@@ -95,11 +152,11 @@ export default function InvoiceDetailPage() {
   }
 
   const cfg = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.unpaid;
-  const balance = (invoice.total || 0) - (invoice.amountPaid || 0);
   const items = invoice.items || [];
-  const payUrl = invoice.publicToken && typeof window !== 'undefined'
-    ? `${window.location.origin}/pay/${invoice.publicToken}`
-    : null;
+  const editItemsSubtotal = editItems.reduce(
+    (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0
+  );
+  const editItemsTotal = editItemsSubtotal + editItemsSubtotal * (Number(invoice.taxRate) || 0);
 
   // Stripe fee aggregate — only counts non-duplicate rows. The webhook
   // populates processor_fee + net_amount from the actual Stripe charge,
@@ -176,6 +233,76 @@ export default function InvoiceDetailPage() {
       showToast('error', err.message || 'Failed to record payment');
     } finally {
       setRecording(false);
+    }
+  };
+
+  // ─── Edit line items ────────────────────────────────────
+  // The invoice is the document that actually gets sent + paid, so it's the
+  // source of truth for what's billed (subcontract scope changes, added days,
+  // a job that grew). Editing here recomputes subtotal/tax/total and
+  // re-derives the status against whatever's already been paid.
+  const openEditItems = () => {
+    const seed = (invoice.items || []).map(it => ({
+      name: it.name || '',
+      description: it.description || '',
+      quantity: it.quantity ?? 1,
+      unitPrice: it.unitPrice ?? 0,
+    }));
+    setEditItems(seed.length ? seed : [{ name: '', description: '', quantity: 1, unitPrice: 0 }]);
+    setEditItemsError(null);
+    setShowEditItems(true);
+  };
+  const updateEditItem = (idx, patch) =>
+    setEditItems(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)));
+  const addEditItem = (preset = {}) =>
+    setEditItems(prev => [...prev, { name: '', description: '', quantity: 1, unitPrice: 0, ...preset }]);
+  const removeEditItem = (idx) =>
+    setEditItems(prev => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
+
+  const handleSaveItems = async () => {
+    const cleaned = editItems
+      .map(it => ({
+        name: (it.name || '').trim(),
+        description: (it.description || '').trim(),
+        quantity: Number(it.quantity) || 0,
+        unitPrice: Number(it.unitPrice) || 0,
+      }))
+      .filter(it => it.name && it.quantity * it.unitPrice > 0)
+      .map(it => ({ ...it, total: +(it.quantity * it.unitPrice).toFixed(2) }));
+
+    if (cleaned.length === 0) {
+      setEditItemsError('Add at least one line item with a description and an amount.');
+      return;
+    }
+
+    setSavingItems(true);
+    setEditItemsError(null);
+    try {
+      const subtotal = +cleaned.reduce((s, it) => s + it.total, 0).toFixed(2);
+      const taxRate = Number(invoice.taxRate) || 0;
+      const tax = +(subtotal * taxRate).toFixed(2);
+      const total = +(subtotal + tax).toFixed(2);
+      const paid = Number(invoice.amountPaid) || 0;
+
+      // Re-derive status from the new total vs what's already been paid. A
+      // shrunk total can flip an invoice to paid; a grown one back to partial.
+      let status = invoice.status;
+      if (paid >= total && total > 0) status = 'paid';
+      else if (paid > 0) status = 'partial';
+      else if (status === 'paid' || status === 'partial') status = 'unpaid';
+
+      const patch = { items: cleaned, subtotal, tax, total, status };
+      if (status === 'paid' && !invoice.paidDate) patch.paidDate = new Date().toISOString().split('T')[0];
+      if (status !== 'paid') patch.paidDate = null;
+
+      await updateInvoice(id, patch);
+      setShowEditItems(false);
+      showToast('success', 'Line items updated');
+    } catch (err) {
+      console.error('Error updating line items:', err);
+      setEditItemsError(err?.message || 'Could not save line items. Try again.');
+    } finally {
+      setSavingItems(false);
     }
   };
 
@@ -331,50 +458,6 @@ export default function InvoiceDetailPage() {
       setSendState({ loading: false, success: false, error: err.message });
     }
   };
-
-  // Pre-formatted SMS body — copy/paste into any messaging app
-  const isPaid = invoice?.status === 'paid';
-  const smsBody = useMemo(() => {
-    if (!invoice) return '';
-    const firstName = customer?.firstName || 'there';
-    const smsCashOption = computeCashDiscount(balance, cashDiscountPct);
-    const lines = isPaid ? [
-      `Hi ${firstName}! 🍀 Here's your paid receipt from Lucky Landscapes.`,
-      ``,
-      `📄 Invoice ${invoice.invoiceNumber}`,
-      `✅ Paid in full: ${formatCurrency(invoice.total)}`,
-      invoice.paidDate ? `📅 Paid: ${formatDate(invoice.paidDate)}` : null,
-      ``,
-      sendMessage || null,
-      sendMessage ? '' : null,
-      `View your receipt online:`,
-      payUrl,
-      ``,
-      `Questions? Just reply or call (402) 405-5475.`,
-      ``,
-      `Thanks again!`,
-      `— The Lucky Landscapes Team`,
-    ] : [
-      `Hi ${firstName}! 🍀 Thanks again for your business — your invoice from Lucky Landscapes is ready.`,
-      ``,
-      `📄 Invoice ${invoice.invoiceNumber}`,
-      `💰 Balance Due: ${formatCurrency(balance)}`,
-      invoice.dueDate ? `📅 Due: ${formatDate(invoice.dueDate)}` : null,
-      ``,
-      sendMessage || null,
-      sendMessage ? '' : null,
-      `Pay securely online (credit/debit card or bank transfer — takes 30 seconds):`,
-      payUrl,
-      ``,
-      cashDiscountPct > 0 ? `💵 Save ${cashDiscountPct}% (${formatCurrency(smsCashOption.discount)}) by paying cash, check, Venmo, or Zelle — just reply to arrange. New balance would be ${formatCurrency(smsCashOption.cashTotal)}.` : null,
-      cashDiscountPct > 0 ? `` : null,
-      `Questions? Just reply or call (402) 405-5475.`,
-      ``,
-      `Thanks!`,
-      `— The Lucky Landscapes Team`,
-    ];
-    return lines.filter(l => l !== null).join('\n');
-  }, [invoice, customer, balance, sendMessage, payUrl, isPaid, cashDiscountPct]);
 
   const markInvoiceSent = async () => {
     try {
@@ -572,6 +655,11 @@ export default function InvoiceDetailPage() {
           <div className="table-wrapper">
             <div className="table-header">
               <h3>Line Items</h3>
+              {invoice.status !== 'cancelled' && (
+                <button className="btn btn-secondary btn-sm" onClick={openEditItems}>
+                  <Pencil size={14} /> Edit Items
+                </button>
+              )}
             </div>
             <table>
               <thead>
@@ -1059,6 +1147,128 @@ export default function InvoiceDetailPage() {
               <button className="btn btn-secondary" onClick={() => setShowDeleteModal(false)} disabled={deleting}>Cancel</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={deleting}>
                 {deleting ? <><Loader2 size={16} className="spin" /> Deleting...</> : <><Trash2 size={16} /> Delete</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== EDIT LINE ITEMS MODAL ========== */}
+      {showEditItems && (
+        <div className="modal-overlay" onClick={() => !savingItems && setShowEditItems(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '640px' }}>
+            <div className="modal-header">
+              <h2><Pencil size={20} style={{ marginRight: '8px', verticalAlign: 'middle' }} /> Edit Line Items</h2>
+              <button className="btn btn-icon btn-ghost" onClick={() => !savingItems && setShowEditItems(false)}><X size={20} /></button>
+            </div>
+            <div className="modal-body">
+              {(invoice.amountPaid > 0 || invoice.sentAt) && (
+                <div style={{ ...infoBoxStyle, marginTop: 0, marginBottom: 'var(--space-md)' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>
+                    {invoice.amountPaid > 0 && <>This invoice already has {formatCurrency(invoice.amountPaid)} paid — changing the total updates the balance due. </>}
+                    {invoice.sentAt && <>It was already sent, so re-send it after editing so the customer has the updated version.</>}
+                  </span>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label className="form-label">Line Items <span className="required">*</span></label>
+                <p style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: '-4px', marginBottom: 'var(--space-sm)' }}>
+                  Billing by day? Use Qty = number of days and Rate = day rate (e.g. 5 × $750 = $3,750).
+                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-sm)' }}>
+                  {editItems.map((item, idx) => {
+                    const lineTotal = (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
+                    return (
+                      <div key={idx} style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1fr 70px 110px auto auto',
+                        gap: '6px',
+                        alignItems: 'start',
+                      }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <input
+                            className="form-input"
+                            placeholder="Description (e.g. Subcontract labor — May 11-15)"
+                            value={item.name}
+                            onChange={e => updateEditItem(idx, { name: e.target.value })}
+                          />
+                          <input
+                            className="form-input"
+                            placeholder="Extra detail (optional)"
+                            value={item.description}
+                            onChange={e => updateEditItem(idx, { description: e.target.value })}
+                            style={{ fontSize: '0.78rem', padding: '6px 10px' }}
+                          />
+                        </div>
+                        <input
+                          className="form-input" type="number" min="0" step="any" placeholder="Qty"
+                          value={item.quantity}
+                          onChange={e => updateEditItem(idx, { quantity: e.target.value })}
+                          style={{ textAlign: 'right' }}
+                        />
+                        <input
+                          className="form-input" type="number" min="0" step="0.01" placeholder="Rate"
+                          value={item.unitPrice}
+                          onChange={e => updateEditItem(idx, { unitPrice: e.target.value })}
+                          style={{ textAlign: 'right' }}
+                        />
+                        <div style={{ minWidth: '80px', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem', paddingTop: '8px' }}>
+                          {formatCurrency(lineTotal)}
+                        </div>
+                        <button
+                          type="button" className="btn btn-icon btn-ghost"
+                          onClick={() => removeEditItem(idx)}
+                          disabled={editItems.length === 1}
+                          title={editItems.length === 1 ? 'At least one line required' : 'Remove line'}
+                          style={{ opacity: editItems.length === 1 ? 0.3 : 1 }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-sm)' }}>
+                  <button type="button" className="btn btn-secondary btn-sm" onClick={() => addEditItem()}>
+                    <Plus size={14} /> Add line
+                  </button>
+                  <button
+                    type="button" className="btn btn-secondary btn-sm"
+                    onClick={() => addEditItem({ name: 'Subcontract labor — day rate', quantity: 1, unitPrice: 0 })}
+                    title="Pre-fills a day-rate line you just fill in"
+                  >
+                    <CalendarDays size={14} /> Add day-rate line
+                  </button>
+                </div>
+                <div style={{
+                  marginTop: 'var(--space-md)', padding: 'var(--space-md)',
+                  background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                }}>
+                  <span style={{ fontWeight: 700 }}>New Invoice Total</span>
+                  <span style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--lucky-green-light)' }}>
+                    {formatCurrency(editItemsTotal)}
+                  </span>
+                </div>
+              </div>
+
+              {editItemsError && (
+                <div style={{
+                  background: 'var(--status-danger-bg)', borderRadius: 'var(--radius-md)',
+                  padding: 'var(--space-md)', display: 'flex', gap: 'var(--space-sm)', alignItems: 'flex-start',
+                  fontSize: '0.82rem', color: 'var(--status-danger)',
+                }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                  <span>{editItemsError}</span>
+                </div>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowEditItems(false)} disabled={savingItems}>Cancel</button>
+              <button className="btn btn-primary" onClick={handleSaveItems} disabled={savingItems || editItemsSubtotal <= 0}>
+                {savingItems ? <><Loader2 size={16} className="spin" /> Saving...</> : <><Save size={16} /> Save Items</>}
               </button>
             </div>
           </div>
