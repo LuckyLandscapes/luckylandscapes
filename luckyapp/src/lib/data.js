@@ -1842,6 +1842,88 @@ export function DataProvider({ children }) {
     return { job, createdCustomer, insertedExpenses };
   }, [addCustomer, addJob, updateJob, addJobExpense]);
 
+  // ─── Create a job directly (no quote) ──────────────────
+  // For subcontract / informal work where there's no sales quote and we DON'T
+  // collect a customer signature (e.g. Jeremiah subbing work to us). Customer
+  // is picked or quick-created (a GC by default for sub work). Lands as
+  // 'scheduled'. The start-job gate in jobs/[id] still applies per
+  // workAuthorization — subcontract needs a work order on file (notes/upload),
+  // verbal needs typed notes — so there's always *some* paper trail, just no
+  // signing flow. Mirrors addHistoricalJob's customer-resolution logic.
+  // Input shape: {
+  //   customerId?, firstName?, lastName?, customerPhone?, customerType?,
+  //   title, scheduledDate?, scheduledDates?, scheduledTime?,
+  //   workAuthorization ('subcontract'|'verbal'|'contract'),
+  //   workOrderNotes?, workOrderUrl?, workOrderPath?,
+  //   siteContactName?, siteContactPhone?,
+  //   assignedTo?, revenue?, wcClass?, priority?, description?, crewNotes?, address?,
+  // }
+  const addDirectJob = useCallback(async (input) => {
+    let customerId = input.customerId || null;
+    let createdCustomer = null;
+
+    if (!customerId) {
+      const fn = (input.firstName || '').trim();
+      const ln = (input.lastName || '').trim();
+      if (!fn) throw new Error('Pick a customer or type a name to create a new one');
+      // Infer the customer type: sub work → the new contact is the GC; any
+      // other auth mode → treat as a homeowner. Riley can change it later.
+      const inferredType = input.customerType
+        || (input.workAuthorization === 'subcontract' ? 'general_contractor' : 'homeowner');
+      createdCustomer = await addCustomer({
+        firstName: fn,
+        lastName: ln,
+        email: '',
+        phone: (input.customerPhone || '').trim(),
+        address: input.address || '',
+        customerType: inferredType,
+        tags: [],
+        source: 'manual',
+      });
+      customerId = createdCustomer?.id || null;
+      if (!customerId) throw new Error('Failed to create customer');
+    }
+
+    if (!(input.title || '').trim()) throw new Error('Job title is required');
+
+    // Match convertQuoteToJob's workday-set handling: scheduledDates is the
+    // canonical set, scheduledDate is the denormalized anchor (= min).
+    let dates = Array.isArray(input.scheduledDates) ? input.scheduledDates.filter(Boolean) : [];
+    if (dates.length === 0 && input.scheduledDate) dates = [input.scheduledDate];
+    dates = Array.from(new Set(dates)).sort();
+    const anchorDate = dates[0] || input.scheduledDate || null;
+
+    const revenue = Number(input.revenue) || 0;
+
+    const jobPayload = {
+      quoteId: null,
+      customerId,
+      title: input.title.trim(),
+      status: 'scheduled',
+      description: input.description || '',
+      address: input.address || '',
+      scheduledDate: anchorDate,
+      scheduledDates: dates,
+      scheduledTime: input.scheduledTime || null,
+      assignedTo: Array.isArray(input.assignedTo) ? input.assignedTo : [],
+      crewNotes: input.crewNotes || '',
+      priority: input.priority || 'normal',
+      total: revenue,
+      revenue,
+      workAuthorization: input.workAuthorization || 'subcontract',
+      workOrderNotes: input.workOrderNotes || '',
+      workOrderUrl: input.workOrderUrl || null,
+      workOrderPath: input.workOrderPath || null,
+      siteContactName: input.siteContactName || '',
+      siteContactPhone: input.siteContactPhone || '',
+      wcClass: input.wcClass || null,
+    };
+
+    const job = await addJob(jobPayload);
+    if (!job?.id) throw new Error('addJob returned no id');
+    return { job, createdCustomer };
+  }, [addCustomer, addJob]);
+
   const bulkImportHistoricalCompanyExpenses = useCallback(async (rows) => {
     let inserted = 0;
     const errors = [];
@@ -1886,6 +1968,9 @@ export function DataProvider({ children }) {
     // Historical backfill (CSV import for legacy Google Sheet data)
     bulkImportHistoricalJobs, bulkImportHistoricalCompanyExpenses,
     addHistoricalJob,
+
+    // Direct job creation (no quote — subcontract / no-signature work)
+    addDirectJob,
 
     // Calendar
     addCalendarEvent, updateCalendarEvent, deleteCalendarEvent,

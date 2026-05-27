@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import ImportHistoricalJobsModal from '@/components/ImportHistoricalJobsModal';
 import AddPastJobModal from '@/components/AddPastJobModal';
+import NewJobModal from '@/components/NewJobModal';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(n || 0);
@@ -33,6 +34,7 @@ export default function JobsPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showImport, setShowImport] = useState(false);
   const [showAddPast, setShowAddPast] = useState(false);
+  const [showNewJob, setShowNewJob] = useState(false);
 
   const statuses = ['all', 'scheduled', 'in_progress', 'completed', 'cancelled'];
 
@@ -69,10 +71,13 @@ export default function JobsPage() {
       <div className="page-header">
         <div className="page-header-left">
           <h1>Jobs</h1>
-          <p>{jobs.length} total jobs from accepted quotes</p>
+          <p>{jobs.length} total jobs — from accepted quotes or created directly for sub work</p>
         </div>
         <div className="page-header-actions">
-          <button className="btn btn-primary" onClick={() => setShowAddPast(true)}>
+          <button className="btn btn-primary" onClick={() => setShowNewJob(true)}>
+            <Plus size={18} /> New Job
+          </button>
+          <button className="btn btn-secondary" onClick={() => setShowAddPast(true)}>
             <Plus size={18} /> Add Past Job
           </button>
           <button className="btn btn-secondary" onClick={() => setShowImport(true)}>
@@ -84,6 +89,7 @@ export default function JobsPage() {
         </div>
       </div>
 
+      {showNewJob && <NewJobModal onClose={() => setShowNewJob(false)} />}
       {showImport && <ImportHistoricalJobsModal onClose={() => setShowImport(false)} />}
       {showAddPast && <AddPastJobModal onClose={() => setShowAddPast(false)} />}
 
@@ -221,10 +227,10 @@ export default function JobsPage() {
                   <div className="empty-state">
                     <div className="empty-state-icon"><Briefcase size={28} /></div>
                     <h3>No jobs found</h3>
-                    <p>Jobs are created when you accept and schedule a quote.</p>
-                    <Link href="/quotes" className="btn btn-primary btn-sm">
-                      View Quotes
-                    </Link>
+                    <p>Click <strong>New Job</strong> for sub work, or accept and schedule a quote.</p>
+                    <button className="btn btn-primary btn-sm" onClick={() => setShowNewJob(true)}>
+                      <Plus size={14} /> New Job
+                    </button>
                   </div>
                 </td>
               </tr>
