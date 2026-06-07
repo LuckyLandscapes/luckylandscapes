@@ -158,19 +158,68 @@ async function lookupAddress(query, map) {
   return runGeocoderUS(query);
 }
 
+// OverlayView subclasses must be built at runtime (google.maps is only defined
+// after the API script loads) AND must be real `class extends` subclasses — the
+// legacy `Fn.prototype = new OverlayView()` form stopped registering the overlay
+// lifecycle in recent Maps JS API versions (onAdd/draw never fire → getProjection()
+// stays null and the overlay never renders). These factories live at module scope
+// so the inline `class` doesn't opt the component out of React Compiler.
+
+// Hidden no-op overlay used purely for its MapCanvasProjection (screen px ↔ LatLng).
+function makeProjectionOverlay(g) {
+  return class ProjectionOverlay extends g.OverlayView {
+    onAdd() {}
+    draw() {}
+    onRemove() {}
+  };
+}
+
+// HTML label anchored at a geographic point — used for the per-edge length labels.
+function makeEdgeLabelClass(g) {
+  return class EdgeLabel extends g.OverlayView {
+    constructor(position, text) {
+      super();
+      this.position_ = position;
+      this.text_ = text;
+      this.div_ = null;
+    }
+    onAdd() {
+      const div = document.createElement('div');
+      div.className = 'measure-edge-label';
+      div.textContent = this.text_;
+      this.div_ = div;
+      this.getPanes().floatPane.appendChild(div);
+    }
+    draw() {
+      const proj = this.getProjection();
+      if (!proj || !this.div_) return;
+      const px = proj.fromLatLngToDivPixel(this.position_);
+      if (px) {
+        this.div_.style.left = `${px.x}px`;
+        this.div_.style.top = `${px.y}px`;
+      }
+    }
+    onRemove() {
+      if (this.div_ && this.div_.parentNode) {
+        this.div_.parentNode.removeChild(this.div_);
+      }
+      this.div_ = null;
+    }
+  };
+}
+
 export default function MeasurePage() {
   const router = useRouter();
   const { customers, updateCustomer } = useData();
 
   const mapRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const drawingManagerRef = useRef(null);
   const searchInputRef = useRef(null);
   const autocompleteRef = useRef(null);
   const shapesRef = useRef(new Map());
   const candidateOverlaysRef = useRef(new Map());
   const projectionOverlayRef = useRef(null); // for screen→latlng during freehand
-  const freehandStateRef = useRef(null);
+  const activeDrawRef = useRef(null); // cleanup handle for the active custom-drawing session (freehand / polygon / rectangle / circle)
   const mapTypeRef = useRef('satellite');
   const panoRef = useRef(null);
   const panoInstanceRef = useRef(null);
@@ -229,7 +278,7 @@ export default function MeasurePage() {
     }
     const s = document.createElement('script');
     s.id = 'google-maps-script';
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=drawing,geometry,places`;
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_KEY}&libraries=geometry,places`;
     s.async = true;
     s.defer = true;
     s.onload = () => setMapsLoaded(true);
@@ -326,35 +375,18 @@ export default function MeasurePage() {
     });
     mapInstanceRef.current = map;
 
-    // Hidden overlay used purely to access the projection (screen px → LatLng) for freehand.
-    const Overlay = function () {};
-    Overlay.prototype = new g.OverlayView();
-    Overlay.prototype.onAdd = function () {};
-    Overlay.prototype.draw = function () {};
-    Overlay.prototype.onRemove = function () {};
-    const overlay = new Overlay();
+    // A hidden no-op OverlayView gives us a MapCanvasProjection (screen px ↔ LatLng)
+    // used by the freehand + rectangle/circle drag drawing. Built via a module-level
+    // factory — see makeProjectionOverlay for why it must be a `class extends` subclass.
+    const ProjectionOverlay = makeProjectionOverlay(g);
+    const overlay = new ProjectionOverlay();
     overlay.setMap(map);
     projectionOverlayRef.current = overlay;
 
-    const drawingManager = new g.drawing.DrawingManager({
-      drawingMode: null,
-      drawingControl: false,
-      polygonOptions:   { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
-      rectangleOptions: { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
-      circleOptions:    { fillColor: AREA_FILL, strokeColor: AREA_STROKE, fillOpacity: 0.3, strokeWeight: 2, editable: true },
-    });
-    drawingManager.setMap(map);
-    drawingManagerRef.current = drawingManager;
-
-    const onComplete = (shape) => {
-      const kind = drawingManager.__kind || 'area';
-      addShape(shape, kind);
-      drawingManager.setDrawingMode(null);
-      setActiveTool(null);
-    };
-    g.event.addListener(drawingManager, 'polygoncomplete',   onComplete);
-    g.event.addListener(drawingManager, 'rectanglecomplete', onComplete);
-    g.event.addListener(drawingManager, 'circlecomplete',    onComplete);
+    // Drawing is implemented with custom controllers (see selectTool →
+    // startFreehand / startPolygonDraw / startDragDraw). google.maps.drawing's
+    // DrawingManager was removed from the Maps JS API in v3.65, so we no longer
+    // use it — constructing one now throws and crashes the page.
 
     if (searchInputRef.current) {
       const autocomplete = new g.places.Autocomplete(searchInputRef.current, {
@@ -376,16 +408,14 @@ export default function MeasurePage() {
         }
       });
     }
-  }, [mapsLoaded, addShape]);
+  }, [mapsLoaded]);
 
   // ---- Tool selection ----
   const cancelDrawing = useCallback(() => {
-    const dm = drawingManagerRef.current;
-    if (dm) { dm.setDrawingMode(null); dm.__kind = null; }
-    // Clean up freehand if active
-    if (freehandStateRef.current) {
-      freehandStateRef.current.cleanup?.();
-      freehandStateRef.current = null;
+    // Tear down whatever custom-drawing session is active (freehand / polygon / rect / circle).
+    if (activeDrawRef.current) {
+      activeDrawRef.current.cleanup?.();
+      activeDrawRef.current = null;
     }
     setActiveTool(null);
   }, []);
@@ -486,7 +516,7 @@ export default function MeasurePage() {
       window.removeEventListener('touchend', onUp);
       map.setOptions({ draggable: prevDraggable !== false, gestureHandling: prevGesture || 'greedy' });
       div.classList.remove('measure-cursor-cross');
-      freehandStateRef.current = null;
+      activeDrawRef.current = null;
       setActiveTool(null);
     };
 
@@ -498,50 +528,224 @@ export default function MeasurePage() {
     window.addEventListener('touchend', onUp);
 
     div.classList.add('measure-cursor-cross');
-    freehandStateRef.current = { cleanup };
+    activeDrawRef.current = { cleanup };
   }, [addShape]);
 
-  const selectTool = useCallback((toolId) => {
-    const dm = drawingManagerRef.current;
-    if (!dm) return;
-    if (toolId === activeTool || toolId == null) {
-      cancelDrawing();
-      return;
-    }
-    // Always clear any prior freehand state first
-    if (freehandStateRef.current) {
-      freehandStateRef.current.cleanup?.();
-      freehandStateRef.current = null;
-    }
-    const tool = TOOLS.find(t => t.id === toolId);
-    if (!tool) return;
+  // Drag-to-draw for rectangle + circle. Mirrors the proven freehand gesture
+  // model: disable map panning, then track pointer down → move → up on the map
+  // div, building a live overlay. Replaces DrawingManager's rectangle/circle modes.
+  const startDragDraw = useCallback((kind, shapeType) => {
+    const map = mapInstanceRef.current;
+    const overlay = projectionOverlayRef.current;
     const g = window.google.maps;
+    if (!map || !overlay) return;
 
-    if (tool.shape === 'freehand') {
-      dm.setDrawingMode(null);
-      setActiveTool(toolId);
-      startFreehand(tool.kind);
-      return;
-    }
+    const prevDraggable = map.get('draggable');
+    const prevGesture = map.get('gestureHandling');
+    map.setOptions({ draggable: false, gestureHandling: 'none' });
 
-    const isExclusion = tool.kind === 'exclusion';
-    const opts = {
+    const div = map.getDiv();
+    const isExclusion = kind === 'exclusion';
+    const baseOpts = {
       fillColor: isExclusion ? EXCLUSION_FILL : AREA_FILL,
       strokeColor: isExclusion ? EXCLUSION_STROKE : AREA_STROKE,
       fillOpacity: isExclusion ? 0.4 : 0.3,
       strokeWeight: 2,
-      editable: true,
+      map,
     };
-    dm.setOptions({ polygonOptions: opts, rectangleOptions: opts, circleOptions: opts });
-    dm.__kind = tool.kind;
-    const modeMap = {
-      polygon: g.drawing.OverlayType.POLYGON,
-      rectangle: g.drawing.OverlayType.RECTANGLE,
-      circle: g.drawing.OverlayType.CIRCLE,
+
+    let shape = null;
+    let anchor = null;
+    let active = false;
+
+    const screenToLatLng = (x, y) => {
+      const rect = div.getBoundingClientRect();
+      const projection = overlay.getProjection();
+      if (!projection) return null;
+      return projection.fromContainerPixelToLatLng(new g.Point(x - rect.left, y - rect.top));
     };
-    dm.setDrawingMode(modeMap[tool.shape]);
+
+    const onDown = (e) => {
+      const t = e.touches?.[0] || e;
+      const ll = screenToLatLng(t.clientX, t.clientY);
+      if (!ll) return;
+      active = true;
+      anchor = ll;
+      if (shapeType === 'circle') {
+        shape = new g.Circle({ ...baseOpts, center: ll, radius: 0.5 });
+      } else {
+        shape = new g.Rectangle({ ...baseOpts, bounds: { north: ll.lat(), south: ll.lat(), east: ll.lng(), west: ll.lng() } });
+      }
+      e.preventDefault();
+    };
+
+    const onMove = (e) => {
+      if (!active || !shape) return;
+      const t = e.touches?.[0] || e;
+      const ll = screenToLatLng(t.clientX, t.clientY);
+      if (!ll) return;
+      if (shapeType === 'circle') {
+        shape.setRadius(Math.max(g.geometry.spherical.computeDistanceBetween(anchor, ll), 0.5));
+      } else {
+        shape.setBounds({
+          north: Math.max(anchor.lat(), ll.lat()),
+          south: Math.min(anchor.lat(), ll.lat()),
+          east: Math.max(anchor.lng(), ll.lng()),
+          west: Math.min(anchor.lng(), ll.lng()),
+        });
+      }
+      e.preventDefault();
+    };
+
+    const onUp = () => {
+      if (!active) return;
+      active = false;
+      let ok = false;
+      if (shape) {
+        if (shapeType === 'circle') {
+          ok = shape.getRadius() > 1;
+        } else {
+          const b = shape.getBounds();
+          ok = !!b && !b.getNorthEast().equals(b.getSouthWest());
+        }
+      }
+      if (shape && ok) {
+        shape.setOptions({ editable: true, clickable: true });
+        addShape(shape, kind);
+        shape = null; // ownership handed to addShape / shapesRef
+      }
+      cleanup();
+    };
+
+    const cleanup = () => {
+      div.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      div.removeEventListener('touchstart', onDown);
+      window.removeEventListener('touchmove', onMove, { passive: false });
+      window.removeEventListener('touchend', onUp);
+      map.setOptions({ draggable: prevDraggable !== false, gestureHandling: prevGesture || 'greedy' });
+      div.classList.remove('measure-cursor-cross');
+      if (shape) { shape.setMap(null); shape = null; } // abandoned mid-draw
+      activeDrawRef.current = null;
+      setActiveTool(null);
+    };
+
+    div.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    div.addEventListener('touchstart', onDown, { passive: false });
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+
+    div.classList.add('measure-cursor-cross');
+    activeDrawRef.current = { cleanup };
+  }, [addShape]);
+
+  // Click-to-add-vertex polygon. Click the map to drop vertices; click near the
+  // first vertex (within ~14px) or double-click to close. Replaces DrawingManager's
+  // polygon mode.
+  const startPolygonDraw = useCallback((kind) => {
+    const map = mapInstanceRef.current;
+    const g = window.google.maps;
+    if (!map) return;
+
+    const isExclusion = kind === 'exclusion';
+    const stroke = isExclusion ? EXCLUSION_STROKE : AREA_STROKE;
+    const fill = isExclusion ? EXCLUSION_FILL : AREA_FILL;
+
+    const points = [];
+    const preview = new g.Polyline({
+      map, strokeColor: stroke, strokeOpacity: 0.95, strokeWeight: 3, clickable: false, path: [],
+    });
+    let startDot = null;
+
+    const prevCursor = map.get('draggableCursor');
+    const prevDblZoom = map.get('disableDoubleClickZoom');
+    map.setOptions({ draggableCursor: 'crosshair', disableDoubleClickZoom: true });
+
+    const pixelDist = (a, b) => {
+      const proj = projectionOverlayRef.current?.getProjection();
+      if (!proj) return Infinity;
+      const pa = proj.fromLatLngToContainerPixel(a);
+      const pb = proj.fromLatLngToContainerPixel(b);
+      if (!pa || !pb) return Infinity;
+      return Math.hypot(pa.x - pb.x, pa.y - pb.y);
+    };
+
+    const finish = () => {
+      const pts = points.slice();
+      // Drop trailing near-duplicate vertices (e.g. the extra click of a closing double-click).
+      while (pts.length >= 2 &&
+        g.geometry.spherical.computeDistanceBetween(pts[pts.length - 1], pts[pts.length - 2]) < 0.5) {
+        pts.pop();
+      }
+      if (pts.length >= 3) {
+        const polygon = new g.Polygon({
+          paths: pts, fillColor: fill, strokeColor: stroke,
+          fillOpacity: isExclusion ? 0.45 : 0.3, strokeWeight: 2, editable: true, map,
+        });
+        addShape(polygon, kind);
+      }
+      cleanup();
+    };
+
+    const clickL = map.addListener('click', (e) => {
+      if (!e.latLng) return;
+      // Click near the first vertex closes the ring.
+      if (points.length >= 3 && pixelDist(e.latLng, points[0]) < 14) {
+        finish();
+        return;
+      }
+      points.push(e.latLng);
+      preview.setPath(points);
+      if (!startDot) {
+        startDot = new g.Circle({
+          map, center: e.latLng, radius: 1.5,
+          fillColor: '#ffffff', fillOpacity: 1, strokeColor: stroke, strokeWeight: 2,
+          clickable: false, zIndex: 6,
+        });
+      }
+    });
+    const dblL = map.addListener('dblclick', () => finish());
+
+    const cleanup = () => {
+      g.event.removeListener(clickL);
+      g.event.removeListener(dblL);
+      preview.setMap(null);
+      if (startDot) { startDot.setMap(null); startDot = null; }
+      points.length = 0;
+      map.setOptions({ draggableCursor: prevCursor || null, disableDoubleClickZoom: prevDblZoom || false });
+      activeDrawRef.current = null;
+      setActiveTool(null);
+    };
+
+    activeDrawRef.current = { cleanup };
+  }, [addShape]);
+
+  const selectTool = useCallback((toolId) => {
+    if (!mapInstanceRef.current) return;
+    if (toolId === activeTool || toolId == null) {
+      cancelDrawing();
+      return;
+    }
+    // Tear down any in-progress drawing session first.
+    if (activeDrawRef.current) {
+      activeDrawRef.current.cleanup?.();
+      activeDrawRef.current = null;
+    }
+    const tool = TOOLS.find(t => t.id === toolId);
+    if (!tool) return;
+
     setActiveTool(toolId);
-  }, [activeTool, cancelDrawing, startFreehand]);
+    if (tool.shape === 'freehand') {
+      startFreehand(tool.kind);
+    } else if (tool.shape === 'polygon') {
+      startPolygonDraw(tool.kind);
+    } else {
+      startDragDraw(tool.kind, tool.shape); // rectangle | circle
+    }
+  }, [activeTool, cancelDrawing, startFreehand, startPolygonDraw, startDragDraw]);
 
   const removeShape = useCallback((id) => {
     const overlay = shapesRef.current.get(id);
@@ -951,39 +1155,11 @@ export default function MeasurePage() {
     if (!g?.OverlayView) return;
     const map = mapInstanceRef.current;
 
-    // Lazy-define the OverlayView subclass once google.maps is available.
-    // Uses prototype assignment instead of `class` because react-hooks/eslint
-    // rejects inline class declarations inside a hook.
+    // Lazy-build the OverlayView subclass once google.maps is available (cached in
+    // a ref so it's built once). See makeEdgeLabelClass for why it's a `class extends`
+    // subclass built via a module-level factory rather than inline / prototype-based.
     if (!edgeLabelClassRef.current) {
-      function EdgeLabel(position, text) {
-        this.position_ = position;
-        this.text_ = text;
-        this.div_ = null;
-      }
-      EdgeLabel.prototype = new g.OverlayView();
-      EdgeLabel.prototype.onAdd = function () {
-        const div = document.createElement('div');
-        div.className = 'measure-edge-label';
-        div.textContent = this.text_;
-        this.div_ = div;
-        this.getPanes().floatPane.appendChild(div);
-      };
-      EdgeLabel.prototype.draw = function () {
-        const proj = this.getProjection();
-        if (!proj || !this.div_) return;
-        const px = proj.fromLatLngToDivPixel(this.position_);
-        if (px) {
-          this.div_.style.left = `${px.x}px`;
-          this.div_.style.top = `${px.y}px`;
-        }
-      };
-      EdgeLabel.prototype.onRemove = function () {
-        if (this.div_ && this.div_.parentNode) {
-          this.div_.parentNode.removeChild(this.div_);
-        }
-        this.div_ = null;
-      };
-      edgeLabelClassRef.current = EdgeLabel;
+      edgeLabelClassRef.current = makeEdgeLabelClass(g);
     }
     const EdgeLabelCtor = edgeLabelClassRef.current;
 
@@ -1445,7 +1621,7 @@ export default function MeasurePage() {
     edgeLabelOverlaysRef.current.forEach(arr => arr.forEach(o => o?.setMap?.(null)));
     edgeLabelOverlaysRef.current.clear();
     if (elevFetchTimerRef.current) clearTimeout(elevFetchTimerRef.current);
-    if (freehandStateRef.current) freehandStateRef.current.cleanup?.();
+    if (activeDrawRef.current) activeDrawRef.current.cleanup?.();
   }, []);
 
   if (!GOOGLE_MAPS_KEY) {
