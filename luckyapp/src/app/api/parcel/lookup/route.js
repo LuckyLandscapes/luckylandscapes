@@ -14,6 +14,10 @@ import { NextResponse } from 'next/server';
 // All sources are public, free, and operated by Nebraska state / Lancaster
 // County government. No API key required.
 
+// Two sources at up to 8s each can exceed Vercel's default function limit —
+// give the route headroom so a slow statewide fallback doesn't 504.
+export const maxDuration = 20;
+
 // Verified live 2026-05-01. Both endpoints are public ArcGIS REST FeatureServers
 // operated by NE government — no API key required.
 const SOURCES = [

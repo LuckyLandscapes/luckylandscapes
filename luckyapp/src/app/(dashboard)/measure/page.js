@@ -12,7 +12,6 @@ import { lookupParcel } from '@/lib/parcelLookup';
 
 const GOOGLE_MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY;
 const SQM_TO_SQFT = 10.7639;
-const OVERPASS_ENDPOINT = 'https://overpass-api.de/api/interpreter';
 
 const AREA_FILL = '#2d7a3a';
 const AREA_STROKE = '#7dd87d';
@@ -1261,21 +1260,26 @@ export default function MeasurePage() {
     setCandidates([]);
 
     try {
-      const q = `[out:json][timeout:25];(way["building"](${sw.lat()},${sw.lng()},${ne.lat()},${ne.lng()}););out geom;`;
-      const res = await fetch(OVERPASS_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'data=' + encodeURIComponent(q),
-      });
-      if (!res.ok) throw new Error(`Overpass ${res.status}`);
-      const data = await res.json();
-      const elements = (data.elements || []).filter(e => e.type === 'way' && Array.isArray(e.geometry) && e.geometry.length >= 3);
+      // Server-side proxy (see /api/buildings/lookup) — tries multiple Overpass
+      // mirrors with a proper User-Agent so a busy overpass-api.de doesn't fail
+      // the whole detect. Same-origin call, so no CSP/CORS surprises.
+      const params = new URLSearchParams({ s: sw.lat(), w: sw.lng(), n: ne.lat(), e: ne.lng() });
+      const res = await fetch(`/api/buildings/lookup?${params.toString()}`, { cache: 'no-store' });
+      const data = await res.json().catch(() => null);
+      if (!data?.ok) {
+        showToast(
+          data?.error === 'too_large'
+            ? 'Zoom in a little before detecting buildings.'
+            : 'Building data service is busy right now. Try again in a few seconds.',
+          'error',
+        );
+        return;
+      }
       const g = window.google.maps;
       const found = [];
-      elements.forEach((el) => {
-        const path = el.geometry.map(pt => ({ lat: pt.lat, lng: pt.lon }));
+      (data.buildings || []).forEach((b) => {
         const overlay = new g.Polygon({
-          paths: path,
+          paths: b.geometry,
           fillColor: CANDIDATE_FILL,
           fillOpacity: 0.45,
           strokeColor: CANDIDATE_STROKE,
@@ -1289,9 +1293,9 @@ export default function MeasurePage() {
         });
         const sqft = Math.round(g.geometry.spherical.computeArea(overlay.getPath()) * SQM_TO_SQFT);
         if (sqft < 30) { overlay.setMap(null); return; }
-        const cid = `cand-${el.id}`;
+        const cid = `cand-${b.id}`;
         candidateOverlaysRef.current.set(cid, overlay);
-        found.push({ id: cid, sqft, tag: el.tags?.building || 'building', kind: 'building' });
+        found.push({ id: cid, sqft, tag: b.building || 'building', kind: 'building' });
         overlay.addListener('click', () => acceptCandidate(cid));
       });
       setCandidates(found);
@@ -1331,8 +1335,8 @@ export default function MeasurePage() {
       if (!result.ok) {
         showToast(
           result.miss
-            ? 'No parcel found at map center. Pan to the property and try again.'
-            : (result.error || 'Parcel lookup failed.'),
+            ? 'No parcel at the map center — it may be on a street. Drag the map so the crosshair sits on the property’s rooftop, then try again.'
+            : (result.error || 'Parcel lookup failed. The county GIS service may be down — try again shortly.'),
           result.miss ? 'info' : 'error',
         );
         return;
