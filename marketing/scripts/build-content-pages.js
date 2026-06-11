@@ -61,7 +61,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
                     <a href="/blog/">Blog</a>
-                    <a href="/team">Our Team</a>
                     <a href="/#contact">Contact</a>
                 </div>
                 <div class="footer-nav">
@@ -2186,7 +2185,7 @@ const SITEMAP_STATIC = [
     { loc: '/services/fencing',              lastmod: '2026-05-11', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/garden-beds',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
     { loc: '/services/property-cleanup',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
-    { loc: '/team',                          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.5' },
+    // /team deliberately omitted — page exists but is unlisted (no nav/footer/sitemap links).
     { loc: '/careers',                       lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.4' },
     { loc: '/privacy',                       lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
     { loc: '/terms',                         lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
@@ -2261,7 +2260,6 @@ ${sortedPosts.map(p => `- [${p.title}](${LLMS_ORIGIN}/blog/${p.slug}): ${p.descr
 
 - [Get a Free Quote](${LLMS_ORIGIN}/quote): Request a custom estimate for any service.
 - [Project Gallery](${LLMS_ORIGIN}/gallery): Photos of completed landscaping and hardscaping projects around Lincoln.
-- [Our Team](${LLMS_ORIGIN}/team): The people behind Lucky Landscapes.
 - [Careers](${LLMS_ORIGIN}/careers): Open crew and landscaping positions in Lincoln, NE.
 
 ## Optional

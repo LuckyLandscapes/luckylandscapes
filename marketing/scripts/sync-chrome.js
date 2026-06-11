@@ -5,9 +5,10 @@
  * every page matches the homepage. Run after editing the canonical blocks below.
  *
  *   - Nav + mobile menu: adds Blog so it's reachable from every page. Our Team
- *     is intentionally NOT in the nav — it's footer-only (demoted so the site
- *     doesn't lead with the crew). Also fixes the old property-cleanup mobile
- *     "Services" → /quote bug, since the whole menu is replaced.
+ *     is intentionally NOT linked anywhere (nav OR footer) — the page still
+ *     exists at /team but is unlisted, so prospects aren't led to the crew.
+ *     Also fixes the old property-cleanup mobile "Services" → /quote bug,
+ *     since the whole menu is replaced.
  *   - Footer: adds the "Service Areas" column + Blog quick link + social icons.
  *   - Sticky mobile CTA: injected before </body> if missing.
  *
@@ -70,7 +71,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
                     <a href="/blog/">Blog</a>
-                    <a href="/team">Our Team</a>
                     <a href="/#contact">Contact</a>
                 </div>
                 <div class="footer-nav">
