@@ -26,7 +26,6 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
-                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -41,7 +40,6 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
-        <a href="/team" class="mobile-link">Our Team</a>
         <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
@@ -63,7 +61,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
-                    <a href="/team">Our Team</a>
                     <a href="/contractors">For Contractors</a>
                     <a href="/blog/">Blog</a>
                     <a href="/#contact">Contact</a>
@@ -2191,7 +2188,7 @@ const SITEMAP_STATIC = [
     { loc: '/services/garden-beds',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
     { loc: '/services/property-cleanup',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
     { loc: '/contractors',                   lastmod: '2026-06-11', changefreq: 'monthly', priority: '0.8' },
-    { loc: '/team',                          lastmod: '2026-06-11', changefreq: 'monthly', priority: '0.6' },
+    // /team deliberately omitted — unlisted + noindexed (young-crew age-objection concern); reachable by direct link only.
     { loc: '/careers',                       lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.4' },
     { loc: '/privacy',                       lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
     { loc: '/terms',                         lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },

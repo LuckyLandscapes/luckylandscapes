@@ -4,10 +4,11 @@
  * footer, and the sticky mobile CTA bar) across the hand-authored HTML pages so
  * every page matches the homepage. Run after editing the canonical blocks below.
  *
- *   - Nav + mobile menu: adds Blog + Our Team so they're reachable from every
- *     page (the 2026-06 conversion audit found /team is the strongest trust
- *     asset on the site — all four buyer personas wanted it linked). The
- *     mobile menu + footer also link /contractors (GC / commercial lane).
+ *   - Nav + mobile menu: adds Blog. Our Team is intentionally NOT linked
+ *     anywhere (nav OR footer) — owner decision 2026-06: the crew is young and
+ *     headshots invite age-based objections before a quote ever happens. The
+ *     page stays live at /team (unlisted, noindexed) for direct sends only.
+ *     The mobile menu + footer link /contractors (GC / commercial lane).
  *     Also fixes the old property-cleanup mobile "Services" → /quote bug,
  *     since the whole menu is replaced.
  *   - Footer: adds the "Service Areas" column + Blog quick link + social icons.
@@ -38,7 +39,6 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
-                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -52,7 +52,6 @@ const MOBILE_MENU = `<div class="mobile-menu-overlay" id="mobile-overlay"></div>
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
-        <a href="/team" class="mobile-link">Our Team</a>
         <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
@@ -74,7 +73,6 @@ const FOOTER = `<footer class="footer">
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
-                    <a href="/team">Our Team</a>
                     <a href="/contractors">For Contractors</a>
                     <a href="/blog/">Blog</a>
                     <a href="/#contact">Contact</a>
