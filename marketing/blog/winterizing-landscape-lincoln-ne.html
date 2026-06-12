@@ -23,6 +23,81 @@
     <link rel="manifest" href="/favicon/site.webmanifest" />
     <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BlogPosting","@id":"https://luckylandscapes.com/blog/winterizing-landscape-lincoln-ne#post","headline":"Winterizing Your Landscape in Lincoln, NE","datePublished":"2026-05-22","dateModified":"2026-05-22","author":{"@type":"Organization","@id":"https://luckylandscapes.com/#business","name":"Lucky Landscapes"},"publisher":{"@type":"Organization","name":"Lucky Landscapes","logo":{"@type":"ImageObject","url":"https://luckylandscapes.com/images/Icon.png"}},"description":"How to put your Lincoln, Nebraska yard to bed for winter — sprinkler blowout, protecting plants, the final lawn feeding, and the hardscape steps that prevent freeze damage.","image":"https://luckylandscapes.com/images/og-card.png","articleSection":"Lawn Care","keywords":"Lawn Care, Lincoln NE, landscaping","wordCount":712,"timeRequired":"PT3M","inLanguage":"en-US","mainEntityOfPage":{"@type":"WebPage","@id":"https://luckylandscapes.com/blog/winterizing-landscape-lincoln-ne"},"isPartOf":{"@id":"https://luckylandscapes.com/blog/#blog"},"about":{"@id":"https://luckylandscapes.com/#business"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://luckylandscapes.com/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://luckylandscapes.com/blog/"},{"@type":"ListItem","position":3,"name":"Winterizing Your Landscape in Lincoln, NE","item":"https://luckylandscapes.com/blog/winterizing-landscape-lincoln-ne"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How do I winterize my yard in Lincoln, Nebraska?","acceptedAnswer":{"@type":"Answer","text":"Blow out the irrigation system before the first hard freeze, give the lawn its fall nitrogen feeding in mid-October, refresh bed mulch to 2–3 inches, water trees and evergreens until the ground freezes, protect young tree trunks from sunscald and rodents, and drain and disconnect all hoses and exterior spigots."}},{"@type":"Question","name":"When should I blow out my sprinkler system in Nebraska?","acceptedAnswer":{"@type":"Answer","text":"Before the first hard freeze — typically by mid-to-late October in Lincoln. Water left in the lines and backflow preventer freezes and cracks the components. Use a real air compressor or hire the service; it's inexpensive compared to replacing a frozen backflow assembly."}},{"@type":"Question","name":"Why do my plants get pushed out of the ground over winter?","acceptedAnswer":{"@type":"Answer","text":"It's called frost heave. Lincoln's repeated freeze-thaw cycles expand and contract the soil, which physically lifts shallow-rooted perennials out of the ground and exposes their roots. A 2–3 inch mulch layer insulates the soil and buffers those swings, preventing most heaving."}}]}]}</script>
     <link rel="stylesheet" href="/styles.css" />
+    <!-- LL:HEAD-INJECT v4 -->
+    <!-- Preconnect to critical third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.clarity.ms" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- Google Fonts — loaded as <link> (not CSS @import) so it runs in parallel with styles.css.
+         display=swap shows fallback text immediately while the woff2 files arrive. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" />
+
+    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
+         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
+         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
+         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
+         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
+    <script>
+      window.LL_CONFIG = {
+        ga4:       'G-Z21C16KEMN',
+        clarity:   'wk50251l6r',
+        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
+        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
+      };
+    </script>
+
+    <!-- GA4 loader — only fires when a real ID is set. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { anonymize_ip: true });
+      })();
+    </script>
+
+    <!-- Microsoft Clarity loader — lazy-loaded after first user interaction.
+         Eager loading was causing iOS WKWebView (Safari/Chrome/Firefox iOS) to
+         spend the first ~10 seconds doing session-recording setup + DOM mutation
+         observation, starving the render thread and leaving below-the-fold
+         sections invisible. Deferring until first scroll/touch/click means the
+         page paints fully before Clarity even starts. Failsafe at 5s loads
+         it anyway so we don't lose analytics on bots / users who never interact. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        // Stub clarity() so any early calls queue up and replay when the real one loads.
+        window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
+        var loaded = false;
+        function loadClarity() {
+          if (loaded) return;
+          loaded = true;
+          var t = document.createElement('script');
+          t.async = 1;
+          t.src = 'https://www.clarity.ms/tag/' + id;
+          var y = document.getElementsByTagName('script')[0];
+          y.parentNode.insertBefore(t, y);
+        }
+        ['scroll', 'touchstart', 'click', 'keydown'].forEach(function (e) {
+          window.addEventListener(e, loadClarity, { once: true, passive: true });
+        });
+        // Failsafe: load after 5s even if no interaction (bot/idle session).
+        setTimeout(loadClarity, 5000);
+      })();
+    </script>
+    <!-- LL:HEAD-INJECT-END -->
+
 </head>
 <body>
 
@@ -36,6 +111,7 @@
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -50,6 +126,8 @@
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/team" class="mobile-link">Our Team</a>
+        <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -221,15 +299,15 @@
                         <span class="blog-card-link">Read more →</span>
                     </div>
                 </a>
-                <a class="blog-card" href="/blog/spring-lawn-care-checklist-lincoln-ne" data-title="Spring Lawn Care Checklist for Lincoln, NE (2026)" data-category="Lawn Care" data-date="2026-03-18" data-keywords="Spring Lawn Care Checklist for Lincoln, NE (2026) A practical spring lawn care checklist for Lincoln, Nebraska homeowners. What to do in March, April, and May — and what to skip. Late March: do nothing but plan — walking dormant, semi-frozen turf does more harm than the cleanup helps. Pre-emergent crabgrass control must go down before the soil hits 55°F — usually the first or second week of April here. First mow at 3.5″ once the grass is 4–5″ tall; save fertilizing and overseeding for early May, not before.">
+                <a class="blog-card" href="/blog/best-grass-seed-nebraska" data-title="The Best Grass Seed for Nebraska Lawns (Lincoln Guide)" data-category="Lawn Care" data-date="2026-03-23" data-keywords="The Best Grass Seed for Nebraska Lawns (Lincoln Guide) Which grass actually thrives in Lincoln, Nebraska — the best cool-season grass types and seed blends for sun, shade, and high traffic, from a local lawn crew. Lincoln is cool-season grass country: Kentucky bluegrass, turf-type tall fescue, fine fescue, and perennial ryegrass. A turf-type tall fescue / Kentucky bluegrass blend is the best all-around choice for most Lincoln yards. Match the seed to the spot: fine fescue for shade, tall fescue for heat and traffic, bluegrass for the deep-green showpiece look. Skip cheap big-box &quot;contractor mix&quot; — it's padded with annual ryegrass and weed seed that thins out fast.">
                     <div class="blog-card-media">
-                        <img src="/images/blog/spring-lawn-care-checklist-lincoln-ne.svg" alt="Freshly mowed and edged Lincoln, NE lawn in early spring" loading="lazy" width="400" height="260" />
+                        <img src="/images/blog/best-grass-seed-nebraska.svg" alt="Healthy cool-season turf grass on a Lincoln, NE lawn" loading="lazy" width="400" height="260" />
                         <span class="blog-card-chip">Lawn Care</span>
                     </div>
                     <div class="blog-card-body">
-                        <p class="blog-card-meta"><time datetime="2026-03-18">March 18, 2026</time> · 3 min read</p>
-                        <h3 class="blog-card-title">Spring Lawn Care Checklist for Lincoln, NE (2026)</h3>
-                        <p class="blog-card-desc">A practical spring lawn care checklist for Lincoln, Nebraska homeowners. What to do in March, April, and May — and what to skip.</p>
+                        <p class="blog-card-meta"><time datetime="2026-03-23">March 23, 2026</time> · 3 min read</p>
+                        <h3 class="blog-card-title">The Best Grass Seed for Nebraska Lawns (Lincoln Guide)</h3>
+                        <p class="blog-card-desc">Which grass actually thrives in Lincoln, Nebraska — the best cool-season grass types and seed blends for sun, shade, and high traffic, from a local lawn crew.</p>
                         <span class="blog-card-link">Read more →</span>
                     </div>
                 </a>
@@ -304,6 +382,8 @@
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
+                    <a href="/team">Our Team</a>
+                    <a href="/contractors">For Contractors</a>
                     <a href="/blog/">Blog</a>
                     <a href="/#contact">Contact</a>
                 </div>
@@ -325,8 +405,8 @@
                 </div>
                 <div class="footer-contact">
                     <h4>Contact</h4>
-                    <p>(402) 405-5475</p>
-                    <p>rileykopf@luckylandscapes.com</p>
+                    <p><a href="tel:+14024055475">(402) 405-5475</a></p>
+                    <p><a href="mailto:rileykopf@luckylandscapes.com">rileykopf@luckylandscapes.com</a></p>
                     <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
                         <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>

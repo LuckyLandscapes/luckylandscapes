@@ -154,6 +154,7 @@
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -168,6 +169,8 @@
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/team" class="mobile-link">Our Team</a>
+        <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -184,9 +187,9 @@
                         <img src="/images/Icon.png" alt="" />
                         <span>Free Quote — No Obligation</span>
                     </div>
-                    <h1 id="quote-hero-title">Let's Build Your<br /><em class="highlight">Dream Yard</em> Together</h1>
-                    <p class="hero-sub" id="quote-hero-sub">Answer a few quick questions and we'll craft a personalized
-                        quote just for you. It only takes 2 minutes.</p>
+                    <h1 id="quote-hero-title">Get a <em class="highlight">Fixed-Price</em> Quote,<br />Free and In Person</h1>
+                    <p class="hero-sub" id="quote-hero-sub">Two minutes of questions, then Riley comes out, looks at the
+                        actual property, and gives you a written number — homes and businesses alike.</p>
                 </div>
             </div>
         </section>
@@ -222,6 +225,10 @@
                                 <button type="button" class="qz-option-card qz-chip" data-category="lawn">
                                     <span class="qz-option-icon">🌿</span>
                                     <span class="qz-option-title">Lawn Care</span>
+                                </button>
+                                <button type="button" class="qz-option-card qz-chip" data-category="maintenance">
+                                    <span class="qz-option-icon">🔁</span>
+                                    <span class="qz-option-title">Recurring Maintenance</span>
                                 </button>
                                 <button type="button" class="qz-option-card qz-chip" data-category="cleanup">
                                     <span class="qz-option-icon">🧹</span>
@@ -312,8 +319,8 @@
                                 <input type="text" id="q-firstName" name="firstName" placeholder="John" autocomplete="given-name" required />
                             </div>
                             <div class="form-group">
-                                <label for="q-lastName">Last name <span class="form-required">*</span></label>
-                                <input type="text" id="q-lastName" name="lastName" placeholder="Doe" autocomplete="family-name" required />
+                                <label for="q-lastName">Last name <span class="label-optional">(optional)</span></label>
+                                <input type="text" id="q-lastName" name="lastName" placeholder="Doe" autocomplete="family-name" />
                             </div>
                         </div>
 
@@ -324,7 +331,8 @@
                                 <span class="form-error" id="email-error">Please enter a valid email address</span>
                             </div>
                             <div class="form-group">
-                                <label for="q-phone">Phone <span class="label-optional">(optional)</span></label>
+                                <label for="q-phone">Phone <span class="label-optional">(optional — but a text from Riley
+                                        is usually the fastest way to your quote)</span></label>
                                 <input type="tel" id="q-phone" name="phone" placeholder="(402) 555-1234" autocomplete="tel" inputmode="tel" maxlength="14" />
                                 <span class="form-error" id="phone-error">Please enter a valid phone number</span>
                             </div>
@@ -367,6 +375,16 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                                 We come look in person
                             </div>
+                        </div>
+
+                        <!-- Verifiable proof at the moment of commitment — real Google review + live link -->
+                        <div class="qz-review-proof">
+                            <span class="qz-review-stars" aria-hidden="true">★★★★★</span>
+                            <p>"We were very pleased with the work Riley and crew did. They were hard working and did a
+                                great job on our retaining wall."</p>
+                            <span class="qz-review-name">Jeff Chapelle ·
+                                <a href="https://www.google.com/maps?cid=2884806323034838689" target="_blank"
+                                    rel="noopener">5.0 on Google — see all reviews</a></span>
                         </div>
 
                         <button type="submit" class="form-submit quote-next-btn" id="qz-submit">
@@ -443,52 +461,15 @@
     </main>
 
     <!-- ==================== FOOTER ==================== -->
-    <footer class="footer">
+    <footer class="footer footer--slim">
         <div class="container">
-            <div class="footer-top">
-                <div class="footer-brand">
-                    <a href="/" class="footer-logo">
-                        <img src="/images/Icon.png" alt="Lucky Landscapes" />
-                        <span class="footer-logo-text">Lucky <span>Landscapes</span></span>
-                    </a>
-                    <p class="footer-tagline">Creating outdoor spaces you'll feel lucky to have.</p>
-                </div>
-                <div class="footer-nav">
-                    <h4>Quick Links</h4>
-                    <a href="/#about">About</a>
-                    <a href="/#services">Services</a>
-                    <a href="/gallery">Gallery</a>
-                    <a href="/blog/">Blog</a>
-                    <a href="/#contact">Contact</a>
-                </div>
-                <div class="footer-nav">
-                    <h4>Service Areas</h4>
-                    <a href="/areas/east-lincoln">East Lincoln</a>
-                    <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
-                    <a href="/areas/south-lincoln">South Lincoln</a>
-                    <a href="/areas/waverly">Waverly</a>
-                </div>
-                <div class="footer-nav">
-                    <h4>Services</h4>
-                    <a href="/services/lawn-care">Lawn Care</a>
-                    <a href="/services/garden-beds">Garden &amp; Beds</a>
-                    <a href="/services/hardscaping">Hardscaping</a>
-                    <a href="/services/fencing">Fencing</a>
-                    <a href="/services/property-cleanup">Property Cleanup</a>
-                    <a href="/services/landscape-design">Landscape Design</a>
-                </div>
-                <div class="footer-contact">
-                    <h4>Contact</h4>
-                    <p>(402) 405-5475</p>
-                    <p>rileykopf@luckylandscapes.com</p>
-                    <p>Lincoln, NE &amp; Surrounding Areas</p>
-                    <div class="footer-social">
-                        <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>
-                        <a href="https://www.instagram.com/lucky.landscapes/" aria-label="Instagram"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" x2="17.51" y1="6.5" y2="6.5" /></svg></a>
-                        <a href="https://www.tiktok.com/@lucky.landscapes" aria-label="TikTok"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5" /></svg></a>
-                        <a href="https://www.youtube.com/@luckylandscapes" aria-label="YouTube"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A21 21 0 0 0 1 12c0 1.8 0 5.45.46 8.58a2.78 2.78 0 0 0 1.94 2 19.79 19.79 0 0 0 8.6.46 21 21 0 0 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 20.65 20.65 0 0 0 .45-3.09 21 21 0 0 0 .45-3.09 20.76 20.76 0 0 0-.45-3.09 20.65 20.65 0 0 0-.45-3.09z" /><polygon points="10 15 16 12 10 9 10 15" /></svg></a>
-                    </div>
-                </div>
+            <div class="footer-slim-inner">
+                <a href="/" class="footer-logo">
+                    <img src="/images/Icon.png" alt="Lucky Landscapes" />
+                    <span class="footer-logo-text">Lucky <span>Landscapes</span></span>
+                </a>
+                <p>Questions? Call or text <a href="tel:+14024055475">(402) 405-5475</a> &middot; <a
+                        href="mailto:rileykopf@luckylandscapes.com">rileykopf@luckylandscapes.com</a></p>
             </div>
             <div class="footer-bottom">
                 <p>&copy; 2026 Lucky Landscapes. All rights reserved.</p>
@@ -503,10 +484,10 @@
     <!-- Entry Point -->
     <script type="module" src="/main.js"></script>
 
-    <!-- Sticky Mobile CTA Bar -->
+    <!-- Sticky Mobile CTA Bar — phone only on /quote (the form IS this page;
+         a "Free Quote" self-link would waste half the bar) -->
     <div class="sticky-mobile-cta" id="sticky-mobile-cta">
-        <a href="/quote" class="btn btn-primary">Free Quote</a>
-        <a href="tel:+14024055475" class="sticky-phone-link">📞 (402) 405-5475</a>
+        <a href="tel:+14024055475" class="sticky-phone-link">📞 Prefer to talk? (402) 405-5475</a>
     </div>
 
 </body>

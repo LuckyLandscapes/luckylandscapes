@@ -15,6 +15,7 @@ export default defineConfig({
                 terms: resolve(__dirname, 'terms.html'),
                 quote: resolve(__dirname, 'quote.html'),
                 gallery: resolve(__dirname, 'gallery.html'),
+                contractors: resolve(__dirname, 'contractors.html'),
                 svcLawnCare: resolve(__dirname, 'services/lawn-care.html'),
                 svcGardenBeds: resolve(__dirname, 'services/garden-beds.html'),
                 svcHardscaping: resolve(__dirname, 'services/hardscaping.html'),

@@ -150,7 +150,7 @@ textarea {
     font-weight: 700;
     letter-spacing: .15em;
     text-transform: uppercase;
-    color: var(--clover);
+    color: var(--clover-dark);
     margin-bottom: 1rem;
 }
 
@@ -234,13 +234,15 @@ textarea {
 }
 
 .btn-primary {
-    background: var(--clover);
+    /* clover-dark, not clover: white-on-#6B8E4E is 3.75:1 (fails WCAG AA);
+       #5A7A40 is 4.89:1. Keep raw clover for borders/accents only. */
+    background: var(--clover-dark);
     color: var(--white);
     box-shadow: 0 4px 15px rgba(107, 142, 78, .4);
 }
 
 .btn-primary:hover {
-    background: var(--clover-dark);
+    background: #4A6635;
     transform: translateY(-2px);
     box-shadow: 0 6px 25px rgba(107, 142, 78, .5);
 }
@@ -369,7 +371,7 @@ textarea {
 
 .navbar.scrolled .nav-link:hover,
 .navbar.scrolled .nav-link.active {
-    color: var(--clover);
+    color: var(--clover-dark);
 }
 
 .nav-cta {
@@ -503,10 +505,12 @@ textarea {
 .hero-overlay {
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg,
-            rgba(30, 53, 22, .35) 0%,
-            rgba(0, 0, 0, .25) 40%,
-            rgba(0, 0, 0, .38) 100%);
+    /* Strong enough that white text passes contrast over the BRIGHTEST video
+       frame, not just the dark-lawn ones (recipe matches the gallery tiles). */
+    background: linear-gradient(to bottom,
+            rgba(15, 32, 12, .55) 0%,
+            rgba(15, 32, 12, .45) 55%,
+            rgba(15, 32, 12, .62) 100%);
 }
 
 .hero-content {
@@ -550,6 +554,7 @@ textarea {
     margin-bottom: 1.25rem;
     line-height: 1.1;
     letter-spacing: -.02em;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, .45);
 }
 
 .hero-title-line {
@@ -563,11 +568,12 @@ textarea {
 
 .hero-sub {
     font-size: clamp(1.05rem, 2vw, 1.3rem);
-    color: rgba(255, 255, 255, .8);
+    color: rgba(255, 255, 255, .94);
     font-weight: 300;
     max-width: 600px;
     margin: 0 auto 2.5rem;
     line-height: 1.6;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, .4);
 }
 
 .hero-buttons {
@@ -724,9 +730,15 @@ textarea {
 }
 
 .about-card p {
-    color: var(--gray-500);
+    /* gray-600, not gray-500: the cards sit on cream where gray-500 is 4.44:1 */
+    color: var(--gray-600);
     font-size: .95rem;
     line-height: 1.6;
+}
+
+.about-card p a {
+    color: var(--clover-dark);
+    font-weight: 600;
 }
 
 /* ============================================
@@ -966,9 +978,86 @@ textarea {
 
 .cta-banner-content p {
     font-size: 1.1rem;
-    color: rgba(255, 255, 255, .7);
+    color: rgba(255, 255, 255, .88);
     max-width: 500px;
     margin: 0 auto 2rem;
+}
+
+/* "General contractor or property manager?" line under the CTA banner button */
+.cta-banner-gc-link {
+    margin: 1.5rem auto 0 !important;
+    font-size: .95rem !important;
+}
+
+.cta-banner-gc-link a {
+    color: var(--white);
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* Tappable phone/email in the contact section + footer read as links */
+.contact-item-value a,
+.footer-contact p a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Verifiable review proof sitting next to the quote form's submit button */
+.qz-review-proof {
+    margin: 1.25rem 0;
+    padding: 1rem 1.25rem;
+    background: var(--cream);
+    border: 1px solid var(--gray-200);
+    border-left: 3px solid var(--clover-dark);
+    border-radius: var(--radius-md);
+}
+
+.qz-review-proof .qz-review-stars {
+    color: #B8860B;
+    font-size: .9rem;
+    letter-spacing: 2px;
+}
+
+.qz-review-proof p {
+    font-size: .92rem;
+    color: var(--gray-600);
+    line-height: 1.55;
+    margin: .35rem 0 .45rem;
+}
+
+.qz-review-proof .qz-review-name {
+    font-size: .85rem;
+    font-weight: 600;
+    color: var(--charcoal);
+}
+
+.qz-review-proof .qz-review-name a {
+    color: var(--clover-dark);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 600;
+}
+
+/* Slim footer (quote page) — the form page sheds its exit links */
+.footer--slim .footer-slim-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding-bottom: 2rem;
+    text-align: center;
+}
+
+.footer--slim .footer-slim-inner p {
+    color: var(--gray-400);
+    font-size: .95rem;
+}
+
+.footer--slim .footer-slim-inner p a {
+    color: var(--white);
+    text-decoration: underline;
+    text-underline-offset: 2px;
 }
 
 /* ============================================
@@ -1020,7 +1109,7 @@ textarea {
 }
 
 .cta-info>p {
-    color: rgba(255, 255, 255, .7);
+    color: rgba(255, 255, 255, .88);
     font-size: 1.1rem;
     line-height: 1.7;
     margin-bottom: 2.5rem;
@@ -1052,11 +1141,11 @@ textarea {
 }
 
 .contact-item-label {
-    font-size: .75rem;
+    font-size: .8rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: .1em;
-    color: rgba(255, 255, 255, .5);
+    color: rgba(255, 255, 255, .75);
     margin-bottom: .15rem;
 }
 
@@ -1984,6 +2073,7 @@ textarea {
     .reveal-right,
     .reveal-scale,
     .stagger-children > *,
+    .quote-card,
     .hero-content .hero-badge,
     .hero-content .hero-title,
     .hero-content .hero-sub,
@@ -1991,6 +2081,17 @@ textarea {
     .hero-content .hero-social-proof {
         animation: none !important;
         opacity: 1 !important;
+        transform: none !important;
+    }
+
+    /* Gallery overlays are hover-revealed on desktop; touch devices have no
+       hover, so keep the label/tag visible all the time there. */
+    .gallery-overlay {
+        opacity: 1 !important;
+    }
+
+    .gallery-label,
+    .gallery-tag {
         transform: none !important;
     }
 }
@@ -2865,7 +2966,8 @@ body.promo-active .mobile-menu {
     background: var(--white);
     border: 1.5px solid var(--gray-200);
     border-radius: var(--radius-md);
-    font-size: .95rem;
+    /* 16px minimum — anything smaller makes iOS Safari zoom the viewport on focus */
+    font-size: 1rem;
     font-family: inherit;
 }
 
@@ -2877,7 +2979,7 @@ body.promo-active .mobile-menu {
 
 #quote-form .form-group input::placeholder,
 #quote-form .form-group textarea::placeholder {
-    color: var(--gray-400);
+    color: var(--gray-500);
 }
 
 #quote-form .form-group label {
@@ -2901,13 +3003,15 @@ body.promo-active .mobile-menu {
 }
 
 @keyframes quoteCardIn {
+
+    /* Transform-only on purpose: an opacity:0 start means a stalled CSS
+       animation (the Firefox-iOS bug documented above) leaves the entire
+       quote form invisible with no failsafe. A stalled rise is still readable. */
     from {
-        opacity: 0;
         transform: translateY(20px);
     }
 
     to {
-        opacity: 1;
         transform: translateY(0);
     }
 }
@@ -2941,13 +3045,13 @@ body.promo-active .mobile-menu {
 /* --- Form Hint --- */
 .form-hint {
     display: block;
-    font-size: .78rem;
-    color: var(--gray-400);
+    font-size: .82rem;
+    color: var(--gray-500);
     margin-top: .3rem;
 }
 
 .label-optional {
-    color: var(--gray-400);
+    color: var(--gray-500);
     font-weight: 400;
 }
 
@@ -3250,8 +3354,8 @@ body.promo-active .mobile-menu {
 }
 
 .quote-disclaimer {
-    font-size: .78rem;
-    color: var(--gray-400);
+    font-size: .82rem;
+    color: var(--gray-500);
     margin-bottom: 2rem;
     font-style: italic;
 }
@@ -3275,7 +3379,7 @@ body.promo-active .mobile-menu {
 .quote-decline-btn {
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--gray-500);
     font-size: .9rem;
     font-weight: 500;
     cursor: pointer;
@@ -3294,7 +3398,7 @@ body.promo-active .mobile-menu {
     gap: .3rem;
     background: none;
     border: none;
-    color: var(--gray-400);
+    color: var(--gray-500);
     font-size: .85rem;
     font-weight: 500;
     cursor: pointer;
@@ -4392,7 +4496,7 @@ body.promo-active .mobile-menu {
     gap: .6rem;
     width: 100%;
     padding: 1rem 1.5rem;
-    background: linear-gradient(135deg, var(--clover), var(--sage));
+    background: linear-gradient(135deg, var(--clover-dark), #4A6635);
     color: var(--white);
     font-size: 1.05rem;
     font-weight: 700;
@@ -4711,7 +4815,7 @@ body.promo-active .mobile-menu {
 .qz-select {
     width: 100%;
     padding: .85rem 1rem;
-    font-size: .95rem;
+    font-size: 1rem;
     font-family: inherit;
     color: var(--charcoal);
     background: var(--white);
@@ -4734,7 +4838,7 @@ body.promo-active .mobile-menu {
 .qz-textarea {
     width: 100%;
     padding: .85rem 1rem;
-    font-size: .95rem;
+    font-size: 1rem;
     font-family: inherit;
     color: var(--charcoal);
     background: var(--white);
@@ -5010,8 +5114,8 @@ body.promo-active .mobile-menu {
 }
 
 .qz-upload-hint {
-    font-size: .78rem;
-    color: var(--gray-400);
+    font-size: .82rem;
+    color: var(--gray-500);
 }
 
 .qz-upload-preview {
@@ -5409,8 +5513,8 @@ body.promo-active .mobile-menu {
 }
 
 .review-date {
-    font-size: .78rem;
-    color: var(--gray-400);
+    font-size: .8rem;
+    color: var(--gray-500);
 }
 
 .review-google-icon {
@@ -5864,7 +5968,7 @@ body.promo-active .mobile-menu {
 }
 
 .svc-cta .btn-primary {
-    background: linear-gradient(135deg, var(--clover), var(--sage));
+    background: linear-gradient(135deg, var(--clover-dark), #4A6635);
     color: var(--white);
 }
 
@@ -7535,7 +7639,14 @@ body.promo-active .mobile-menu {
     color: var(--charcoal);
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: .4rem;
+    /* Full-height tap target — the text alone was ~22px tall, well under the
+       44px minimum for the primary call CTA on mobile. */
+    flex: 1;
+    padding: .75rem .5rem;
+    margin: -.75rem 0;
+    min-height: 44px;
 }
 
 @media (max-width: 768px) {

@@ -4,9 +4,10 @@
  * footer, and the sticky mobile CTA bar) across the hand-authored HTML pages so
  * every page matches the homepage. Run after editing the canonical blocks below.
  *
- *   - Nav + mobile menu: adds Blog so it's reachable from every page. Our Team
- *     is intentionally NOT linked anywhere (nav OR footer) — the page still
- *     exists at /team but is unlisted, so prospects aren't led to the crew.
+ *   - Nav + mobile menu: adds Blog + Our Team so they're reachable from every
+ *     page (the 2026-06 conversion audit found /team is the strongest trust
+ *     asset on the site — all four buyer personas wanted it linked). The
+ *     mobile menu + footer also link /contractors (GC / commercial lane).
  *     Also fixes the old property-cleanup mobile "Services" → /quote bug,
  *     since the whole menu is replaced.
  *   - Footer: adds the "Service Areas" column + Blog quick link + social icons.
@@ -37,6 +38,7 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -50,6 +52,8 @@ const MOBILE_MENU = `<div class="mobile-menu-overlay" id="mobile-overlay"></div>
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/team" class="mobile-link">Our Team</a>
+        <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -70,6 +74,8 @@ const FOOTER = `<footer class="footer">
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
+                    <a href="/team">Our Team</a>
+                    <a href="/contractors">For Contractors</a>
                     <a href="/blog/">Blog</a>
                     <a href="/#contact">Contact</a>
                 </div>
@@ -91,8 +97,8 @@ const FOOTER = `<footer class="footer">
                 </div>
                 <div class="footer-contact">
                     <h4>Contact</h4>
-                    <p>(402) 405-5475</p>
-                    <p>rileykopf@luckylandscapes.com</p>
+                    <p><a href="tel:+14024055475">(402) 405-5475</a></p>
+                    <p><a href="mailto:rileykopf@luckylandscapes.com">rileykopf@luckylandscapes.com</a></p>
                     <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
                         <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>
@@ -125,6 +131,7 @@ const STICKY_CTA = `    <!-- Sticky Mobile CTA Bar -->
 // is consistent.
 const TARGETS = [
     'quote.html', 'gallery.html', 'team.html', 'careers.html', 'privacy.html', 'terms.html',
+    'contractors.html',
     'services/lawn-care.html', 'services/garden-beds.html', 'services/hardscaping.html',
     'services/fencing.html', 'services/property-cleanup.html', 'services/landscape-design.html',
 ];
@@ -144,7 +151,10 @@ async function process(file) {
     if (MOBILE_RE.test(html)) html = html.replace(MOBILE_RE, MOBILE_MENU);
     else issues.push('mobile-menu not matched');
 
-    if (FOOTER_RE.test(html)) html = html.replace(FOOTER_RE, FOOTER);
+    // quote.html carries a deliberately slim footer (the form page sheds its
+    // 25+ exit links) — leave any footer tagged footer--slim alone.
+    if (html.includes('footer--slim')) { /* keep slim footer */ }
+    else if (FOOTER_RE.test(html)) html = html.replace(FOOTER_RE, FOOTER);
     else issues.push('footer not matched');
 
     if (!html.includes('sticky-mobile-cta')) {

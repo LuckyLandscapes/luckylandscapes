@@ -222,10 +222,11 @@ const stickyMobileCta = document.getElementById('sticky-mobile-cta');
 if (stickyMobileCta) {
     let stickyVisible = false;
     function handleStickyCta() {
-        const showAfter = 400;
+        // Visible from load (no scroll gate) — a visitor who lands and never
+        // scrolls still needs a one-tap call path. Hides only over the footer.
         const footer = document.querySelector('.footer');
         const footerTop = footer ? footer.getBoundingClientRect().top : Infinity;
-        const shouldShow = window.scrollY > showAfter && footerTop > window.innerHeight;
+        const shouldShow = footerTop > window.innerHeight;
 
         if (shouldShow && !stickyVisible) {
             stickyMobileCta.classList.add('visible');
@@ -533,20 +534,38 @@ if (contactForm) {
         btn.disabled = true;
 
         try {
-            // Use URLSearchParams so the body survives no-cors mode
-            // (JSON content-type is not a "simple" header and gets stripped)
-            const params = new URLSearchParams();
-            for (const [key, value] of Object.entries(data)) {
-                params.append(key, value);
+            // Primary: luckyapp lead intake (readable response — we only show
+            // success if the server actually accepted the lead). The old
+            // Apps Script no-cors path claimed "✓ Sent!" unconditionally,
+            // which silently swallowed leads whenever the script broke.
+            const leadPayload = {
+                firstName: data.firstName,
+                lastName: data.lastName || '',
+                email: data.email,
+                phone: data.phone || '',
+                category: 'other',
+                categoryLabel: data.service || 'General Contact',
+                project_description: [data.message, data.service ? `Service interested in: ${data.service}` : '']
+                    .filter(Boolean).join('\n') || 'Contact form message (no message text)',
+                source_form: 'homepage_contact_modal',
+            };
+            const turnstileResp = contactForm.querySelector('[name="cf-turnstile-response"]');
+            if (turnstileResp && turnstileResp.value) leadPayload.turnstile_token = turnstileResp.value;
+
+            const res = await fetch(LEADS_INTAKE_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(leadPayload),
+            });
+            if (!res.ok) throw new Error(`Lead intake responded ${res.status}`);
+
+            // Best-effort backup: legacy Apps Script sheet (fire-and-forget).
+            if (CONTACT_SCRIPT_URL) {
+                const params = new URLSearchParams();
+                for (const [key, value] of Object.entries(data)) params.append(key, value);
+                fetch(CONTACT_SCRIPT_URL, { method: 'POST', mode: 'no-cors', body: params }).catch(() => { });
             }
 
-            await fetch(CONTACT_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: params,
-            });
-
-            // no-cors means we can't read the response, but if fetch didn't throw, it sent
             trackEvent('contact_submit', { service: data.service || 'none' });
             btn.innerHTML = '✓ Request Sent!';
             btn.classList.remove('loading');
@@ -559,7 +578,8 @@ if (contactForm) {
                 btn.disabled = false;
             }, 4000);
         } catch (err) {
-            btn.innerHTML = '✕ Error — try again';
+            console.error('Contact form submission failed:', err);
+            btn.innerHTML = '✕ Error — try again or call (402) 405-5475';
             btn.classList.remove('loading');
             btn.classList.add('error');
 
@@ -567,7 +587,7 @@ if (contactForm) {
                 btn.innerHTML = originalHTML;
                 btn.classList.remove('error');
                 btn.disabled = false;
-            }, 3000);
+            }, 4000);
         }
     });
 }
@@ -590,7 +610,22 @@ if (serviceSelect) {
     serviceSelect.addEventListener('change', () => {
         const route = serviceRoutes[serviceSelect.value];
         if (route) {
-            window.location.href = `/quote.html?category=${route}`;
+            // Carry anything already typed into the quote form's autosave so
+            // the redirect doesn't discard the visitor's input.
+            try {
+                const fd = Object.fromEntries(new FormData(contactForm).entries());
+                const stash = { savedAt: Date.now() };
+                if (fd.firstName) stash.firstName = fd.firstName;
+                if (fd.lastName) stash.lastName = fd.lastName;
+                if (fd.email) stash.email = fd.email;
+                if (fd.phone) stash.phone = fd.phone;
+                if (fd.message) stash.project_description = fd.message;
+                if (Object.keys(stash).length > 1) {
+                    localStorage.setItem('lucky_quote_partial', JSON.stringify(stash));
+                }
+            } catch (_) { }
+            // Clean URL — /quote.html eats a 308 redirect on CF Pages.
+            window.location.href = `/quote?category=${route}`;
         }
     });
 }
@@ -758,7 +793,7 @@ let projectData = [
         title: 'Custom Built Deck',
         tag: 'Construction',
         cover: 1, // index of the image shown in the gallery grid
-        desc: 'A custom built deck designed to extend this family\'s outdoor living space. We selected premium composite materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
+        desc: 'A custom composite deck with a contrasting picture-frame border, built to extend this family\'s living space into the backyard.',
         images: [
             '/images/megandeck/1.webp',
             '/images/megandeck/2.webp',
@@ -769,7 +804,7 @@ let projectData = [
         title: 'Retaining Walls',
         tag: 'Hardscaping',
         cover: 4,
-        desc: 'We specialize in building strong, long-lasting retaining walls that solve drainage and erosion problems while looking great. Using high-quality materials and proven construction methods, we create retaining walls that protect your property and enhance its curb appeal.',
+        desc: 'A block retaining wall built to stop erosion and square up the grade — set on a compacted base with clean cap courses, so it stays plumb through freeze-thaw.',
         images: [
             '/images/retainingwall/1-1.webp',
             '/images/retainingwall/1-2.webp',
@@ -782,7 +817,7 @@ let projectData = [
         title: 'Lawn Maintenance',
         tag: 'Maintenance',
         cover: 0,
-        desc: 'Regular lawn maintenance to keep your lawn looking its best. Includes mowing, edging, trimming, blowing, and hedge trimming.',
+        desc: 'Weekly maintenance on a set route: mowing, crisp edging along every walk and bed, trimming, blowing, and hedge work — the same crew each visit.',
         images: [
             '/images/lawncare/1.webp',
             '/images/lawncare/2.webp',
@@ -793,10 +828,10 @@ let projectData = [
         ],
     },
     {
-        title: 'Fire Places',
+        title: 'Outdoor Fireplace',
         tag: 'Hardscaping',
         cover: 0,
-        desc: 'A custom built fire place designed to extend this family\'s outdoor living space. We selected premium materials with a complementary border pattern, creating a durable and beautiful surface perfect for entertainment and relaxation.',
+        desc: 'An outdoor fireplace and surround laid course by course — the anchor of this backyard\'s gathering space, built to handle Nebraska winters.',
         images: [
             '/images/fireplace/1.jpg',
         ],
@@ -805,7 +840,7 @@ let projectData = [
         title: 'Garden Beds',
         tag: 'Landscaping',
         cover: 1,
-        desc: 'A beautiful garden bed built to maximize outdoor living space. Featuring low-maintenance materials and a design that flows seamlessly from the home to the backyard.',
+        desc: 'Fresh-cut bed lines, new plantings, and a clean mulch finish that frames the house instead of fighting it.',
         images: [
             '/images/mulchgardenbeds/1.webp',
             '/images/mulchgardenbeds/2.jpg',
@@ -815,7 +850,7 @@ let projectData = [
         title: 'Design & Build',
         tag: 'Landscaping',
         cover: 0,
-        desc: 'Transforming outdoor spaces with thoughtful design and expert construction. From concept to completion, we create landscapes that enhance beauty and functionality.',
+        desc: 'A full design-and-build: layout, plant selection, and installation handled by the same crew from the first sketch to the final walkthrough.',
         images: [
             '/images/landscapedesign/3.webp',
             '/images/landscapedesign/1.webp',
@@ -1831,12 +1866,13 @@ if (qzCategoryBtns.length > 0) {
     const categoryError = document.getElementById('category-error');
 
     const categoryLabels = {
-        lawn:      'Lawn Care',
-        garden:    'Garden & Beds',
-        hardscape: 'Patios & Walls',
-        cleanup:   'Property Cleanup',
-        design:    'Design & Build',
-        other:     'Something Else',
+        lawn:        'Lawn Care',
+        garden:      'Garden & Beds',
+        hardscape:   'Patios & Walls',
+        cleanup:     'Property Cleanup',
+        design:      'Design & Build',
+        maintenance: 'Recurring Maintenance',
+        other:       'Something Else',
     };
 
     // --- Category chip selection (single-select) ---
@@ -2111,13 +2147,15 @@ if (qzCategoryBtns.length > 0) {
             const description = document.getElementById('q-description').value.trim();
             const category  = categoryInput.value;
 
-            // Required: category + first/last name + email + description.
+            // Required: category + first name + email + description.
+            // Last name is optional — it's not needed to respond to a lead,
+            // and every extra required field costs form completions.
             if (!category) {
                 if (categoryError) categoryError.classList.add('visible');
                 document.getElementById('qz-categories').scrollIntoView({ behavior: 'smooth', block: 'center' });
                 return;
             }
-            if (!firstName || !lastName || !email || !description) {
+            if (!firstName || !email || !description) {
                 quoteForm.reportValidity();
                 return;
             }

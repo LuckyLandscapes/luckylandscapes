@@ -26,6 +26,7 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
                 <a href="/#about" class="nav-link">About</a>
                 <a href="/#services" class="nav-link">Services</a>
                 <a href="/gallery" class="nav-link">Gallery</a>
+                <a href="/team" class="nav-link">Our Team</a>
                 <a href="/blog/" class="nav-link">Blog</a>
                 <a href="/#contact" class="nav-link">Contact</a>
                 <a href="/quote" class="btn btn-primary nav-cta">Get a Quote</a>
@@ -40,6 +41,8 @@ const NAV = `<nav class="navbar scrolled" id="navbar">
         <a href="/#about" class="mobile-link">About</a>
         <a href="/#services" class="mobile-link">Services</a>
         <a href="/gallery" class="mobile-link">Gallery</a>
+        <a href="/team" class="mobile-link">Our Team</a>
+        <a href="/contractors" class="mobile-link">For Contractors</a>
         <a href="/blog/" class="mobile-link">Blog</a>
         <a href="/#contact" class="mobile-link">Contact</a>
         <a href="/quote" class="btn btn-primary mobile-cta-btn">Get a Quote</a>
@@ -60,6 +63,8 @@ const FOOTER = `<footer class="footer">
                     <a href="/#about">About</a>
                     <a href="/#services">Services</a>
                     <a href="/gallery">Gallery</a>
+                    <a href="/team">Our Team</a>
+                    <a href="/contractors">For Contractors</a>
                     <a href="/blog/">Blog</a>
                     <a href="/#contact">Contact</a>
                 </div>
@@ -81,8 +86,8 @@ const FOOTER = `<footer class="footer">
                 </div>
                 <div class="footer-contact">
                     <h4>Contact</h4>
-                    <p>(402) 405-5475</p>
-                    <p>rileykopf@luckylandscapes.com</p>
+                    <p><a href="tel:+14024055475">(402) 405-5475</a></p>
+                    <p><a href="mailto:rileykopf@luckylandscapes.com">rileykopf@luckylandscapes.com</a></p>
                     <p>Lincoln, NE &amp; Surrounding Areas</p>
                     <div class="footer-social">
                         <a href="https://www.facebook.com/luckylandscapes" aria-label="Facebook"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" /></svg></a>
@@ -115,7 +120,7 @@ const REVIEWS_STRIP = `
                     <h2 class="section-title">Rated 5.0 Across Lincoln, NE</h2>
                     <div class="reviews-overall">
                         <div class="reviews-stars">★★★★★</div>
-                        <span class="reviews-rating-text">5.0 · 7 Google Reviews</span>
+                        <span class="reviews-rating-text">5.0 ★ on Google</span>
                     </div>
                 </div>
                 <div class="reviews-grid stagger-children">
@@ -912,7 +917,7 @@ const POSTS = [
         description: 'An honest buyer\'s guide to hiring a landscaper in Lincoln, Nebraska. The exact questions to ask about insurance, base depth, and written quotes — plus the red flags that tell you to walk.',
         h1: 'How to <em class="highlight">Choose a Landscaper</em> in Lincoln, NE',
         sub: 'A straight buyer\'s guide — the questions that actually separate a crew that will still be standing behind the work in five years from one that won\'t.',
-        date: '2026-01-14',
+        date: '2026-03-04',
         category: 'Hardscaping',
         image: '/images/landscapedesign/1.webp',
         imageAlt: 'Finished professional landscape and hardscape installation in Lincoln',
@@ -968,7 +973,7 @@ const POSTS = [
         description: 'An honest mulch-vs-rock comparison for Lincoln, Nebraska landscape beds. Real local pricing, weed control, heat, soil health, and exactly when each one makes sense.',
         h1: '<em class="highlight">Mulch vs. Rock</em> for Your Landscape Beds in Lincoln, NE',
         sub: 'The "rock is maintenance-free" pitch is half-true and half-marketing. Here\'s the honest trade-off for Lincoln yards — cost, weeds, heat, and what it does to your plants.',
-        date: '2026-02-24',
+        date: '2026-03-26',
         category: 'Garden Beds',
         image: '/images/mulchgardenbeds/1.webp',
         imageAlt: 'Fresh hardwood mulch in a planted Lincoln, NE garden bed',
@@ -1189,7 +1194,7 @@ const POSTS = [
         description: 'A real budgeting guide to landscaping costs in Lincoln, Nebraska for 2026 — from a few-hundred-dollar bed refresh to a full design-build. What drives the number and how to phase a big project.',
         h1: 'How Much Does <em class="highlight">Landscaping</em> Cost in Lincoln, NE?',
         sub: 'From a $400 mulch refresh to a $50,000 backyard transformation — here\'s how to think about a landscaping budget in Lincoln, and where the money actually goes.',
-        date: '2026-01-27',
+        date: '2026-03-12',
         category: 'Landscape Design',
         image: '/images/landscapedesign/2.webp',
         imageAlt: 'Completed full-yard landscape design-build project in Lincoln, Nebraska',
@@ -1313,7 +1318,7 @@ const POSTS = [
         description: 'Which grass actually thrives in Lincoln, Nebraska — the best cool-season grass types and seed blends for sun, shade, and high traffic, from a local lawn crew.',
         h1: 'The Best <em class="highlight">Grass Seed</em> for Nebraska Lawns',
         sub: 'Lincoln sits in the cool-season grass zone, so the lawn videos shot down South will steer you wrong. Here\'s what actually thrives in Nebraska — and the blend we use.',
-        date: '2026-02-10',
+        date: '2026-03-23',
         category: 'Lawn Care',
         image: '/images/lawncare/5.webp',
         imageAlt: 'Healthy cool-season turf grass on a Lincoln, NE lawn',
@@ -2185,7 +2190,8 @@ const SITEMAP_STATIC = [
     { loc: '/services/fencing',              lastmod: '2026-05-11', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/garden-beds',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
     { loc: '/services/property-cleanup',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
-    // /team deliberately omitted — page exists but is unlisted (no nav/footer/sitemap links).
+    { loc: '/contractors',                   lastmod: '2026-06-11', changefreq: 'monthly', priority: '0.8' },
+    { loc: '/team',                          lastmod: '2026-06-11', changefreq: 'monthly', priority: '0.6' },
     { loc: '/careers',                       lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.4' },
     { loc: '/privacy',                       lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
     { loc: '/terms',                         lastmod: '2026-05-05', changefreq: 'yearly',  priority: '0.2' },
