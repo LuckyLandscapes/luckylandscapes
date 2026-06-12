@@ -428,9 +428,13 @@
         <header class="hero" id="hero">
             <!-- Video Background -->
             <div class="hero-video-wrap">
+                <!-- Phones get the 6MB 720p; wider viewports fall through to the 21MB 1440p.
+                     Filenames are versioned (immutable cache in _headers) — never overwrite
+                     these in place, ship a new name instead. -->
                 <video class="hero-video" autoplay muted loop playsinline preload="metadata"
-                    poster="/images/banner.jpg">
-                    <source src="/images/webheromain.mp4" type="video/mp4" />
+                    poster="/images/hero-poster.jpg">
+                    <source src="/images/hero-drone-720.mp4" type="video/mp4" media="(max-width: 767px)" />
+                    <source src="/images/hero-drone-1440.mp4" type="video/mp4" />
                 </video>
                 <div class="hero-overlay"></div>
             </div>

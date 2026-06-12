@@ -497,17 +497,15 @@ textarea {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    filter: blur(10px) brightness(.85);
-    transform: scale(1.05);
-    /* prevent blur edge artifacts */
+    filter: brightness(.9);
 }
 
 .hero-overlay {
     position: absolute;
     inset: 0;
     background: linear-gradient(135deg,
-            rgba(30, 53, 22, .72) 0%,
-            rgba(45, 74, 34, .50) 40%,
+            rgba(30, 53, 22, .35) 0%,
+            rgba(0, 0, 0, .25) 40%,
             rgba(0, 0, 0, .38) 100%);
 }
 
@@ -1977,12 +1975,6 @@ textarea {
     * {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
-    }
-
-    /* Drop the heavy blur on the hero background video — its bg gradients
-       still convey the same look without forcing the GPU to blur every frame. */
-    .hero-video {
-        filter: brightness(.85) !important;
     }
 
     /* Kill every cosmetic entrance animation on mobile. Content is rendered
