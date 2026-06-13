@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/apiClient';
 import {
   getPayrollSettings,
   computeBurdenedHourlyRate,
+  computeShiftPaidBreak,
   PAYROLL_CLASSIFICATIONS,
   PAYROLL_BURDEN_CONSTANTS,
 } from '@/lib/finance';
@@ -109,17 +110,9 @@ export default function TeamPage() {
       let totalBreakMinutes = 0;
       for (const t of entries) {
         const segs = (timeSegments || []).filter(s => s.timeEntryId === t.id);
-        if (segs.length > 0) {
-          const paidMins = segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
-          const breakMins = segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
-          totalMinutes += paidMins;
-          totalBreakMinutes += breakMins;
-        } else {
-          const shiftMins = computeDurationMinutes(t.clockIn, t.clockOut);
-          const breakMins = Number(t.breakMinutes || 0);
-          totalMinutes += Math.max(0, (shiftMins || 0) - breakMins);
-          totalBreakMinutes += breakMins;
-        }
+        const { paidMinutes, breakMinutes } = computeShiftPaidBreak(t, segs);
+        totalMinutes += paidMinutes;
+        totalBreakMinutes += breakMinutes;
       }
       const totalHours = totalMinutes / 60;
       const rateInfo = computeBurdenedHourlyRate(member, payrollSettings);
@@ -741,13 +734,8 @@ function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTi
             const segs = timeSegments.filter(s => s.timeEntryId === e.id);
             const hasSegs = segs.length > 0;
             const shiftMins = computeDurationMinutes(e.clockIn, e.clockOut);
-            // Prefer segment math when available
-            const breakMins = hasSegs
-              ? segs.filter(s => s.kind === 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
-              : Number(e.breakMinutes || 0);
-            const paidMins = hasSegs
-              ? segs.filter(s => s.kind !== 'break').reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0)
-              : Math.max(0, shiftMins - breakMins);
+            // Single source of truth (matches payroll + crew cockpit + finance).
+            const { paidMinutes: paidMins, breakMinutes: breakMins } = computeShiftPaidBreak(e, segs);
             const isOpen = openRow === e.id;
             return [
               <tr key={e.id}>
@@ -759,7 +747,7 @@ function TimeLog({ memberId, timeEntries, timeSegments = [], jobs = [], updateTi
                 <td>{new Date(e.clockOut).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'})}</td>
                 <td style={{ color:'var(--text-tertiary)' }}>{fmtDur(shiftMins)}</td>
                 <td style={{ color: breakMins > 0 ? 'var(--lucky-gold)' : 'var(--text-tertiary)' }}>
-                  {breakMins > 0 ? `${breakMins}m` : '—'}
+                  {breakMins > 0 ? `${Math.round(breakMins)}m` : '—'}
                 </td>
                 <td style={{ fontWeight:600 }}>{fmtDur(paidMins)}</td>
                 <td style={{ color:'var(--text-tertiary)', maxWidth:'200px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{e.notes || '—'}</td>
@@ -1212,7 +1200,7 @@ function PayrollSettingsModal({ payrollSettings, totalGross, totalBurden, update
             marginBottom: 'var(--space-md)',
             fontSize: '0.82rem',
           }}>
-            <strong style={{ display: 'block', marginBottom: 6 }}>What is "employer burden"?</strong>
+            <strong style={{ display: 'block', marginBottom: 6 }}>What is &quot;employer burden&quot;?</strong>
             <p style={{ margin: 0, color: 'var(--text-tertiary)' }}>
               For every $1 of W-2 wages, the business also pays payroll tax (FICA + FUTA + SUTA) and workers comp insurance.
               These add up to ~10–15% on top of gross pay. The /team page and job profitability use these numbers so margins

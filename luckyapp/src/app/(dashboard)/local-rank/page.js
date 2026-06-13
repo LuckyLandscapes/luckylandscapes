@@ -125,20 +125,31 @@ export default function LocalRankPage() {
   const [finderBusy, setFinderBusy] = useState(false);
   const [finderResults, setFinderResults] = useState(null);
   const [manualId, setManualId] = useState('');
-  const [apiBlocked, setApiBlocked] = useState(false);
   const [organicQuery, setOrganicQuery] = useState(ORGANIC_PRESETS[0]);
 
   const mapDivRef = useRef(null);
   const gmapRef = useRef(null);
   const infoRef = useRef(null);
   const markersRef = useRef([]);
-  const apiModeRef = useRef(null); // 'new' | 'legacy'
   const cancelRef = useRef(false);
 
   const seoPlaceId = org?.settings?.seo_place_id || null;
   const seoBusinessName = org?.settings?.seo_business_name || null;
   const activeKeyword = (customKeyword.trim() || keyword).trim();
   const totalPoints = gridSize * gridSize;
+
+  // We can scan as long as we have SOMETHING to recognize ourselves by —
+  // a Place ID OR a business name. Name-matching is the robust path when the
+  // Place ID is in flux (e.g. after a storefront→service-area reclassification
+  // retires the old ID) or the listing is hard to pin down in the Places API.
+  const trackName = (seoBusinessName || '').trim().toLowerCase();
+  const trackingByName = !!trackName && trackName !== 'my listing (manual id)';
+  const canScan = !!seoPlaceId || trackingByName;
+  const matchesUs = useCallback((p) => {
+    if (seoPlaceId && p?.id === seoPlaceId) return true;
+    if (trackingByName && p?.name) return p.name.toLowerCase().includes(trackName);
+    return false;
+  }, [seoPlaceId, trackingByName, trackName]);
 
   // ---- History (this device only) ----
   useEffect(() => {
@@ -270,50 +281,23 @@ export default function LocalRankPage() {
     gmapRef.current.fitBounds(bounds, 40);
   }, [mapInited, viewScan, center, gridSize, spacing, scanning, clearMarkers, addRankMarker]);
 
-  // ---- Places text search: tries the new Place API, falls back to legacy ----
-  const searchText = useCallback(async (query, lat, lng, radius, maxN = 20) => {
-    const g = window.google;
-    if (apiModeRef.current !== 'legacy') {
-      try {
-        const { Place } = await g.maps.importLibrary('places');
-        if (Place?.searchByText) {
-          const { places } = await Place.searchByText({
-            textQuery: query,
-            fields: ['id', 'displayName', 'formattedAddress'],
-            locationBias: { center: { lat, lng }, radius: Math.min(radius, 50000) },
-            maxResultCount: maxN,
-          });
-          apiModeRef.current = 'new';
-          return (places || []).map((p) => ({
-            id: p.id,
-            name: typeof p.displayName === 'string' ? p.displayName : (p.displayName?.text || ''),
-            address: p.formattedAddress || '',
-          }));
-        }
-      } catch (e) {
-        // If the new API worked before, this is a real failure — surface it.
-        if (apiModeRef.current === 'new') throw e;
-        // "PERMISSION_DENIED / blocked" = Places API (New) isn't enabled on the
-        // Cloud project. Flag it so the UI can tell the user exactly that,
-        // instead of silently degrading to the deprecated legacy index (which
-        // can't find newer service-area listings by name).
-        if (/PERMISSION_DENIED|blocked|not.*enabled|API_NOT_ACTIVATED/i.test(String(e?.message))) {
-          setApiBlocked(true);
-        }
-        apiModeRef.current = 'legacy';
-      }
-    }
-    return new Promise((resolve, reject) => {
-      const svc = new g.maps.places.PlacesService(document.createElement('div'));
-      svc.textSearch({ query, location: new g.maps.LatLng(lat, lng), radius }, (res, status) => {
-        const S = g.maps.places.PlacesServiceStatus;
-        if (status === S.OK || status === S.ZERO_RESULTS) {
-          resolve((res || []).slice(0, maxN).map((p) => ({ id: p.place_id, name: p.name, address: p.formatted_address || '' })));
-        } else {
-          reject(new Error(`Places search failed: ${status}`));
-        }
-      });
+  // ---- Real Google Maps local-pack results at a lat/lng (via server route) ----
+  // The Places API ranks by text relevance, NOT the map pack a real searcher
+  // sees — so ranking goes through /api/local-rank/scan, which reads the actual
+  // Google Maps SERP server-side (key never client-side). Returns results in
+  // true rank order: index 0 = rank #1. Same shape the old searchText returned,
+  // so runScan / runFinder / matchesUs are unchanged. `radius` is now ignored.
+  const searchText = useCallback(async (query, lat, lng, _radius, maxN = 20) => {
+    const res = await fetch('/api/local-rank/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ keyword: query, lat, lng, maxN }),
     });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || `Scan failed (${res.status})`);
+    }
+    return (data.results || []).map((r) => ({ id: r.id || null, name: r.name, address: r.address || '' }));
   }, []);
 
   // ---- Find-my-listing ----
@@ -331,7 +315,17 @@ export default function LocalRankPage() {
   };
 
   const pickBusiness = async (r) => {
-    await updateOrgSettings({ seo_place_id: r.id, seo_business_name: r.name });
+    await updateOrgSettings({ seo_place_id: r.id || null, seo_business_name: r.name });
+    setFinderOpen(false);
+    setFinderResults(null);
+  };
+
+  // Track by typed name only (no Place ID) — the scan matches this name in the
+  // live Maps results, which is robust when the listing's Place ID is in flux.
+  const applyTrackByName = async () => {
+    const name = finderQuery.trim();
+    if (!name || finderBusy) return;
+    await updateOrgSettings({ seo_place_id: null, seo_business_name: name });
     setFinderOpen(false);
     setFinderResults(null);
   };
@@ -350,8 +344,8 @@ export default function LocalRankPage() {
           address: place.formattedAddress || '',
         };
       }
-    } catch (e) {
-      if (/PERMISSION_DENIED|blocked|not.*enabled|API_NOT_ACTIVATED/i.test(String(e?.message))) setApiBlocked(true);
+    } catch {
+      // New Places API unavailable for this lookup — fall through to legacy.
     }
     return new Promise((resolve, reject) => {
       const svc = new g.maps.places.PlacesService(document.createElement('div'));
@@ -368,7 +362,7 @@ export default function LocalRankPage() {
   // Save a manually-pasted Place ID. We try to confirm the name, but save the
   // raw ID regardless — the grid match only needs the ID string, so this is the
   // guaranteed path when name search can't find the listing.
-  const useManualId = async () => {
+  const applyManualId = async () => {
     const id = manualId.trim();
     if (!id || finderBusy) return;
     setFinderBusy(true);
@@ -383,7 +377,7 @@ export default function LocalRankPage() {
 
   // ---- The scan ----
   const runScan = async () => {
-    if (scanning || !seoPlaceId || !activeKeyword || !mapInited) return;
+    if (scanning || !canScan || !activeKeyword || !mapInited) return;
     setScanning(true);
     setScanError(null);
     setViewScan(null);
@@ -402,11 +396,11 @@ export default function LocalRankPage() {
       let point = { ...pts[i], rank: null, top: [] };
       try {
         const places = await searchText(activeKeyword, pts[i].lat, pts[i].lng, biasRadius, 20);
-        const idx = places.findIndex((p) => p.id === seoPlaceId);
+        const idx = places.findIndex((p) => matchesUs(p));
         point = {
           ...pts[i],
           rank: idx >= 0 ? idx + 1 : null,
-          top: places.slice(0, 5).map((p) => ({ name: p.name, us: p.id === seoPlaceId })),
+          top: places.slice(0, 5).map((p) => ({ name: p.name, us: matchesUs(p) })),
         };
       } catch (e) {
         errors++;
@@ -490,13 +484,15 @@ export default function LocalRankPage() {
 
       {/* Step 1 — pick the GBP listing */}
       <div className="card" style={{ marginBottom: 'var(--space-md)' }}>
-        {seoPlaceId && !finderOpen ? (
+        {canScan && !finderOpen ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <CheckCircle2 size={18} style={{ color: 'var(--lucky-green)' }} />
               <span style={{ fontSize: '0.88rem' }}>
                 Tracking <strong>{seoBusinessName || 'your listing'}</strong>
-                <span style={{ color: 'var(--text-tertiary)', fontFamily: 'monospace', fontSize: '0.72rem', marginLeft: 8 }}>{seoPlaceId}</span>
+                <span style={{ color: 'var(--text-tertiary)', fontFamily: 'monospace', fontSize: '0.72rem', marginLeft: 8 }}>
+                  {seoPlaceId || 'matched by name'}
+                </span>
               </span>
             </div>
             <button className="btn btn-secondary btn-sm" onClick={() => setFinderOpen(true)}>Change</button>
@@ -508,7 +504,8 @@ export default function LocalRankPage() {
               {seoPlaceId && <button className="btn btn-secondary btn-sm" onClick={() => { setFinderOpen(false); setFinderResults(null); }}><X size={14} /></button>}
             </div>
             <p style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-sm)' }}>
-              One-time setup: search for the listing, pick it, and every scan after this tracks it by its Google place ID.
+              One-time setup: search the live Google Maps results for your listing and pick it — or just track by your
+              business name. Every scan after this looks for you by name (and Place ID if set).
             </p>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <input
@@ -517,10 +514,13 @@ export default function LocalRankPage() {
                 value={finderQuery}
                 onChange={(e) => setFinderQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runFinder()}
-                placeholder="Lucky Landscapes Lincoln NE"
+                placeholder="Lucky Landscapes"
               />
-              <button className="btn btn-primary" onClick={runFinder} disabled={finderBusy || !mapsLoaded}>
+              <button className="btn btn-primary" onClick={runFinder} disabled={finderBusy || !finderQuery.trim()}>
                 {finderBusy ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Search
+              </button>
+              <button className="btn btn-secondary" onClick={applyTrackByName} disabled={finderBusy || !finderQuery.trim()} title="Skip the search and just match this name in the live results">
+                Track by name
               </button>
             </div>
             {finderResults?.error && (
@@ -530,10 +530,9 @@ export default function LocalRankPage() {
               <div style={{ marginTop: 'var(--space-sm)', display: 'grid', gap: 6 }}>
                 {finderResults.length === 0 && (
                   <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-                    <strong>No match for that name.</strong> Two common reasons: (1) Places API (New) isn&apos;t enabled
-                    {apiBlocked ? ' — and we detected it IS blocked, so enable it (see below) and search again' : ''}; or
-                    (2) the exact name on your Google listing is different (e.g. &ldquo;Lucky Landscapes LLC&rdquo;). Try the exact
-                    name, or just paste your Place ID below — that always works.
+                    <strong>No match found.</strong> Try your exact listing name (e.g. &ldquo;Lucky Landscapes LLC&rdquo;), or
+                    just type your business name in the box below and pick <em>Track by name</em> — the scan matches your
+                    name in the live Maps results, so a Place ID is optional.
                   </div>
                 )}
                 {finderResults.map((r) => (
@@ -548,13 +547,6 @@ export default function LocalRankPage() {
               </div>
             )}
 
-            {apiBlocked && (
-              <div style={{ marginTop: 'var(--space-sm)', padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                <strong>Places API (New) is blocked on your Google Cloud project.</strong> Enable it: Google Cloud Console →
-                APIs &amp; Services → Library → search <strong>&ldquo;Places API (New)&rdquo;</strong> → Enable (same project as
-                your Maps key). It has a free tier and gives a far better index for newer service-area listings than the old API.
-              </div>
-            )}
 
             {/* Guaranteed path: paste the Place ID directly */}
             <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--border-color)' }}>
@@ -569,10 +561,10 @@ export default function LocalRankPage() {
                   style={{ flex: '1 1 240px', fontFamily: 'monospace', fontSize: '0.8rem' }}
                   value={manualId}
                   onChange={(e) => setManualId(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && useManualId()}
+                  onKeyDown={(e) => e.key === 'Enter' && applyManualId()}
                   placeholder="ChIJ…"
                 />
-                <button className="btn btn-secondary" onClick={useManualId} disabled={finderBusy || !manualId.trim()}>
+                <button className="btn btn-secondary" onClick={applyManualId} disabled={finderBusy || !manualId.trim()}>
                   {finderBusy ? <Loader2 size={16} className="animate-spin" /> : null} Use this ID
                 </button>
               </div>
@@ -613,21 +605,22 @@ export default function LocalRankPage() {
               <option value={3}>3 mi</option>
             </select>
           </div>
-          <button className="btn btn-primary" onClick={runScan} disabled={scanning || !seoPlaceId || !activeKeyword || !mapInited}>
+          <button className="btn btn-primary" onClick={runScan} disabled={scanning || !canScan || !activeKeyword || !mapInited}>
             {scanning ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
             {scanning ? ` Scanning ${progress}/${totalPoints}…` : ' Run scan'}
           </button>
         </div>
         <div style={{ marginTop: 8, fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
-          {totalPoints} searches per scan · Google&apos;s free tier covers ~5,000/month, so weekly scans cost $0 · drag the center pin on the map to move the grid
-          {!seoPlaceId && <strong style={{ color: '#f59e0b' }}> · pick your listing above first</strong>}
+          {totalPoints} live Maps searches per scan · Bright Data&apos;s free tier covers 5,000/month (~{Math.floor(5000 / totalPoints)} scans), so weekly checks cost $0 · drag the center pin to move the grid
+          {!canScan && <strong style={{ color: '#f59e0b' }}> · set your listing above first</strong>}
         </div>
         {scanError && (
           <div style={{ marginTop: 'var(--space-sm)', padding: '10px 12px', borderRadius: 8, background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.3)', fontSize: '0.82rem' }}>
             <strong>Scan failed:</strong> {scanError}
             <div style={{ marginTop: 4, color: 'var(--text-secondary)' }}>
-              Usually this means the Maps key doesn&apos;t have a Places API enabled. In Google Cloud Console → APIs &amp; Services, enable
-              <strong> Places API (New)</strong> (or the legacy <strong>Places API</strong>) for the same project as the Maps key.
+              If this says <em>not configured</em>, add your <strong>Bright Data SERP</strong> credentials
+              (<code>BRIGHTDATA_API_TOKEN</code> + <code>BRIGHTDATA_SERP_ZONE</code>) to the app&apos;s environment and redeploy —
+              that&apos;s what reads the real Google Maps results. The free tier covers 5,000 searches/month.
             </div>
           </div>
         )}
@@ -756,12 +749,13 @@ export default function LocalRankPage() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
           <Crosshair size={18} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 2 }} />
           <div style={{ fontSize: '0.84rem', lineHeight: 1.55 }}>
-            <strong>How to read this.</strong> Grid ranks come from the Places API, which orders by the same core signals as the
-            map pack (proximity, relevance, prominence) but isn&apos;t pixel-identical to a live phone search — trust the <em>trends
-            and weak zones</em>, and spot-check any surprising dot with its live-Maps link. The grid measures; it doesn&apos;t move
-            rankings. What moves them: <strong>review velocity</strong> (keep the one-tap asks going after every job),
-            <strong> photo uploads + weekly GBP posts</strong>, and matching <strong>categories/services</strong> on the profile.
-            Proximity you can&apos;t change — as a service-area business you&apos;ll always rank strongest near the home base.
+            <strong>How to read this.</strong> Grid ranks now come from the <strong>real Google Maps results</strong> at each
+            point (read server-side via Bright Data) — the same map pack a searcher standing there would see, not the old
+            Places-API approximation. It&apos;s still not pixel-identical to one person&apos;s phone (history, exact GPS, and device
+            all vary), so trust the <em>trends and weak zones</em>, and spot-check a surprising dot with its live-Maps link. The
+            grid measures; it doesn&apos;t move rankings. What moves them: <strong>review velocity</strong> (keep the one-tap asks
+            going after every job), <strong>photo uploads + weekly GBP posts</strong>, and matching <strong>categories/services</strong>
+            on the profile. Proximity you can&apos;t change — as a service-area business you&apos;ll always rank strongest near home base.
           </div>
         </div>
       </div>

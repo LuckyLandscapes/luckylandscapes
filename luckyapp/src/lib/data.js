@@ -209,6 +209,29 @@ export function DataProvider({ children }) {
   function subscribeRealtime() {
     if (!supabase) return () => {};
 
+    // A single clock action (close segment + open segment + roll up break)
+    // fires several writes in a burst, each echoing a realtime event that does
+    // a FULL refetch-and-replace of the whole array. Replacing state mid-action
+    // is what made the live clock stutter ("lag"). Debounce the time-table
+    // refetches so the burst collapses into one reconcile shortly after the
+    // worker's last tap; the optimistic local updates already show the right
+    // state instantly.
+    let teTimer = null, tsTimer = null;
+    const refetchTimeEntries = () => {
+      clearTimeout(teTimer);
+      teTimer = setTimeout(() => {
+        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(1000)
+          .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId }))); });
+      }, 400);
+    };
+    const refetchTimeSegments = () => {
+      clearTimeout(tsTimer);
+      tsTimer = setTimeout(() => {
+        supabase.from('time_segments').select('*').eq('org_id', orgId).order('started_at', { ascending: false }).limit(2000)
+          .then(({ data }) => { if (data) setTimeSegments(snakeToCamel(data)); });
+      }, 400);
+    };
+
     const channel = supabase
       .channel('data-changes')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, () => {
@@ -243,14 +266,8 @@ export function DataProvider({ children }) {
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setQuotes(snakeToCamel(data)); });
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, () => {
-        supabase.from('time_entries').select('*').eq('org_id', orgId).order('clock_in', { ascending: false }).limit(1000)
-          .then(({ data }) => { if (data) setTimeEntries(snakeToCamel(data).map(t => ({ ...t, teamMemberId: t.memberId || t.teamMemberId }))); });
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_segments' }, () => {
-        supabase.from('time_segments').select('*').eq('org_id', orgId).order('started_at', { ascending: false }).limit(2000)
-          .then(({ data }) => { if (data) setTimeSegments(snakeToCamel(data)); });
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_entries' }, refetchTimeEntries)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'time_segments' }, refetchTimeSegments)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'invoices' }, () => {
         supabase.from('invoices').select('*').eq('org_id', orgId).order('created_at', { ascending: false })
           .then(({ data }) => { if (data) setInvoices(snakeToCamel(data)); });
@@ -285,7 +302,7 @@ export function DataProvider({ children }) {
       })
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { clearTimeout(teTimer); clearTimeout(tsTimer); supabase.removeChannel(channel); };
   }
 
   // ─── Getters ────────────────────────────────────────────
@@ -786,7 +803,7 @@ export function DataProvider({ children }) {
   // thin wrapper so older code paths (e.g. job-detail manual logging) keep
   // working. New worker UX should call startShift / switchSegment / endShift.
 
-  async function insertSegment({ memberId, timeEntryId, kind, jobId = null, notes = '' }) {
+  async function insertSegment({ memberId, timeEntryId, kind, jobId = null, notes = '' }, _retried = false) {
     const startedAt = new Date().toISOString();
     if (connected) {
       const payload = {
@@ -799,9 +816,22 @@ export function DataProvider({ children }) {
         notes: notes || '',
       };
       const { data: row, error } = await supabase.from('time_segments').insert(payload).select().single();
-      if (error) throw error;
+      if (error) {
+        // The partial unique index uniq_open_segment_per_entry (migration 046)
+        // rejects a second open segment for the same shift — the symptom of a
+        // clock-in race. Heal it instead of surfacing an error: force-close any
+        // straggling open segment(s) for this shift, then retry once.
+        if (error.code === '23505' && !_retried) {
+          await supabase.from('time_segments')
+            .update({ ended_at: startedAt })
+            .eq('time_entry_id', timeEntryId)
+            .is('ended_at', null);
+          return insertSegment({ memberId, timeEntryId, kind, jobId, notes }, true);
+        }
+        throw error;
+      }
       const seg = snakeToCamel(row);
-      setTimeSegments(prev => [seg, ...prev]);
+      setTimeSegments(prev => (prev.some(s => s.id === seg.id) ? prev : [seg, ...prev]));
       return seg;
     } else {
       const seg = {
@@ -860,6 +890,58 @@ export function DataProvider({ children }) {
   // Open a shift + an initial segment.
   const startShift = useCallback(async (memberId, { jobId = null, kind = null, notes = '' } = {}) => {
     const segKind = kind || (jobId ? 'job' : 'travel');
+
+    // Guard: never create a SECOND open shift for one member. Two open shifts
+    // were a root cause of "double time" (every open shift counts live + at
+    // payroll). The DB also enforces this via uniq_open_shift_per_member
+    // (migration 046); this app guard keeps it from ever surfacing as an error.
+    const existingOpen = timeEntries.find(t => (t.memberId || t.teamMemberId) === memberId && !t.clockOut);
+    if (existingOpen) {
+      const sameDay = new Date(existingOpen.clockIn).toDateString() === new Date().toDateString();
+      if (sameDay) {
+        // The worker is already clocked in today (e.g. reopened the app) —
+        // resume that shift instead of duplicating it. Close any straggling
+        // open segment(s), then open the requested one.
+        const opens = timeSegments.filter(s => s.timeEntryId === existingOpen.id && !s.endedAt);
+        for (const o of opens) await closeSegment(o.id);
+        const seg = await insertSegment({ memberId, timeEntryId: existingOpen.id, kind: segKind, jobId, notes });
+        if (segKind === 'job' && jobId) {
+          try { await ensureMemberOnJob(memberId, jobId); } catch (e) { console.warn('ensureMemberOnJob failed', e); }
+        }
+        return { entry: existingOpen, segment: seg };
+      }
+      // Stale shift left open on a prior day (forgot to clock out). Close
+      // abandoned open segments at their OWN start (zero duration — we don't
+      // know when work stopped, and billing to "now" would be days of phantom
+      // pay), set clock_out to the last real activity, then start fresh.
+      const entrySegs = timeSegments.filter(s => s.timeEntryId === existingOpen.id);
+      const openSegs = entrySegs.filter(s => !s.endedAt);
+      for (const o of openSegs) {
+        if (connected) await supabase.from('time_segments').update({ ended_at: o.startedAt, duration_minutes: 0 }).eq('id', o.id);
+      }
+      if (openSegs.length) {
+        setTimeSegments(prev => {
+          const ids = new Set(openSegs.map(o => o.id));
+          const next = prev.map(s => ids.has(s.id) ? { ...s, endedAt: s.startedAt, durationMinutes: 0 } : s);
+          if (!connected) saveLocal('time_segments', next);
+          return next;
+        });
+      }
+      const closedEnds = entrySegs.filter(s => s.endedAt).map(s => new Date(s.endedAt).getTime());
+      const closeAt = new Date(closedEnds.length ? Math.max(...closedEnds) : new Date(existingOpen.clockIn).getTime()).toISOString();
+      const staleBreakMins = entrySegs
+        .filter(s => s.kind === 'break' && s.endedAt)
+        .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
+      try {
+        if (connected) await supabase.from('time_entries').update({ clock_out: closeAt, break_minutes: staleBreakMins }).eq('id', existingOpen.id);
+        setTimeEntries(prev => {
+          const next = prev.map(t => t.id === existingOpen.id ? { ...t, clockOut: closeAt, breakMinutes: staleBreakMins } : t);
+          if (!connected) saveLocal('time_entries', next);
+          return next;
+        });
+      } catch (e) { console.warn('auto-close stale shift failed', e); }
+    }
+
     const clockInAt = new Date().toISOString();
     let entry;
     if (connected) {
@@ -884,15 +966,18 @@ export function DataProvider({ children }) {
     }
     return { entry, segment: seg };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connected, orgId, jobs]);
+  }, [connected, orgId, jobs, timeEntries, timeSegments]);
 
   // Close the current open segment and open a new one.
   const switchSegment = useCallback(async (timeEntryId, { kind, jobId = null, notes = '' } = {}) => {
     const entry = timeEntries.find(t => t.id === timeEntryId);
     if (!entry) return null;
     const memberId = entry.memberId || entry.teamMemberId;
-    const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
-    if (open) await closeSegment(open.id);
+    // Close ALL open segments, not just the first — if a race ever left two
+    // open, closing only `.find()` would orphan one (it keeps counting live →
+    // "double time"). Closing all heals the duplicate on the next transition.
+    const opens = timeSegments.filter(s => s.timeEntryId === timeEntryId && !s.endedAt);
+    for (const o of opens) await closeSegment(o.id);
     const seg = await insertSegment({ memberId, timeEntryId, kind, jobId, notes });
     // Auto-extend job assigned_to if a worker switches to a job they
     // weren't originally on (e.g. day-2 reinforcements showing up).
@@ -907,12 +992,16 @@ export function DataProvider({ children }) {
   const endShift = useCallback(async (timeEntryId, { notes = '' } = {}) => {
     const entry = timeEntries.find(t => t.id === timeEntryId);
     if (!entry) return null;
-    const open = timeSegments.find(s => s.timeEntryId === timeEntryId && !s.endedAt);
-    let closedOpen = null;
-    if (open) closedOpen = await closeSegment(open.id, notes ? { notes } : {});
+    // Close ALL open segments (a clock-in race could leave more than one).
+    const opens = timeSegments.filter(s => s.timeEntryId === timeEntryId && !s.endedAt);
+    const closedById = new Map();
+    for (let i = 0; i < opens.length; i++) {
+      const c = await closeSegment(opens[i].id, (i === 0 && notes) ? { notes } : {});
+      if (c) closedById.set(c.id, c);
+    }
 
     const segsForEntry = timeSegments
-      .map(s => (closedOpen && s.id === closedOpen.id ? closedOpen : s))
+      .map(s => closedById.get(s.id) || s)
       .filter(s => s.timeEntryId === timeEntryId);
     const breakMins = segsForEntry
       .filter(s => s.kind === 'break')

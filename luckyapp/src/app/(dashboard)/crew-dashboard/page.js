@@ -13,9 +13,10 @@
 // Job time is captured per segment, so a 3-property day produces 3 job-attributed
 // labor blocks instead of one lumped together.
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
+import { computeShiftPaidBreak } from '@/lib/finance';
 import Link from 'next/link';
 import {
   Clock, MapPin, Phone, CalendarDays, Briefcase, Timer,
@@ -80,6 +81,11 @@ export default function CrewDashboardPage() {
   const [showBlockerNote, setShowBlockerNote] = useState(false);
   const [customNote, setCustomNote] = useState('');
   const [busy, setBusy] = useState(false);
+  // Synchronous re-entrancy lock. A useState boolean does NOT block a second
+  // tap fired in the same tick (state hasn't re-rendered yet) — that double-tap
+  // was opening two shifts/segments → "double time". A ref flips immediately,
+  // so the duplicate tap is dropped before any await runs.
+  const busyRef = useRef(false);
   const [tick, setTick] = useState(0);
 
   // Tick once per second so live timers refresh.
@@ -143,34 +149,19 @@ export default function CrewDashboardPage() {
     ? Date.now() - new Date(openSegment.startedAt).getTime()
     : 0;
 
-  // Total paid time today = sum of (job + travel) durations from all segments.
-  // Active job/travel segment is included as "now - startedAt".
+  // Paid time + break today, via the shared helper (single source of truth with
+  // payroll/job-cost). The helper collapses overlapping segments, so even if a
+  // stray duplicate open segment ever existed, the live clock can't read 2x.
   const paidMsToday = useMemo(() => {
     if (!activeShift) return 0;
-    let total = 0;
-    for (const s of shiftSegments) {
-      if (s.kind === 'break') continue;
-      if (s.endedAt) {
-        total += (Number(s.durationMinutes) || 0) * 60_000;
-      } else {
-        total += Date.now() - new Date(s.startedAt).getTime();
-      }
-    }
-    return total;
+    return computeShiftPaidBreak(activeShift, shiftSegments, { now: Date.now() }).paidMinutes * 60_000;
     // tick included so it updates each second
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeShift, shiftSegments, tick]);
 
-  // Total break minutes today (closed + open break).
   const breakMinutesToday = useMemo(() => {
     if (!activeShift) return 0;
-    let total = 0;
-    for (const s of shiftSegments) {
-      if (s.kind !== 'break') continue;
-      if (s.endedAt) total += Number(s.durationMinutes) || 0;
-      else total += (Date.now() - new Date(s.startedAt).getTime()) / 60_000;
-    }
-    return total;
+    return computeShiftPaidBreak(activeShift, shiftSegments, { now: Date.now() }).breakMinutes;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeShift, shiftSegments, tick]);
 
@@ -184,124 +175,90 @@ export default function CrewDashboardPage() {
     weekStart.setHours(0, 0, 0, 0);
     const weekStartTs = weekStart.getTime();
 
-    let totalMs = 0;
+    let totalMin = 0;
     for (const t of timeEntries) {
       if (t.teamMemberId !== user.id) continue;
       const inTs = new Date(t.clockIn).getTime();
       if (isNaN(inTs) || inTs < weekStartTs) continue;
-      const outTs = t.clockOut ? new Date(t.clockOut).getTime() : Date.now();
-      const breakMs = Number(t.breakMinutes || 0) * 60_000;
-      totalMs += Math.max(0, outTs - inTs - breakMs);
+      // Segment-aware: for the OPEN shift this correctly EXCLUDES break time
+      // (the old entry-level `clockOut-clockIn-breakMinutes` counted live break
+      // as worked, because break_minutes isn't written until the shift ends).
+      const segs = timeSegments.filter(s => s.timeEntryId === t.id);
+      totalMin += computeShiftPaidBreak(t, segs, { now: Date.now() }).paidMinutes;
     }
-    return totalMs / (1000 * 60 * 60);
+    return totalMin / 60;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeEntries, user?.id, tick]);
+  }, [timeEntries, timeSegments, user?.id, tick]);
 
   // ─── action handlers ────────────────────────────────────
-  const handleStart = (jobId) => async () => {
-    if (busy) return;
+  // Every clock action goes through runGuarded so a double-tap (or a tap during
+  // the in-flight window) can't fire the same mutation twice. The ref check is
+  // synchronous, so it blocks the second tap before any state/DB write.
+  const runGuarded = async (fn) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(true);
     try {
-      await startShift(user.id, { jobId });
-      setPickerMode(null);
+      await fn();
     } catch (err) {
-      console.error('startShift failed', err);
+      console.error('crew action failed', err);
     } finally {
+      busyRef.current = false;
       setBusy(false);
     }
   };
 
-  const handleSwitchJob = (jobId) => async () => {
-    if (busy || !activeShift) return;
-    setBusy(true);
-    try {
-      await switchSegment(activeShift.id, { kind: 'job', jobId });
-      setPickerMode(null);
-    } catch (err) {
-      console.error('switchSegment failed', err);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleStart = (jobId) => () => runGuarded(async () => {
+    await startShift(user.id, { jobId });
+    setPickerMode(null);
+  });
 
-  const handleSwitchTravel = async () => {
-    if (busy || !activeShift) return;
-    setBusy(true);
-    try {
-      await switchSegment(activeShift.id, { kind: 'travel' });
-      setPickerMode(null);
-    } catch (err) {
-      console.error('switchSegment(travel) failed', err);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleSwitchJob = (jobId) => () => runGuarded(async () => {
+    if (!activeShift) return;
+    await switchSegment(activeShift.id, { kind: 'job', jobId });
+    setPickerMode(null);
+  });
 
-  const handleStartBreak = async () => {
-    if (busy || !activeShift) return;
-    setBusy(true);
-    try {
-      await switchSegment(activeShift.id, { kind: 'break' });
-    } catch (err) {
-      console.error('start break failed', err);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleSwitchTravel = () => runGuarded(async () => {
+    if (!activeShift) return;
+    await switchSegment(activeShift.id, { kind: 'travel' });
+    setPickerMode(null);
+  });
+
+  const handleStartBreak = () => runGuarded(async () => {
+    if (!activeShift) return;
+    await switchSegment(activeShift.id, { kind: 'break' });
+  });
 
   // Ending a break resumes whatever they were doing before. We pull the most
   // recent non-break segment for context.
-  const handleEndBreak = async () => {
-    if (busy || !activeShift) return;
+  const handleEndBreak = () => runGuarded(async () => {
+    if (!activeShift) return;
     const previousNonBreak = [...shiftSegments].reverse().find(s => s.kind !== 'break' && s.endedAt);
-    setBusy(true);
-    try {
-      const next = previousNonBreak
-        ? { kind: previousNonBreak.kind, jobId: previousNonBreak.jobId }
-        : { kind: 'travel' };
-      await switchSegment(activeShift.id, next);
-    } catch (err) {
-      console.error('end break failed', err);
-    } finally {
-      setBusy(false);
-    }
-  };
+    const next = previousNonBreak
+      ? { kind: previousNonBreak.kind, jobId: previousNonBreak.jobId }
+      : { kind: 'travel' };
+    await switchSegment(activeShift.id, next);
+  });
 
-  const handleEndShift = async () => {
-    if (busy || !activeShift) return;
-    setBusy(true);
-    try {
-      await endShift(activeShift.id);
-      setShowEndConfirm(false);
-    } catch (err) {
-      console.error('endShift failed', err);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleEndShift = () => runGuarded(async () => {
+    if (!activeShift) return;
+    await endShift(activeShift.id);
+    setShowEndConfirm(false);
+  });
 
-  const handleBlocker = (label) => async () => {
-    if (busy || !activeShift) return;
-    setBusy(true);
-    try {
-      await annotateOpenSegment(activeShift.id, label);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleBlocker = (label) => () => runGuarded(async () => {
+    if (!activeShift) return;
+    await annotateOpenSegment(activeShift.id, label);
+  });
 
-  const handleSubmitCustomNote = async () => {
+  const handleSubmitCustomNote = () => runGuarded(async () => {
     const trimmed = customNote.trim();
     if (!trimmed || !activeShift) { setShowBlockerNote(false); return; }
-    setBusy(true);
-    try {
-      await annotateOpenSegment(activeShift.id, trimmed);
-      setCustomNote('');
-      setShowBlockerNote(false);
-    } finally {
-      setBusy(false);
-    }
-  };
+    await annotateOpenSegment(activeShift.id, trimmed);
+    setCustomNote('');
+    setShowBlockerNote(false);
+  });
 
   // ─── header bits ────────────────────────────────────────
   const firstName = user?.fullName?.split(' ')[0] || 'there';
@@ -390,7 +347,7 @@ export default function CrewDashboardPage() {
             {/* Long-shift break nudge — landscape days are physical */}
             {paidMsToday > 5 * 3600_000 && breakMinutesToday < 15 && openSegment?.kind !== 'break' && (
               <div className="cockpit-nudge">
-                <Coffee size={14} /> You've been working 5+ hours without a break. Take 15.
+                <Coffee size={14} /> You&apos;ve been working 5+ hours without a break. Take 15.
               </div>
             )}
           </>
@@ -511,7 +468,7 @@ export default function CrewDashboardPage() {
       {activeShift && shiftSegments.length > 1 && (
         <div className="cockpit-section">
           <div className="cockpit-section-head">
-            <h3><Timer size={16} /> Today's Timeline</h3>
+            <h3><Timer size={16} /> Today&apos;s Timeline</h3>
           </div>
           <div className="cockpit-timeline">
             {shiftSegments.map(seg => {
@@ -545,7 +502,7 @@ export default function CrewDashboardPage() {
       {/* Today's jobs */}
       <div className="cockpit-section">
         <div className="cockpit-section-head">
-          <h3><Briefcase size={16} /> Today's Jobs <span className="cockpit-badge">{todayJobs.length}</span></h3>
+          <h3><Briefcase size={16} /> Today&apos;s Jobs <span className="cockpit-badge">{todayJobs.length}</span></h3>
           <Link href="/crew-schedule" className="cockpit-section-link">
             <CalendarDays size={12} /> Full week
           </Link>
@@ -654,7 +611,7 @@ export default function CrewDashboardPage() {
 
               {clockableJobs.length > 0 && (
                 <div style={{ marginTop: 'var(--space-md)', fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  Today's Jobs
+                  Today&apos;s Jobs
                 </div>
               )}
 

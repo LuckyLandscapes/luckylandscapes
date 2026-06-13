@@ -200,13 +200,13 @@ export function laborCostForJobBurdened(jobId, timeEntries, teamMembers, timeSeg
     return { rate, mult: burden ? 1 + burden.totalPct : 1 };
   };
 
-  for (const seg of timeSegments) {
-    if (seg.kind !== 'job' || seg.jobId !== jobId) continue;
-    if (!seg.endedAt) continue;
-    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+  const jobSegs = timeSegments.filter(s => s.kind === 'job' && s.jobId === jobId && s.endedAt);
+  const minsByEntry = coveredMinutesGrouped(jobSegs, s => s.timeEntryId);
+  for (const [entryId, mins] of minsByEntry) {
+    const entry = timeEntries.find(t => t.id === entryId);
     if (!entry) continue;
     const { rate, mult } = memberMultiplier(entry.teamMemberId || entry.memberId);
-    total += rate * mult * (Number(seg.durationMinutes || 0) / 60);
+    total += rate * mult * (mins / 60);
   }
 
   const legacyEntries = timeEntries.filter(t =>
@@ -261,6 +261,106 @@ const inRange = (dateStr, start, end) => {
   return d >= start && d <= end;
 };
 
+// ─── Shift paid/break math — SINGLE SOURCE OF TRUTH ─────────
+// Every surface that turns clocked time into "paid hours" / "break minutes"
+// (crew cockpit live timers, team payroll, job labor cost, P&L, insurance
+// split) MUST route through computeShiftPaidBreak / coveredMinutesGrouped so
+// they can never disagree about the same shift again. (They used to be
+// re-implemented 5 separate ways.)
+//
+// The functions also DE-DUPLICATE overlapping segments: a clock-in race could
+// leave two simultaneously-open segments on one shift, which the old per-segment
+// sums double-counted ("counted double time"). These helpers collapse
+// overlapping windows so a stray/duplicate segment can't inflate paid time —
+// belt-and-suspenders with the DB unique index (migration 046) that prevents
+// new duplicates from being created.
+//
+// IMPORTANT — no regression for healthy data: when an entry's segments do NOT
+// overlap, we sum the stored `durationMinutes` exactly as before (preserving
+// the rounding convention every other report used). Interval-merging only
+// kicks in when a real overlap is detected, so clean historical payroll/job-cost
+// numbers are byte-for-byte unchanged.
+
+function segToInterval(s, now) {
+  const start = new Date(s.startedAt).getTime();
+  const end = s.endedAt ? new Date(s.endedAt).getTime() : now;
+  return { start, end: Math.max(start, end || start), closed: !!s.endedAt, dur: Number(s.durationMinutes) || 0 };
+}
+
+function intervalsOverlap(intervals) {
+  if (intervals.length < 2) return false;
+  const sorted = intervals.slice().sort((a, b) => a.start - b.start);
+  for (let i = 1; i < sorted.length; i++) {
+    // strict overlap — back-to-back segments (start === prev end) are fine
+    if (sorted[i].start < sorted[i - 1].end) return true;
+  }
+  return false;
+}
+
+function mergedCoveredMinutes(intervals) {
+  if (!intervals.length) return 0;
+  const sorted = intervals.slice().sort((a, b) => a.start - b.start);
+  let total = 0, curStart = sorted[0].start, curEnd = sorted[0].end;
+  for (let i = 1; i < sorted.length; i++) {
+    const iv = sorted[i];
+    if (iv.start <= curEnd) curEnd = Math.max(curEnd, iv.end);
+    else { total += curEnd - curStart; curStart = iv.start; curEnd = iv.end; }
+  }
+  total += curEnd - curStart;
+  return total / 60000;
+}
+
+// Minutes covered by a set of segments, de-duping overlaps but preserving the
+// exact stored durations when nothing overlaps.
+function nonOverlapMinutes(segments, now) {
+  if (!segments.length) return 0;
+  const intervals = segments.map(s => segToInterval(s, now)).filter(iv => !Number.isNaN(iv.start));
+  if (!intervals.length) return 0;
+  if (intervalsOverlap(intervals)) return mergedCoveredMinutes(intervals);
+  // No overlap: nominal sum (stored duration for closed, live elapsed for open).
+  return intervals.reduce((sum, iv) => sum + (iv.closed ? iv.dur : (iv.end - iv.start) / 60000), 0);
+}
+
+// Paid + break minutes for a single shift (time_entry).
+//   - segment-aware when the entry has segments: paid = job+travel, break = break,
+//     both overlap-collapsed; open segments counted live against `now`.
+//   - legacy fallback (entries created before segments existed, demo mode):
+//     paid = (clockOut||now - clockIn) - break_minutes; break = break_minutes.
+// Returns { paidMinutes, breakMinutes, isOpen }.
+export function computeShiftPaidBreak(entry, segmentsForEntry = [], { now = Date.now() } = {}) {
+  if (!entry || !entry.clockIn) return { paidMinutes: 0, breakMinutes: 0, isOpen: false };
+  const segs = segmentsForEntry.filter(s => s.timeEntryId === entry.id);
+  if (segs.length > 0) {
+    return {
+      paidMinutes: nonOverlapMinutes(segs.filter(s => s.kind !== 'break'), now),
+      breakMinutes: nonOverlapMinutes(segs.filter(s => s.kind === 'break'), now),
+      isOpen: segs.some(s => !s.endedAt),
+    };
+  }
+  const start = new Date(entry.clockIn).getTime();
+  const isOpen = !entry.clockOut;
+  const end = entry.clockOut ? new Date(entry.clockOut).getTime() : now;
+  const breakMinutes = Number(entry.breakMinutes || 0);
+  const totalMin = Math.max(0, (end - start) / 60000);
+  return { paidMinutes: Math.max(0, totalMin - breakMinutes), breakMinutes, isOpen };
+}
+
+// Group segments by a key, returning Map(key -> overlap-collapsed minutes).
+// Used by job-cost + P&L + insurance to dedup overlapping segments within each
+// (entry [, job]) bucket while preserving exact durations when nothing overlaps.
+export function coveredMinutesGrouped(segments, keyFn, { now = Date.now() } = {}) {
+  const groups = new Map();
+  for (const s of segments) {
+    const k = keyFn(s);
+    const arr = groups.get(k) || [];
+    arr.push(s);
+    groups.set(k, arr);
+  }
+  const out = new Map();
+  for (const [k, segs] of groups) out.set(k, nonOverlapMinutes(segs, now));
+  return out;
+}
+
 // ─── Labor cost ─────────────────────────────────────────────
 // Sum (paid hours × rate) across entries. Breaks are subtracted (unpaid).
 //
@@ -272,21 +372,11 @@ export function laborCostForEntries(entries, teamMembers, timeSegments = []) {
   let total = 0;
   for (const t of entries) {
     if (!t.clockIn || !t.clockOut) continue;
-    const member = teamMembers.find(m => m.id === t.teamMemberId);
+    const member = teamMembers.find(m => m.id === (t.teamMemberId || t.memberId));
     const rate = Number(member?.hourlyRate || 0);
     const segs = timeSegments.filter(s => s.timeEntryId === t.id);
-    let paidHours;
-    if (segs.length > 0) {
-      const paidMins = segs
-        .filter(s => s.kind !== 'break')
-        .reduce((sum, s) => sum + (Number(s.durationMinutes) || 0), 0);
-      paidHours = paidMins / 60;
-    } else {
-      const totalHours = (new Date(t.clockOut) - new Date(t.clockIn)) / (1000 * 60 * 60);
-      const breakHrs = Number(t.breakMinutes || 0) / 60;
-      paidHours = Math.max(0, totalHours - breakHrs);
-    }
-    total += rate * paidHours;
+    const { paidMinutes } = computeShiftPaidBreak(t, segs);
+    total += rate * (paidMinutes / 60);
   }
   return total;
 }
@@ -298,15 +388,16 @@ export function laborCostForEntries(entries, teamMembers, timeSegments = []) {
 export function laborCostForJob(jobId, timeEntries, teamMembers, timeSegments = []) {
   let total = 0;
 
-  // 1. Segment-attributed labor
-  for (const seg of timeSegments) {
-    if (seg.kind !== 'job' || seg.jobId !== jobId) continue;
-    if (!seg.endedAt) continue; // skip in-progress segments
-    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+  // 1. Segment-attributed labor — overlap-collapsed per entry so a duplicate
+  //    'job' segment can't double-count the same wall-clock window.
+  const jobSegs = timeSegments.filter(s => s.kind === 'job' && s.jobId === jobId && s.endedAt);
+  const minsByEntry = coveredMinutesGrouped(jobSegs, s => s.timeEntryId);
+  for (const [entryId, mins] of minsByEntry) {
+    const entry = timeEntries.find(t => t.id === entryId);
     if (!entry) continue;
     const member = teamMembers.find(m => m.id === (entry.teamMemberId || entry.memberId));
     const rate = Number(member?.hourlyRate || 0);
-    total += rate * (Number(seg.durationMinutes || 0) / 60);
+    total += rate * (mins / 60);
   }
 
   // 2. Legacy fallback: time_entries with this jobId AND no segments at all
@@ -455,14 +546,14 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
   // Direct labor — closed job-kind segments dated in period (any job).
   // Plus legacy entries with a jobId, clocked out, no segments.
   let directLabor = 0;
-  for (const seg of timeSegments) {
-    if (seg.kind !== 'job' || !seg.endedAt) continue;
-    if (!inRange(seg.startedAt, start, end)) continue;
-    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+  const inRangeJobSegs = timeSegments.filter(s => s.kind === 'job' && s.endedAt && inRange(s.startedAt, start, end));
+  const directMinsByEntry = coveredMinutesGrouped(inRangeJobSegs, s => s.timeEntryId);
+  for (const [entryId, mins] of directMinsByEntry) {
+    const entry = timeEntries.find(t => t.id === entryId);
     const memberId = entry?.teamMemberId || entry?.memberId;
     const member = teamMembers.find(m => m.id === memberId);
     const rate = Number(member?.hourlyRate || 0);
-    directLabor += rate * burdenMult(memberId) * (Number(seg.durationMinutes || 0) / 60);
+    directLabor += rate * burdenMult(memberId) * (mins / 60);
   }
   const legacyDirect = timeEntries.filter(t =>
     t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
@@ -491,14 +582,14 @@ function pnlForRange({ jobs, jobExpenses, timeEntries, timeSegments = [], teamMe
   }
 
   let indirectLabor = 0;
-  for (const seg of timeSegments) {
-    if (seg.kind !== 'travel' || !seg.endedAt) continue;
-    if (!inRange(seg.startedAt, start, end)) continue;
-    const entry = timeEntries.find(t => t.id === seg.timeEntryId);
+  const inRangeTravelSegs = timeSegments.filter(s => s.kind === 'travel' && s.endedAt && inRange(s.startedAt, start, end));
+  const indirectMinsByEntry = coveredMinutesGrouped(inRangeTravelSegs, s => s.timeEntryId);
+  for (const [entryId, mins] of indirectMinsByEntry) {
+    const entry = timeEntries.find(t => t.id === entryId);
     const memberId = entry?.teamMemberId || entry?.memberId;
     const member = teamMembers.find(m => m.id === memberId);
     const rate = Number(member?.hourlyRate || 0);
-    indirectLabor += rate * burdenMult(memberId) * (Number(seg.durationMinutes || 0) / 60);
+    indirectLabor += rate * burdenMult(memberId) * (mins / 60);
   }
   const legacyIndirect = timeEntries.filter(t =>
     !t.jobId && t.clockIn && t.clockOut && inRange(t.clockIn, start, end) &&
@@ -779,23 +870,33 @@ export function buildInsuranceClassReport({
   let unallocatedPayroll = 0, unallocatedHours = 0;
 
   // 1. Segment-attributed payroll (job-kind → class; travel → unallocated).
-  for (const seg of timeSegments) {
-    if (!seg.endedAt || !inRange(seg.startedAt, start, end)) continue;
-    const entry = entryById.get(seg.timeEntryId);
+  //    Overlap-collapsed per (entry, job) so a duplicate 'job' segment can't
+  //    inflate a class's payroll/hours basis (which would over-state premium).
+  const inRangeJobSegs = timeSegments.filter(s => s.kind === 'job' && s.jobId && s.endedAt && inRange(s.startedAt, start, end));
+  const jobMins = coveredMinutesGrouped(inRangeJobSegs, s => `${s.timeEntryId}|${s.jobId}`);
+  for (const [key, mins] of jobMins) {
+    const sep = key.lastIndexOf('|');
+    const entryId = key.slice(0, sep);
+    const jobId = key.slice(sep + 1);
+    const entry = entryById.get(entryId);
     const memberId = entry?.teamMemberId || entry?.memberId;
-    const hrs = Number(seg.durationMinutes || 0) / 60;
+    const hrs = mins / 60;
     const dollars = rateOf(memberId) * hrs;
-    if (seg.kind === 'job' && seg.jobId) {
-      const job = jobById.get(seg.jobId);
-      const b = ensure(classOfJob(job));
-      b.payroll += dollars; b.hours += hrs;
-      if (job) b.jobIds.add(job.id);
-      if (memberId) b.memberIds.add(memberId);
-    } else if (seg.kind === 'travel') {
-      unallocatedPayroll += dollars; unallocatedHours += hrs;
-    }
-    // break = unpaid, ignored
+    const job = jobById.get(jobId);
+    const b = ensure(classOfJob(job));
+    b.payroll += dollars; b.hours += hrs;
+    if (job) b.jobIds.add(job.id);
+    if (memberId) b.memberIds.add(memberId);
   }
+  const inRangeTravelSegs = timeSegments.filter(s => s.kind === 'travel' && s.endedAt && inRange(s.startedAt, start, end));
+  const travelMins = coveredMinutesGrouped(inRangeTravelSegs, s => s.timeEntryId);
+  for (const [entryId, mins] of travelMins) {
+    const entry = entryById.get(entryId);
+    const memberId = entry?.teamMemberId || entry?.memberId;
+    const hrs = mins / 60;
+    unallocatedPayroll += rateOf(memberId) * hrs; unallocatedHours += hrs;
+  }
+  // break = unpaid, ignored
 
   // 2. Legacy entries with no segments.
   const segEntryIds = new Set(timeSegments.map(s => s.timeEntryId));
