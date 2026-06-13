@@ -124,6 +124,8 @@ export default function LocalRankPage() {
   const [finderQuery, setFinderQuery] = useState('Lucky Landscapes Lincoln NE');
   const [finderBusy, setFinderBusy] = useState(false);
   const [finderResults, setFinderResults] = useState(null);
+  const [manualId, setManualId] = useState('');
+  const [apiBlocked, setApiBlocked] = useState(false);
   const [organicQuery, setOrganicQuery] = useState(ORGANIC_PRESETS[0]);
 
   const mapDivRef = useRef(null);
@@ -291,6 +293,13 @@ export default function LocalRankPage() {
       } catch (e) {
         // If the new API worked before, this is a real failure — surface it.
         if (apiModeRef.current === 'new') throw e;
+        // "PERMISSION_DENIED / blocked" = Places API (New) isn't enabled on the
+        // Cloud project. Flag it so the UI can tell the user exactly that,
+        // instead of silently degrading to the deprecated legacy index (which
+        // can't find newer service-area listings by name).
+        if (/PERMISSION_DENIED|blocked|not.*enabled|API_NOT_ACTIVATED/i.test(String(e?.message))) {
+          setApiBlocked(true);
+        }
         apiModeRef.current = 'legacy';
       }
     }
@@ -325,6 +334,51 @@ export default function LocalRankPage() {
     await updateOrgSettings({ seo_place_id: r.id, seo_business_name: r.name });
     setFinderOpen(false);
     setFinderResults(null);
+  };
+
+  // Validate a pasted Place ID to a name (nice-to-have); works on either API.
+  const lookupPlaceById = useCallback(async (placeId) => {
+    const g = window.google;
+    try {
+      const { Place } = await g.maps.importLibrary('places');
+      if (Place) {
+        const place = new Place({ id: placeId });
+        await place.fetchFields({ fields: ['displayName', 'formattedAddress'] });
+        return {
+          id: placeId,
+          name: typeof place.displayName === 'string' ? place.displayName : (place.displayName?.text || ''),
+          address: place.formattedAddress || '',
+        };
+      }
+    } catch (e) {
+      if (/PERMISSION_DENIED|blocked|not.*enabled|API_NOT_ACTIVATED/i.test(String(e?.message))) setApiBlocked(true);
+    }
+    return new Promise((resolve, reject) => {
+      const svc = new g.maps.places.PlacesService(document.createElement('div'));
+      svc.getDetails({ placeId, fields: ['name', 'formatted_address'] }, (res, status) => {
+        if (status === g.maps.places.PlacesServiceStatus.OK && res) {
+          resolve({ id: placeId, name: res.name, address: res.formatted_address || '' });
+        } else {
+          reject(new Error(`Place lookup failed: ${status}`));
+        }
+      });
+    });
+  }, []);
+
+  // Save a manually-pasted Place ID. We try to confirm the name, but save the
+  // raw ID regardless — the grid match only needs the ID string, so this is the
+  // guaranteed path when name search can't find the listing.
+  const useManualId = async () => {
+    const id = manualId.trim();
+    if (!id || finderBusy) return;
+    setFinderBusy(true);
+    setFinderResults(null);
+    let name = null;
+    try { const r = await lookupPlaceById(id); name = r.name; } catch { /* save raw anyway */ }
+    await updateOrgSettings({ seo_place_id: id, seo_business_name: name || 'My listing (manual ID)' });
+    setManualId('');
+    setFinderOpen(false);
+    setFinderBusy(false);
   };
 
   // ---- The scan ----
@@ -474,7 +528,14 @@ export default function LocalRankPage() {
             )}
             {Array.isArray(finderResults) && (
               <div style={{ marginTop: 'var(--space-sm)', display: 'grid', gap: 6 }}>
-                {finderResults.length === 0 && <div style={{ fontSize: '0.84rem', color: 'var(--text-tertiary)' }}>Nothing found — try just the business name.</div>}
+                {finderResults.length === 0 && (
+                  <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                    <strong>No match for that name.</strong> Two common reasons: (1) Places API (New) isn&apos;t enabled
+                    {apiBlocked ? ' — and we detected it IS blocked, so enable it (see below) and search again' : ''}; or
+                    (2) the exact name on your Google listing is different (e.g. &ldquo;Lucky Landscapes LLC&rdquo;). Try the exact
+                    name, or just paste your Place ID below — that always works.
+                  </div>
+                )}
                 {finderResults.map((r) => (
                   <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', border: '1px solid var(--border-color)', borderRadius: 8 }}>
                     <div style={{ minWidth: 0 }}>
@@ -486,6 +547,36 @@ export default function LocalRankPage() {
                 ))}
               </div>
             )}
+
+            {apiBlocked && (
+              <div style={{ marginTop: 'var(--space-sm)', padding: '10px 12px', borderRadius: 8, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.35)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                <strong>Places API (New) is blocked on your Google Cloud project.</strong> Enable it: Google Cloud Console →
+                APIs &amp; Services → Library → search <strong>&ldquo;Places API (New)&rdquo;</strong> → Enable (same project as
+                your Maps key). It has a free tier and gives a far better index for newer service-area listings than the old API.
+              </div>
+            )}
+
+            {/* Guaranteed path: paste the Place ID directly */}
+            <div style={{ marginTop: 'var(--space-md)', paddingTop: 'var(--space-md)', borderTop: '1px solid var(--border-color)' }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 6 }}>
+                Can&apos;t find it by name? Paste your Google <strong>Place ID</strong> — get it from{' '}
+                <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--lucky-green)' }}>Google&apos;s Place ID Finder ↗</a>
+                {' '}(search your business on that map, copy the ID it shows).
+              </div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  className="form-input"
+                  style={{ flex: '1 1 240px', fontFamily: 'monospace', fontSize: '0.8rem' }}
+                  value={manualId}
+                  onChange={(e) => setManualId(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && useManualId()}
+                  placeholder="ChIJ…"
+                />
+                <button className="btn btn-secondary" onClick={useManualId} disabled={finderBusy || !manualId.trim()}>
+                  {finderBusy ? <Loader2 size={16} className="animate-spin" /> : null} Use this ID
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

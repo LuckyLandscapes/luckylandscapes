@@ -63,7 +63,7 @@ async function listObjectsRecursive(bucket, prefix = '') {
 
     if (items.length < limit) break;
     offset += limit;
-  }
+  }t
   return all;
 }
 
