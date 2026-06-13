@@ -36,6 +36,7 @@ import {
   Globe,
   Image as ImageIcon,
   Shield,
+  MapPinned,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
@@ -64,6 +65,7 @@ const ownerNavItems = [
   { href: '/routing', label: 'Route Planner', icon: Route, roles: ['owner', 'admin'] },
   { href: '/marketing-gallery', label: 'Website Gallery', icon: Globe, roles: ['owner', 'admin'] },
   { href: '/marketing-images', label: 'Website Images', icon: ImageIcon, roles: ['owner', 'admin'] },
+  { href: '/local-rank', label: 'Local Rank', icon: MapPinned, roles: ['owner', 'admin'] },
   { label: 'Management', type: 'section', roles: ['owner', 'admin'] },
   { href: '/finance', label: 'Finance', icon: Wallet, roles: ['owner', 'admin'] },
   { href: '/reports', label: 'P&L Report', icon: BarChart3, roles: ['owner', 'admin'] },
