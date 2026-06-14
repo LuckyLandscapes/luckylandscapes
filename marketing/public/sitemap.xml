@@ -110,6 +110,24 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://luckylandscapes.com/areas/northwest-lincoln</loc>
+    <lastmod>2026-05-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://luckylandscapes.com/areas/hickman</loc>
+    <lastmod>2026-05-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://luckylandscapes.com/areas/seward</loc>
+    <lastmod>2026-05-05</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://luckylandscapes.com/blog/fire-pit-cost-lincoln-ne</loc>
     <lastmod>2026-06-11</lastmod>
     <changefreq>yearly</changefreq>

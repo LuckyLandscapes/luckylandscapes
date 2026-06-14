@@ -68,9 +68,12 @@ const FOOTER = `<footer class="footer">
                 <div class="footer-nav">
                     <h4>Service Areas</h4>
                     <a href="/areas/east-lincoln">East Lincoln</a>
-                    <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
+                    <a href="/areas/northwest-lincoln">Northwest Lincoln</a>
                     <a href="/areas/south-lincoln">South Lincoln</a>
+                    <a href="/areas/pine-lake">Pine Lake / Stevens Creek</a>
+                    <a href="/areas/hickman">Hickman</a>
                     <a href="/areas/waverly">Waverly</a>
+                    <a href="/areas/seward">Seward</a>
                 </div>
                 <div class="footer-nav">
                     <h4>Services</h4>
@@ -311,6 +314,69 @@ const AREAS = [
             { q: 'Why is there a $500 minimum for Waverly?', a: 'It\'s a 15-minute drive from our Lincoln base. The minimum makes the trip worthwhile and lets us keep our hourly pricing the same as in-town. Most real landscape projects are well above that anyway.' },
             { q: 'Do you mow lawns in Waverly?', a: 'For larger acreages or as part of a multi-service contract, yes. We don\'t do single small-lot weekly mows in Waverly because the drive doesn\'t pencil out — but if you\'re bundling with cleanup or hardscape, we can include it.' },
             { q: 'How quickly can you start a project in Waverly?', a: 'Most cleanup and lawn jobs we can be on-site within the same week. Hardscape and design projects typically start 1-3 weeks out depending on the season and scope.' },
+        ],
+    },
+    {
+        slug: 'northwest-lincoln',
+        title: 'Landscaping in Northwest Lincoln & The Highlands, NE',
+        description: 'Landscaping, lawn care, and hardscaping for Northwest Lincoln — The Highlands, Capitol Beach, Air Park, and Arnold Heights (68521, 68528). Free estimates from a local Lincoln crew.',
+        h1: 'Landscaping in <em class="highlight">Northwest Lincoln</em>',
+        sub: 'The Highlands, Capitol Beach, Air Park, and Arnold Heights. Golf-course builds, lakefront lots, and open west-side yards that catch every bit of the Nebraska wind.',
+        zips: ['68521', '68528'],
+        intro: `<p>Northwest Lincoln has more variety than people give it credit for. The Highlands wraps a golf course with newer builds and big open lots; Capitol Beach has lakefront homes with shoreline beds and grade to manage; Air Park and Arnold Heights are established neighborhoods with mature, settled yards. Different streets, different needs — and we work all of them.</p>
+        <p>What ties the northwest side together is exposure. There's less tree cover and more open ground out here than in the older central neighborhoods, so the wind hits harder and lawns dry out faster. We pick grasses, plantings, and watering plans that account for that instead of installing the same generic package everywhere.</p>`,
+        whyHere: [
+            { icon: '💨', title: 'Plantings that handle the wind', text: 'The open northwest-side lots catch the prairie wind and dry out fast. We choose wind- and drought-tolerant grasses and bed plants that hold up here — not the soft stuff that browns out by July.' },
+            { icon: '🌊', title: 'Lakefront and slope work at Capitol Beach', text: 'Shoreline beds, grade changes, and erosion control are common around Capitol Beach. Retaining walls, regrading, and the right plantings keep the waterline tidy and the soil where it belongs.' },
+            { icon: '🏡', title: 'Turning Highlands builder yards into real landscapes', text: 'New golf-course-area builds come with thin builder sod and bare beds. We do the soil work, shaping, and planting that make a brand-new yard look established.' },
+        ],
+        services: ['lawn-care', 'hardscaping', 'landscape-design', 'garden-beds'],
+        faqs: [
+            { q: 'Do you service homes around Capitol Beach?', a: 'Yes. We do shoreline beds, retaining walls, and grade/erosion work around Capitol Beach, plus regular lawn and bed maintenance. The slope and waterline change how we approach planting and drainage, and we plan for it.' },
+            { q: 'My Highlands yard is a new build with thin sod — can you help?', a: 'Absolutely. New-build yards in The Highlands are some of our most common projects. We amend the soil, overseed or re-sod weak areas, shape the beds, and plant so the yard actually fills in instead of staying patchy.' },
+            { q: 'Is there a trip charge for the northwest side?', a: 'No. The Highlands, Capitol Beach, Air Park, and Arnold Heights are all inside Lincoln and in our regular rotation — same pricing as the rest of the city, no trip charge.' },
+        ],
+    },
+    {
+        slug: 'hickman',
+        title: 'Hickman, NE Landscaping & Lawn Care — Lucky Landscapes',
+        description: 'Landscaping, lawn care, and hardscaping for Hickman, NE (68372) — acreages, new builds, and family yards just south of Lincoln. Free estimates from a local crew.',
+        h1: '<em class="highlight">Hickman, NE</em> Landscaping',
+        sub: 'Just 15 minutes south of Lincoln, Hickman is a growing family town with bigger lots and room to do things right. We cover it as part of our regular service area.',
+        zips: ['68372'],
+        intro: `<p>Hickman has grown fast — families moving south for the Norris schools, bigger lots, and a little more breathing room than in-town Lincoln. That mix of new builds and established acreages is exactly the kind of work we like, and at a 15-minute drive from our Lincoln base, we cover Hickman as part of our normal route.</p>
+        <p>Bigger lots open up possibilities you don't always have on a tight city lot — a real patio with a fire pit, a proper bed plan around the whole house, room for the kids and still a yard that looks designed. We help Hickman homeowners use the whole property, not just the strip by the front door.</p>`,
+        whyHere: [
+            { icon: '🚜', title: 'Equipped for bigger lots and acreages', text: 'Many Hickman properties run from a generous suburban lot to a full acreage. We have the equipment for larger mowing, brush clearing, and full-property cleanups that smaller in-town crews can\'t take on.' },
+            { icon: '🏡', title: 'New-build yard transformations', text: 'A lot of Hickman homes are recent builds with builder-grade sod and empty beds. We do the soil work, planting, and shaping that turn a blank new yard into a finished landscape.' },
+            { icon: '🔥', title: 'Outdoor living with room to spread out', text: 'Patios, fire pits, retaining walls — Hickman\'s larger lots leave space for real outdoor-living projects. We design and build them to fit the property and last for decades.' },
+        ],
+        services: ['lawn-care', 'hardscaping', 'landscape-design', 'property-cleanup'],
+        faqs: [
+            { q: 'Is there a minimum project size for Hickman?', a: 'For most work, no — Hickman is close enough (about 15 minutes) that we treat it like the rest of our service area. We can include regular mowing, especially on larger lots or as part of a maintenance plan.' },
+            { q: 'How quickly can you get out for an estimate in Hickman?', a: 'Usually within a day or two. We\'re already running jobs on the south side of Lincoln most days, so swinging down to Hickman for a measurement is easy to fit in.' },
+            { q: 'Do you mow larger Hickman lots and acreages?', a: 'Yes. Larger lots and acreages are a good fit for our equipment, whether it\'s regular mowing, a one-time overgrowth knock-down, or a full-property cleanup.' },
+        ],
+    },
+    {
+        slug: 'seward',
+        title: 'Seward, NE Landscaping & Hardscaping — Lucky Landscapes',
+        description: 'Paver patios, retaining walls, landscape design, and cleanups for Seward, NE (68434). A Lincoln-based crew serving Seward for project work, with a small minimum. Free estimates.',
+        h1: '<em class="highlight">Seward, NE</em> Landscaping & Hardscaping',
+        sub: 'About 25 minutes west of Lincoln, Seward is a town we serve for project work — patios, walls, design-build, and cleanups. A small project minimum keeps the trip worthwhile.',
+        zips: ['68434'],
+        intro: `<p>Seward is a great town — the Concordia University campus, classic established homes near downtown, and newer builds spreading out around the edges. It's about 25 minutes west of our Lincoln base, so we focus our Seward work on real projects: hardscaping, design-build, bed installs, and cleanups, rather than weekly small-lot mowing.</p>
+        <p>For a paver patio, a retaining wall, a full bed redesign, or a property cleanup, the drive is no problem and our pricing stays the same as in Lincoln. A small project minimum (below) just makes sure a trip to Seward is worth the windshield time for both of us.</p>`,
+        whyHere: [
+            { icon: '🪨', title: 'Project work is worth the drive', text: 'Patios, walls, walkways, and design-build are what we come to Seward for. A real hardscape or landscape project easily justifies the 25-minute trip, and you get the same crew and standards as our Lincoln jobs.' },
+            { icon: '🏛️', title: 'Established-home landscaping', text: 'The older homes near downtown and Concordia have character worth matching. We pick paver styles and plantings that fit an established Seward property instead of dropping in a generic suburban package.' },
+            { icon: '💲', title: 'A small project minimum', text: 'Because Seward is a 25-minute drive, we ask for a $750 minimum on Seward jobs. Most hardscape, design, and cleanup projects clear that easily — it just keeps the trip worthwhile so our pricing can stay the same as in town.' },
+        ],
+        services: ['hardscaping', 'landscape-design', 'garden-beds', 'property-cleanup'],
+        faqs: [
+            { q: 'Why is there a minimum for Seward?', a: 'Seward is about 25 minutes from our Lincoln base, so we ask for a $750 project minimum to make the trip worthwhile and keep our pricing the same as in town. Most patios, walls, bed installs, and cleanups are well above that minimum anyway.' },
+            { q: 'Do you mow lawns in Seward?', a: 'Generally not as a standalone weekly service — the drive doesn\'t pencil out for a single small mow. But we can include mowing as part of a larger maintenance plan or alongside a hardscape or cleanup project.' },
+            { q: 'How far out do you schedule Seward projects?', a: 'Cleanups can usually happen within a week or two. Hardscape and design-build projects typically start one to three weeks out depending on the season and the scope of the work.' },
         ],
     },
 ];
