@@ -23,6 +23,81 @@
     <link rel="manifest" href="/favicon/site.webmanifest" />
     <script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BlogPosting","@id":"https://luckylandscapes.com/blog/landscaping-cost-lincoln-ne#post","headline":"How Much Does Landscaping Cost in Lincoln, NE? (2026 Guide)","datePublished":"2026-03-12","dateModified":"2026-03-12","author":{"@type":"Organization","@id":"https://luckylandscapes.com/#business","name":"Lucky Landscapes"},"publisher":{"@type":"Organization","name":"Lucky Landscapes","logo":{"@type":"ImageObject","url":"https://luckylandscapes.com/images/Icon.png"}},"description":"A real budgeting guide to landscaping costs in Lincoln, Nebraska for 2026 — from a few-hundred-dollar bed refresh to a full design-build. What drives the number and how to phase a big project.","image":"https://luckylandscapes.com/images/og-card.png","articleSection":"Landscape Design","keywords":"Landscape Design, Lincoln NE, landscaping","wordCount":635,"timeRequired":"PT3M","inLanguage":"en-US","mainEntityOfPage":{"@type":"WebPage","@id":"https://luckylandscapes.com/blog/landscaping-cost-lincoln-ne"},"isPartOf":{"@id":"https://luckylandscapes.com/blog/#blog"},"about":{"@id":"https://luckylandscapes.com/#business"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://luckylandscapes.com/"},{"@type":"ListItem","position":2,"name":"Blog","item":"https://luckylandscapes.com/blog/"},{"@type":"ListItem","position":3,"name":"How Much Does Landscaping Cost in Lincoln, NE? (2026 Guide)","item":"https://luckylandscapes.com/blog/landscaping-cost-lincoln-ne"}]},{"@type":"FAQPage","mainEntity":[{"@type":"Question","name":"How much does landscaping cost in Lincoln, NE?","acceptedAnswer":{"@type":"Answer","text":"It depends entirely on scope. A bed refresh runs $300–$1,500, a paver patio $3,000–$15,000, and a full backyard design-build $15,000–$60,000+. A common rule of thumb is to invest 5–10% of your home's value in landscaping over time."}},{"@type":"Question","name":"What is the most expensive part of a landscaping project?","acceptedAnswer":{"@type":"Answer","text":"Usually labor and site prep — not the plants. Demolition, grading, drainage, equipment access, and hardscape (patios, walls, fences) drive the cost far more than the plant list. Hardscape costs much more per square foot than beds and lawn."}},{"@type":"Question","name":"Can I split a big landscaping project into phases?","acceptedAnswer":{"@type":"Answer","text":"Yes, and it is common. We design the whole yard up front, then build it over two or three seasons — structural work like grading and hardscape first, then planting and finishing. Phasing spreads the cost while keeping the finished result coherent because every phase follows one master plan."}}]}]}</script>
     <link rel="stylesheet" href="/styles.css" />
+    <!-- LL:HEAD-INJECT v4 -->
+    <!-- Preconnect to critical third parties -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" />
+    <link rel="preconnect" href="https://www.clarity.ms" />
+    <link rel="dns-prefetch" href="https://script.google.com" />
+    <link rel="dns-prefetch" href="https://api.geoapify.com" />
+
+    <!-- Google Fonts — loaded as <link> (not CSS @import) so it runs in parallel with styles.css.
+         display=swap shows fallback text immediately while the woff2 files arrive. -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@600;700;800;900&display=swap" />
+
+    <!-- LUCKY LANDSCAPES site config — paste your real keys here.
+         GA4:       analytics.google.com → Admin → Data Streams (format: G-XXXXXXXXXX)
+         Clarity:   clarity.microsoft.com → Project → Settings → Setup (10-char string)
+         Geoapify:  myprojects.geoapify.com → Free tier 3k req/day → API key (address autocomplete)
+         Turnstile: dash.cloudflare.com → Turnstile → New site (anti-bot widget on the quote/contact forms) -->
+    <script>
+      window.LL_CONFIG = {
+        ga4:       'G-Z21C16KEMN',
+        clarity:   'wk50251l6r',
+        geoapify:  'bb034a0dcb2d4c91b7daf7e7f2d8665c',
+        turnstile: '0x4AAAAAADG09UVeBSCovaYq'
+      };
+    </script>
+
+    <!-- GA4 loader — only fires when a real ID is set. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.ga4;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + id;
+        document.head.appendChild(s);
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function () { window.dataLayer.push(arguments); };
+        window.gtag('js', new Date());
+        window.gtag('config', id, { anonymize_ip: true });
+      })();
+    </script>
+
+    <!-- Microsoft Clarity loader — lazy-loaded after first user interaction.
+         Eager loading was causing iOS WKWebView (Safari/Chrome/Firefox iOS) to
+         spend the first ~10 seconds doing session-recording setup + DOM mutation
+         observation, starving the render thread and leaving below-the-fold
+         sections invisible. Deferring until first scroll/touch/click means the
+         page paints fully before Clarity even starts. Failsafe at 5s loads
+         it anyway so we don't lose analytics on bots / users who never interact. -->
+    <script>
+      (function () {
+        var id = window.LL_CONFIG && window.LL_CONFIG.clarity;
+        if (!id || id.indexOf('XXXX') !== -1) return;
+        // Stub clarity() so any early calls queue up and replay when the real one loads.
+        window.clarity = window.clarity || function () { (window.clarity.q = window.clarity.q || []).push(arguments); };
+        var loaded = false;
+        function loadClarity() {
+          if (loaded) return;
+          loaded = true;
+          var t = document.createElement('script');
+          t.async = 1;
+          t.src = 'https://www.clarity.ms/tag/' + id;
+          var y = document.getElementsByTagName('script')[0];
+          y.parentNode.insertBefore(t, y);
+        }
+        ['scroll', 'touchstart', 'click', 'keydown'].forEach(function (e) {
+          window.addEventListener(e, loadClarity, { once: true, passive: true });
+        });
+        // Failsafe: load after 5s even if no interaction (bot/idle session).
+        setTimeout(loadClarity, 5000);
+      })();
+    </script>
+    <!-- LL:HEAD-INJECT-END -->
+
 </head>
 <body>
 
@@ -193,39 +268,39 @@
                     <h2 class="section-title">More From the Blog</h2>
                 </div>
                 <div class="blog-grid blog-grid--related stagger-children">
-                <a class="blog-card" href="/blog/winterizing-landscape-lincoln-ne" data-title="Winterizing Your Landscape in Lincoln, NE" data-category="Lawn Care" data-date="2026-05-22" data-keywords="Winterizing Your Landscape in Lincoln, NE How to put your Lincoln, Nebraska yard to bed for winter — sprinkler blowout, protecting plants, the final lawn feeding, and the hardscape steps that prevent freeze damage. Blow out your irrigation system before the first hard freeze — a cracked backflow or line is the most expensive winter mistake. The fall nitrogen feeding (mid-October) is the highest-value lawn task of the year and sets next spring's color. Mulch beds 2–3″ to buffer Lincoln's freeze-thaw swings, which heave shallow-rooted plants right out of the ground. Drain and disconnect hoses, protect young tree trunks from sunscald and rodents, and water evergreens until the ground freezes.">
+                <a class="blog-card" href="/blog/fire-pit-cost-lincoln-ne" data-title="Outdoor Fire Pit Cost & Ideas for Lincoln, NE (2026)" data-category="Hardscaping" data-date="2026-06-11" data-keywords="Outdoor Fire Pit Cost & Ideas for Lincoln, NE (2026) What an outdoor fire pit costs in Lincoln, Nebraska in 2026 — prefab kits vs. custom stone, wood-burning vs. gas, what drives the price, and the local rules to know before you build. A paver/block prefab fire pit kit, professionally installed, runs about $1,500–$3,500. A custom wood-burning stone or block fire pit typically runs $3,500–$6,500; gas units run $5,000–$9,000+ with the gas line. Wood-burning is cheaper and simpler; gas is push-button and cleaner but costs more and needs a plumbed line. Lincoln allows recreational fires with rules on size, placement, and burn bans — confirm current City of Lincoln / fire department guidance before you build.">
                     <div class="blog-card-media">
-                        <img src="/images/blog/winterizing-landscape-lincoln-ne.svg" alt="Lincoln, NE landscape prepared and put to bed for winter" loading="lazy" width="400" height="260" />
-                        <span class="blog-card-chip">Lawn Care</span>
-                    </div>
-                    <div class="blog-card-body">
-                        <p class="blog-card-meta"><time datetime="2026-05-22">May 22, 2026</time> · 3 min read</p>
-                        <h3 class="blog-card-title">Winterizing Your Landscape in Lincoln, NE</h3>
-                        <p class="blog-card-desc">How to put your Lincoln, Nebraska yard to bed for winter — sprinkler blowout, protecting plants, the final lawn feeding, and the hardscape steps that prevent freeze damage.</p>
-                        <span class="blog-card-link">Read more →</span>
-                    </div>
-                </a>
-                <a class="blog-card" href="/blog/fence-cost-lincoln-ne" data-title="How Much Does a Fence Cost in Lincoln, NE? (2026 Pricing)" data-category="Fencing" data-date="2026-05-18" data-keywords="How Much Does a Fence Cost in Lincoln, NE? (2026 Pricing) What it costs to fence a yard in Lincoln, Nebraska in 2026 — wood privacy, vinyl, chain link, and ornamental steel, priced per linear foot. Gates, permits, and posts set for Nebraska frost. Fencing is priced per linear foot installed; in 2026 Lincoln, budget roughly $18–$60+ per foot depending on material. A typical 150-foot backyard fence runs about $3,000 (chain link) to $9,000+ (vinyl or ornamental steel). Posts must be set below Nebraska's ~40″ frost line in concrete, or the fence heaves and leans — this is where cheap installs cut corners. Gates, sloped ground, tearing out an old fence, and rocky clay digging all add to the base per-foot price.">
-                    <div class="blog-card-media">
-                        <img src="/images/blog/fence-cost-lincoln-ne.svg" alt="Wood privacy fence installed in a Lincoln, Nebraska backyard" loading="lazy" width="400" height="260" />
-                        <span class="blog-card-chip">Fencing</span>
-                    </div>
-                    <div class="blog-card-body">
-                        <p class="blog-card-meta"><time datetime="2026-05-18">May 18, 2026</time> · 3 min read</p>
-                        <h3 class="blog-card-title">How Much Does a Fence Cost in Lincoln, NE? (2026 Pricing)</h3>
-                        <p class="blog-card-desc">What it costs to fence a yard in Lincoln, Nebraska in 2026 — wood privacy, vinyl, chain link, and ornamental steel, priced per linear foot. Gates, permits, and posts set for Nebraska frost.</p>
-                        <span class="blog-card-link">Read more →</span>
-                    </div>
-                </a>
-                <a class="blog-card" href="/blog/above-ground-pool-base-prep-lincoln-ne" data-title="Above-Ground Pool Base Prep in Lincoln, NE — The Real Guide" data-category="Hardscaping" data-date="2026-05-12" data-keywords="Above-Ground Pool Base Prep in Lincoln, NE — The Real Guide How to properly prep the ground for an above-ground pool in Lincoln, Nebraska. Screenings vs. sand, base depth, level tolerance, and what most installers skip. Level matters more than anything: target within 1/2″ across the whole pool, not the manufacturer's 1″ maximum. Build on compacted 1/4-minus screenings with a thin concrete-sand top — never play sand or mason sand. Strip the sod and topsoil first, and set a 16″ patio block under each leg as cheap insurance against sinking.">
-                    <div class="blog-card-media">
-                        <img src="/images/blog/above-ground-pool-base-prep-lincoln-ne.svg" alt="Leveled, compacted aggregate base prepared for an above-ground pool" loading="lazy" width="400" height="260" />
+                        <img src="/images/blog/fire-pit-cost-lincoln-ne.svg" alt="Built-in stone fire pit on a paver patio in a Lincoln, Nebraska backyard" loading="lazy" width="400" height="260" />
                         <span class="blog-card-chip">Hardscaping</span>
                     </div>
                     <div class="blog-card-body">
-                        <p class="blog-card-meta"><time datetime="2026-05-12">May 12, 2026</time> · 5 min read</p>
-                        <h3 class="blog-card-title">Above-Ground Pool Base Prep in Lincoln, NE — The Real Guide</h3>
-                        <p class="blog-card-desc">How to properly prep the ground for an above-ground pool in Lincoln, Nebraska. Screenings vs. sand, base depth, level tolerance, and what most installers skip.</p>
+                        <p class="blog-card-meta"><time datetime="2026-06-11">June 11, 2026</time> · 3 min read</p>
+                        <h3 class="blog-card-title">Outdoor Fire Pit Cost & Ideas for Lincoln, NE (2026)</h3>
+                        <p class="blog-card-desc">What an outdoor fire pit costs in Lincoln, Nebraska in 2026 — prefab kits vs. custom stone, wood-burning vs. gas, what drives the price, and the local rules to know before you build.</p>
+                        <span class="blog-card-link">Read more →</span>
+                    </div>
+                </a>
+                <a class="blog-card" href="/blog/paver-patio-vs-concrete-lincoln-ne" data-title="Paver Patio vs. Concrete Patio in Lincoln, NE: Which Is Better?" data-category="Hardscaping" data-date="2026-06-04" data-keywords="Paver Patio vs. Concrete Patio in Lincoln, NE: Which Is Better? Pavers vs. poured concrete for a patio in Lincoln, Nebraska — cost compared, how each handles freeze-thaw, repairs, lifespan, and resale. An honest breakdown from a local hardscaping crew. Concrete is cheaper upfront ($8–$15/sq ft plain); pavers cost more ($18–$30/sq ft) but last longer and repair cleaner. Nebraska's freeze-thaw cycle cracks concrete slabs over time; a paver patio flexes with the ground and is fixed by lifting and relaying. When a concrete slab cracks, the patch always shows. When a paver cracks or settles, you swap a few units and it's invisible. For most Lincoln backyards you'll keep for 10+ years, pavers win on lifetime cost and resale; concrete wins when budget is the hard constraint.">
+                    <div class="blog-card-media">
+                        <img src="/images/blog/paver-patio-vs-concrete-lincoln-ne.svg" alt="Paver patio next to a poured concrete slab in a Lincoln, NE backyard" loading="lazy" width="400" height="260" />
+                        <span class="blog-card-chip">Hardscaping</span>
+                    </div>
+                    <div class="blog-card-body">
+                        <p class="blog-card-meta"><time datetime="2026-06-04">June 4, 2026</time> · 3 min read</p>
+                        <h3 class="blog-card-title">Paver Patio vs. Concrete Patio in Lincoln, NE: Which Is Better?</h3>
+                        <p class="blog-card-desc">Pavers vs. poured concrete for a patio in Lincoln, Nebraska — cost compared, how each handles freeze-thaw, repairs, lifespan, and resale. An honest breakdown from a local hardscaping crew.</p>
+                        <span class="blog-card-link">Read more →</span>
+                    </div>
+                </a>
+                <a class="blog-card" href="/blog/lawn-mowing-cost-lincoln-ne" data-title="How Much Does Lawn Mowing Cost in Lincoln, NE? (2026)" data-category="Lawn Care" data-date="2026-05-28" data-keywords="How Much Does Lawn Mowing Cost in Lincoln, NE? (2026) Real 2026 lawn mowing prices in Lincoln, Nebraska — per-mow cost by lot size, weekly vs. bi-weekly, what should be included, and why the cheapest quote usually costs you more. Most average Lincoln lots (5,000–10,000 sq ft) run $45–$60 per visit for a full mow, trim, edge, and blow. Weekly mowing usually costs less per visit than bi-weekly — taller bi-weekly grass takes longer to cut and clean up. A real quote includes mowing, string-trimming, hard-edge, and blowing clippings off hard surfaces — not just the mow. The cheapest bid is often a solo operator with no insurance; one accident on your property can cost you far more than the few dollars saved.">
+                    <div class="blog-card-media">
+                        <img src="/images/blog/lawn-mowing-cost-lincoln-ne.svg" alt="Striped, freshly mowed residential lawn in Lincoln, Nebraska" loading="lazy" width="400" height="260" />
+                        <span class="blog-card-chip">Lawn Care</span>
+                    </div>
+                    <div class="blog-card-body">
+                        <p class="blog-card-meta"><time datetime="2026-05-28">May 28, 2026</time> · 3 min read</p>
+                        <h3 class="blog-card-title">How Much Does Lawn Mowing Cost in Lincoln, NE? (2026)</h3>
+                        <p class="blog-card-desc">Real 2026 lawn mowing prices in Lincoln, Nebraska — per-mow cost by lot size, weekly vs. bi-weekly, what should be included, and why the cheapest quote usually costs you more.</p>
                         <span class="blog-card-link">Read more →</span>
                     </div>
                 </a>

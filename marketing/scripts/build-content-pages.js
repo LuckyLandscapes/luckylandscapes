@@ -432,6 +432,9 @@ const POST_VISUALS = {
     'wet-yard-drainage-lincoln-ne':            { theme: 'rain',   motif: 'drainage' },
     'native-drought-tolerant-plants-nebraska': { theme: 'warm',   motif: 'prairie' },
     'winterizing-landscape-lincoln-ne':        { theme: 'winter', motif: 'winter' },
+    'lawn-mowing-cost-lincoln-ne':             { theme: 'bright', motif: 'mower' },
+    'paver-patio-vs-concrete-lincoln-ne':      { theme: 'warm',   motif: 'pavers' },
+    'fire-pit-cost-lincoln-ne':                { theme: 'warm',   motif: 'wall' },
 };
 
 function visualFor(slug) {
@@ -1555,6 +1558,202 @@ const POSTS = [
             { q: 'Why do my plants get pushed out of the ground over winter?', a: 'It\'s called frost heave. Lincoln\'s repeated freeze-thaw cycles expand and contract the soil, which physically lifts shallow-rooted perennials out of the ground and exposes their roots. A 2–3 inch mulch layer insulates the soil and buffers those swings, preventing most heaving.' },
         ],
         related: ['lawn-care', 'garden-beds'],
+    },
+    {
+        slug: 'lawn-mowing-cost-lincoln-ne',
+        title: 'How Much Does Lawn Mowing Cost in Lincoln, NE? (2026)',
+        description: 'Real 2026 lawn mowing prices in Lincoln, Nebraska — per-mow cost by lot size, weekly vs. bi-weekly, what should be included, and why the cheapest quote usually costs you more.',
+        h1: 'How Much Does <em class="highlight">Lawn Mowing</em> Cost in Lincoln, NE?',
+        sub: 'Honest per-mow and seasonal pricing for Lincoln yards — what actually drives the number, what should be included in a real quote, and the hidden cost in a lowball bid.',
+        date: '2026-05-28',
+        category: 'Lawn Care',
+        imageAlt: 'Striped, freshly mowed residential lawn in Lincoln, Nebraska',
+        takeaways: [
+            'Most average Lincoln lots (5,000–10,000 sq ft) run $45–$60 per visit for a full mow, trim, edge, and blow.',
+            'Weekly mowing usually costs less per visit than bi-weekly — taller bi-weekly grass takes longer to cut and clean up.',
+            'A real quote includes mowing, string-trimming, hard-edge, and blowing clippings off hard surfaces — not just the mow.',
+            'The cheapest bid is often a solo operator with no insurance; one accident on your property can cost you far more than the few dollars saved.',
+        ],
+        body: `
+        <p>"How much to mow my yard?" is the most common question we get in the spring, and the honest answer is: it depends on your lot, but the range is narrower than people expect. Below is what residential lawn mowing actually costs in Lincoln in 2026 — the numbers, what drives them, and what a fair quote should include.</p>
+
+        <h2>What lawn mowing costs in Lincoln by lot size</h2>
+        <p>Almost every reputable Lincoln crew prices a mow off lot size and complexity (slopes, obstacles, gates, fenced dogs). These are typical per-visit ranges for a full service — mow, trim, edge, and blow:</p>
+        ${table({
+            caption: 'Typical per-mow pricing in Lincoln, NE (2026)',
+            headers: ['Lot size', 'Per-visit range', 'Notes'],
+            rows: [
+                ['Small in-town lot (under 5,000 sq ft)', '$35–$45', 'Most older near-downtown and University Place lots'],
+                ['Average Lincoln lot (5,000–10,000 sq ft)', '$45–$60', 'The bulk of homes east, south, and southeast'],
+                ['Large lot (1/4–1/2 acre)', '$60–$90', 'Newer builds in Pine Lake, Stevens Creek, Wilderness Hills'],
+                ['Acreage (1+ acre)', '$90+ (quoted)', 'Waverly, Davey, and rural edges — priced on site'],
+            ],
+        })}
+        <p>If a quote comes in far below these, ask what it includes. A $25 "mow" that skips trimming and edging isn't cheaper — it just moves the trim-and-edge work onto you.</p>
+
+        <h2>Weekly vs. bi-weekly: which is cheaper?</h2>
+        <p>This surprises people: <strong>weekly mowing is usually the better value per visit.</strong> When grass grows for two weeks instead of one, it's taller and thicker at cut time, which means slower mowing, double-cutting to mulch the clippings, and more cleanup. Many crews charge a few dollars more per bi-weekly visit to cover that — so you pay more per cut and your lawn looks ragged for the back half of every cycle.</p>
+        ${callout({ type: 'tip', title: 'The 1/3 rule is why weekly wins', body: '<p>Cool-season Lincoln lawns should never lose more than 1/3 of their blade height in one mow. In the May–June growth surge, a healthy lawn can grow past that in a week — so on a bi-weekly schedule you\'re either scalping it or hauling away a thatch of clippings. Weekly keeps it in the healthy zone and is gentler on the grass.</p>' })}
+
+        <h2>What should be included in the price</h2>
+        <p>A real mowing service in Lincoln includes four things on every visit:</p>
+        <ol>
+            <li><strong>Mow</strong> — at the right height (3.5"+ for cool-season grass), with a sharp blade so it cuts cleanly instead of tearing.</li>
+            <li><strong>String-trim</strong> — around fences, trees, beds, AC units, and anything the mower can't reach.</li>
+            <li><strong>Hard-edge</strong> — a clean line along driveways, sidewalks, and curbs. This single step is what makes a yard look professionally maintained.</li>
+            <li><strong>Blow</strong> — clippings cleared off all hard surfaces so the driveway and walks are clean when we leave.</li>
+        </ol>
+        <p>If "edging" and "blowing" are line-item upsells rather than standard, that's a sign the headline price is engineered to look low.</p>
+
+        <h2>What makes the number go up or down</h2>
+        <ul>
+            <li><strong>Obstacles and trim work.</strong> A wide-open lawn mows fast. A yard full of beds, trees, and play sets is mostly trimming — and trimming is the slow part.</li>
+            <li><strong>Slopes and ditches.</strong> Steep banks (common on south-side and Yankee Hill lots) can't be ridden and take longer by hand.</li>
+            <li><strong>Gates and dogs.</strong> A narrow gate that forces a push-mower in back, or a dog that has to be coordinated around, adds time.</li>
+            <li><strong>Frequency and contract.</strong> A full-season weekly account almost always earns a better per-visit rate than one-off mows.</li>
+        </ul>
+
+        <h2>Why the cheapest quote usually costs more</h2>
+        <p>The lowest bid in Lincoln is almost always a single person with a truck and no insurance. That's fine until a thrown rock cracks your window, a string-trimmer scars your siding, or someone gets hurt on your property — at which point an uninsured "$30 mow" can become a very expensive afternoon. We carry liability insurance on every job, which is part of why our number isn't the rock-bottom one. <a href="/services/lawn-care">See what's included in our lawn care</a>.</p>
+        ${callout({ type: 'local', title: 'Lincoln-specific timing', body: '<p>Lincoln\'s cool-season grass grows fastest in May–June and again in September–October, and slows in the July–August heat. A good crew adjusts — weekly in the surge, sometimes stretching to every 10 days in a dry August — so you\'re not paying to cut grass that didn\'t grow. For the full season plan, see our <a href="/blog/spring-lawn-care-checklist-lincoln-ne">spring lawn care checklist</a>.</p>' })}
+
+        <h2>Get a fixed mowing price for your yard</h2>
+        <p>We\'ll give you a flat per-visit price for your specific lot — no per-cut surprises, edging and blowing always included. <a href="/quote">Request a free quote</a> and we\'ll get you on the schedule.</p>
+        `,
+        faqs: [
+            { q: 'How much does it cost to mow an average yard in Lincoln, NE?', a: 'Most average Lincoln lots (about 5,000–10,000 sq ft) run $45–$60 per visit for a full service — mowing, string-trimming, hard-edging, and blowing the clippings off hard surfaces. Smaller in-town lots are closer to $35–$45, and quarter-acre-plus lots run $60–$90.' },
+            { q: 'Is weekly or bi-weekly mowing cheaper?', a: 'Weekly mowing is usually the better value per visit. On a bi-weekly schedule the grass grows taller and thicker, which takes longer to cut and clean up, so many crews charge more per bi-weekly visit — and the lawn looks overgrown for the second half of each cycle.' },
+            { q: 'Do lawn services charge per mow or monthly in Lincoln?', a: 'Both are common. Many homeowners pay per visit during the season; others prefer a flat monthly amount that averages the cost across the year. We can quote either way — a full-season weekly account typically earns the best per-visit rate.' },
+            { q: 'What should be included in a lawn mowing price?', a: 'A complete service includes mowing at the correct height, string-trimming around obstacles, hard-edging along driveways and walks, and blowing all clippings off hard surfaces. If edging and blowing are charged as extras, the headline price is misleadingly low.' },
+        ],
+        related: ['lawn-care', 'property-cleanup'],
+    },
+    {
+        slug: 'paver-patio-vs-concrete-lincoln-ne',
+        title: 'Paver Patio vs. Concrete Patio in Lincoln, NE: Which Is Better?',
+        description: 'Pavers vs. poured concrete for a patio in Lincoln, Nebraska — cost compared, how each handles freeze-thaw, repairs, lifespan, and resale. An honest breakdown from a local hardscaping crew.',
+        h1: '<em class="highlight">Paver Patio</em> vs. Concrete in Lincoln, NE',
+        sub: 'The real trade-offs for a Nebraska patio — upfront cost, how each survives our freeze-thaw winters, what happens when something cracks, and which one actually pays off.',
+        date: '2026-06-04',
+        category: 'Hardscaping',
+        imageAlt: 'Paver patio next to a poured concrete slab in a Lincoln, NE backyard',
+        takeaways: [
+            'Concrete is cheaper upfront ($8–$15/sq ft plain); pavers cost more ($18–$30/sq ft) but last longer and repair cleaner.',
+            'Nebraska\'s freeze-thaw cycle cracks concrete slabs over time; a paver patio flexes with the ground and is fixed by lifting and relaying.',
+            'When a concrete slab cracks, the patch always shows. When a paver cracks or settles, you swap a few units and it\'s invisible.',
+            'For most Lincoln backyards you\'ll keep for 10+ years, pavers win on lifetime cost and resale; concrete wins when budget is the hard constraint.',
+        ],
+        body: `
+        <p>Almost every patio conversation in Lincoln comes down to the same fork: poured concrete or pavers? Both are good options — the right one depends on your budget, how long you'll be in the house, and how you feel about the near-certainty that a Nebraska concrete slab eventually cracks. Here's the honest comparison we give homeowners.</p>
+
+        <h2>Cost compared</h2>
+        <p>Concrete is cheaper to install. Pavers cost more because the base prep is deeper and the labor is hands-on. Rough 2026 installed pricing in Lincoln:</p>
+        ${table({
+            caption: 'Patio cost and durability: concrete vs. pavers in Lincoln',
+            headers: ['Factor', 'Poured concrete', 'Paver patio'],
+            rows: [
+                ['Installed cost (per sq ft)', '$8–$15 plain · $15–$25 stamped', '$18–$30'],
+                ['Realistic lifespan', '20–25 yrs (cracks sooner)', '30–50 yrs'],
+                ['Freeze-thaw behavior', 'Rigid slab — cracks and heaves', 'Flexes with the ground'],
+                ['Repairs', 'Patch is visible; hard to match', 'Lift and relay individual pavers'],
+                ['Resale appeal', 'Standard', 'Premium / upgraded look'],
+            ],
+        })}
+        <p>If you want exact numbers for a paver build specifically — base depth, edge restraint, and what drives the price — we broke it down in <a href="/blog/paver-patio-cost-lincoln-ne">how much a paver patio costs in Lincoln</a>.</p>
+
+        <h2>How each handles Nebraska freeze-thaw</h2>
+        <p>This is the part that actually matters here. Lincoln goes through dozens of freeze-thaw cycles every winter, and our heavy clay soil swells and shrinks with moisture. A poured slab is one rigid piece — when the ground moves underneath it, it has nowhere to go but crack. You can control where (with control joints) but not whether.</p>
+        <p>A paver patio is dozens of small units sitting on a deep compacted-gravel base with sand between them. When the ground moves, the pavers move with it and stay intact. If a section does settle over the years, it didn't fail — it just needs to be lifted and re-leveled, which is a routine fix, not a teardown.</p>
+        ${callout({ type: 'warning', title: 'Base prep is everything', body: '<p>A paver patio is only as good as the base under it. The failures we get called to fix are almost always thin or skipped base prep — pavers laid on a few inches of sand with no compacted gravel below. Done right (proper excavation, compacted road base, edge restraint), a Lincoln paver patio stays flat for decades. Done cheap, it ripples in two winters. Ask any installer exactly how deep their base is.</p>' })}
+
+        <h2>What happens when something goes wrong</h2>
+        <p>Nothing outdoors in Nebraska lasts forever untouched, so the real question is what a repair looks like. With concrete, a crack or a spalled surface means patching — and the patch never quite matches the color or texture, so the repair is permanently visible. Bad enough, and you're tearing out and re-pouring the whole slab.</p>
+        <p>With pavers, you pull the affected units, fix the base, and drop them (or a few replacements) back in. Because the rest of the patio is the same pavers, the repair disappears. Keeping a small stack of leftover pavers from the original install makes this trivial years down the road.</p>
+
+        <h2>Looks and resale</h2>
+        <p>Stamped concrete can look great when new, but it fades and the pattern wears at high-traffic spots. Pavers hold their color and texture, come in a huge range of styles, and read as a premium feature to buyers. In Lincoln's competitive resale neighborhoods — Pine Lake, Stevens Creek, the Highlands — a quality paver patio is a selling point in a way a plain slab isn't.</p>
+
+        <h2>So which should you choose?</h2>
+        <ul>
+            <li><strong>Choose concrete</strong> if upfront budget is the hard limit, the patio is utilitarian (a slab under a grill or shed), or you're not planning to stay in the home long.</li>
+            <li><strong>Choose pavers</strong> if you'll keep the house 10+ years, you want an outdoor living space that lasts and adds value, or you simply don't want to watch a slab crack. Over a 25-year horizon, pavers usually win on total cost once you factor in concrete repairs and replacement.</li>
+        </ul>
+        ${callout({ type: 'tip', title: 'A middle path', body: '<p>Some homeowners pour a concrete pad where it\'s purely functional and spend the paver budget on the patio people actually see and use. There\'s no rule that says the whole yard has to be one material.</p>' })}
+
+        <h2>Not sure which fits your yard?</h2>
+        <p>We install both, so our recommendation isn\'t tied to selling you one or the other — it\'s tied to your lot, your budget, and how long you\'ll be there. <a href="/quote">Get a free on-site estimate</a> and we\'ll walk it with you, or <a href="/services/hardscaping">see our hardscaping work</a> first.</p>
+        `,
+        faqs: [
+            { q: 'Are pavers worth it over concrete in Nebraska?', a: 'For most homeowners staying 10+ years, yes. Pavers cost more upfront but flex with Nebraska\'s freeze-thaw soil instead of cracking like a rigid concrete slab, last 30–50 years, repair invisibly, and add more resale value. Concrete is the better pick when upfront budget is the hard constraint or the patio is purely utilitarian.' },
+            { q: 'Do paver patios crack like concrete?', a: 'No. A concrete slab is one rigid piece, so when the ground shifts it cracks. A paver patio is dozens of separate units on a compacted gravel base — when the ground moves, the pavers move with it and stay intact. If a section settles over the years, it\'s lifted and re-leveled rather than cracked.' },
+            { q: 'Which is cheaper, pavers or concrete?', a: 'Concrete is cheaper to install — roughly $8–$15 per square foot for plain concrete versus $18–$30 for pavers in Lincoln. Over a 25-year span, though, pavers often come out ahead once you factor in concrete crack repairs and eventual slab replacement.' },
+            { q: 'How long does a paver patio last in Lincoln, NE?', a: 'A properly built paver patio — deep compacted base, edge restraint, the right pavers — lasts 30 to 50 years in Lincoln. The key is base prep: failures almost always trace back to thin or skipped base work, not the pavers themselves.' },
+        ],
+        related: ['hardscaping', 'landscape-design'],
+    },
+    {
+        slug: 'fire-pit-cost-lincoln-ne',
+        title: 'Outdoor Fire Pit Cost & Ideas for Lincoln, NE (2026)',
+        description: 'What an outdoor fire pit costs in Lincoln, Nebraska in 2026 — prefab kits vs. custom stone, wood-burning vs. gas, what drives the price, and the local rules to know before you build.',
+        h1: 'Outdoor <em class="highlight">Fire Pit</em> Cost & Ideas for Lincoln, NE',
+        sub: 'Prefab kit or custom stone? Wood or gas? What a built-in fire pit actually costs here, what changes the number, and the Lincoln rules worth checking first.',
+        date: '2026-06-11',
+        category: 'Hardscaping',
+        imageAlt: 'Built-in stone fire pit on a paver patio in a Lincoln, Nebraska backyard',
+        takeaways: [
+            'A paver/block prefab fire pit kit, professionally installed, runs about $1,500–$3,500.',
+            'A custom wood-burning stone or block fire pit typically runs $3,500–$6,500; gas units run $5,000–$9,000+ with the gas line.',
+            'Wood-burning is cheaper and simpler; gas is push-button and cleaner but costs more and needs a plumbed line.',
+            'Lincoln allows recreational fires with rules on size, placement, and burn bans — confirm current City of Lincoln / fire department guidance before you build.',
+        ],
+        body: `
+        <p>A fire pit is one of the highest-payback things you can add to a Lincoln backyard — it stretches the usable season from March through November and turns a patio into a place people actually gather. Here's what one costs in 2026, the choices that move the price, and the local rules to check before you light it.</p>
+
+        <h2>What an outdoor fire pit costs in Lincoln</h2>
+        ${table({
+            caption: 'Installed fire pit pricing in Lincoln, NE (2026)',
+            headers: ['Type', 'Installed cost', 'Best for'],
+            rows: [
+                ['Prefab paver/block kit (wood-burning)', '$1,500–$3,500', 'A clean, durable pit on a budget'],
+                ['Custom stone or block (wood-burning)', '$3,500–$6,500', 'A built-in feature matched to your patio'],
+                ['Gas (natural gas or propane)', '$5,000–$9,000+', 'Push-button convenience, no smoke or ash'],
+            ],
+        })}
+        <p>Those numbers assume professional installation on a stable, level base. A loose ring of blocks dropped on the grass is cheaper, but it shifts, scorches the lawn, and looks it — most homeowners who want a fire pit want one that's built in and permanent.</p>
+
+        <h2>Wood-burning vs. gas</h2>
+        <p>This is the first real decision, and it drives everything downstream.</p>
+        <ul>
+            <li><strong>Wood-burning</strong> is cheaper to build, gives you the real crackle and a bigger flame, and has no fuel plumbing. The trade-offs are smoke, ash cleanup, hauling firewood, and needing to fully extinguish it.</li>
+            <li><strong>Gas</strong> (natural gas or propane) lights with a switch, throws no smoke or sparks, and shuts off instantly — great for families and tighter lots. It costs more because you're paying for the burner, the safety components, and running a gas line from the house (a licensed plumber job).</li>
+        </ul>
+        ${callout({ type: 'tip', title: 'Natural gas vs. propane', body: '<p>If your home already has natural gas, tapping it means you never refill a tank — convenient and cheaper to run, but it ties the pit to a fixed location and a plumber-run line. Propane is more flexible to place and easier to add later, but you manage tanks. For a permanent built-in near the house, natural gas usually makes more sense in Lincoln.</p>' })}
+
+        <h2>What drives the price up or down</h2>
+        <ul>
+            <li><strong>Materials.</strong> A standard concrete-block kit is the budget end; natural stone, premium pavers, or a stone veneer with a flagstone cap pushes it up.</li>
+            <li><strong>Size and seating wall.</strong> A simple 36"–48" pit is one price; add a curved seating wall around it and you're building a small hardscape, not just a pit.</li>
+            <li><strong>Gas line length.</strong> The farther the pit sits from the gas meter, the more trenching and pipe — a real line item on gas builds.</li>
+            <li><strong>Base and patio.</strong> Setting a pit on an existing patio is simple; building the patio and the pit together is a combined project (often the smart way to do it).</li>
+        </ul>
+
+        <h2>Lincoln rules worth knowing before you build</h2>
+        <p>Lincoln generally allows recreational fires (a fire pit, chiminea, or similar) on private property, but with common-sense rules — limits on the size of the fire, a minimum distance from structures and property lines, adult supervision, and a ban during declared burn bans or air-quality alerts. Gas appliances and any gas line will need the proper plumbing permit and inspection.</p>
+        ${callout({ type: 'warning', title: 'Confirm the current rules', body: '<p>Local fire and burning rules change and are enforced by the City of Lincoln and Lincoln Fire &amp; Rescue. Before you build — especially for placement near a fence or house, or any gas connection — confirm the current requirements with the City. We build to keep clearances safe and code-friendly, but the homeowner should verify local rules for their specific lot.</p>' })}
+
+        <h2>Pair it with the patio</h2>
+        <p>The fire pits that look best and cost the least per square foot are the ones designed with the patio, not added as an afterthought. If you're already considering a patio, building the pit at the same time shares the base prep and gives you one cohesive space. See <a href="/blog/paver-patio-vs-concrete-lincoln-ne">pavers vs. concrete for the patio itself</a>, or browse our <a href="/services/hardscaping">hardscaping services</a>.</p>
+
+        <h2>Get a fire pit quote</h2>
+        <p>Tell us your space, your fuel preference, and your budget, and we\'ll design a fire pit that fits the yard and the way you\'ll use it. <a href="/quote">Request a free on-site estimate</a>.</p>
+        `,
+        faqs: [
+            { q: 'How much does a built-in fire pit cost in Lincoln, NE?', a: 'A professionally installed prefab paver or block fire pit runs about $1,500–$3,500. A custom wood-burning stone or block pit typically runs $3,500–$6,500, and a gas fire pit runs $5,000–$9,000 or more once you include running the gas line.' },
+            { q: 'Should I get a wood-burning or gas fire pit?', a: 'Wood-burning is cheaper to build and gives you a real flame and crackle, at the cost of smoke, ash, and hauling firewood. Gas lights with a switch, makes no smoke or sparks, and shuts off instantly, but costs more because of the burner and the plumbed gas line. Families on tighter lots often prefer gas; budget-minded buyers who want a big flame prefer wood.' },
+            { q: 'Are fire pits legal in Lincoln, Nebraska?', a: 'Lincoln generally allows recreational fires on private property with rules on fire size, distance from structures and property lines, adult supervision, and no burning during a declared burn ban or air-quality alert. Gas connections require the proper plumbing permit. Always confirm the current requirements with the City of Lincoln and Lincoln Fire & Rescue before building.' },
+            { q: 'Is it cheaper to build a fire pit with a patio?', a: 'Usually, yes — per square foot. Building the fire pit and patio together shares the excavation and base prep and produces one cohesive space, rather than retrofitting a pit onto an existing patio later. If you\'re already planning a patio, it\'s the most cost-effective time to add the pit.' },
+        ],
+        related: ['hardscaping', 'landscape-design'],
     },
 ];
 
