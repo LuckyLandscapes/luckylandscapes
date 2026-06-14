@@ -505,6 +505,7 @@ const POST_VISUALS = {
     'modern-landscape-design-lincoln-ne':      { theme: 'warm',   motif: 'plan' },
     'sod-installation-cost-lincoln-ne':        { theme: 'bright', motif: 'sodseed' },
     'when-to-plant-trees-shrubs-nebraska':     { theme: 'autumn', motif: 'prairie' },
+    'fence-types-compared-lincoln-ne':         { theme: 'bright', motif: 'fence' },
 };
 
 function visualFor(slug) {
@@ -2001,6 +2002,75 @@ const POSTS = [
             { q: 'How wide should I dig the hole for a new tree?', a: 'Dig the hole two to three times as wide as the root ball, but no deeper than the root ball is tall. Roots spread outward, and a wide hole loosens Lincoln\'s compacted clay so they can establish — while keeping the tree from settling too deep.' },
         ],
         related: ['garden-beds', 'landscape-design'],
+    },
+    {
+        slug: 'fence-types-compared-lincoln-ne',
+        title: 'Wood vs. Chain Link vs. Ornamental Fence in Lincoln, NE',
+        description: 'Compare the main fence types for a Lincoln, Nebraska yard — wood privacy, chain link, and ornamental iron. Cost, privacy, maintenance, lifespan, and which fits your goal. From a local installer.',
+        h1: 'Wood vs. Chain Link vs. <em class="highlight">Ornamental</em> Fence in Lincoln',
+        sub: 'Privacy, budget, or curb appeal? A straight comparison of the fence types we install in Lincoln — what each does best, what it costs to own, and how it holds up to Nebraska.',
+        date: '2026-05-31',
+        category: 'Fencing',
+        imageAlt: 'Wood privacy fence in a Lincoln, Nebraska backyard',
+        takeaways: [
+            'Wood privacy is the go-to for backyards — full privacy and a warm look, at the cost of periodic staining and a 15–20 year lifespan.',
+            'Chain link is the budget-friendly, low-maintenance pick for containing pets and kids when privacy isn\'t the goal.',
+            'Ornamental iron/aluminum is the curb-appeal and durability choice — see-through, long-lived, low-maintenance, but the priciest.',
+            'In Nebraska the install matters as much as the material: posts have to be set deep and in concrete to survive freeze-thaw and wind.',
+        ],
+        body: `
+        <p>"What kind of fence should I get?" almost always comes down to one question: what's the fence <em>for</em>? Privacy, keeping the dog in, defining the yard, or curb appeal? Each material wins at a different job. Here's a straight comparison of the fence types we install in Lincoln, with the trade-offs that actually matter here.</p>
+
+        <h2>The quick comparison</h2>
+        ${table({
+            caption: 'Fence types compared for Lincoln, NE',
+            headers: ['Type', 'Best for', 'Maintenance', 'Lifespan'],
+            rows: [
+                ['Wood privacy', 'Full backyard privacy + warm look', 'Stain/seal every 2–3 yrs', '15–20 yrs'],
+                ['Chain link', 'Budget, pets/kids, low upkeep', 'Almost none', '20+ yrs'],
+                ['Ornamental iron/aluminum', 'Curb appeal + durability', 'Very low', '30+ yrs'],
+                ['Picket (wood)', 'Front-yard charm, defining space', 'Stain/seal periodically', '15–20 yrs'],
+            ],
+        })}
+        <p>For real dollar figures on each, see our <a href="/blog/fence-cost-lincoln-ne">fence cost guide for Lincoln</a> — this post is about choosing the right type, not the exact price.</p>
+
+        <h2>Wood privacy fence</h2>
+        <p>The default for Lincoln backyards, and for good reason: a 6-foot wood privacy fence gives you a full visual screen, blocks wind, and has a warm, classic look that suits most homes. It's mid-priced and endlessly customizable — board-on-board, shadowbox, lattice top, different heights.</p>
+        <p>The trade-off is upkeep. Wood needs to be cleaned and re-stained or sealed every couple of years to fight Nebraska's sun, snow, and swings; skip it and it grays, warps, and shortens its life. Plan on 15–20 years with good maintenance.</p>
+        ${callout({ type: 'tip', title: 'Shadowbox = neighbor-friendly privacy', body: '<p>A shadowbox (board-on-both-sides) wood fence looks finished from both yards and lets a little air through, which actually helps it survive Nebraska wind better than a solid wall that catches every gust. It\'s a popular middle ground when a fence sits on a shared property line.</p>' })}
+
+        <h2>Chain link fence</h2>
+        <p>When privacy isn't the point, chain link is hard to beat on value. It's the cheapest option, lasts 20+ years, and needs essentially zero maintenance. It's the practical pick for containing a dog or kids, fencing a back lot line, or anywhere you want a boundary without spending on looks. Black vinyl-coated chain link looks far better than bare galvanized and "disappears" against a yard — a small upgrade worth considering.</p>
+
+        <h2>Ornamental iron &amp; aluminum</h2>
+        <p>If curb appeal and longevity are the goal, ornamental (steel or aluminum) is the top of the range. It's elegant, see-through (great for showing off a yard or pool area while still enclosing it), extremely durable, and nearly maintenance-free — 30+ years without much fuss. It's the most expensive per foot, and it doesn't provide privacy, but for a front yard, a pool enclosure, or a decorative boundary, nothing else looks like it.</p>
+
+        <h2>What matters in Nebraska: the install</h2>
+        <p>Here's the part homeowners underestimate — the material matters less than how the fence is set. Nebraska's freeze-thaw cycle heaves shallow posts right out of the ground, and our wind leans on anything that isn't anchored properly. A fence that lasts here has:</p>
+        <ul>
+            <li><strong>Posts set deep</strong> — below the frost line — and in <strong>concrete</strong>, so winter heave and wind can't move them.</li>
+            <li><strong>Proper spacing and bracing</strong> so long runs and gates don't sag.</li>
+            <li><strong>Gates hung to stay square</strong> through the seasons, not just on install day.</li>
+        </ul>
+        <p>A cheap fence set in shallow, dirt-tamped holes looks fine for a year and then starts leaning. We set posts deep and in concrete on every job — it's the difference between a fence that lasts its full life and one you're fixing in three winters.</p>
+        ${callout({ type: 'warning', title: 'Check the line and the rules first', body: '<p>Before any fence goes in, the property line should be confirmed and you should check whether your neighborhood or HOA has fence rules (height, material, or "good side out" requirements). Lincoln also has placement and permit considerations depending on the project. We help sort this out before we dig — it\'s far cheaper than moving a finished fence.</p>' })}
+
+        <h2>So which should you choose?</h2>
+        <ul>
+            <li><strong>Want privacy?</strong> Wood privacy (or a shadowbox for shared lines).</li>
+            <li><strong>Want it cheap and low-maintenance to contain pets/kids?</strong> Chain link, ideally black vinyl-coated.</li>
+            <li><strong>Want curb appeal and decades of durability?</strong> Ornamental iron or aluminum.</li>
+            <li><strong>Front-yard charm?</strong> A wood picket.</li>
+        </ul>
+        <p>Still not sure? We'll walk your yard, talk through the goal and budget, and give you a fixed-price quote on the type that fits. See our <a href="/services/fencing">fence installation service</a> or <a href="/quote?category=fence">request a free quote</a>.</p>
+        `,
+        faqs: [
+            { q: 'What is the cheapest type of fence in Lincoln, NE?', a: 'Chain link is the most budget-friendly fence to install and owns the lowest lifetime cost because it needs almost no maintenance. It doesn\'t provide privacy, so it\'s best for containing pets and kids or marking a boundary. Black vinyl-coated chain link looks much better than bare galvanized for a small upgrade.' },
+            { q: 'What is the best fence for privacy?', a: 'A 6-foot wood privacy fence is the standard choice for full backyard privacy in Lincoln — it blocks sightlines and wind and has a warm, classic look. A shadowbox style looks finished from both sides and handles Nebraska wind better than a solid panel. The trade-off is staining or sealing every couple of years.' },
+            { q: 'How long does a fence last in Nebraska?', a: 'It depends on material and installation: wood lasts about 15–20 years with regular staining, chain link 20+ years, and ornamental iron or aluminum 30+ years. In Nebraska the install is decisive — posts set deep and in concrete survive freeze-thaw and wind, while shallow-set posts heave and lean within a few years regardless of the material.' },
+            { q: 'Do I need a permit to build a fence in Lincoln, NE?', a: 'Lincoln has placement, height, and (in some cases) permit considerations, and many neighborhoods or HOAs add their own fence rules. It\'s worth confirming the property line and the local requirements before installing. We help sort out placement and rules before we dig so the finished fence doesn\'t have to be moved.' },
+        ],
+        related: ['fencing', 'property-cleanup'],
     },
 ];
 

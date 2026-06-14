@@ -52,6 +52,7 @@ export default defineConfig({
                 blogModernDesign: resolve(__dirname, 'blog/modern-landscape-design-lincoln-ne.html'),
                 blogSodInstallCost: resolve(__dirname, 'blog/sod-installation-cost-lincoln-ne.html'),
                 blogPlantTreesShrubs: resolve(__dirname, 'blog/when-to-plant-trees-shrubs-nebraska.html'),
+                blogFenceTypes: resolve(__dirname, 'blog/fence-types-compared-lincoln-ne.html'),
             },
         },
     },
