@@ -504,6 +504,7 @@ const POST_VISUALS = {
     'fire-pit-cost-lincoln-ne':                { theme: 'warm',   motif: 'wall' },
     'modern-landscape-design-lincoln-ne':      { theme: 'warm',   motif: 'plan' },
     'sod-installation-cost-lincoln-ne':        { theme: 'bright', motif: 'sodseed' },
+    'when-to-plant-trees-shrubs-nebraska':     { theme: 'autumn', motif: 'prairie' },
 };
 
 function visualFor(slug) {
@@ -1946,6 +1947,60 @@ const POSTS = [
             { q: 'How soon can you walk on or mow new sod?', a: 'Keep traffic light for the first 2–3 weeks while the roots knit into the soil, and hold off mowing until it\'s rooted enough that a gentle tug doesn\'t lift it — usually around two to three weeks, then mow high on a sharp blade.' },
         ],
         related: ['lawn-care', 'landscape-design'],
+    },
+    {
+        slug: 'when-to-plant-trees-shrubs-nebraska',
+        title: 'The Best Time to Plant Trees & Shrubs in Nebraska (Lincoln Guide)',
+        description: 'When to plant trees and shrubs in Nebraska for the best survival — why fall usually wins, the spring window, the summer danger zone, and how to plant so they make it through a Lincoln winter.',
+        h1: 'The Best Time to Plant <em class="highlight">Trees &amp; Shrubs</em> in Nebraska',
+        sub: 'Fall vs. spring, the summer danger zone, and how to give a new tree the best shot at surviving its first Lincoln winter.',
+        date: '2026-06-07',
+        category: 'Garden Beds',
+        imageAlt: 'Newly planted tree with mulch ring in a Lincoln, Nebraska yard',
+        takeaways: [
+            'Fall (mid-September to late October) is usually the best time to plant trees and shrubs in Lincoln — roots establish in warm soil while the top is dormant.',
+            'Early spring is the second-best window; summer is the riskiest time because heat and transplant shock work against a new root system.',
+            'Dig the hole 2–3× as wide as the root ball but no deeper — planting too deep is the #1 killer of new trees here.',
+            'Mulch in a flat ring (never a volcano against the trunk) and water deeply and infrequently, especially heading into the first winter.',
+        ],
+        body: `
+        <p>"When should I plant this tree?" is one of the most common questions we get, and the answer surprises people: for most trees and shrubs in Nebraska, <strong>fall beats spring.</strong> Timing matters more than almost anything else for whether a new plant thrives or limps along for years. Here's how to get it right in Lincoln's climate.</p>
+
+        <h2>Fall is the best window (mid-September to late October)</h2>
+        <p>It feels backwards to plant as everything's going dormant, but it's exactly why fall works. In fall, the soil is still warm from summer while the air is cooling. The tree stops pushing leaves and pours its energy into <em>roots</em> instead — establishing a strong system before winter. Then it gets a full, cool, rainy spring to keep rooting before the next summer's heat ever tests it.</p>
+        <p>Plant in fall and you're giving the tree two root-growing seasons (this fall and next spring) before its first real summer. That head start is the whole game.</p>
+        ${callout({ type: 'local', title: 'The Lincoln fall window', body: '<p>Aim for <strong>mid-September through late October</strong> — early enough that roots get 4–6 weeks to establish before the ground freezes, late enough that the plant has gone dormant up top. Evergreens are the exception: plant them a little earlier (late summer to early fall) since they keep losing moisture through winter and need more time to root in.</p>' })}
+
+        <h2>Spring is a solid second choice</h2>
+        <p>Early spring — after the ground thaws but before the heat arrives, roughly April into early May — is the next-best window. The tree has the whole growing season ahead of it. The catch is that a spring-planted tree hits its first Nebraska summer with a young, shallow root system, so it needs much more attentive watering through July and August than a fall-planted one.</p>
+
+        <h2>Avoid the summer danger zone</h2>
+        <p>Planting in the heat of summer (late June through August) is the riskiest time. The plant is trying to push top growth and recover from transplant shock at the same time the heat is pulling moisture out of it faster than its cut-back roots can replace. It can be done with diligent watering, but you're fighting the season the whole way. If you can wait for fall, wait.</p>
+
+        <h2>How to plant so it actually survives</h2>
+        <p>Timing gets the plant in the ground; technique keeps it alive. The fundamentals:</p>
+        <ol>
+            <li><strong>Dig wide, not deep.</strong> The hole should be 2–3 times as wide as the root ball but only as deep as the root ball is tall. Roots spread out, not down — a wide hole in our compacted clay gives them room to run.</li>
+            <li><strong>Don't plant too deep.</strong> The root flare (where the trunk widens into roots) should sit at or slightly above grade. Burying the flare is the single most common way new trees die slowly in Lincoln yards.</li>
+            <li><strong>Loosen and backfill with native soil.</strong> Skip the heavy amendments — you want roots to grow into the surrounding clay, not circle inside a cushy pocket they never leave.</li>
+            <li><strong>Mulch in a flat ring, not a volcano.</strong> Two to three inches of mulch over the root zone, pulled back a few inches from the trunk. Mulch piled against the bark traps moisture and invites rot and rodents.</li>
+            <li><strong>Water deeply and infrequently.</strong> A long, slow soak that wets the whole root ball, then let it dry slightly before the next one. That trains roots to go deep instead of staying shallow.</li>
+        </ol>
+        ${callout({ type: 'warning', title: 'Water it into winter', body: '<p>The most common reason a "hardy" tree dies its first winter isn\'t the cold — it\'s going into a hard freeze dry. Keep watering a fall-planted tree (especially evergreens) right up until the ground freezes. A well-hydrated root ball survives winter; a dry one desiccates. This is part of the same routine as <a href="/blog/winterizing-landscape-lincoln-ne">winterizing the rest of your landscape</a>.</p>' })}
+
+        <h2>Pick plants that belong here</h2>
+        <p>The best timing won't save a plant that doesn't suit Nebraska. Choose species rated for our zone and conditions, and lean toward natives and proven performers that handle clay soil, wind, and our swings — the same logic behind our guide to <a href="/blog/native-drought-tolerant-plants-nebraska">native and drought-tolerant plants for Nebraska yards</a>. A tree that fits the site needs far less babying than a trendy one that's barely hanging on.</p>
+
+        <h2>Want it planted right?</h2>
+        <p>We plant trees, shrubs, and full beds across Lincoln — sited, dug, and mulched the way that gives them the best shot, at the right time of year. See our <a href="/services/garden-beds">garden beds &amp; planting service</a> or <a href="/quote?category=garden">request a free quote</a>.</p>
+        `,
+        faqs: [
+            { q: 'When is the best time to plant trees in Nebraska?', a: 'For most trees and shrubs in Lincoln, fall — roughly mid-September through late October — is the best time. The soil is still warm so roots establish, while the top is dormant, and the plant then gets a full cool spring to keep rooting before its first summer. Early spring is the second-best window; summer is the riskiest.' },
+            { q: 'Can I plant a tree in the summer in Lincoln?', a: 'You can, but it\'s the hardest time. Summer heat and transplant shock work against a young root system, so it takes diligent deep watering to pull a summer planting through. If you can wait for fall, the tree will establish far more easily.' },
+            { q: 'Why do newly planted trees die in Nebraska?', a: 'The two most common causes are planting too deep (burying the root flare, which slowly suffocates the tree) and going into winter dry. Plant with the root flare at grade, mulch in a flat ring rather than a volcano against the trunk, and keep watering until the ground freezes the first winter.' },
+            { q: 'How wide should I dig the hole for a new tree?', a: 'Dig the hole two to three times as wide as the root ball, but no deeper than the root ball is tall. Roots spread outward, and a wide hole loosens Lincoln\'s compacted clay so they can establish — while keeping the tree from settling too deep.' },
+        ],
+        related: ['garden-beds', 'landscape-design'],
     },
 ];
 
