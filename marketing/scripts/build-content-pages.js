@@ -501,6 +501,8 @@ const POST_VISUALS = {
     'lawn-mowing-cost-lincoln-ne':             { theme: 'bright', motif: 'mower' },
     'paver-patio-vs-concrete-lincoln-ne':      { theme: 'warm',   motif: 'pavers' },
     'fire-pit-cost-lincoln-ne':                { theme: 'warm',   motif: 'wall' },
+    'modern-landscape-design-lincoln-ne':      { theme: 'warm',   motif: 'plan' },
+    'sod-installation-cost-lincoln-ne':        { theme: 'bright', motif: 'sodseed' },
 };
 
 function visualFor(slug) {
@@ -1820,6 +1822,129 @@ const POSTS = [
             { q: 'Is it cheaper to build a fire pit with a patio?', a: 'Usually, yes — per square foot. Building the fire pit and patio together shares the excavation and base prep and produces one cohesive space, rather than retrofitting a pit onto an existing patio later. If you\'re already planning a patio, it\'s the most cost-effective time to add the pit.' },
         ],
         related: ['hardscaping', 'landscape-design'],
+    },
+    {
+        slug: 'modern-landscape-design-lincoln-ne',
+        title: 'Modern Landscape Design Ideas for Lincoln, NE (2026)',
+        description: 'Modern landscape design ideas that actually work in Lincoln, Nebraska — clean lines, low-maintenance native plantings, hardscape-forward yards, and what design-build costs. From a local crew.',
+        h1: 'Modern <em class="highlight">Landscape Design</em> Ideas for Lincoln, NE',
+        sub: 'Clean lines, low-maintenance plantings, and outdoor living that survives Nebraska. What a modern Lincoln yard looks like in 2026 — and how to get there.',
+        date: '2026-06-14',
+        category: 'Landscape Design',
+        imageAlt: 'Modern landscape design plan for a Lincoln, Nebraska backyard',
+        takeaways: [
+            'Modern in Nebraska means clean geometry, fewer plant varieties in bigger drifts, and hardscape doing the heavy lifting — not fussy, high-water beds.',
+            'Lean on native and drought-tolerant plantings: they read modern, survive our swings, and cut watering and maintenance.',
+            'Structure first (patios, walls, edging, paths), plants second — the bones are what make a yard look designed year-round.',
+            'A design-build approach (one crew designs and builds it) avoids the gap where a pretty plan meets a contractor who can\'t execute it.',
+        ],
+        body: `
+        <p>"Modern" landscaping gets thrown around a lot, and half the photos people send us are gorgeous yards shot in Arizona or the Pacific Northwest that would die or look out of place in Nebraska. Modern design absolutely works in Lincoln — but it has to be built for our clay soil, wind, and 100°-to-below-zero swings. Here's what a genuinely modern Lincoln yard looks like in 2026, and how we approach designing one.</p>
+
+        <h2>What "modern" actually means here</h2>
+        <p>Modern landscape design isn't a style you bolt on — it's a set of principles. In Lincoln they translate to:</p>
+        <ul>
+            <li><strong>Clean geometry.</strong> Straight lines, defined rectangles, intentional curves — not the wavy, do-everything beds of the early 2000s.</li>
+            <li><strong>Restraint.</strong> Fewer plant varieties, repeated in bigger groups ("drifts"), instead of one of everything. It reads calmer and more designed.</li>
+            <li><strong>Hardscape doing real work.</strong> Patios, walls, steel or stone edging, and clean paths give the yard structure that looks good in February, not just June.</li>
+            <li><strong>Low maintenance on purpose.</strong> Modern yards lean on plants that thrive on neglect here, so the design still looks intentional in year three.</li>
+        </ul>
+
+        <h2>Plantings: native, structural, and drought-tolerant</h2>
+        <p>The fastest way to make a Lincoln yard look modern <em>and</em> survive is to lean on native and drought-tolerant plants used structurally. Ornamental grasses (little bluestem, switchgrass, feather reed grass) give movement and winter structure. Coneflower, sedum, catmint, and Russian sage give long bloom with almost no fuss. Massed in clean drifts rather than dotted around, they look designed instead of wild. They also cut your water and maintenance — see our guide to <a href="/blog/native-drought-tolerant-plants-nebraska">native and drought-tolerant plants for Nebraska yards</a>.</p>
+        ${callout({ type: 'tip', title: 'The "matrix" look, done right', body: '<p>The modern prairie/matrix style — big sweeps of grasses and perennials — is having a moment and it suits Nebraska perfectly. The trick is editing: 4–6 species repeated, with crisp edges and a hardscape frame, so it reads intentional and not like a field reclaiming your yard.</p>' })}
+
+        <h2>Hardscape is the backbone</h2>
+        <p>Modern yards are hardscape-forward. The structure is what makes them look finished year-round, and it's where a good crew earns its keep:</p>
+        <ul>
+            <li><strong>Large-format pavers</strong> with tight, clean joints — or poured concrete with crisp control joints — for patios and paths.</li>
+            <li><strong>Clean edging</strong> (steel, aluminum, or a tidy paver soldier course) to separate beds, lawn, and gravel with a sharp line.</li>
+            <li><strong>Block or natural-stone walls</strong> that double as seating and define levels on our sloped lots.</li>
+            <li><strong>Gravel and ground-cover panels</strong> to reduce lawn and add texture without adding upkeep.</li>
+        </ul>
+        <p>Because our freeze-thaw winters are hard on rigid surfaces, how it's built matters as much as how it's drawn — see <a href="/blog/paver-patio-vs-concrete-lincoln-ne">pavers vs. concrete in Lincoln</a> before you commit a patio material.</p>
+
+        <h2>Outdoor living and the finishing touches</h2>
+        <p>Modern design treats the backyard as another room. A clean patio, a built-in <a href="/blog/fire-pit-cost-lincoln-ne">fire pit</a>, a seating wall, and simple low-voltage path or uplighting turn a flat lawn into a space you actually use from spring through fall. Lighting in particular is the detail people forget — it makes the design work after dark and is worth planning for early, even if you add it later.</p>
+
+        <h2>What modern design-build costs in Lincoln</h2>
+        <p>A modern look isn't necessarily more expensive — restraint can cost less than a busy, plant-heavy yard — but the hardscape drives the budget. Most full design-build yard transformations in Lincoln land anywhere from the mid-four-figures for a focused project (one patio, clean beds, edging) to $20,000+ for a complete back-to-front redesign with walls, patio, and planting. We give a fixed price after walking the property. For a broader cost breakdown, see <a href="/blog/landscaping-cost-lincoln-ne">how much landscaping costs in Lincoln</a>.</p>
+        ${callout({ type: 'local', title: 'Design-build beats design-only', body: '<p>A common, expensive mistake: paying a designer for a beautiful plan, then handing it to whoever bids lowest to build. The plan and the build drift apart and the result disappoints. We design and build the same project, so what you approve is what gets installed — and we flag during design anything that won\'t hold up in Nebraska.</p>' })}
+
+        <h2>Start with a plan</h2>
+        <p>The best modern yards start with the bones — structure, levels, and flow — before a single plant is chosen. We do that planning in person, on your actual lot, accounting for your soil, slope, and how you'll use the space. See our <a href="/services/landscape-design">landscape design &amp; build service</a> or <a href="/quote">request a free design consultation</a>.</p>
+        `,
+        faqs: [
+            { q: 'Does modern landscape design work in Nebraska\'s climate?', a: 'Yes — as long as it\'s built for it. Modern design in Lincoln means clean geometry and hardscape structure paired with native, drought-tolerant plantings that handle our clay soil, wind, and temperature swings. The mistake is copying designs from milder climates that won\'t survive here.' },
+            { q: 'Is modern landscaping more expensive?', a: 'Not necessarily. Restraint — fewer plant varieties, clean lines — can cost less than a busy, plant-heavy yard. The budget is usually driven by how much hardscape (patios, walls, edging) you include. Most full design-build transformations in Lincoln range from the mid-four-figures to $20,000+ depending on scope.' },
+            { q: 'What plants give a modern look but survive Lincoln winters?', a: 'Ornamental grasses like little bluestem and feather reed grass, plus coneflower, sedum, catmint, and Russian sage, massed in clean drifts. They\'re native or drought-tolerant, give long seasonal interest and winter structure, and need very little maintenance once established.' },
+            { q: 'Should I hire a designer and a separate builder?', a: 'We recommend design-build — one crew that designs and installs the project — so the finished yard matches the approved plan and nothing gets lost in translation. Paying for a plan and then handing it to a separate low bidder is where most disappointing results come from.' },
+        ],
+        related: ['landscape-design', 'hardscaping'],
+    },
+    {
+        slug: 'sod-installation-cost-lincoln-ne',
+        title: 'How Much Does Sod Installation Cost in Lincoln, NE? (2026)',
+        description: 'Real 2026 sod installation pricing in Lincoln, Nebraska — installed cost per square foot, what proper prep includes, sod vs. seed, and what makes the price move. From a local crew.',
+        h1: 'How Much Does <em class="highlight">Sod Installation</em> Cost in Lincoln, NE?',
+        sub: 'Installed cost per square foot, what real prep includes, and when sod is worth it over seed. Honest 2026 pricing from a Lincoln crew.',
+        date: '2026-05-25',
+        category: 'Lawn Care',
+        imageAlt: 'Fresh rolls of sod being installed on a prepared Lincoln, NE lawn',
+        takeaways: [
+            'Professionally installed sod in Lincoln typically runs about $1.25–$2.50 per square foot, including prep and the sod itself.',
+            'Most of the cost — and the result — is in the prep: grading, tilling, and soil work, not the sod rolls.',
+            'Sod gives you an instant, erosion-proof lawn; seed is cheaper but takes a full season and careful watering to fill in.',
+            'Small or hard-to-access yards cost more per square foot; big open areas cost less.',
+        ],
+        body: `
+        <p>Sod gets you a finished, green, walk-on-it-soon lawn in an afternoon instead of babysitting seed for a season. The catch is that it costs more upfront — and how much depends far more on the prep than on the grass itself. Here's what sod installation actually costs in Lincoln in 2026.</p>
+
+        <h2>What sod installation costs in Lincoln</h2>
+        <p>For professionally installed sod — meaning prep plus delivery plus laying — typical Lincoln pricing in 2026 looks like this:</p>
+        ${table({
+            caption: 'Installed sod pricing in Lincoln, NE (2026)',
+            headers: ['Project', 'Installed cost (per sq ft)', 'Notes'],
+            rows: [
+                ['Large open area (5,000+ sq ft)', '$1.25–$1.75', 'Best per-foot rate — easy access, efficient'],
+                ['Typical yard section (1,000–5,000 sq ft)', '$1.50–$2.25', 'The most common range'],
+                ['Small or tight area (under 1,000 sq ft)', '$2.00–$2.50+', 'Mobilization and hand-work raise the per-foot cost'],
+            ],
+        })}
+        <p>As a rough feel: re-sodding a 2,000 sq ft front yard usually lands somewhere around $3,000–$4,500 installed, depending on how much prep and grading it needs. We quote a fixed number after seeing the site.</p>
+
+        <h2>The prep is where the money (and the result) is</h2>
+        <p>People assume they're paying for sod. They're mostly paying for everything that happens <em>before</em> the sod goes down — and that's exactly where cheap installs fail. Proper prep includes:</p>
+        <ol>
+            <li><strong>Killing or removing the old lawn/weeds</strong> so they don't grow up through the new sod.</li>
+            <li><strong>Grading</strong> for drainage and a smooth surface — pulling soil away from the house and eliminating low spots.</li>
+            <li><strong>Tilling and amending</strong> Lincoln's heavy clay so roots can actually penetrate, instead of laying sod on a hard pan where it struggles to knit in.</li>
+            <li><strong>Rolling and laying tight</strong> with staggered seams, then a starter watering.</li>
+        </ol>
+        ${callout({ type: 'warning', title: 'Sod on bad prep is wasted money', body: '<p>The most common sod failure we get called to fix is beautiful rolls laid over un-tilled clay and rough grade. It looks great for two weeks, then the seams shrink, low spots pond, and the roots never tie in. If a quote is suspiciously cheap, ask what prep is included — that\'s almost always what got skipped.</p>' })}
+
+        <h2>Sod vs. seed — which is worth it?</h2>
+        <p>Sod costs more upfront but buys you time, certainty, and erosion control: an instant lawn you can use in 2–3 weeks, no muddy season, and no bare patches washing out on a slope. Seed is much cheaper but takes a full growing season to fill in and needs consistent watering and protection. The right pick depends on your timeline, slope, and budget — we break it down fully in <a href="/blog/sod-vs-seed-lincoln-ne">sod vs. seed for a new lawn in Lincoln</a>.</p>
+
+        <h2>What moves the price</h2>
+        <ul>
+            <li><strong>Prep needed.</strong> A bare, roughly level dirt lot is cheap to sod; tearing out an old weedy lawn and regrading adds labor.</li>
+            <li><strong>Access.</strong> A backyard reached only through a narrow gate means wheelbarrowing everything by hand — slower, pricier.</li>
+            <li><strong>Grade and drainage work.</strong> If the yard needs real regrading or a drainage fix first, that's its own line item.</li>
+            <li><strong>Sod type.</strong> Standard Kentucky bluegrass blend is the norm here; specialty blends cost more.</li>
+            <li><strong>Size.</strong> Bigger areas spread the fixed mobilization cost out, so the per-foot rate drops.</li>
+        </ul>
+
+        <h2>Get a fixed sod quote</h2>
+        <p>We'll look at your yard, tell you honestly whether sod or seed makes more sense, and give you a flat installed price that includes the prep — not a per-foot teaser that balloons later. See our <a href="/services/lawn-care">lawn care services</a> or <a href="/quote?category=lawn">request a free quote</a>.</p>
+        `,
+        faqs: [
+            { q: 'How much does it cost to sod a yard in Lincoln, NE?', a: 'Professionally installed sod in Lincoln typically runs about $1.25–$2.50 per square foot including prep and the sod itself, so a 2,000 sq ft front yard usually lands around $3,000–$4,500 installed. Larger open areas cost less per foot; small or hard-to-access yards cost more.' },
+            { q: 'Why is sod installation more than just the price of the sod?', a: 'Because most of the cost — and the result — is in the prep: killing the old lawn, grading for drainage, and tilling and amending Lincoln\'s heavy clay so the roots can knit in. Sod laid over un-prepped clay looks good briefly, then the seams shrink and the roots never establish. The prep is what you\'re really paying for.' },
+            { q: 'Is sod or seed better for a new lawn in Lincoln?', a: 'Sod gives you an instant, usable, erosion-proof lawn in 2–3 weeks but costs more upfront. Seed is much cheaper but takes a full growing season and careful watering to fill in. Sod is the better choice for slopes, tight timelines, and high-traffic areas; seed can work when budget matters most and you can wait.' },
+            { q: 'How soon can you walk on or mow new sod?', a: 'Keep traffic light for the first 2–3 weeks while the roots knit into the soil, and hold off mowing until it\'s rooted enough that a gentle tug doesn\'t lift it — usually around two to three weeks, then mow high on a sharp blade.' },
+        ],
+        related: ['lawn-care', 'landscape-design'],
     },
 ];
 

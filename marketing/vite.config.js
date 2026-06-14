@@ -48,6 +48,8 @@ export default defineConfig({
                 blogLawnMowingCost: resolve(__dirname, 'blog/lawn-mowing-cost-lincoln-ne.html'),
                 blogPaverVsConcrete: resolve(__dirname, 'blog/paver-patio-vs-concrete-lincoln-ne.html'),
                 blogFirePitCost: resolve(__dirname, 'blog/fire-pit-cost-lincoln-ne.html'),
+                blogModernDesign: resolve(__dirname, 'blog/modern-landscape-design-lincoln-ne.html'),
+                blogSodInstallCost: resolve(__dirname, 'blog/sod-installation-cost-lincoln-ne.html'),
             },
         },
     },
