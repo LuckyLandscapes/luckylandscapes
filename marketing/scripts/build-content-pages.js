@@ -67,6 +67,7 @@ const FOOTER = `<footer class="footer">
                 </div>
                 <div class="footer-nav">
                     <h4>Service Areas</h4>
+                    <a href="/areas">All Service Areas →</a>
                     <a href="/areas/east-lincoln">East Lincoln</a>
                     <a href="/areas/northwest-lincoln">Northwest Lincoln</a>
                     <a href="/areas/south-lincoln">South Lincoln</a>
@@ -2026,13 +2027,130 @@ function areaSchema(area) {
                 '@type': 'BreadcrumbList',
                 itemListElement: [
                     { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://luckylandscapes.com/' },
-                    { '@type': 'ListItem', position: 2, name: 'Service Areas', item: 'https://luckylandscapes.com/#service-areas' },
+                    { '@type': 'ListItem', position: 2, name: 'Service Areas', item: 'https://luckylandscapes.com/areas' },
                     { '@type': 'ListItem', position: 3, name: areaName, item: url },
                 ],
             },
             ...(faqs.length ? [{ '@type': 'FAQPage', mainEntity: faqs }] : []),
         ],
     };
+}
+
+// Strip HTML from an area's h1 for use as a plain display label.
+function areaLabel(area) {
+    return area.h1.replace(/<[^>]+>/g, '').trim();
+}
+
+function areasHubSchema() {
+    const url = 'https://luckylandscapes.com/areas';
+    return {
+        '@context': 'https://schema.org',
+        '@graph': [
+            {
+                '@type': 'CollectionPage',
+                '@id': `${url}#webpage`,
+                url,
+                name: 'Landscaping Service Areas — Lincoln, NE',
+                description: 'The Lincoln, NE neighborhoods and surrounding towns Lucky Landscapes serves.',
+                isPartOf: { '@id': 'https://luckylandscapes.com/#website' },
+                about: { '@id': 'https://luckylandscapes.com/#business' },
+            },
+            {
+                '@type': 'BreadcrumbList',
+                itemListElement: [
+                    { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://luckylandscapes.com/' },
+                    { '@type': 'ListItem', position: 2, name: 'Service Areas', item: url },
+                ],
+            },
+            {
+                '@type': 'ItemList',
+                name: 'Lucky Landscapes Service Areas',
+                itemListElement: AREAS.map((a, i) => ({
+                    '@type': 'ListItem',
+                    position: i + 1,
+                    name: areaLabel(a),
+                    url: `https://luckylandscapes.com/areas/${a.slug}`,
+                })),
+            },
+        ],
+    };
+}
+
+// Service Areas hub page (/areas) — a rankable "areas we serve" landing page that
+// links out to every neighborhood/town page. Gives the area pages a real parent
+// (the breadcrumb points here) and a single discoverable hub.
+function renderAreasHub() {
+    const canonical = 'https://luckylandscapes.com/areas';
+    const title = 'Landscaping Service Areas in Lincoln, NE — Lucky Landscapes';
+    const description = 'The Lincoln, NE neighborhoods and surrounding towns Lucky Landscapes serves — East & Northwest Lincoln, Pine Lake, South Lincoln, Hickman, Waverly, Seward, and more. Free local estimates, 24-hour response.';
+    const cards = AREAS.map(a => `
+                    <a href="/areas/${a.slug}" class="home-service-card">
+                        <div class="home-service-icon">📍</div>
+                        <h3>${areaLabel(a)}</h3>
+                        <p>${a.description}</p>
+                        <span class="home-service-link">View this area →</span>
+                    </a>`).join('');
+
+    return `${head({ title, description, canonical, schema: areasHubSchema() })}
+
+        <section class="svc-hero">
+            <div class="svc-hero-bg"></div>
+            <div class="container">
+                <div class="svc-hero-content">
+                    <div class="hero-badge">
+                        <img src="/images/Icon.png" alt="" />
+                        <span>Lincoln, NE &amp; Surrounding Areas</span>
+                    </div>
+                    <h1>Landscaping <em class="highlight">Service Areas</em></h1>
+                    <p class="hero-sub">We're a local, owner-run crew based in Lincoln. Here's where we work — every Lincoln neighborhood plus the surrounding towns. Same crew, same fixed-price quotes, same 24-hour response across all of them.</p>
+                    <div class="hero-buttons">
+                        <a href="/quote" class="btn btn-primary btn-lg">Get a Free Estimate</a>
+                        <a href="tel:+14024055475" class="btn btn-outline btn-lg">📞 (402) 405-5475</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="svc-features">
+            <div class="container">
+                <div class="svc-features-header reveal">
+                    <p class="section-label">Where we work</p>
+                    <h2 class="section-title">Lincoln &amp; the Towns Around It</h2>
+                </div>
+                <div style="max-width: 760px; margin: 0 auto 1rem; line-height: 1.7; text-align:center;">
+                    <p>Lucky Landscapes serves all of Lincoln and the nearby communities of Lancaster County. We don't add a trip charge anywhere inside Lincoln, and we cover the surrounding towns for project work (a small minimum applies on the farther ones). Pick your area below for the local details, or just <a href="/quote">request a free estimate</a> — we'll come look in person.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="home-services-section">
+            <div class="home-services-bg"></div>
+            <div class="container">
+                <div class="home-services-header reveal">
+                    <p class="section-label section-label--light">Service Areas</p>
+                    <h2 class="section-title section-title--light">Find Your Neighborhood</h2>
+                </div>
+                <div class="home-services-grid stagger-children">${cards}
+                </div>
+            </div>
+        </section>
+${REVIEWS_STRIP}
+${FOUR_LEAF}
+
+        <section class="svc-cta">
+            <div class="container">
+                <div class="svc-cta-content reveal">
+                    <h2>Don't see your exact neighborhood?</h2>
+                    <p>If you're in or around Lincoln, we almost certainly cover you. Tell us your address and project — free estimate, 24-hour response, no obligation.</p>
+                    <div class="hero-buttons">
+                        <a href="/quote" class="btn btn-primary btn-lg">Request My Free Estimate</a>
+                        <a href="tel:+14024055475" class="btn btn-outline btn-lg">📞 Call Now</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+${pageEnd()}`;
 }
 
 function postSchema(post) {
@@ -2393,6 +2511,9 @@ for (const area of AREAS) {
     console.log('  area  ', `areas/${area.slug}.html`);
 }
 
+await writeFile(join(ROOT, 'areas', 'index.html'), renderAreasHub());
+console.log('  hub   ', 'areas/index.html');
+
 for (const post of POSTS) {
     const path = join(ROOT, 'blog', `${post.slug}.html`);
     await writeFile(path, renderPost(post));
@@ -2571,6 +2692,7 @@ const SITEMAP_STATIC = [
     { loc: '/',                              lastmod: '2026-05-21', changefreq: 'weekly',  priority: '1.0' },
     { loc: '/quote',                         lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
     { loc: '/gallery',                       lastmod: '2026-05-05', changefreq: 'weekly',  priority: '0.8' },
+    { loc: '/areas',                         lastmod: '2026-06-14', changefreq: 'monthly', priority: '0.7' },
     { loc: '/services/landscape-design',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/lawn-care',            lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/hardscaping',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
