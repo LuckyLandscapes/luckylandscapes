@@ -53,6 +53,7 @@ cd marketing
 npm run dev               # Vite dev server on http://localhost:3000 (auto-opens)
 npm run build             # Build to marketing/dist/
 npm run preview           # Preview the built dist/
+npm run qa                # Build, then validate dist/ for SEO integrity — broken internal links, .html-in-URL, malformed JSON-LD, missing canonicals, unresolved sitemap URLs. Exits non-zero on any issue (run before deploy). Script: scripts/qa-check.mjs
 npm run optimize-images   # Re-encode source-images/ → public/images/ (run after adding new photos)
 node scripts/inject-head.js          # Re-inject the analytics/preconnect block into every HTML page (idempotent)
 node scripts/build-content-pages.js  # Regenerate area + blog pages + public/sitemap.xml + public/llms.txt from the AREAS/POSTS data arrays (run after editing them)
