@@ -2062,7 +2062,7 @@ const POSTS = [
             <li><strong>Want curb appeal and decades of durability?</strong> Ornamental iron or aluminum.</li>
             <li><strong>Front-yard charm?</strong> A wood picket.</li>
         </ul>
-        <p>Still not sure? We'll walk your yard, talk through the goal and budget, and give you a fixed-price quote on the type that fits. See our <a href="/services/fencing">fence installation service</a> or <a href="/quote?category=fence">request a free quote</a>.</p>
+        <p>Still not sure? We'll walk your yard, talk through the goal and budget, and give you a fixed-price quote on the type that fits. See our <a href="/services/fencing">fence installation service</a> or <a href="/quote?category=fencing">request a free quote</a>.</p>
         `,
         faqs: [
             { q: 'What is the cheapest type of fence in Lincoln, NE?', a: 'Chain link is the most budget-friendly fence to install and owns the lowest lifetime cost because it needs almost no maintenance. It doesn\'t provide privacy, so it\'s best for containing pets and kids or marking a boundary. Black vinyl-coated chain link looks much better than bare galvanized for a small upgrade.' },
@@ -2452,12 +2452,35 @@ function postCard(p) {
                 </a>`;
 }
 
+// End-of-post CTA personalization, keyed on post.category.
+// Headline noun → benefit-led phrase (rendered inside <em class="highlight">).
+const CTA_PHRASE_BY_CATEGORY = {
+    'Lawn Care':        "a Lawn You Don't Have to Think About",
+    'Hardscaping':      'a Patio That Lasts Decades',
+    'Garden Beds':      'Beds That Look Sharp All Season',
+    'Fencing':          'a Fence Done Right the First Time',
+    'Landscape Design': 'a Yard the Neighbors Notice',
+};
+// Quote deep-link param → MUST match a real chip key in marketing/main.js
+// `categoryLabels` (lawn|garden|hardscape|fencing|cleanup|design|maintenance|other);
+// main.js only pre-selects when the key exists, else it no-ops.
+const CTA_CATEGORY_PARAM_BY_CATEGORY = {
+    'Lawn Care':        'lawn',
+    'Hardscaping':      'hardscape',
+    'Garden Beds':      'garden',
+    'Fencing':          'fencing',
+    'Landscape Design': 'design',
+};
+
 function renderPost(post) {
     const canonical = `https://luckylandscapes.com/blog/${post.slug}`;
     const cleanTitle = post.title.replace(' — Lucky Landscapes', '');
     const ogImage = ogImageFor(post);
     const { minutes } = postStats(post);
     const { html: bodyHtml, toc } = buildToc(post.body);
+    const ctaPhrase = CTA_PHRASE_BY_CATEGORY[post.category] || 'get your project priced';
+    const ctaParam = CTA_CATEGORY_PARAM_BY_CATEGORY[post.category] || '';
+    const quoteHref = ctaParam ? `/quote?category=${ctaParam}` : '/quote';
 
     const related = (post.related || []).map(s => `
                     <a href="/services/${s}" class="home-service-card">
@@ -2553,12 +2576,25 @@ function renderPost(post) {
                         <p class="post-author-bio">We're an owner-operated landscaping company in Lincoln, NE. Everything here is what we actually do on the job — written by the people doing it, not an AI content farm or a national chain.</p>
                     </div>
                 </div>
-                <div class="post-cta">
-                    <p>Got a project in mind?</p>
-                    <a href="/quote" class="btn btn-primary btn-lg">Request a Free Estimate</a>
-                </div>
             </article>
         </div>
+
+        <section class="svc-cta">
+            <div class="container">
+                <div class="svc-cta-content reveal">
+                    <h2>Ready for <em class="highlight">${ctaPhrase}</em>?</h2>
+                    <p>I'm Riley — I own Lucky Landscapes and I quote every job in person, right here in Lincoln. Tell me what you're picturing and I'll get you a straight, fixed-price number within a day. No pressure, no sales pitch.</p>
+                    <div class="hero-buttons">
+                        <a href="${quoteHref}" class="btn btn-primary btn-lg">
+                            Get My Free Quote
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14" /><path d="m12 5 7 7-7 7" /></svg>
+                        </a>
+                        <a href="tel:+14024055475" class="btn btn-outline btn-lg">📞 Call or Text — (402) 405-5475</a>
+                    </div>
+                    <p style="color:rgba(255,255,255,.82);font-size:.9rem;margin-top:-.5rem;">Free &amp; fixed-price · Fully insured · Owner quotes every job in person · 5.0 on Google</p>
+                </div>
+            </div>
+        </section>
 ${faqsHtml}
         <section class="related-posts">
             <div class="container">

@@ -1869,6 +1869,7 @@ if (qzCategoryBtns.length > 0) {
         lawn:        'Lawn Care',
         garden:      'Garden & Beds',
         hardscape:   'Patios & Walls',
+        fencing:     'Fencing',
         cleanup:     'Property Cleanup',
         design:      'Design & Build',
         maintenance: 'Recurring Maintenance',
