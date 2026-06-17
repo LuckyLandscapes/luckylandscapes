@@ -9,6 +9,7 @@ import {
   Clock, CheckCircle2, Send, Plus, Edit3, Trash2, X, AlertTriangle, Save,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import AddressLink from '@/components/AddressLink';
 import ReviewRequestCard from '@/components/ReviewRequestCard';
 import { CUSTOMER_TYPES, customerTypeMeta } from '../page';
 
@@ -263,10 +264,14 @@ export default function CustomerDetailPage() {
               {customer.address && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)' }}>
                   <MapPin size={16} style={{ color: 'var(--text-tertiary)' }} />
-                  <span style={{ fontSize: '0.85rem' }}>
-                    {customer.address}<br />
-                    {customer.city}, {customer.state} {customer.zip}
-                  </span>
+                  <AddressLink
+                    address={customer.address}
+                    city={customer.city}
+                    state={customer.state}
+                    zip={customer.zip}
+                    multiline
+                    style={{ fontSize: '0.85rem' }}
+                  />
                 </div>
               )}
             </div>

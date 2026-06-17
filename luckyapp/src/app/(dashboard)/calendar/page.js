@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
 import Link from 'next/link';
 import EventModal from '@/components/EventModal';
+import AddressLink from '@/components/AddressLink';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
 import { dayLoad, eventDurationHours, STATUS_LABELS, buildEventsByDate } from '@/lib/capacity';
 import {
@@ -785,7 +786,15 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit, onDelete }) {
                   <div className="cal-detail-label">Customer</div>
                   <div className="cal-detail-value">{customer.firstName} {customer.lastName || ''}</div>
                   {customer.phone && <div className="cal-detail-sub">{customer.phone}</div>}
-                  {customer.address && <div className="cal-detail-sub">{customer.address}</div>}
+                  {customer.address && (
+                    <div className="cal-detail-sub">
+                      <AddressLink
+                        query={`${customer.address}${customer.city ? `, ${customer.city}` : ''}${customer.state ? ` ${customer.state}` : ''} ${customer.zip || ''}`.trim()}
+                      >
+                        {customer.address}
+                      </AddressLink>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

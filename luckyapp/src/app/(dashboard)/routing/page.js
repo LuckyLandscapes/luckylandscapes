@@ -9,6 +9,7 @@ import {
   geocodeBatch,
   googleMapsRouteUrl,
 } from '@/lib/routeOptimizer';
+import AddressLink from '@/components/AddressLink';
 
 const SHOP_ADDRESS_KEY = 'lucky_routing_shop_address';
 
@@ -208,7 +209,7 @@ export default function RoutingPage() {
                     {s.time && <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>· {s.time}</span>}
                   </div>
                   <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)', marginLeft: 22 }}>
-                    {s.address}
+                    <AddressLink query={s.address}>{s.address}</AddressLink>
                   </div>
                 </li>
               ))}
@@ -243,7 +244,9 @@ export default function RoutingPage() {
                   <strong>{s.label}</strong>
                   {s.time && <span style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>· {s.time}</span>}
                 </div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>{s.address}</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-tertiary)' }}>
+                  <AddressLink query={s.address}>{s.address}</AddressLink>
+                </div>
                 {s.sub && <div style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)' }}>{s.sub}</div>}
               </li>
             ))}

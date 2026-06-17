@@ -8,6 +8,8 @@ import {
   AlertCircle, CheckCircle, Home, Briefcase, HardHat,
 } from 'lucide-react';
 import AddressAutocomplete from '@/components/AddressAutocomplete';
+import AddressLink from '@/components/AddressLink';
+import { formatAddress } from '@/lib/addressLink';
 
 // ─── Customer type tags ───────────────────────────────
 // 'homeowner'           — residential property owner (default)
@@ -191,7 +193,13 @@ export default function CustomersPage() {
                 <td>
                   <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.82rem' }}>
                     <MapPin size={12} style={{ color: 'var(--text-tertiary)' }} />
-                    {c.city}, {c.state}
+                    {formatAddress({ address: c.address, city: c.city, state: c.state, zip: c.zip }) ? (
+                      <AddressLink address={c.address} city={c.city} state={c.state} zip={c.zip}>
+                        {[c.city, c.state].filter(Boolean).join(', ') || c.address}
+                      </AddressLink>
+                    ) : (
+                      <span style={{ color: 'var(--text-tertiary)' }}>—</span>
+                    )}
                   </span>
                 </td>
                 <td>

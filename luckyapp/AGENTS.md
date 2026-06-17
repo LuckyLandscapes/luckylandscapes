@@ -4,6 +4,16 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+# Tappable addresses — always use `<AddressLink>`
+
+Any address shown to a user must be tap-to-navigate. **Never hand-roll a maps `<a>` again** — use the shared pieces so every surface behaves identically:
+
+- **Component:** `src/components/AddressLink.js` — `<AddressLink address city state zip />` (or a single `address` string, or `query={fullString}` with custom `children`). `multiline` renders street on line 1, city/state/zip on line 2. Presentational (no hooks) so it works in client or server components. Renders nothing when there's no address; `stopPropagation` is on by default so it's safe inside clickable rows.
+- **Helpers:** `src/lib/addressLink.js` — `formatAddress(parts|string)` builds the one-line string; `mapsHref(parts|string)` returns the URL for a standalone "Navigate" button.
+- **URL shape:** the universal `https://www.google.com/maps/search/?api=1&query=…` form (opens the Google Maps app on iOS/Android, google.com/maps on desktop). Don't reintroduce the old `maps.google.com/?q=` form.
+- **Styling:** `.address-link` in `globals.css` (inherits text color, subtle green underline, green on hover).
+- **Current surfaces:** customers list + detail, job detail (+ "Open in Maps" button), crew cockpit (quick-nav + job cards), calendar event detail, routing stops (scheduled + optimized), mileage trip start/end. The public customer-facing `/quote` and `/pay` pages deliberately keep the recipient's own address as plain text (no navigation value). Add `<AddressLink>` to any new address you render.
+
 # Catalog system — quick map
 
 Rebuilt 2026-05 in migrations 030–032. If you're touching anything material-related:

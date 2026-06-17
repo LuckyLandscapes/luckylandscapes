@@ -21,6 +21,7 @@ import {
   Download, AlertTriangle, Square, Loader2,
 } from 'lucide-react';
 import ReceiptUpload from '@/components/ReceiptUpload';
+import AddressLink from '@/components/AddressLink';
 
 // Standard IRS business mileage rate. 2026 = $0.70/mi; bump this annually.
 const MILEAGE_RATE_2026 = 0.70;
@@ -561,7 +562,9 @@ export default function MileagePage() {
                   {(m.startAddress || m.endAddress) && (
                     <div style={{ marginTop: '4px', fontSize: '0.78rem', color: 'var(--text-tertiary)', display: 'flex', gap: '6px', alignItems: 'center' }}>
                       <MapPin size={12} />
-                      {m.startAddress || '—'} → {m.endAddress || '—'}
+                      {m.startAddress ? <AddressLink query={m.startAddress}>{m.startAddress}</AddressLink> : '—'}
+                      {' → '}
+                      {m.endAddress ? <AddressLink query={m.endAddress}>{m.endAddress}</AddressLink> : '—'}
                     </div>
                   )}
                   {(m.startOdometer != null || m.endOdometer != null) && (

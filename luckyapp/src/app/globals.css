@@ -205,6 +205,21 @@ a {
   text-decoration: none;
 }
 
+/* Tappable address → opens maps. Keeps the surrounding text color but signals
+   it's interactive with a subtle green underline; turns fully green on hover. */
+.address-link {
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--lucky-green);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+}
+.address-link:hover {
+  color: var(--lucky-green);
+}
+
 button {
   font-family: inherit;
   cursor: pointer;

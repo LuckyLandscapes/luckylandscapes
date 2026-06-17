@@ -17,6 +17,8 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth';
 import { useData } from '@/lib/data';
 import { computeShiftPaidBreak } from '@/lib/finance';
+import { mapsHref } from '@/lib/addressLink';
+import AddressLink from '@/components/AddressLink';
 import Link from 'next/link';
 import {
   Clock, MapPin, Phone, CalendarDays, Briefcase, Timer,
@@ -442,7 +444,7 @@ export default function CrewDashboardPage() {
             const j = currentJob || todayJobs[0];
             const cust = j.customerId ? getCustomer(j.customerId) : null;
             const addr = j.address || (cust?.address ? `${cust.address}${cust.city ? `, ${cust.city}` : ''} ${cust.zip || ''}`.trim() : '');
-            const mapsUrl = addr ? `https://maps.google.com/?q=${encodeURIComponent(addr)}` : null;
+            const mapsUrl = mapsHref(addr) || null;
             return (
               <>
                 {mapsUrl && (
@@ -539,7 +541,7 @@ export default function CrewDashboardPage() {
                 )}
                 {fullAddr && (
                   <div className="cockpit-job-addr">
-                    <MapPin size={12} /> {fullAddr}
+                    <MapPin size={12} /> <AddressLink query={fullAddr}>{fullAddr}</AddressLink>
                   </div>
                 )}
                 {job.crewNotes && <div className="cockpit-job-notes">{job.crewNotes}</div>}

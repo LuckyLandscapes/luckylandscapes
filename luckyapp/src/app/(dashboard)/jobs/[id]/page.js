@@ -15,6 +15,8 @@ import {
 import ReceiptUpload from '@/components/ReceiptUpload';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import ReviewRequestCard from '@/components/ReviewRequestCard';
+import AddressLink from '@/components/AddressLink';
+import { mapsHref } from '@/lib/addressLink';
 import { getWcClasses } from '@/lib/finance';
 
 // ─── Job authorization modes ───────────────────────────────
@@ -143,7 +145,7 @@ export default function JobDetailPage({ params }) {
   const fullAddress = job.address || (customer?.address
     ? `${customer.address}${customer.city ? `, ${customer.city}` : ''}${customer.state ? ` ${customer.state}` : ''} ${customer.zip || ''}`.trim()
     : '');
-  const mapsUrl = fullAddress ? `https://maps.google.com/?q=${encodeURIComponent(fullAddress)}` : '';
+  const mapsUrl = mapsHref(fullAddress);
 
   // Lookup any contract tied to this job (directly or via the quote it came from).
   // We block "Start Job" unless authorization is on file — protects us from
@@ -662,7 +664,7 @@ export default function JobDetailPage({ params }) {
                     <div className="job-detail-row-content">
                       <div className="job-detail-row-label">Address</div>
                       <div className="job-detail-row-value">
-                        {mapsUrl ? <a href={mapsUrl} target="_blank" rel="noopener noreferrer">{fullAddress}</a> : fullAddress}
+                        {mapsUrl ? <AddressLink query={fullAddress}>{fullAddress}</AddressLink> : fullAddress}
                       </div>
                       {mapsUrl && (
                         <a href={mapsUrl} target="_blank" rel="noopener noreferrer"
