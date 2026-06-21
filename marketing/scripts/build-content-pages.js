@@ -81,6 +81,7 @@ const FOOTER = `<footer class="footer">
                     <a href="/services/lawn-care">Lawn Care</a>
                     <a href="/services/garden-beds">Garden &amp; Beds</a>
                     <a href="/services/hardscaping">Hardscaping</a>
+                    <a href="/services/drainage">Drainage &amp; Grading</a>
                     <a href="/services/fencing">Fencing</a>
                     <a href="/services/property-cleanup">Property Cleanup</a>
                     <a href="/services/landscape-design">Landscape Design</a>
@@ -1498,7 +1499,7 @@ const POSTS = [
         ${callout({ type: 'warning', title: 'Water at the foundation is not a cosmetic problem', body: '<p>A soggy spot in the back forty is annoying. Water pooling against the foundation is a basement-flooding and structural risk — over time it can cause hydrostatic pressure, cracks, and seepage that cost far more than the drainage fix. If water is collecting against the house, treat it as urgent, not a someday project.</p>' })}
 
         <h2>Getting it diagnosed</h2>
-        <p>Drainage is the one area where a site visit really matters — we need to see where the water comes from, where it pools, and where it could go. We'll walk it after a rain if we can, identify the actual cause, and recommend the least-invasive fix that solves it rather than the most expensive one. It often ties into a regrading or <a href="/services/hardscaping">hardscaping</a> project, but plenty of drainage work stands alone. <a href="/quote">Request an estimate</a> and we'll take a look.</p>
+        <p>Drainage is the one area where a site visit really matters — we need to see where the water comes from, where it pools, and where it could go. We'll walk it after a rain if we can, identify the actual cause, and recommend the least-invasive fix that solves it rather than the most expensive one. See our full <a href="/services/drainage">drainage &amp; grading services</a> — it often ties into a regrading or <a href="/services/hardscaping">hardscaping</a> project, but plenty of drainage work stands alone. <a href="/quote">Request an estimate</a> and we'll take a look.</p>
         `,
         faqs: [
             { q: 'Why is my yard always wet and soggy in Lincoln?', a: 'Usually a combination of Lincoln\'s heavy clay soil, which drains slowly, and grade that runs toward the house or into a low spot with no outlet. Downspouts dumping roof water at the foundation make it worse. Identifying which of these is the main cause determines the right fix.' },
@@ -2857,6 +2858,7 @@ const SITEMAP_STATIC = [
     { loc: '/services/landscape-design',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/lawn-care',            lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/hardscaping',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.9' },
+    { loc: '/services/drainage',             lastmod: '2026-06-21', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/fencing',              lastmod: '2026-05-11', changefreq: 'monthly', priority: '0.9' },
     { loc: '/services/garden-beds',          lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
     { loc: '/services/property-cleanup',     lastmod: '2026-05-05', changefreq: 'monthly', priority: '0.8' },
@@ -2907,6 +2909,7 @@ const LLMS_SERVICES = [
     { loc: '/services/lawn-care',         name: 'Lawn Care',        desc: 'Mowing, edging, trimming, blowing, bagging, and leaf cleanup — weekly, bi-weekly, monthly, one-time, or seasonal.' },
     { loc: '/services/garden-beds',       name: 'Garden Beds',      desc: 'New bed installation, mulch and rock refresh, edging, weed barrier, planting, transplanting, and weeding.' },
     { loc: '/services/hardscaping',       name: 'Hardscaping',      desc: 'Paver patios, retaining walls, walkways, fire pits, bed edging, and above-ground pool base prep.' },
+    { loc: '/services/drainage',          name: 'Drainage & Grading', desc: 'Regrading, French drains, dry wells, catch basins, swales, and downspout drainage for wet yards and water against the foundation.' },
     { loc: '/services/fencing',           name: 'Fencing',          desc: 'Wood privacy, picket, chain link, prefab ornamental, and custom ornamental iron fencing — install, tear-out, and permits.' },
     { loc: '/services/property-cleanup',  name: 'Property Cleanup', desc: 'Spring and fall cleanups, leaf and brush removal, storm debris, and haul-away.' },
     { loc: '/services/landscape-design',  name: 'Landscape Design', desc: 'Custom landscape design and design-build for residential and commercial properties.' },

@@ -94,6 +94,7 @@ const FOOTER = `<footer class="footer">
                     <a href="/services/lawn-care">Lawn Care</a>
                     <a href="/services/garden-beds">Garden &amp; Beds</a>
                     <a href="/services/hardscaping">Hardscaping</a>
+                    <a href="/services/drainage">Drainage &amp; Grading</a>
                     <a href="/services/fencing">Fencing</a>
                     <a href="/services/property-cleanup">Property Cleanup</a>
                     <a href="/services/landscape-design">Landscape Design</a>
@@ -136,6 +137,7 @@ const TARGETS = [
     'quote.html', 'gallery.html', 'team.html', 'careers.html', 'privacy.html', 'terms.html',
     'contractors.html',
     'services/lawn-care.html', 'services/garden-beds.html', 'services/hardscaping.html',
+    'services/drainage.html',
     'services/fencing.html', 'services/property-cleanup.html', 'services/landscape-design.html',
 ];
 

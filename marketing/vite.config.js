@@ -22,6 +22,7 @@ export default defineConfig({
                 svcFencing: resolve(__dirname, 'services/fencing.html'),
                 svcPropertyCleanup: resolve(__dirname, 'services/property-cleanup.html'),
                 svcLandscapeDesign: resolve(__dirname, 'services/landscape-design.html'),
+                svcDrainage: resolve(__dirname, 'services/drainage.html'),
                 areasHub: resolve(__dirname, 'areas/index.html'),
                 areaEastLincoln: resolve(__dirname, 'areas/east-lincoln.html'),
                 areaPineLake: resolve(__dirname, 'areas/pine-lake.html'),

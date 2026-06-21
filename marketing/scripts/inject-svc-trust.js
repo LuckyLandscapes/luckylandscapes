@@ -80,6 +80,7 @@ const FOUR_LEAF = `        <section class="guarantee-section">
 
 const TARGETS = [
     'services/lawn-care.html', 'services/garden-beds.html', 'services/hardscaping.html',
+    'services/drainage.html',
     'services/fencing.html', 'services/property-cleanup.html', 'services/landscape-design.html',
 ];
 
