@@ -975,6 +975,64 @@ function buildGalleryGrid() {
 buildGalleryGrid();
 
 // ============================================
+// SERVICE-PAGE GALLERY STRIP
+// ============================================
+// Service pages (hardscaping / design / garden) can include a
+// <div class="collection-grid" id="svc-gallery-grid" data-svc-category="A,B,C">.
+// We fill it with up to 6 projectData cards whose tag/tags match any of the
+// comma-separated category keywords (case-insensitive, substring either way).
+// Cards link straight to /gallery (service pages don't mount the lightbox).
+// The whole section is hidden if nothing matches, so the page never shows an
+// empty grid. Re-runs after the luckyapp remote fetch replaces projectData.
+function buildServiceGallery() {
+    const grid = document.getElementById('svc-gallery-grid');
+    if (!grid) return;
+    const section = document.getElementById('svc-gallery-section');
+    const wanted = (grid.dataset.svcCategory || '')
+        .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+    const picks = (wanted.length ? projectData.filter((p) => {
+        const tags = [p.tag, ...(p.tags || [])].filter(Boolean).map((t) => String(t).toLowerCase());
+        return tags.some((t) => wanted.some((w) => t.includes(w) || w.includes(t)));
+    }) : []).slice(0, 6);
+
+    if (!picks.length) {
+        if (section) section.style.display = 'none';
+        return;
+    }
+    if (section) section.style.display = '';
+
+    grid.innerHTML = picks.map((project) => {
+        const coverIdx = project.cover ?? 0;
+        const coverImg = (project.images && (project.images[coverIdx] ?? project.images[0])) || '/images/banner.jpg';
+        const src = getImageSrc(coverImg);
+        const badgeText = project.beforeAfter ? 'Before & After'
+            : (project.images && project.images.length > 1) ? `${project.images.length} Photos` : '1 Photo';
+        const title = prettyTitle(project);
+        const titleHtml = title ? `<h3 class="collection-card-title">${escapeHtml(title)}</h3>` : '';
+        const tagText = escapeHtml(project.tag || 'Project');
+        const altText = escapeHtml(title || project.tag || 'Lucky Landscapes project');
+        return `
+            <a class="collection-card" href="/gallery" aria-label="See more projects in our gallery">
+                <img src="${escapeHtml(src)}" alt="${altText}" loading="lazy" class="collection-card-img"
+                     onerror="this.onerror=null;this.src='/images/banner.jpg';this.classList.add('is-fallback');" />
+                <div class="collection-card-overlay">
+                    <div class="collection-card-bottom">
+                        <span class="collection-card-tag">${tagText}</span>
+                        ${titleHtml}
+                    </div>
+                    <span class="collection-card-badge">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+                        ${badgeText}
+                    </span>
+                </div>
+            </a>`;
+    }).join('');
+}
+
+buildServiceGallery();
+
+// ============================================
 // MARKETING GALLERY — REMOTE FETCH FROM LUCKYAPP
 // ============================================
 // Pulls live photos from /api/marketing/gallery (managed in luckyapp via
@@ -1133,6 +1191,7 @@ async function loadMarketingGalleryFromLuckyapp() {
     // static seed. Safe to re-call; both functions clear their containers.
     if (typeof buildGalleryGrid === 'function') buildGalleryGrid();
     if (typeof buildCollectionGrid === 'function') buildCollectionGrid();
+    if (typeof buildServiceGallery === 'function') buildServiceGallery();
 
     console.info(
         `[gallery] loaded ${converted.length} project${converted.length === 1 ? '' : 's'} ` +
