@@ -151,7 +151,7 @@
         <div class="container">
             <div class="legal-content">
 
-                <p class="legal-updated">Last updated: April 1, 2026</p>
+                <p class="legal-updated">Last updated: June 21, 2026</p>
 
                 <h2>Introduction</h2>
                 <p>
@@ -175,8 +175,10 @@
                     <li>Photos of your property (if uploaded through our quote form)</li>
                     <li>Any additional notes or messages you include</li>
                 </ul>
-                <p>We do <strong>not</strong> collect information automatically through cookies, tracking
-                    pixels, or analytics tools installed on our website.</p>
+                <p>We also collect certain information <strong>automatically</strong> when you visit our
+                    website, using cookies and third-party analytics tools. See the
+                    <a href="#analytics">Cookies, Analytics &amp; Session Recording</a> section below for exactly
+                    what is collected and the choices you have.</p>
 
                 <h2>How We Use Your Information</h2>
                 <p>The information you submit through our forms is used solely to:</p>
@@ -192,18 +194,20 @@
                     When you submit a quote request or contact form, your information is processed as follows:
                 </p>
                 <ul>
-                    <li><strong>Form data</strong> (name, email, phone, project details) is transmitted to and stored in
-                        a private Google Sheet accessible only to Lucky Landscapes team members.</li>
-                    <li><strong>Email notification</strong> — A summary of your submission is sent to our team email at
-                        <strong>rileykopf@luckylandscapes.com</strong> so we can review and respond promptly.
-                    </li>
-                    <li><strong>Photos</strong> — If you upload photos through our quote form, they are stored in a
-                        private Google Drive folder accessible only to our team. Photos are used solely to assess your
-                        project and prepare an accurate quote.</li>
+                    <li><strong>Form data</strong> (name, email, phone, property address, and project details) is sent
+                        over an encrypted (HTTPS) connection to our internal business application and stored in our
+                        cloud database, hosted by <strong>Supabase</strong> (which runs on Amazon Web Services). It is
+                        accessible only to Lucky Landscapes team members.</li>
+                    <li><strong>Photos</strong> — If you upload photos through our quote form, they are stored in our
+                        private Supabase cloud storage and used solely to assess your project and prepare an accurate
+                        quote.</li>
+                    <li><strong>Email notification</strong> — A summary of your submission is emailed to our team (via
+                        <strong>Resend</strong>, our transactional email provider) at
+                        <strong>rileykopf@luckylandscapes.com</strong> so we can review and respond promptly.</li>
                 </ul>
-                <p>All data is stored using Google's infrastructure, which is protected by Google's enterprise-grade
-                    security. For more information, see <a href="https://policies.google.com/privacy" target="_blank"
-                        rel="noopener">Google's Privacy Policy</a>.</p>
+                <p>Our website is hosted on <strong>Cloudflare Pages</strong> and our business application on
+                    <strong>Vercel</strong>. We may also retain a backup copy of form submissions via Google Workspace.
+                    Each of these providers processes data under its own security and privacy practices.</p>
 
                 <h2>Data Retention</h2>
                 <p>
@@ -212,27 +216,71 @@
                     additional services. You may request deletion of your data at any time by contacting us.
                 </p>
 
-                <h2>Third-Party Services</h2>
+                <h2 id="analytics">Cookies, Analytics &amp; Session Recording</h2>
                 <p>
-                    We do not install third-party analytics or tracking tools on our website. Our website
-                    does not use cookies.
+                    Our website uses cookies and similar technologies, and we use third-party analytics tools to
+                    understand how visitors use the site so we can improve it. Specifically:
+                </p>
+                <ul>
+                    <li><strong>Google Analytics 4</strong> — measures aggregate traffic and how pages are used. It sets
+                        cookies (such as <code>_ga</code> and <code>_gid</code>) and shares data with Google. We have
+                        enabled IP anonymization. You can opt out using Google's
+                        <a href="https://tools.google.com/dlpage/gaoptout" target="_blank" rel="noopener">Analytics
+                            Opt-out Browser Add-on</a>, or see
+                        <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google's Privacy
+                            Policy</a>.</li>
+                    <li><strong>Microsoft Clarity</strong> — a product-analytics and <strong>session-recording</strong>
+                        tool that captures how visitors interact with pages (mouse movement, scrolling, clicks, and
+                        on-page content) to build heatmaps and session replays. It sets cookies (such as
+                        <code>_clck</code> and <code>_clsk</code>) and shares data with Microsoft. See
+                        <a href="https://privacy.microsoft.com/privacystatement" target="_blank" rel="noopener">Microsoft's
+                            Privacy Statement</a>.</li>
+                    <li><strong>Cloudflare Turnstile</strong> — a privacy-friendly anti-bot check on our quote and
+                        contact forms, provided by Cloudflare. It may set a temporary token or cookie to confirm you are
+                        not a bot.</li>
+                    <li><strong>Geoapify</strong> — powers address auto-complete in our quote form; the address text you
+                        type is sent to Geoapify to return suggestions.</li>
+                </ul>
+                <p>
+                    Google and Microsoft may use the information collected through these tools to recognize activity
+                    across websites over time. We do not use this information to sell your data.
                 </p>
                 <p>
-                    We use Google Workspace services (Google Sheets, Google Drive, Gmail) to store and process form
-                    submissions. Google may process data according to their privacy policies.
+                    <strong>Do Not Track / Global Privacy Control.</strong> We honor recognized opt-out browser signals
+                    (such as Global Privacy Control) as a request to opt out of non-essential analytics where it is
+                    technically feasible to do so.
                 </p>
+
+                <h2>Service Providers We Use</h2>
+                <p>
+                    We share your information only with the service providers that help us operate our business, and
+                    only as needed to do so:
+                </p>
+                <ul>
+                    <li><strong>Supabase</strong> — cloud database and photo storage (hosted on Amazon Web Services)</li>
+                    <li><strong>Vercel</strong> — hosting for our internal business application</li>
+                    <li><strong>Cloudflare</strong> — website hosting/CDN (Cloudflare Pages) and bot protection
+                        (Turnstile)</li>
+                    <li><strong>Resend</strong> — transactional email delivery to our team</li>
+                    <li><strong>Google</strong> (Analytics) and <strong>Microsoft</strong> (Clarity) — website
+                        analytics</li>
+                    <li><strong>Geoapify</strong> — address auto-complete on our quote form</li>
+                    <li><strong>Stripe</strong> — if you become a customer and choose to pay online, card and bank
+                        payments are processed by Stripe; we never receive or store your full card number</li>
+                    <li><strong>Google Workspace</strong> — business email and, in some cases, a backup copy of form
+                        submissions</li>
+                </ul>
                 <p>
                     We maintain business profiles on social media platforms including Facebook, Instagram,
-                    TikTok, and YouTube. These platforms may collect their own data about users who visit
+                    TikTok, LinkedIn, and YouTube. These platforms may collect their own data about users who visit
                     our profiles — please refer to each platform's privacy policy for details.
                 </p>
 
                 <h2>Data Sharing</h2>
                 <p>
                     We do <strong>not</strong> sell, trade, or rent your personal information to third
-                    parties. Your information is shared only with Google (via Google Sheets and Google Drive) for the
-                    purpose of storing and organizing your submissions, and with Gmail for email notifications to our
-                    team.
+                    parties. Your information is shared only with the service providers listed above, and only so they
+                    can perform services on our behalf.
                 </p>
 
                 <h2>Data Security</h2>
@@ -264,10 +312,27 @@
 
                 <h2>Nebraska &amp; State Privacy Rights</h2>
                 <p>
-                    If you are a resident of Nebraska or any other state with applicable privacy legislation, you may
-                    have additional rights regarding your personal data, including the right to know what data we
-                    collect, the right to request deletion, and the right to opt out of data sales (we do not sell your
-                    data). Contact us to exercise these rights.
+                    Lucky Landscapes LLC is based in Nebraska. Under the <strong>Nebraska Data Privacy Act</strong>
+                    (effective January 1, 2025) and similar state privacy laws, you may have the right to:
+                </p>
+                <ul>
+                    <li>Confirm whether we process your personal data, and access that data;</li>
+                    <li>Correct inaccuracies in your personal data;</li>
+                    <li>Delete personal data we hold about you;</li>
+                    <li>Obtain a portable copy of the data you provided to us; and</li>
+                    <li>Opt out of targeted advertising, the sale of personal data, or profiling. We do not sell your
+                        data, and you can opt out of our analytics as described above.</li>
+                </ul>
+                <p>
+                    To exercise these rights, contact us using the details below. We will respond within 30 days. If we
+                    decline your request, you may <strong>appeal</strong> by replying to our decision; we will review the
+                    appeal and explain the outcome within a reasonable time.
+                </p>
+                <p>
+                    <strong>California residents:</strong> We do not meet the thresholds that make a business subject to
+                    the California Consumer Privacy Act (CCPA/CPRA), but we will still honor the rights listed above on
+                    request as a courtesy. We do not sell or share your personal information for cross-context behavioral
+                    advertising.
                 </p>
 
                 <h2>Changes to This Policy</h2>

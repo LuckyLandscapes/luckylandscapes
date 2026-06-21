@@ -9,6 +9,8 @@
 import { useRef, useState } from 'react';
 import { Camera, Loader2, X, FileImage } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import SignedImage from '@/components/SignedImage';
+import { resolveStorageUrl } from '@/lib/signedStorage';
 
 const MAX_DIMENSION = 1600;        // px on the longest edge
 const TARGET_QUALITY = 0.7;        // JPEG quality
@@ -114,10 +116,17 @@ export default function ReceiptUpload({ orgId, scope = 'job', value, onChange })
   };
 
   if (url) {
+    // The receipts bucket is private (migration 047) — open the full-size file
+    // via a short-lived signed url rather than the (now dead) public url.
+    const openSigned = async (e) => {
+      e.preventDefault();
+      const u = await resolveStorageUrl(url);
+      if (u) window.open(u, '_blank', 'noopener');
+    };
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', background: 'var(--bg-elevated)' }}>
-        <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', flexShrink: 0 }}>
-          <img src={url} alt="Receipt" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+        <a href={url} onClick={openSigned} target="_blank" rel="noopener noreferrer" style={{ display: 'block', flexShrink: 0 }}>
+          <SignedImage src={url} alt="Receipt" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
         </a>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--status-success)' }}>Receipt attached</div>
@@ -126,7 +135,7 @@ export default function ReceiptUpload({ orgId, scope = 'job', value, onChange })
               {bytesPretty(progress.in)} → {bytesPretty(progress.out)} ({Math.round((1 - progress.out / progress.in) * 100)}% smaller)
             </div>
           )}
-          <a href={url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+          <a href={url} onClick={openSigned} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
             View full size →
           </a>
         </div>

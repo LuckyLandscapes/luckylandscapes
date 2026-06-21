@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 // POST /api/catalog/lookup
 // Body: { url: string }
@@ -103,6 +104,12 @@ function extractFromHtml(html) {
 }
 
 export async function POST(request) {
+  // Authenticated only — this drives an outbound scrape to a supplier site from
+  // our IPs; leaving it open invites resource/IP-reputation abuse. (refresh-batch
+  // forwards the caller's bearer token when it fans out to this route.)
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   let body;
   try { body = await request.json(); } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });

@@ -14,6 +14,10 @@
 import { computeQuoteDeposit, DEPOSIT_TYPES } from './deposit';
 
 const COMPANY_NAME = 'Lucky Landscapes';
+// Full legal entity name — used in the binding PARTIES clause + signature block so
+// the contract is formed with the LLC (preserving the liability shield), while
+// COMPANY_NAME stays the trade name used in the document header/branding.
+const COMPANY_LEGAL_NAME = 'Lucky Landscapes LLC, a Nebraska limited liability company';
 const COMPANY_ADDR = '109 South Canopy ST, Lincoln, NE';
 const COMPANY_PHONE = '(402) 405-5475';
 const COMPANY_EMAIL = 'rileykopf@luckylandscapes.com';
@@ -147,7 +151,7 @@ export function renderContractBody({
     quoteNumber ? `Reference Quote: #${quoteNumber}` : null,
     '',
     'PARTIES',
-    `This Service Agreement ("Agreement") is entered into between ${COMPANY_NAME} ("Contractor"), located at ${COMPANY_ADDR}, and the undersigned customer ("Customer"):`,
+    `This Service Agreement ("Agreement") is entered into between ${COMPANY_LEGAL_NAME} ("Contractor"), located at ${COMPANY_ADDR}, and the undersigned customer ("Customer"):`,
     '',
     `  Name:    ${customerName}`,
     customerEmail ? `  Email:   ${customerEmail}` : null,
@@ -202,7 +206,7 @@ export function renderContractBody({
     'CUSTOMER SIGNATURE',
     'By signing below, Customer acknowledges that they have read, understood, and agree to be bound by every section of this Agreement, and that the person signing is at least 18 years of age and authorized to enter into this Agreement on behalf of the property at the address listed above.',
     '',
-    `${COMPANY_NAME}`,
+    `${COMPANY_LEGAL_NAME}`,
     `${COMPANY_ADDR} • ${COMPANY_PHONE} • ${COMPANY_EMAIL}`,
   ].filter(line => line !== null).join('\n');
 }

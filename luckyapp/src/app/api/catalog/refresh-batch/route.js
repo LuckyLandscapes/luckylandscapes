@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 // POST /api/catalog/refresh-batch
 // Body: { materialIds: string[], origin?: string }
@@ -31,6 +32,10 @@ async function getServiceSupabase() {
 }
 
 export async function POST(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+  const authHeader = request.headers.get('authorization') || '';
+
   let body;
   try { body = await request.json(); } catch {
     return NextResponse.json({ ok: false, error: 'Invalid JSON body' }, { status: 400 });
@@ -49,6 +54,7 @@ export async function POST(request) {
   const { data: rows, error } = await supabase
     .from('materials')
     .select('id, name, supplier_url, unit_cost, stock_status, image_url')
+    .eq('org_id', auth.orgId)
     .in('id', ids);
   if (error) {
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
@@ -72,7 +78,10 @@ export async function POST(request) {
     try {
       const res = await fetch(lookupUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
         body: JSON.stringify({ url: row.supplier_url }),
       });
       const data = await res.json();

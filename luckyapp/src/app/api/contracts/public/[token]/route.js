@@ -22,7 +22,7 @@ export async function GET(_request, { params }) {
       start_date, completion_window,
       body, customer_snapshot, public_token,
       sent_at, last_viewed_at, signed_at, declined_at,
-      signature_typed_name, pdf_url, created_at,
+      signature_typed_name, pdf_url, pdf_path, created_at,
       selected_materials,
       customers ( first_name, last_name, email, phone, address, city, state, zip )
     `)
@@ -37,6 +37,18 @@ export async function GET(_request, { params }) {
   const updates = { last_viewed_at: new Date().toISOString() };
   if (contract.status === 'sent') updates.status = 'viewed';
   supabase.from('contracts').update(updates).eq('id', contract.id).then(() => {}).catch(() => {});
+
+  // contract-pdfs is a PRIVATE bucket (migration 047), so the stored pdf_url is a
+  // dead public url. Mint a short-lived signed url server-side (service role) so
+  // the unauthenticated customer can still download their signed PDF.
+  if (contract.pdf_path) {
+    try {
+      const { data: signed } = await supabase.storage
+        .from('contract-pdfs')
+        .createSignedUrl(contract.pdf_path, 3600);
+      if (signed?.signedUrl) contract.pdf_url = signed.signedUrl;
+    } catch { /* fall back to the stored url */ }
+  }
 
   return NextResponse.json({ contract });
 }
@@ -131,6 +143,7 @@ export async function POST(request, { params }) {
     };
 
     let pdfPublicUrl = null;
+    let pdfSignedUrl = null;
     try {
       const pdfBytes = buildContractPdfBytes(enrichedContract);
       const path = `${contract.org_id}/${contract.id}.pdf`;
@@ -149,6 +162,11 @@ export async function POST(request, { params }) {
           .from('contracts')
           .update({ pdf_path: path, pdf_url: pdfPublicUrl })
           .eq('id', contract.id);
+        // Bucket is private — mint a signed url for the customer's immediate download.
+        try {
+          const { data: signed } = await supabase.storage.from('contract-pdfs').createSignedUrl(path, 3600);
+          if (signed?.signedUrl) pdfSignedUrl = signed.signedUrl;
+        } catch { /* fall back to the public url below */ }
       }
     } catch (pdfErr) {
       console.error('[contract sign] PDF render failed:', pdfErr);
@@ -177,11 +195,31 @@ export async function POST(request, { params }) {
           content: attachmentBytes,
         }] : undefined,
       });
+
+      // Email the signed agreement to the CUSTOMER too (E-SIGN/UETA copy
+      // retention). notifyOrg only reaches owners/admins, so send directly.
+      try {
+        const custEmail = contract.customers?.email;
+        if (custEmail && process.env.RESEND_API_KEY && attachmentBytes) {
+          const { Resend } = await import('resend');
+          const resend = new Resend(process.env.RESEND_API_KEY);
+          await resend.emails.send({
+            from: process.env.RESEND_FROM_EMAIL || 'Lucky Landscapes <onboarding@resend.dev>',
+            reply_to: process.env.RESEND_REPLY_TO || 'rileykopf@luckylandscapes.com',
+            to: [custEmail],
+            subject: `Your signed agreement — Lucky Landscapes (Contract #${contract.contract_number})`,
+            html: `<p>Hi ${(customerName || 'there').split(' ')[0]},</p><p>Thanks for signing your agreement with Lucky Landscapes LLC. A copy of your signed contract is attached for your records.</p><p>Questions? Just reply to this email or call (402) 405-5475.</p><p>— Lucky Landscapes</p>`,
+            attachments: [{ filename: `Contract-${contract.contract_number}-Signed.pdf`, content: attachmentBytes }],
+          });
+        }
+      } catch (custMailErr) {
+        console.error('[contract sign] customer copy email failed:', custMailErr);
+      }
     } catch (notifyErr) {
       console.error('[contract sign] notify failed:', notifyErr);
     }
 
-    return NextResponse.json({ success: true, signedAt, pdfUrl: pdfPublicUrl });
+    return NextResponse.json({ success: true, signedAt, pdfUrl: pdfSignedUrl || pdfPublicUrl });
   }
 
   if (action === 'decline') {

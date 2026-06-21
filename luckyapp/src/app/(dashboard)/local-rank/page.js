@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import {
   Crosshair, Search, Play, ExternalLink, AlertTriangle, Trash2,
   History, CheckCircle2, Globe, X, Loader2,
@@ -288,7 +289,7 @@ export default function LocalRankPage() {
   // true rank order: index 0 = rank #1. Same shape the old searchText returned,
   // so runScan / runFinder / matchesUs are unchanged. `radius` is now ignored.
   const searchText = useCallback(async (query, lat, lng, _radius, maxN = 20) => {
-    const res = await fetch('/api/local-rank/scan', {
+    const res = await apiFetch('/api/local-rank/scan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keyword: query, lat, lng, maxN }),

@@ -1,8 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
 import { sendInvoiceReminder } from '@/lib/invoiceReminder';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export async function POST(request) {
+  // Authenticated team members only — otherwise anyone could spam a customer with
+  // payment-reminder emails from our domain.
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { invoiceId, sentBy } = body;

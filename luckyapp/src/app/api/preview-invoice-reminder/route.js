@@ -7,11 +7,17 @@ import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
 import {
   buildReminderHtml, computeDaysOver, pickTone,
 } from '@/lib/invoiceReminder';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
+  // Internal owner/admin preview — gate it so an anonymous caller can't read
+  // customer name/email + invoice balances + the pay-token by invoice id.
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   const url = new URL(request.url);
   const invoiceId = url.searchParams.get('invoiceId');
   const toneOverride = url.searchParams.get('tone'); // optional: friendly|firm|urgent
@@ -27,6 +33,7 @@ export async function GET(request) {
     .from('invoices')
     .select('*, customers(first_name, last_name, email)')
     .eq('id', invoiceId)
+    .eq('org_id', auth.orgId)
     .single();
   if (error || !invoice) {
     return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });

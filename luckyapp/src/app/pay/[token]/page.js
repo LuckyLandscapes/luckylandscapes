@@ -258,9 +258,14 @@ export default function PayPage({ params }) {
         </div>
 
         <footer style={styles.footer} className="pay-footer">
-          <div>Lucky Landscapes • (402) 405-5475 • rileykopf@luckylandscapes.com</div>
+          <div>Lucky Landscapes LLC • (402) 405-5475 • rileykopf@luckylandscapes.com</div>
           <div style={{ marginTop: 4 }}>109 South Canopy ST, Lincoln, NE</div>
-          <div style={{ marginTop: 12, fontSize: 11, color: '#aaa' }}>Secured by Stripe</div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#888' }}>
+            Refunds &amp; cancellations are handled per your service agreement — call (402) 405-5475 with any question before paying.
+          </div>
+          <div style={{ marginTop: 8, fontSize: 11, color: '#aaa' }}>
+            <a href="/terms" style={{ color: '#888' }}>Terms</a> · <a href="/privacy" style={{ color: '#888' }}>Privacy</a> · Secured by Stripe
+          </div>
         </footer>
       </div>
     </div>

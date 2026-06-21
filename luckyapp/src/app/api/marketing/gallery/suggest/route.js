@@ -214,6 +214,18 @@ export async function POST(request) {
   if (authErr || !authData?.user) {
     return NextResponse.json({ error: 'invalid_auth' }, { status: 401 });
   }
+  // A valid token only proves the caller has SOME account on the shared Supabase
+  // project (a demo/self-signup user, a future second tenant, etc.). Require an
+  // active org membership before spending Gemini/Anthropic credit on their behalf.
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('id')
+    .eq('user_id', authData.user.id)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (!member) {
+    return NextResponse.json({ error: 'forbidden' }, { status: 403 });
+  }
 
   let body;
   try {

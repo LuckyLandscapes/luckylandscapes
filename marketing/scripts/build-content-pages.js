@@ -122,7 +122,7 @@ const REVIEWS_STRIP = `
                     <h2 class="section-title">Rated 5.0 Across Lincoln, NE</h2>
                     <div class="reviews-overall">
                         <div class="reviews-stars">★★★★★</div>
-                        <span class="reviews-rating-text">5.0 ★ on Google</span>
+                        <span class="reviews-rating-text">5.0 ★ · 10+ Google reviews</span>
                     </div>
                 </div>
                 <div class="reviews-grid stagger-children">

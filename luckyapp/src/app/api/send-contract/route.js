@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/stripeServer';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(Number(n) || 0);
@@ -12,6 +13,9 @@ function formatUSD(n) {
 // On success, marks the contract as `sent` (status bumped from 'draft' if so)
 // and stamps `sent_at`.
 export async function POST(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { contractId, to, customerName, message } = body;
@@ -33,6 +37,7 @@ export async function POST(request) {
         total_amount, deposit_amount, public_token, customer_snapshot
       `)
       .eq('id', contractId)
+      .eq('org_id', auth.orgId)
       .single();
 
     if (fetchErr || !contract) {

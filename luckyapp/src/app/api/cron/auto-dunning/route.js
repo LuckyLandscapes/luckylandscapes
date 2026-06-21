@@ -27,15 +27,17 @@ const MIN_DAYS_OVERDUE = Number(process.env.DUNNING_MIN_DAYS_OVERDUE) || 3;
 const MIN_DAYS_BETWEEN_REMINDERS = Number(process.env.DUNNING_MIN_DAYS_BETWEEN) || 7;
 
 export async function GET(request) {
-  // Auth — Vercel sends `Authorization: Bearer <CRON_SECRET>` if set in env.
-  // If the env var isn't set we accept unauthenticated requests so dev / manual
-  // smoke-testing still works.
+  // Cron auth — fail CLOSED. Vercel auto-injects `x-vercel-cron` on scheduled
+  // invocations (inbound x-vercel-* headers are stripped, so a client cannot
+  // forge it); a manual trigger must present `Authorization: Bearer <CRON_SECRET>`.
+  // In production, if neither is present we reject — otherwise an anonymous caller
+  // could blast dunning emails to every overdue customer. (Dev is allowed through
+  // for local smoke-testing.)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const isVercelCron = request.headers.get('x-vercel-cron');
+  const authed = isVercelCron || (cronSecret && request.headers.get('authorization') === `Bearer ${cronSecret}`);
+  if (!authed && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = getServiceSupabase();

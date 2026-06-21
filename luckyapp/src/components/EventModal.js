@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import DaySchedulePreview, { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
 import { dayLoad, findNextOpenSlot, parseDurationHours, eventDurationHours, buildEventsByDate, summarizeWorkdays } from '@/lib/capacity';
@@ -372,7 +373,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
 
   const syncToGoogleCalendar = async (method, eventData, supabaseEventId) => {
     try {
-      const res = await fetch('/api/google-calendar', {
+      const res = await apiFetch('/api/google-calendar', {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...eventData, description: eventData.notes || '' }),
@@ -390,7 +391,7 @@ export default function EventModal({ event, defaultDate, onClose }) {
     if (!event?.id) return;
     if (event.googleEventId) {
       try {
-        await fetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
+        await apiFetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
       } catch (err) {
         console.warn('Google Calendar delete failed (non-blocking):', err.message);
       }

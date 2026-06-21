@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useData } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import { apiFetch } from '@/lib/apiClient';
 import {
   OPEX_CATEGORIES, OPEX_LABELS, RECURRING_INTERVALS,
   buildARAging, AGING_LABELS, fmtCurrency, getPeriodRange, isInPeriod,
@@ -147,7 +148,7 @@ export default function FinancePage() {
     }
     async function fetchPayouts() {
       try {
-        const res = await fetch('/api/stripe/payouts');
+        const res = await apiFetch('/api/stripe/payouts');
         const data = await res.json();
         if (!cancelled) {
           setPayoutsData({
@@ -172,7 +173,7 @@ export default function FinancePage() {
     if (isDemoMode()) { demoToast('Live Stripe refresh is disabled in the demo.'); return; }
     setPayoutsData(p => ({ ...p, loading: true }));
     try {
-      const res = await fetch('/api/stripe/payouts');
+      const res = await apiFetch('/api/stripe/payouts');
       const data = await res.json();
       setPayoutsData({
         loading: false,
@@ -269,7 +270,7 @@ export default function FinancePage() {
     setSendingId(invoice.id);
     setReminderResult(prev => ({ ...prev, [invoice.id]: null }));
     try {
-      const res = await fetch('/api/send-invoice-reminder', {
+      const res = await apiFetch('/api/send-invoice-reminder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invoiceId: invoice.id, sentBy: user?.id || null }),
@@ -286,6 +287,28 @@ export default function FinancePage() {
       setReminderResult(prev => ({ ...prev, [invoice.id]: { ok: false, msg: err.message || 'Failed' } }));
     } finally {
       setSendingId(null);
+    }
+  };
+
+  // The preview endpoint is auth-gated (it exposes customer PII), so it can't be
+  // a plain <a> link anymore — fetch the HTML with the session token and open it
+  // via a blob URL in a new tab.
+  const openReminderPreview = async (invoiceId) => {
+    if (isDemoMode()) { demoToast('Email preview is disabled in the demo.'); return; }
+    try {
+      const res = await apiFetch(`/api/preview-invoice-reminder?invoiceId=${invoiceId}`);
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        alert(j.error || 'Could not load the preview.');
+        return;
+      }
+      const html = await res.text();
+      const blobUrl = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      window.open(blobUrl, '_blank', 'noopener');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+    } catch (err) {
+      console.error('[preview reminder] failed', err);
+      alert('Could not load the preview.');
     }
   };
 
@@ -809,16 +832,15 @@ export default function FinancePage() {
                             : 'No reminders sent yet'}
                         </div>
                         <div style={{ display: 'flex', gap: '6px', flex: '1 1 100%', justifyContent: 'flex-end' }}>
-                          <a
-                            href={`/api/preview-invoice-reminder?invoiceId=${inv.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            type="button"
+                            onClick={() => openReminderPreview(inv.id)}
                             className="btn btn-sm btn-secondary"
-                            style={{ padding: '5px 10px', fontSize: '0.72rem', textDecoration: 'none' }}
+                            style={{ padding: '5px 10px', fontSize: '0.72rem' }}
                             title="Preview the email the customer would see (opens in new tab)"
                           >
                             <Eye size={12} /> Preview
-                          </a>
+                          </button>
                           <button
                             className="btn btn-sm"
                             style={{

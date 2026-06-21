@@ -367,6 +367,7 @@ function SignForm({ token, defaultName, onCancel, onSigned }) {
         />
         <span>
           I have read the entire agreement above and agree to be bound by all of its terms. I am at least 18 years of age and am authorized to sign on behalf of the property listed.
+          By signing electronically, I agree to use electronic records and electronic signatures for this agreement and that my electronic signature is legally binding. I understand I may request a free paper copy, and may withdraw consent to use electronic records for future documents, by emailing rileykopf@luckylandscapes.com or calling (402) 405-5475. A copy of the signed agreement will be emailed to me and can be downloaded from this page after signing.
         </span>
       </label>
 

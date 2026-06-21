@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
+import { resolveStorageUrl } from '@/lib/signedStorage';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -76,7 +78,7 @@ export default function ContractDetailPage() {
     }
     setSendState({ loading: true, success: false, error: null });
     try {
-      const res = await fetch('/api/send-contract', {
+      const res = await apiFetch('/api/send-contract', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,10 +198,10 @@ export default function ContractDetailPage() {
           )}
           {isSigned && contract.pdfUrl && (
             <>
-              <a href={contract.pdfUrl} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              <a href={contract.pdfUrl} onClick={(e) => { e.preventDefault(); resolveStorageUrl(contract.pdfUrl).then(u => u && window.open(u, '_blank', 'noopener')); }} target="_blank" rel="noopener noreferrer" className="btn btn-primary">
                 <FileDown size={16} /> View Signed PDF
               </a>
-              <a href={contract.pdfUrl} download={`Contract-${contract.contractNumber}-Signed.pdf`} className="btn btn-secondary">
+              <a href={contract.pdfUrl} onClick={(e) => { e.preventDefault(); resolveStorageUrl(contract.pdfUrl).then(u => u && window.open(u, '_blank', 'noopener')); }} className="btn btn-secondary">
                 <Download size={16} /> Download
               </a>
             </>

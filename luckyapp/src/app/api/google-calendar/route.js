@@ -5,6 +5,7 @@ import {
   deleteGoogleEvent,
   isGoogleCalendarConfigured,
 } from '@/lib/googleCalendar';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 /**
  * Google Calendar Sync API
@@ -29,6 +30,8 @@ function formatGCalDate(dateStr, timeStr) {
 
 // POST — Create or generate link
 export async function POST(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
   try {
     const body = await request.json();
     const { title, date, startTime, endTime, description, location, allDay } = body;
@@ -93,6 +96,8 @@ export async function POST(request) {
 
 // PUT — Update an existing event
 export async function PUT(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
   try {
     const body = await request.json();
     const { googleEventId, title, date, startTime, endTime, description, location, allDay } = body;
@@ -118,6 +123,8 @@ export async function PUT(request) {
 
 // DELETE — Remove an event
 export async function DELETE(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
   try {
     const { searchParams } = new URL(request.url);
     const googleEventId = searchParams.get('eventId');

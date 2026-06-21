@@ -7,15 +7,60 @@ import { notifyOrg } from '@/lib/notify';
 // uploads any submitted photos to Supabase Storage tied to that customer,
 // and dispatches an in-app + email + web-push notification to owners/admins.
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Access-Control-Max-Age': '86400',
-};
+// The marketing site is the only legitimate cross-origin caller. Echo the
+// request Origin when it's on the allowlist (apex, www, *.luckylandscapes.com,
+// or a CF Pages preview) instead of the wildcard '*'. NOTE: CORS does not by
+// itself block a scripted POST (a simple request triggers no preflight) — the
+// real abuse gate is the server-side Turnstile check below plus a rate limit.
+// This is least-privilege hygiene.
+const ALLOWED_ORIGINS = [
+  'https://luckylandscapes.com',
+  'https://www.luckylandscapes.com',
+];
 
-export async function OPTIONS() {
-  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+function corsHeaders(request) {
+  const origin = request.headers.get('origin') || '';
+  const allowed =
+    ALLOWED_ORIGINS.includes(origin) ||
+    /^https:\/\/[a-z0-9-]+\.luckylandscapes\.com$/i.test(origin) ||
+    /^https:\/\/[a-z0-9-]+\.pages\.dev$/i.test(origin);
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : 'https://luckylandscapes.com',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+  };
+}
+
+export async function OPTIONS(request) {
+  return new NextResponse(null, { status: 204, headers: corsHeaders(request) });
+}
+
+// Verify the Cloudflare Turnstile token the marketing form attaches. Enforced
+// only when TURNSTILE_SECRET is configured, so the endpoint keeps accepting
+// real leads before the secret is provisioned in Vercel — set the secret to
+// actually turn the bot gate on. A missing token with the secret set is rejected
+// (that's the scripted-bot case); a siteverify network error fails OPEN so a
+// Cloudflare outage doesn't drop genuine revenue (the honeypot still applies).
+async function verifyTurnstile(secret, token, ip) {
+  if (!token) return false;
+  try {
+    const form = new URLSearchParams();
+    form.set('secret', secret);
+    form.set('response', String(token));
+    if (ip) form.set('remoteip', String(ip).split(',')[0].trim());
+    const resp = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form,
+    });
+    const data = await resp.json();
+    return data?.success === true;
+  } catch (err) {
+    console.error('[lead intake] turnstile siteverify error', err);
+    return true; // fail open on network error; honeypot remains as backstop
+  }
 }
 
 // Maps questionnaire field names → human-readable labels for the notes blob.
@@ -316,11 +361,12 @@ async function resolveOrgId(supabase) {
 }
 
 export async function POST(request) {
+  const cors = corsHeaders(request);
   let body;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: CORS_HEADERS });
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400, headers: cors });
   }
 
   const firstName = String(body.firstName || '').trim();
@@ -332,22 +378,38 @@ export async function POST(request) {
   if (!firstName || !email) {
     return NextResponse.json(
       { error: 'firstName and email are required' },
-      { status: 400, headers: CORS_HEADERS }
+      { status: 400, headers: cors }
     );
   }
   // Basic honeypot — silently accept bots without writing a lead.
   if (body.website || body.honeypot) {
-    return NextResponse.json({ ok: true }, { headers: CORS_HEADERS });
+    return NextResponse.json({ ok: true }, { headers: cors });
+  }
+
+  // Server-side Cloudflare Turnstile verification (the real bot gate). The
+  // marketing form posts `turnstile_token`; we verify it whenever the secret is
+  // configured. Until TURNSTILE_SECRET is set in Vercel this is a no-op, so the
+  // form keeps working during rollout — set the secret to enforce.
+  const turnstileSecret = process.env.TURNSTILE_SECRET;
+  if (turnstileSecret) {
+    const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || '';
+    const ok = await verifyTurnstile(turnstileSecret, body.turnstile_token, ip);
+    if (!ok) {
+      return NextResponse.json(
+        { error: 'Verification failed. Please refresh and try again.' },
+        { status: 403, headers: cors }
+      );
+    }
   }
 
   const supabase = getServiceSupabase();
   if (!supabase) {
-    return NextResponse.json({ error: 'DB not configured' }, { status: 500, headers: CORS_HEADERS });
+    return NextResponse.json({ error: 'DB not configured' }, { status: 500, headers: cors });
   }
 
   const orgId = await resolveOrgId(supabase);
   if (!orgId) {
-    return NextResponse.json({ error: 'No organization configured' }, { status: 500, headers: CORS_HEADERS });
+    return NextResponse.json({ error: 'No organization configured' }, { status: 500, headers: cors });
   }
 
   const notes = buildNotes(body);
@@ -377,7 +439,7 @@ export async function POST(request) {
       .eq('id', customerId);
     if (updErr) {
       console.error('[lead intake] update failed', updErr);
-      return NextResponse.json({ error: 'Could not save lead' }, { status: 500, headers: CORS_HEADERS });
+      return NextResponse.json({ error: 'Could not save lead' }, { status: 500, headers: cors });
     }
   } else {
     const { data: ins, error } = await supabase
@@ -397,7 +459,7 @@ export async function POST(request) {
       .single();
     if (error) {
       console.error('[lead intake] insert failed', error);
-      return NextResponse.json({ error: 'Could not save lead' }, { status: 500, headers: CORS_HEADERS });
+      return NextResponse.json({ error: 'Could not save lead' }, { status: 500, headers: cors });
     }
     customerId = ins.id;
   }
@@ -470,5 +532,5 @@ export async function POST(request) {
     },
   }).catch(err => console.error('[lead intake] notifyOrg failed', err));
 
-  return NextResponse.json({ ok: true, customerId, isNew, photoCount }, { headers: CORS_HEADERS });
+  return NextResponse.json({ ok: true, customerId, isNew, photoCount }, { headers: cors });
 }

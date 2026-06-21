@@ -1,7 +1,13 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export async function POST(request) {
+  // Authenticated team members only — this sends branded email from our verified
+  // domain and must never be an open relay for arbitrary recipients/content.
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const {

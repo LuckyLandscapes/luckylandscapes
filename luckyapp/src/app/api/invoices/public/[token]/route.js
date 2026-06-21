@@ -36,5 +36,14 @@ export async function GET(_request, { params }) {
     .then(() => {})
     .catch(() => {});
 
+  // Never expose the full organizations.settings JSONB to an anonymous caller.
+  // The public pay page only reads cash_discount_percent — strip everything else
+  // (google_review_url, seo_place_id/seo_business_name, payroll.wcClasses + rates, etc.).
+  if (invoice.organizations && invoice.organizations.settings) {
+    invoice.organizations.settings = {
+      cash_discount_percent: invoice.organizations.settings.cash_discount_percent ?? null,
+    };
+  }
+
   return NextResponse.json({ invoice });
 }

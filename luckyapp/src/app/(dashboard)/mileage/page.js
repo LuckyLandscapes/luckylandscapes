@@ -14,6 +14,8 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useData } from '@/lib/data';
 import { useAuth } from '@/lib/auth';
+import SignedImage from '@/components/SignedImage';
+import { resolveStorageUrl } from '@/lib/signedStorage';
 import { supabase } from '@/lib/supabase';
 import { fmtCurrency, isInPeriod } from '@/lib/finance';
 import {
@@ -424,8 +426,8 @@ export default function MileagePage() {
             display: 'flex', gap: 'var(--space-md)', alignItems: 'center', flexWrap: 'wrap',
           }}>
             {activeTrip.startPhotoUrl && (
-              <a href={activeTrip.startPhotoUrl} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
-                <img src={activeTrip.startPhotoUrl} alt="Start odometer" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
+              <a href={activeTrip.startPhotoUrl} onClick={(e) => { e.preventDefault(); resolveStorageUrl(activeTrip.startPhotoUrl).then(u => u && window.open(u, '_blank', 'noopener')); }} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
+                <SignedImage src={activeTrip.startPhotoUrl} alt="Start odometer" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 'var(--radius-sm)', display: 'block' }} />
               </a>
             )}
             <div style={{ flex: 1, minWidth: '180px' }}>
@@ -574,8 +576,8 @@ export default function MileagePage() {
                   )}
                   {(m.startPhotoUrl || m.endPhotoUrl) && (
                     <div style={{ marginTop: '6px', display: 'flex', gap: '4px' }}>
-                      {m.startPhotoUrl && <a href={m.startPhotoUrl} target="_blank" rel="noopener noreferrer"><img src={m.startPhotoUrl} alt="Start odometer" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} /></a>}
-                      {m.endPhotoUrl && <a href={m.endPhotoUrl} target="_blank" rel="noopener noreferrer"><img src={m.endPhotoUrl} alt="End odometer" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} /></a>}
+                      {m.startPhotoUrl && <a href={m.startPhotoUrl} onClick={(e) => { e.preventDefault(); resolveStorageUrl(m.startPhotoUrl).then(u => u && window.open(u, '_blank', 'noopener')); }} target="_blank" rel="noopener noreferrer"><SignedImage src={m.startPhotoUrl} alt="Start odometer" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} /></a>}
+                      {m.endPhotoUrl && <a href={m.endPhotoUrl} onClick={(e) => { e.preventDefault(); resolveStorageUrl(m.endPhotoUrl).then(u => u && window.open(u, '_blank', 'noopener')); }} target="_blank" rel="noopener noreferrer"><SignedImage src={m.endPhotoUrl} alt="End odometer" style={{ width: 44, height: 44, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} /></a>}
                     </div>
                   )}
                 </div>

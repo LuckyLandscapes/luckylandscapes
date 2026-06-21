@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import Link from 'next/link';
 import EventModal from '@/components/EventModal';
 import AddressLink from '@/components/AddressLink';
@@ -163,7 +164,7 @@ export default function CalendarPage() {
     try {
       if (event.googleEventId) {
         try {
-          await fetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
+          await apiFetch(`/api/google-calendar?eventId=${event.googleEventId}`, { method: 'DELETE' });
         } catch (err) {
           console.warn('Google Calendar delete failed (non-blocking):', err.message);
         }
@@ -712,7 +713,7 @@ function EventDetailOverlay({ event, getCustomer, onClose, onEdit, onDelete }) {
   const syncToGoogleCalendar = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/google-calendar', {
+      const res = await apiFetch('/api/google-calendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

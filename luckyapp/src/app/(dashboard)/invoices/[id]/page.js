@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -423,7 +424,7 @@ export default function InvoiceDetailPage() {
     if (!sendEmail) return;
     setSendState({ loading: true, success: false, error: null });
     try {
-      const res = await fetch('/api/send-invoice', {
+      const res = await apiFetch('/api/send-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

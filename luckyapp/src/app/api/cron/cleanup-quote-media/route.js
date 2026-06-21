@@ -25,12 +25,17 @@ export const dynamic = 'force-dynamic';
 const STORAGE_DELETE_BATCH = 100; // Supabase storage remove() takes an array
 
 export async function GET(request) {
+  // Cron auth — fail CLOSED. Vercel auto-injects `x-vercel-cron` on scheduled
+  // invocations (inbound x-vercel-* headers are stripped, so a client cannot
+  // forge it); a manual trigger must present `Authorization: Bearer <CRON_SECRET>`.
+  // In production, if neither is present we reject — this route performs
+  // IRREVERSIBLE org-wide deletion of customer photos and must never run for an
+  // anonymous caller. (Dev is allowed through for local smoke-testing.)
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret) {
-    const auth = request.headers.get('authorization');
-    if (auth !== `Bearer ${cronSecret}`) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  const isVercelCron = request.headers.get('x-vercel-cron');
+  const authed = isVercelCron || (cronSecret && request.headers.get('authorization') === `Bearer ${cronSecret}`);
+  if (!authed && process.env.NODE_ENV === 'production') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const supabase = getServiceSupabase();

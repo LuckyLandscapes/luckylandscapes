@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -14,6 +15,9 @@ function formatDate(d) {
 }
 
 export async function POST(request) {
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const { invoiceId, to, customMessage } = body;
@@ -31,6 +35,7 @@ export async function POST(request) {
       .from('invoices')
       .select('*, customers(first_name, last_name)')
       .eq('id', invoiceId)
+      .eq('org_id', auth.orgId)
       .single();
     if (error || !invoice) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 });

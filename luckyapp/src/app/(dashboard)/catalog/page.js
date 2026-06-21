@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import {
   Search, Maximize2, X, ChevronLeft, ChevronRight, Star, Plus,
   Grid3x3, List, ExternalLink, Edit3, Trash2, AlertTriangle, Clock,
@@ -262,7 +263,7 @@ export default function CatalogPage() {
     if (!m.supplierUrl) { setRefreshMsg('Add a supplier URL first.'); return; }
     setRefreshingId(m.id); setRefreshMsg('');
     try {
-      const res = await fetch('/api/catalog/lookup', {
+      const res = await apiFetch('/api/catalog/lookup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: m.supplierUrl }),
@@ -1010,7 +1011,7 @@ function RefreshBatchModal({ suppliers, materials, onClose, onResult, onUpdate, 
       // The route handles delays internally; we just fire it. For very large
       // batches the user can split by supplier (chunking happens server-side
       // up to the 200-cap, which is plenty for Lucky's catalog scale).
-      const res = await fetch('/api/catalog/refresh-batch', {
+      const res = await apiFetch('/api/catalog/refresh-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ materialIds: targets.map(m => m.id) }),

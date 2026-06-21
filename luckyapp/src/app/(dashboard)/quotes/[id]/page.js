@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { generateQuotePdf } from '@/lib/generateQuotePdf';
@@ -127,7 +128,7 @@ export default function QuoteDetailPage() {
       });
 
       if (send) {
-        const res = await fetch('/api/send-contract', {
+        const res = await apiFetch('/api/send-contract', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -204,7 +205,7 @@ export default function QuoteDetailPage() {
     setSendState({ loading: true, success: false, error: null });
 
     try {
-      const res = await fetch('/api/send-quote', {
+      const res = await apiFetch('/api/send-quote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

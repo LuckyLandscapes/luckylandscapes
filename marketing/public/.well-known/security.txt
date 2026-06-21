@@ -1,0 +1,7 @@
+# Security contact for luckylandscapes.com and app.luckylandscapes.com
+# https://www.rfc-editor.org/rfc/rfc9116
+Contact: mailto:rileykopf@luckylandscapes.com
+Contact: tel:+1-402-405-5475
+Expires: 2027-06-21T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://luckylandscapes.com/.well-known/security.txt

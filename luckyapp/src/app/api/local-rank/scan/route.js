@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 // POST /api/local-rank/scan   body: { keyword, lat, lng, maxN? }
 //
@@ -133,6 +134,11 @@ function normalizeOrdered(data, maxN) {
 }
 
 export async function POST(request) {
+  // Owner/admin tool — each call can consume a paid Bright Data / DataForSEO
+  // SERP request, so it must never be anonymously scriptable (billing DoS).
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   let body;
   try { body = await request.json(); } catch { body = null; }
   const keyword = body?.keyword;

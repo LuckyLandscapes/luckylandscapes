@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getStripe, isStripeConfigured } from '@/lib/stripeServer';
+import { authenticateRequest } from '@/lib/apiAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,12 @@ export const dynamic = 'force-dynamic';
 // `arrivalDate` is the date Stripe says the money will land in your bank
 // (`payout.arrival_date`, ISO yyyy-mm-dd). `status` is one of:
 //   'in_transit' | 'paid' | 'pending' | 'canceled' | 'failed'
-export async function GET() {
+export async function GET(request) {
+  // Owner/admin-only financial data — never expose the live bank balance +
+  // payout history to an anonymous caller.
+  const auth = await authenticateRequest(request);
+  if (!auth.ok) return auth.response;
+
   if (!isStripeConfigured()) {
     return NextResponse.json({
       configured: false,

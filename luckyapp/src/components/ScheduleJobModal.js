@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useData } from '@/lib/data';
+import { apiFetch } from '@/lib/apiClient';
 import { DayLoadBar } from '@/components/DaySchedulePreview';
 import MiniMonthPicker from '@/components/MiniMonthPicker';
 import { dayLoad, findNextOpenSlot, buildEventsByDate, summarizeWorkdays } from '@/lib/capacity';
@@ -95,7 +96,7 @@ export default function ScheduleJobModal({ quoteId, onClose, onScheduled }) {
 
         // Fire-and-forget Google Calendar sync
         try {
-          await fetch('/api/google-calendar', {
+          await apiFetch('/api/google-calendar', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
