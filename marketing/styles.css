@@ -508,9 +508,9 @@ textarea {
     /* Strong enough that white text passes contrast over the BRIGHTEST video
        frame, not just the dark-lawn ones (recipe matches the gallery tiles). */
     background: linear-gradient(to bottom,
-            rgba(15, 32, 12, .55) 0%,
-            rgba(15, 32, 12, .45) 55%,
-            rgba(15, 32, 12, .62) 100%);
+            rgba(10, 13, 15, .55) 0%,
+            rgba(10, 13, 15, .45) 55%,
+            rgba(10, 13, 15, .64) 100%);
 }
 
 .hero-content {
