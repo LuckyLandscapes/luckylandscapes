@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash .claude/hooks/git-sync.sh pull",
+            "statusMessage": "Pulling latest from GitHub",
+            "timeout": 90
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "bash",
+            "command": "bash .claude/hooks/git-sync.sh sync",
+            "statusMessage": "Auto-syncing to GitHub (pushes main → live deploy)",
+            "timeout": 90
+          }
+        ]
+      }
+    ]
+  }
+}
