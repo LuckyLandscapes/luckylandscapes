@@ -1,4 +1,4 @@
-**Last updated:** 2026-05-04
+**Last updated:** 2026-07-06 (ownership papered — drafts in hq repo `agreements/`, unsigned)
 **Confidence:** mostly known
 
 # Company — Identity & Team
@@ -31,7 +31,7 @@ List people, roles, and what they actually own day-to-day. Include yourself.
 
 | Name | Role | Owns | Notes |
 |---|---|---|---|
-| Macoy Wollenburg | Co Founder (informal) | 30% (informal — not a legal LLC member) | Handles marketing, development, and sales. **Paid as an arms-length 1099 vendor through WE Media** (his pre-existing media agency that predates Lucky Landscapes). The 30% is a handshake split on profits, not a registered membership interest — legally Riley is sole member of Lucky Landscapes LLC. App classification: `1099_contractor`.
+| Macoy Wollenburg | Co Founder (informal) | 30% (economic-interest agreement drafted 2026-07-06, unsigned — not a legal LLC member) | Handles marketing, development, and sales. **Paid as an arms-length 1099 vendor through WE Media / Wollenburg Media** (his pre-existing media agency that predates Lucky Landscapes). The 30% was a handshake split on profits; **papered 2026-07-06** as a contractual economic ownership interest (30% of distributions + sale proceeds, no registered membership — legally Riley remains sole member of Lucky Landscapes LLC). Drafts in the hq repo's `agreements/` folder, pending signatures. App classification: `1099_contractor`.
 | Riley Kopf | Owner (sole legal member) | 70% (informal) / 100% legal | Sole legal member of Lucky Landscapes LLC. Handles all day-to-day operations and crew management. Currently takes owner draws, not wages — app classification: `owner_excluded`.
 | Brodie Chase | Crew Leader | 0% | Employee of Lucky Landscapes, in charge of one of the crews Junior in Highschool.
 | Sean Chase | Laborer | 0% | Employee of Lucky Landscapes, works on jobsites, just graduated highschool, going to basic training in the fall, not fully signed.

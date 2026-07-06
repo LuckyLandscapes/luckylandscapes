@@ -1,4 +1,4 @@
-**Last updated:** 2026-05-04
+**Last updated:** 2026-07-06 (marketing/pay line papered — see hq repo `agreements/`)
 **Confidence:** Partially Known
 
 # Finances
@@ -20,7 +20,7 @@
 | Vehicles | $800/month | TODO |
 | Insurance | TODO | TODO |
 | Software / subscriptions | $288/month | TODO |
-| Marketing | $3,000/month | **This is Macoy's pay** (1099 via WE Media), covering ALL marketing + dev: website, SEO, content, photo/video, social. **NOT paid ad spend** — currently $0 goes to Google Ads / Local Services Ads / any paid traffic. Organic SEO + Google Business Profile + reviews + word-of-mouth referrals are the *entire* lead engine, which makes that work the only growth lever besides referrals. |
+| Marketing | $1,000/month (per 2026-07-06 services agreement, unsigned) | **This is Macoy's pay** (1099 via WE Media / Wollenburg Media). Services agreement drafted 2026-07-06 (hq repo `agreements/`): $1,000/mo covers ALL marketing + dev — website, internal app, SEO, content, photo/video, social, ad management — with Jan 1 / Jul 1 good-faith reviews targeting the previously discussed $2,500/mo as cash flow allows; plus $4,000 owed for Jan–Jun work + the website, payable as cash flow allows (target Dec 31, 2026). Ad spend is on top — first paid campaign: $300 hardscape push (retaining walls/pavers). The $3,000/month previously recorded here is superseded. |
 | Owner draw / $48,000 | TODO | TODO |
 | Other overhead | shop rent $3500/month,  | TODO |
 
