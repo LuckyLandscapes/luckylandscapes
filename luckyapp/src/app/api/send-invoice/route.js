@@ -2,6 +2,7 @@ import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
 import { authenticateRequest } from '@/lib/apiAuth';
+import { computeSavings } from '@/lib/pricing';
 
 function formatUSD(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -47,6 +48,7 @@ export async function POST(request) {
     const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ').trim() || 'there';
     const balance = Math.max(0, Number(invoice.total || 0) - Number(invoice.amount_paid || 0));
     const items = Array.isArray(invoice.items) ? invoice.items : [];
+    const sav = computeSavings(items); // display-only market-rate savings
     const dueDate = formatDate(invoice.due_date);
     // Receipt mode: invoice fully paid → swap "Pay Online" CTA for "View Invoice",
     // drop the "how payment works" section, and re-word as a thank-you/receipt.
@@ -125,7 +127,10 @@ export async function POST(request) {
       <div style="background:#f7f5f0; border:1px solid #e5e7eb; border-radius:10px; padding:18px 22px; margin:16px 0 24px;">
         <table style="width:100%; border-collapse:collapse;">
           <tr><td style="padding:5px 0; color:#6b7280; font-size:14px;">Subtotal</td>
-              <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.subtotal)}</td></tr>
+              <td style="padding:5px 0; text-align:right;">
+                ${sav.hasSavings ? `<div style="font-size:12px; color:#9ca3af; text-decoration:line-through;">${formatUSD(Number(invoice.subtotal || 0) + sav.savings)}</div>` : ''}
+                <div style="font-weight:600; color:#1f2937;">${formatUSD(invoice.subtotal)}</div>
+              </td></tr>
           ${Number(invoice.tax) ? `<tr><td style="padding:5px 0; color:#6b7280; font-size:14px;">Tax</td>
               <td style="padding:5px 0; text-align:right; font-weight:600; color:#1f2937;">${formatUSD(invoice.tax)}</td></tr>` : ''}
           ${Number(invoice.amount_paid) ? `<tr><td style="padding:5px 0; color:#2d7a3a; font-size:14px; font-weight:600;">Already paid</td>
@@ -195,6 +200,7 @@ export async function POST(request) {
       customMessage || 'Thank you for choosing Lucky Landscapes — we really appreciate your business! Your invoice is ready.',
       '',
       `─── INVOICE ${invoice.invoice_number} ───`,
+      sav.hasSavings ? `Regular: ${formatUSD(Number(invoice.subtotal || 0) + sav.savings)}` : null,
       `Balance Due: ${formatUSD(balance)}`,
       dueDate ? `Due: ${dueDate}` : null,
       '',

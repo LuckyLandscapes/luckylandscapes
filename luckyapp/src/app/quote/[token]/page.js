@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { computeSavings, lineMarketUnitPrice } from '@/lib/pricing';
 import './quote.css';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -126,6 +127,7 @@ export default function QuotePage({ params }) {
   }
 
   const items = Array.isArray(quote.items) ? quote.items : [];
+  const sav = computeSavings(items); // display-only market-rate savings
   const customer = quote.customers || {};
   const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   const materials = Number(quote.materials_cost || 0);
@@ -209,7 +211,14 @@ export default function QuotePage({ params }) {
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right' }} className="quote-td-num">
                       <span className="quote-td-label">Price</span>
-                      <span className="quote-td-value">{formatUSD(item.unitPrice ?? item.unit_price)}</span>
+                      <span className="quote-td-value">
+                        {lineMarketUnitPrice(item) !== null && (
+                          <span style={{ textDecoration: 'line-through', color: '#9ca3af', fontWeight: 400, display: 'block', fontSize: 12 }}>
+                            {formatUSD(lineMarketUnitPrice(item))}
+                          </span>
+                        )}
+                        {formatUSD(item.unitPrice ?? item.unit_price)}
+                      </span>
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} className="quote-td-num">
                       <span className="quote-td-label">Total</span>
@@ -266,7 +275,15 @@ export default function QuotePage({ params }) {
                   </div>
                 </>
               )}
-              <div style={styles.totalRow} className="quote-total-row"><span>Estimated Total</span><span>{formatUSD(quote.total)}</span></div>
+              <div style={styles.totalRow} className="quote-total-row">
+                <span>Estimated Total</span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
+                  {sav.hasSavings && (
+                    <span style={{ textDecoration: 'line-through', color: '#9ca3af', fontWeight: 500, fontSize: 15 }}>{formatUSD(Number(quote.total || 0) + sav.savings)}</span>
+                  )}
+                  <span>{formatUSD(quote.total)}</span>
+                </span>
+              </div>
             </div>
 
             {quote.notes && (

@@ -16,6 +16,7 @@ import {
   estimateCardFee, estimateAchFee, effectiveCardFeePct,
   computeCashDiscount, getCashDiscountPct,
 } from '@/lib/paymentFees';
+import { computeSavings, lineMarketUnitPrice } from '@/lib/pricing';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -154,6 +155,7 @@ export default function InvoiceDetailPage() {
 
   const cfg = STATUS_CONFIG[invoice.status] || STATUS_CONFIG.unpaid;
   const items = invoice.items || [];
+  const sav = computeSavings(items); // display-only campaign-discount savings
   const editItemsSubtotal = editItems.reduce(
     (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unitPrice) || 0), 0
   );
@@ -248,8 +250,9 @@ export default function InvoiceDetailPage() {
       description: it.description || '',
       quantity: it.quantity ?? 1,
       unitPrice: it.unitPrice ?? 0,
+      listUnitPrice: it.listUnitPrice ?? null,
     }));
-    setEditItems(seed.length ? seed : [{ name: '', description: '', quantity: 1, unitPrice: 0 }]);
+    setEditItems(seed.length ? seed : [{ name: '', description: '', quantity: 1, unitPrice: 0, listUnitPrice: null }]);
     setEditItemsError(null);
     setShowEditItems(true);
   };
@@ -262,12 +265,18 @@ export default function InvoiceDetailPage() {
 
   const handleSaveItems = async () => {
     const cleaned = editItems
-      .map(it => ({
-        name: (it.name || '').trim(),
-        description: (it.description || '').trim(),
-        quantity: Number(it.quantity) || 0,
-        unitPrice: Number(it.unitPrice) || 0,
-      }))
+      .map(it => {
+        const lu = Number(it.listUnitPrice);
+        return {
+          name: (it.name || '').trim(),
+          description: (it.description || '').trim(),
+          quantity: Number(it.quantity) || 0,
+          unitPrice: Number(it.unitPrice) || 0,
+          // Optional market-rate anchor (display-only, see pricing.js). Keep
+          // it only when it's a real number above 0; otherwise drop it.
+          listUnitPrice: Number.isFinite(lu) && lu > 0 ? lu : null,
+        };
+      })
       .filter(it => it.name && it.quantity * it.unitPrice > 0)
       .map(it => ({ ...it, total: +(it.quantity * it.unitPrice).toFixed(2) }));
 
@@ -672,17 +681,25 @@ export default function InvoiceDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.map((item, i) => (
+                {items.map((item, i) => {
+                  const mkt = lineMarketUnitPrice(item);
+                  return (
                   <tr key={i}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
                       {item.description && <div className="table-sub">{item.description}</div>}
                     </td>
                     <td>{item.quantity || 1}</td>
-                    <td>{formatCurrency(item.unitPrice)}</td>
+                    <td>
+                      {mkt !== null && (
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', display: 'block', fontSize: '0.85em' }}>{formatCurrency(mkt)}</span>
+                      )}
+                      {formatCurrency(item.unitPrice)}
+                    </td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
@@ -697,7 +714,12 @@ export default function InvoiceDetailPage() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '240px', paddingTop: 'var(--space-sm)', borderTop: '2px solid var(--border-secondary)' }}>
                 <span style={{ fontWeight: 700, fontSize: '1rem' }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>{formatCurrency(invoice.total)}</span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
+                  {sav.hasSavings && (
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', fontWeight: 500, fontSize: '0.9rem' }}>{formatCurrency(Number(invoice.total || 0) + sav.savings)}</span>
+                  )}
+                  <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>{formatCurrency(invoice.total)}</span>
+                </span>
               </div>
             </div>
           </div>
@@ -1209,12 +1231,21 @@ export default function InvoiceDetailPage() {
                           onChange={e => updateEditItem(idx, { quantity: e.target.value })}
                           style={{ textAlign: 'right' }}
                         />
-                        <input
-                          className="form-input" type="number" min="0" step="0.01" placeholder="Rate"
-                          value={item.unitPrice}
-                          onChange={e => updateEditItem(idx, { unitPrice: e.target.value })}
-                          style={{ textAlign: 'right' }}
-                        />
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <input
+                            className="form-input" type="number" min="0" step="0.01" placeholder="Rate"
+                            value={item.unitPrice}
+                            onChange={e => updateEditItem(idx, { unitPrice: e.target.value })}
+                            style={{ textAlign: 'right' }}
+                          />
+                          <input
+                            className="form-input" type="number" min="0" step="0.01" placeholder="Regular (opt.)"
+                            value={item.listUnitPrice ?? ''}
+                            onChange={e => updateEditItem(idx, { listUnitPrice: e.target.value === '' ? null : e.target.value })}
+                            title="Optional. Your regular, pre-discount rate (higher than the rate above). The customer sees it crossed out with how much they save. Leave blank for no discount."
+                            style={{ textAlign: 'right', fontSize: '0.72rem', padding: '5px 8px', color: 'var(--text-tertiary)' }}
+                          />
+                        </div>
                         <div style={{ minWidth: '80px', textAlign: 'right', fontWeight: 700, fontSize: '0.85rem', paddingTop: '8px' }}>
                           {formatCurrency(lineTotal)}
                         </div>

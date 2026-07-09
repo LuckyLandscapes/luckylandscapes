@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getStripe, isStripeConfigured, getServiceSupabase } from '@/lib/stripeServer';
 import { notifyOrg } from '@/lib/notify';
 import { sendDepositReceipt, sendInvoicePaidReceipt } from '@/lib/customerEmails';
+import { authorizationText } from '@/lib/recurring';
 
 const fmtMoney = (n) => `$${Number(n || 0).toFixed(2)}`;
 const fmtCustomerName = (c) => [c?.first_name, c?.last_name].filter(Boolean).join(' ').trim() || 'Customer';
@@ -42,6 +43,49 @@ export async function POST(request) {
   if (!supabase) return NextResponse.json({ error: 'DB not configured' }, { status: 500 });
 
   try {
+    // ── Autopay card saved (SetupIntent succeeded) ───────────────────────
+    // The customer saved a card + authorized recurring charges on /autopay.
+    // Record the payment method + consent on the plan so the cron can charge
+    // it off-session, and stamp the customer's Stripe id.
+    if (event.type === 'setup_intent.succeeded') {
+      const si = event.data.object;
+      const siMeta = si.metadata || {};
+      if (siMeta.kind === 'recurring_authorization' && siMeta.plan_id) {
+        const paymentMethodId = typeof si.payment_method === 'string'
+          ? si.payment_method
+          : si.payment_method?.id;
+        const { data: plan } = await supabase
+          .from('recurring_plans')
+          .select('id, org_id, customer_id, title, amount, interval, customers(first_name, last_name)')
+          .eq('id', siMeta.plan_id)
+          .maybeSingle();
+        if (plan && paymentMethodId) {
+          await supabase.from('recurring_plans').update({
+            stripe_payment_method_id: paymentMethodId,
+            payment_mode: 'autopay',
+            authorized_at: new Date().toISOString(),
+            authorization_text: authorizationText({ amount: plan.amount, interval: plan.interval, title: plan.title }),
+          }).eq('id', plan.id);
+          if (si.customer && plan.customer_id) {
+            await supabase.from('customers')
+              .update({ stripe_customer_id: si.customer })
+              .eq('id', plan.customer_id);
+          }
+          try {
+            await notifyOrg({
+              orgId: plan.org_id,
+              type: 'autopay_authorized',
+              title: `Autopay set up — ${fmtCustomerName(plan.customers)}`,
+              body: `${fmtCustomerName(plan.customers)} saved a card for "${plan.title}". Future charges are automatic.`,
+              link: '/recurring',
+              data: { planId: plan.id },
+            });
+          } catch (e) { console.error('[stripe webhook] autopay notify failed', e); }
+        }
+      }
+      return NextResponse.json({ received: true });
+    }
+
     if (event.type === 'payment_intent.succeeded') {
       const intent = event.data.object;
       const meta = intent.metadata || {};

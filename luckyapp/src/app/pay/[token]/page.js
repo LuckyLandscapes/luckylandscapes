@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { computeCashDiscount, DEFAULT_CASH_DISCOUNT_PCT } from '@/lib/paymentFees';
+import { computeSavings, lineMarketUnitPrice } from '@/lib/pricing';
 import './pay.css';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
@@ -83,6 +84,7 @@ export default function PayPage({ params }) {
 
   const balance = Math.max(0, Number(invoice.total || 0) - Number(invoice.amount_paid || 0));
   const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const sav = computeSavings(items); // display-only market-rate savings
   const customer = invoice.customers || {};
   const customerName = [customer.first_name, customer.last_name].filter(Boolean).join(' ');
   const isPaid = invoice.status === 'paid' || balance <= 0;
@@ -170,7 +172,14 @@ export default function PayPage({ params }) {
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right' }} className="pay-td-num">
                       <span className="pay-td-label">Price</span>
-                      <span className="pay-td-value">{formatUSD(item.unitPrice || item.unit_price)}</span>
+                      <span className="pay-td-value">
+                        {lineMarketUnitPrice(item) !== null && (
+                          <span style={{ textDecoration: 'line-through', color: '#9ca3af', fontWeight: 400, display: 'block', fontSize: 12 }}>
+                            {formatUSD(lineMarketUnitPrice(item))}
+                          </span>
+                        )}
+                        {formatUSD(item.unitPrice || item.unit_price)}
+                      </span>
                     </td>
                     <td style={{ ...styles.td, textAlign: 'right', fontWeight: 600 }} className="pay-td-num">
                       <span className="pay-td-label">Total</span>
@@ -187,7 +196,13 @@ export default function PayPage({ params }) {
             <div style={styles.totals}>
               <div style={styles.totalRow}><span>Subtotal</span><span>{formatUSD(invoice.subtotal)}</span></div>
               {Number(invoice.tax) > 0 && <div style={styles.totalRow}><span>Tax</span><span>{formatUSD(invoice.tax)}</span></div>}
-              <div style={styles.totalRow}><span>Total</span><span>{formatUSD(invoice.total)}</span></div>
+              <div style={styles.totalRow}>
+                <span>Total</span>
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.15 }}>
+                  {sav.hasSavings && <span style={{ textDecoration: 'line-through', color: '#9ca3af' }}>{formatUSD(Number(invoice.total || 0) + sav.savings)}</span>}
+                  <span>{formatUSD(invoice.total)}</span>
+                </span>
+              </div>
               {Number(invoice.amount_paid) > 0 && <div style={{ ...styles.totalRow, color: '#2d7a3a' }}><span>Paid</span><span>−{formatUSD(invoice.amount_paid)}</span></div>}
               <div style={styles.balanceRow} className="pay-balance-row"><span>Balance Due</span><span>{formatUSD(balance)}</span></div>
             </div>

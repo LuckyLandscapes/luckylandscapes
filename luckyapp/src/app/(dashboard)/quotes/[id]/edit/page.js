@@ -11,6 +11,7 @@ import MaterialCalculator from '@/components/MaterialCalculator';
 import DepositCard from '@/components/DepositCard';
 import { DEPOSIT_TYPES } from '@/lib/deposit';
 import { computeSelectedMaterialsCost } from '@/lib/catalog';
+import { computeSavings } from '@/lib/pricing';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -124,6 +125,8 @@ export default function EditQuotePage() {
   // Grand total includes delivery so quote.total IS the customer-facing total
   // everywhere (PDF, public quote, percentage-deposit math, invoices).
   const grandTotal = subtotal + (parseFloat(deliveryFee) || 0);
+  // Display-only market-rate savings (never affects grandTotal — see pricing.js)
+  const sav = computeSavings(items);
 
   const handleSave = async () => {
     await updateQuote(id, {
@@ -304,7 +307,17 @@ export default function EditQuotePage() {
                       type="number"
                       value={item.unitPrice}
                       onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
+                      placeholder="Your price"
                       style={{ padding: '0.4rem 0.6rem', fontSize: '0.82rem' }}
+                    />
+                    <input
+                      className="form-input"
+                      type="number"
+                      value={item.listUnitPrice ?? ''}
+                      onChange={(e) => updateItem(item.id, 'listUnitPrice', e.target.value === '' ? null : (parseFloat(e.target.value) || 0))}
+                      placeholder="Regular price (optional)"
+                      title="Optional. Your regular, pre-discount rate (higher than the price above). The customer sees it crossed out above the price they actually pay. Leave blank for no discount."
+                      style={{ padding: '0.3rem 0.6rem', fontSize: '0.72rem', marginTop: 4, color: 'var(--text-tertiary)' }}
                     />
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>
@@ -340,8 +353,11 @@ export default function EditQuotePage() {
               )}
               <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: 'var(--space-sm)', borderTop: '2px solid var(--border-secondary)' }}>
                 <span style={{ fontWeight: 700 }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>
-                  {formatCurrency(grandTotal)}
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
+                  {sav.hasSavings && (
+                    <span style={{ fontSize: '0.9rem', textDecoration: 'line-through', color: 'var(--text-tertiary)', fontWeight: 500 }}>{formatCurrency(grandTotal + sav.savings)}</span>
+                  )}
+                  <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>{formatCurrency(grandTotal)}</span>
                 </span>
               </div>
             </div>

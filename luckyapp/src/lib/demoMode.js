@@ -21,7 +21,7 @@ export const DEMO_DATA_KEYS = [
   'customers', 'quotes', 'jobs', 'calendar_events', 'team_members', 'activity',
   'time_entries', 'time_segments', 'job_media', 'quote_media', 'job_expenses',
   'materials', 'suppliers', 'services', 'invoices', 'company_expenses',
-  'payments', 'contracts', 'mileage_entries', 'contractors',
+  'payments', 'contracts', 'mileage_entries', 'contractors', 'recurring_plans',
 ].map(k => `lucky_${k}`);
 
 // The synthetic owner profile the demo signs in as. Mirrors DEMO_USER in

@@ -2,6 +2,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import fullLogoSrc from '@/assets/Fulllogopdf.png';
 import { computeQuoteDeposit, isPercentageDeposit } from '@/lib/deposit';
+import { computeSavings, lineMarketUnitPrice } from '@/lib/pricing';
 
 /**
  * Load an image from a URL/import and return a base64 data URL.
@@ -199,16 +200,37 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
       4: { halign: 'right', cellWidth: contentWidth * 0.20, fontStyle: 'bold' },
     },
     head: [['Service / Item', 'Qty', 'Unit', 'Unit Price', 'Total']],
-    body: items.map(item => [
-      item.name,
-      String(item.quantity),
-      item.unit,
-      formatCurrency(item.unitPrice),
-      formatCurrency(item.total),
-    ]),
+    body: items.map(item => {
+      const mkt = lineMarketUnitPrice(item);
+      return [
+        item.name,
+        String(item.quantity),
+        item.unit,
+        // Discounted line: regular price on top (struck via didDrawCell), the
+        // price they actually pay below it.
+        mkt !== null ? `${formatCurrency(mkt)}\n${formatCurrency(item.unitPrice)}` : formatCurrency(item.unitPrice),
+        formatCurrency(item.total),
+      ];
+    }),
     didDrawPage: () => {
       // Footer on every page
       drawFooter(doc, co, pageWidth, margin);
+    },
+    didDrawCell: (d) => {
+      // Strike the regular price (first line) in the Unit Price column.
+      if (d.section !== 'body' || d.column.index !== 3) return;
+      const item = items[d.row.index];
+      const mkt = item ? lineMarketUnitPrice(item) : null;
+      if (mkt === null) return;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      const txt = formatCurrency(mkt);
+      const tw = doc.getTextWidth(txt);
+      const rx = d.cell.x + d.cell.width - 12; // right padding
+      const ly = d.cell.y + 11;                // ~middle of the first text line
+      doc.setDrawColor(...GRAY);
+      doc.setLineWidth(0.5);
+      doc.line(rx - tw, ly, rx, ly);
     },
   });
 
@@ -319,6 +341,7 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   const grandTotal = Number(quote.total || 0);
   const deliveryFeeForTotals = Number(quote.deliveryFee || 0);
   const lineItemsSubtotal = Math.max(0, grandTotal - deliveryFeeForTotals);
+  const sav = computeSavings(items); // display-only campaign-discount savings
 
   // Subtotal (line items only)
   doc.setFontSize(9);
@@ -354,6 +377,20 @@ async function buildQuotePdf(quote, customer, company = {}, opts = {}) {
   doc.line(totalsX, y, pageWidth - margin, y);
 
   y += 18;
+
+  // Regular total slashed above the payable TOTAL (no label — just the slash).
+  if (sav.hasSavings) {
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...GRAY);
+    const regStr = formatCurrency(grandTotal + sav.savings);
+    doc.text(regStr, pageWidth - margin, y + 2, { align: 'right' });
+    const regW = doc.getTextWidth(regStr);
+    doc.setDrawColor(...GRAY);
+    doc.setLineWidth(0.6);
+    doc.line(pageWidth - margin - regW, y - 1, pageWidth - margin, y - 1);
+    y += 16;
+  }
 
   // Total (includes delivery)
   doc.setFontSize(14);

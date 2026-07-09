@@ -6,8 +6,8 @@ brief. Deep feature notes live in [docs/dev-notes.md](docs/dev-notes.md)
 (Grep it before touching any feature it covers); app-code invariants live in
 [luckyapp/AGENTS.md](luckyapp/AGENTS.md) (read it before editing luckyapp).
 
-**Last updated:** 2026-07-06 (restructured — the old 431-line version was
-relocated to docs/dev-notes.md, nothing deleted).
+**Last updated:** 2026-07-09 (added campaign-discount "you save" pricing +
+recurring billing — see dev-notes.md).
 
 ## Business context — read before strategic / non-trivial work
 
@@ -73,7 +73,11 @@ jobs; target the ICP without excluding the small stuff. **No photos from
 sub work under other contractors may be used** — only Lucky's own jobs.
 GBP is a **service-area business** (Google reclassified from storefront;
 the old Place ID is dead — rank tracking matches by name, see the local-rank
-notes in dev-notes.md).
+notes in dev-notes.md). First paid Meta campaign: full playbook with
+verified-2026 platform facts in
+[docs/meta-ads-campaign-001.md](docs/meta-ads-campaign-001.md) — ad copy
+there follows the same conventions (24-hour response, no prices, no faces,
+no "repair" wording).
 
 **Content is luckyapp-managed:** the gallery + fixed image slots load from
 `app.luckylandscapes.com/api/marketing/{gallery,images}` — **remote REPLACES
@@ -101,9 +105,9 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   `generateQuotePdf.js`; Stripe server-side only in `stripeServer.js`.
 - **Migrations:** numbered SQL in `luckyapp/supabase/migrations/`, run **in
   order, by hand, in the Supabase SQL editor**. Prefixes are a sort key, not
-  unique (dupes at 006/007/023/024). Latest is `047_private_storage_buckets`;
-  next is `048_`. `FULL_REBUILD.sql` is deprecated — never use it. Details:
-  `migrations/README.md`.
+  unique (dupes at 006/007/023/024). Latest is `049_recurring_billing` (unrun
+  until Macoy applies it); next is `050_`. `FULL_REBUILD.sql` is deprecated —
+  never use it. Details: `migrations/README.md`.
 - **Backups:** daily encrypted pg_dump + full Storage download via GitHub
   Actions (`.github/workflows/supabase-backup.yml`) — restore notes in the
   workflow header; also keeps the free-tier project from auto-pausing. Don't
@@ -133,6 +137,17 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   close that before promoting the demo publicly.
 - **Public tokens are URL-safe hex** — preserve that property.
 - **Tappable addresses:** always `<AddressLink>`, never a hand-rolled maps link.
+- **Campaign discount "you save" is display-only** (`src/lib/pricing.js`,
+  `listUnitPrice` = regular pre-discount price on line items): it must NEVER change
+  `total`/deposits/revenue — only `unitPrice` (the discounted charge) moves money.
+  Legit *because* the regular price is a real off-campaign rate — don't let it become
+  a price Lucky never charges (FTC fake-former-price). Detail in AGENTS.md quick map.
+- **Recurring billing: the cron never records payments** (mig 049). The
+  `recurring-billing` cron creates the invoice + fires the off-session charge with
+  `metadata.invoice_id`; the **webhook's existing invoice branch** records the
+  `payments` row + marks it paid. Recording in both double-counts cash-basis revenue.
+  Card + autopay consent are written by the webhook on `setup_intent.succeeded`, never
+  trusted from the client. Detail in AGENTS.md quick map.
 
 ## Working here
 

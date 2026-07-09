@@ -247,3 +247,77 @@ export async function sendInvoicePaidReceipt({ to, customer, invoice, amount, me
     return { ok: false, error: err.message };
   }
 }
+
+// ─── Recurring invoice — "your invoice is ready, pay here" ───────────────
+//
+// Sent by the recurring-billing cron when a plan is billed. Two flavors:
+//   - invoice mode (no card on file): a normal "new invoice, pay online" nudge.
+//   - autopayFailed: the saved-card charge was declined; same email but leads
+//     with a heads-up so they know to pay manually / update their card.
+
+export async function sendRecurringInvoiceEmail({ to, customer, invoice, planTitle, origin, autopayFailed = false }) {
+  const resend = getResend();
+  if (!resend || !to) return { ok: false, skip: true };
+  const customerName = [customer?.first_name, customer?.last_name].filter(Boolean).join(' ').trim() || 'there';
+  const total = Number(invoice?.total || 0);
+  const payUrl = `${origin}/pay/${invoice.public_token}`;
+  const title = planTitle || invoice?.notes || 'your recurring service';
+
+  const heads = autopayFailed
+    ? `<div style="background:#fff4e5; border:1px solid #ffd9a0; border-radius:10px; padding:14px 18px; margin:0 0 20px; color:#8a5a00; font-size:14px; line-height:1.6;">
+         We tried to charge the card on file for <strong>${title}</strong> but it didn't go through. No worries — you can pay securely below, and we'll keep the card on file for next time (or call us to update it).
+       </div>`
+    : '';
+
+  const html = emailShell(`
+    <h2 style="color:#1f2937; margin:0 0 12px; font-size:22px; font-weight:700;">Hi ${customerName}, your invoice is ready 🍀</h2>
+    ${heads}
+    <p style="color:#4b5563; font-size:15px; line-height:1.65; margin:0 0 20px;">
+      Here's your invoice for <strong>${title}</strong> (${invoice.invoice_number}). You can pay online in a few seconds using the button below.
+    </p>
+    <div style="text-align:center; margin:24px 0;">
+      <a href="${payUrl}" style="display:inline-block; background:#2d7a3a; color:#fff; text-decoration:none; padding:16px 40px; border-radius:10px; font-weight:700; font-size:16px;">
+        Pay ${fmtUSD(total)} Online →
+      </a>
+      <div style="color:#9ca3af; font-size:12px; margin-top:10px;">Secured by Stripe · Card or bank transfer (ACH)</div>
+    </div>
+    <div style="font-size:13px; color:#6b7280; line-height:1.7; margin:0 0 8px; text-align:center;">
+      Questions, or want to change your schedule? Reply to this email or call <a href="tel:+14024055475" style="color:#2d7a3a; text-decoration:none; font-weight:600;">(402) 405-5475</a>.
+    </div>
+    <div style="text-align:center; margin:24px 0 8px;">
+      <p style="color:#6b7280; font-size:13px; margin:0;">— The Lucky Landscapes Team 🍀</p>
+    </div>
+  `);
+
+  try {
+    const result = await resend.emails.send({
+      from: getFrom(),
+      reply_to: getReplyTo(),
+      to: [to],
+      subject: `${autopayFailed ? 'Action needed — ' : ''}Your Lucky Landscapes invoice ${invoice.invoice_number} (${fmtUSD(total)})`,
+      html,
+      text: [
+        `Hi ${customerName},`,
+        '',
+        autopayFailed
+          ? `We tried to charge your card on file for ${title} but it didn't go through — please pay using the link below.`
+          : `Here's your invoice for ${title} (${invoice.invoice_number}).`,
+        '',
+        `Amount: ${fmtUSD(total)}`,
+        `Pay online: ${payUrl}`,
+        '',
+        `Questions or want to change your schedule? Reply or call (402) 405-5475.`,
+        '',
+        `— The Lucky Landscapes Team 🍀`,
+      ].join('\n'),
+    });
+    if (result.error) {
+      console.error('[customerEmails] recurring invoice failed:', result.error);
+      return { ok: false, error: result.error.message };
+    }
+    return { ok: true, emailId: result.data?.id };
+  } catch (err) {
+    console.error('[customerEmails] recurring invoice threw:', err);
+    return { ok: false, error: err.message };
+  }
+}

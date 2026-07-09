@@ -94,6 +94,7 @@ export function DataProvider({ children }) {
   const [contracts, setContracts] = useState([]);
   const [mileageEntries, setMileageEntries] = useState([]);
   const [contractors, setContractors] = useState([]);
+  const [recurringPlans, setRecurringPlans] = useState([]);
   const [org, setOrg] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -145,6 +146,7 @@ export function DataProvider({ children }) {
       setContracts(loadLocal('contracts'));
       setMileageEntries(loadLocal('mileage_entries'));
       setContractors(loadLocal('contractors'));
+      setRecurringPlans(loadLocal('recurring_plans'));
       setLoading(false);
     }
   }, [orgId, connected]);
@@ -153,7 +155,7 @@ export function DataProvider({ children }) {
   async function fetchAllFromSupabase() {
     setLoading(true);
     try {
-      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr, sup, orgRow] = await Promise.all([
+      const [cust, quot, jb, cal, team, act, te, jexp, mat, svc, inv, jmed, cexp, pay, qmed, tseg, ctr, mile, cntr, sup, rp, orgRow] = await Promise.all([
         supabase.from('customers').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('quotes').select('*').eq('org_id', orgId).order('created_at', { ascending: false }),
         supabase.from('jobs').select('*').eq('org_id', orgId).order('scheduled_date', { ascending: true }),
@@ -174,6 +176,7 @@ export function DataProvider({ children }) {
         supabase.from('mileage_entries').select('*').eq('org_id', orgId).order('date', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('contractors').select('*').eq('org_id', orgId).order('contact_name', { ascending: true }).then(r => r).catch(() => ({ data: null })),
         supabase.from('suppliers').select('*').eq('org_id', orgId).order('sort_order', { ascending: true }).then(r => r).catch(() => ({ data: null })),
+        supabase.from('recurring_plans').select('*').eq('org_id', orgId).order('created_at', { ascending: false }).then(r => r).catch(() => ({ data: null })),
         supabase.from('organizations').select('*').eq('id', orgId).single().then(r => r).catch(() => ({ data: null })),
       ]);
 
@@ -197,6 +200,7 @@ export function DataProvider({ children }) {
       if (mile?.data) setMileageEntries(snakeToCamel(mile.data));
       if (cntr?.data) setContractors(snakeToCamel(cntr.data));
       if (sup?.data) setSuppliers(snakeToCamel(sup.data));
+      if (rp?.data) setRecurringPlans(snakeToCamel(rp.data));
       if (orgRow?.data) setOrg(snakeToCamel(orgRow.data));
     } catch (err) {
       console.error('Error fetching data:', err);
@@ -513,6 +517,53 @@ export function DataProvider({ children }) {
     setContracts(prev => {
       const next = prev.filter(c => c.id !== id);
       if (!connected) saveLocal('contracts', next);
+      return next;
+    });
+  }, [connected]);
+
+  // ─── Recurring plan CRUD (recurring billing) ────────────
+  // A plan bills a customer every period. The daily cron generates an invoice
+  // and either auto-charges the saved card or emails the pay link. Mints a
+  // URL-safe public_token for the /autopay/[token] card-save page.
+  const addRecurringPlan = useCallback(async (data) => {
+    const publicToken = data.publicToken || makeUrlSafeToken();
+    const payload = { ...data, publicToken, status: data.status || 'active' };
+    if (connected) {
+      const dbPayload = { ...camelToSnake(payload), org_id: orgId };
+      if (!dbPayload.id) delete dbPayload.id;
+      const { data: row, error } = await supabase.from('recurring_plans')
+        .insert(dbPayload).select().single();
+      if (error) { console.error('[addRecurringPlan] Supabase error:', JSON.stringify(error, null, 2)); throw error; }
+      const p = snakeToCamel(row);
+      setRecurringPlans(prev => [p, ...prev]);
+      return p;
+    } else {
+      const p = { ...payload, id: crypto.randomUUID(), orgId, createdAt: new Date().toISOString() };
+      setRecurringPlans(prev => { const next = [p, ...prev]; saveLocal('recurring_plans', next); return next; });
+      return p;
+    }
+  }, [connected, orgId]);
+
+  const updateRecurringPlan = useCallback(async (id, data) => {
+    if (connected) {
+      const { error } = await supabase.from('recurring_plans').update(camelToSnake(data)).eq('id', id);
+      if (error) throw error;
+    }
+    setRecurringPlans(prev => {
+      const next = prev.map(p => p.id === id ? { ...p, ...data } : p);
+      if (!connected) saveLocal('recurring_plans', next);
+      return next;
+    });
+  }, [connected]);
+
+  const deleteRecurringPlan = useCallback(async (id) => {
+    if (connected) {
+      const { error } = await supabase.from('recurring_plans').delete().eq('id', id);
+      if (error) throw error;
+    }
+    setRecurringPlans(prev => {
+      const next = prev.filter(p => p.id !== id);
+      if (!connected) saveLocal('recurring_plans', next);
       return next;
     });
   }, [connected]);
@@ -2034,7 +2085,7 @@ export function DataProvider({ children }) {
     activity, timeEntries, timeSegments, jobMedia, jobExpenses, materials,
     suppliers,
     services, invoices, companyExpenses, payments, loading,
-    quoteMedia, contracts, mileageEntries, contractors,
+    quoteMedia, contracts, mileageEntries, contractors, recurringPlans,
 
     // Getters
     getCustomer, getQuote, getJob, getTeamMember, getInvoice,
@@ -2050,6 +2101,9 @@ export function DataProvider({ children }) {
 
     // Contracts
     addContract, updateContract, deleteContract,
+
+    // Recurring billing
+    addRecurringPlan, updateRecurringPlan, deleteRecurringPlan,
 
     // Jobs
     addJob, updateJob, deleteJob, convertQuoteToJob,

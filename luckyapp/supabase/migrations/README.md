@@ -57,6 +57,10 @@ prefix is a sort key, not a uniqueness guarantee.
 | 042 | `042_marketing_gallery_cover_and_sort.sql` | `is_cover` + partial unique index (one cover per project) + one-shot `sort_order` respacing |
 | 043 | `043_marketing_categories.sql` | `marketing_categories` table — per-org category metadata (visibility, cover, display name, icon, sort); backfill all-hidden |
 | 044 | `044_marketing_images.sql` | `marketing_images` table — per-org overrides for fixed image slots on the marketing site (service-page feature images). Reuses the `marketing-gallery` bucket under `<orgId>/slots/`. |
+| 045 | `045_job_wc_class.sql` | `jobs.wc_class` — insurance class-code key for the payroll/revenue split report |
+| 046 | `046_one_open_shift_segment.sql` | Partial unique indexes enforcing one open shift per member + one open segment per shift |
+| 047 | `047_private_storage_buckets.sql` | Privatizes `receipts` + `contract-pdfs` Storage buckets (signed-url read pattern) |
+| 048 | `048_meta_leads.sql` | `meta_leads` table — idempotency (unique `leadgen_id`) + audit record for the Meta Instant Form lead-ads webhook/polling bridge |
 
 > **Prefix 028 was deliberately skipped.** The list jumps 027 → 029.
 

@@ -37,6 +37,7 @@ import {
   Image as ImageIcon,
   Shield,
   MapPinned,
+  Repeat,
 } from 'lucide-react';
 import { useState, useRef } from 'react';
 import QuickReceiptModal from './QuickReceiptModal';
@@ -54,6 +55,7 @@ const ownerNavItems = [
   { href: '/contracts', label: 'Contracts', icon: FileSignature, roles: ['owner', 'admin'], badgeKey: 'unsignedContracts' },
   { href: '/jobs', label: 'Jobs', icon: Briefcase, roles: ['owner', 'admin'], badgeKey: 'activeJobs' },
   { href: '/invoices', label: 'Invoices', icon: Receipt, roles: ['owner', 'admin'], badgeKey: 'unpaidInvoices' },
+  { href: '/recurring', label: 'Recurring', icon: Repeat, roles: ['owner', 'admin'] },
   { href: '/calendar', label: 'Calendar', icon: CalendarDays, roles: ['owner', 'admin'], badgeKey: 'todayEvents' },
   { href: '/crew-dashboard', label: 'Time Clock', icon: Clock, roles: ['owner', 'admin'] },
   { type: 'action', actionKey: 'logReceipt', label: 'Log Receipt', icon: Camera, roles: ['owner', 'admin'] },

@@ -15,6 +15,7 @@ import {
 import ScheduleJobModal from '@/components/ScheduleJobModal';
 import QuoteMediaGallery from '@/components/QuoteMediaGallery';
 import { computeQuoteDeposit, formatDepositLabel, isPercentageDeposit } from '@/lib/deposit';
+import { computeSavings, lineMarketUnitPrice } from '@/lib/pricing';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n);
@@ -43,6 +44,7 @@ export default function QuoteDetailPage() {
   const depositAmount = quote ? computeQuoteDeposit(quote) : 0;
   const depositLabel = quote ? formatDepositLabel(quote) : '';
   const isPctDeposit = quote ? isPercentageDeposit(quote) : false;
+  const sav = computeSavings(quote?.items); // display-only market-rate savings
   const publicLink = quote?.publicToken && typeof window !== 'undefined'
     ? `${window.location.origin}/quote/${quote.publicToken}`
     : '';
@@ -476,7 +478,9 @@ export default function QuoteDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {(quote.items || []).map((item, i) => (
+                {(quote.items || []).map((item, i) => {
+                  const mkt = lineMarketUnitPrice(item);
+                  return (
                   <tr key={i}>
                     <td>
                       <div style={{ fontWeight: 600 }}>{item.name}</div>
@@ -484,10 +488,16 @@ export default function QuoteDetailPage() {
                     </td>
                     <td>{item.quantity}</td>
                     <td style={{ color: 'var(--text-tertiary)' }}>{item.unit}</td>
-                    <td>{formatCurrency(item.unitPrice)}</td>
+                    <td>
+                      {mkt !== null && (
+                        <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', display: 'block', fontSize: '0.85em' }}>{formatCurrency(mkt)}</span>
+                      )}
+                      {formatCurrency(item.unitPrice)}
+                    </td>
                     <td style={{ textAlign: 'right', fontWeight: 600 }}>{formatCurrency(item.total)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
 
@@ -521,8 +531,11 @@ export default function QuoteDetailPage() {
                 paddingTop: 'var(--space-sm)', borderTop: '2px solid var(--border-secondary)',
               }}>
                 <span style={{ fontWeight: 700, fontSize: '1rem' }}>Total</span>
-                <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>
-                  {formatCurrency(quote.total)}
+                <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.1 }}>
+                  {sav.hasSavings && (
+                    <span style={{ textDecoration: 'line-through', color: 'var(--text-tertiary)', fontWeight: 500, fontSize: '0.9rem' }}>{formatCurrency(Number(quote.total || 0) + sav.savings)}</span>
+                  )}
+                  <span style={{ fontWeight: 800, fontSize: '1.25rem', color: 'var(--lucky-green-light)' }}>{formatCurrency(quote.total)}</span>
                 </span>
               </div>
             </div>

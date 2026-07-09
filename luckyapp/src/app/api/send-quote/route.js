@@ -1,6 +1,7 @@
 import { Resend } from 'resend';
 import { NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/apiAuth';
+import { computeSavings } from '@/lib/pricing';
 
 export async function POST(request) {
   // Authenticated team members only — this sends branded email from our verified
@@ -39,6 +40,8 @@ export async function POST(request) {
     const formattedTotal = formatUSD(total);
     const deposit = Number(depositAmount || 0);
     const formattedDeposit = formatUSD(deposit);
+    // Display-only market-rate savings (see src/lib/pricing.js)
+    const sav = computeSavings(items);
     // Neutral CTA — clicking the link doesn't commit to anything; the customer
     // chooses to accept, request changes, or close the tab on the next page.
     const acceptCta = 'Review your estimate';
@@ -113,7 +116,10 @@ export async function POST(request) {
         <table style="width:100%; border-collapse:collapse;">
           <tr>
             <td style="padding:8px 0; font-size:17px; font-weight:700; color:#1f2937;">Estimated total</td>
-            <td style="padding:8px 0; text-align:right; font-size:22px; font-weight:800; color:#2d7a3a;">${formattedTotal}</td>
+            <td style="padding:8px 0; text-align:right;">
+              ${sav.hasSavings ? `<div style="font-size:14px; color:#9ca3af; text-decoration:line-through; font-weight:500;">${formatUSD(Number(total || 0) + sav.savings)}</div>` : ''}
+              <div style="font-size:22px; font-weight:800; color:#2d7a3a;">${formattedTotal}</div>
+            </td>
           </tr>
         </table>
       </div>
@@ -209,6 +215,7 @@ export async function POST(request) {
       `─── QUOTE #${quoteNumber}${category ? ` (${category})` : ''} ───`,
       plainItems || '(see attached details)',
       '─────────────────────────────',
+      sav.hasSavings ? `Regular: ${formatUSD(Number(total || 0) + sav.savings)}` : null,
       `Estimated total: ${formattedTotal}`,
       `Valid for: 30 days`,
       deposit > 0 ? `Deposit to schedule: ${formattedDeposit} (${isPercentageDeposit ? `${depositPct}% of total` : `materials${Number(deliveryFee || 0) > 0 ? ' + delivery' : ''}`})` : null,
