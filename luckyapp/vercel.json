@@ -10,14 +10,6 @@
     {
       "path": "/api/cron/cleanup-quote-media",
       "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/meta-leads-poll",
-      "schedule": "*/15 * * * *"
-    },
-    {
-      "path": "/api/cron/recurring-billing",
-      "schedule": "0 13 * * *"
     }
   ]
 }
