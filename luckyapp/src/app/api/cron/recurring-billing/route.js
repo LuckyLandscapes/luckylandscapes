@@ -3,7 +3,7 @@ import { randomBytes } from 'crypto';
 import { getStripe, getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
 import { notifyOrg } from '@/lib/notify';
 import { sendRecurringInvoiceEmail } from '@/lib/customerEmails';
-import { addInterval } from '@/lib/recurring';
+import { addInterval, amountForNextCharge, isFixedTerm } from '@/lib/recurring';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,16 +60,22 @@ export async function GET(request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const summary = { due: (plans || []).length, processed: 0, charged: 0, invoiced: 0, failed: 0, skipped: 0 };
+  const summary = { due: (plans || []).length, processed: 0, charged: 0, invoiced: 0, failed: 0, skipped: 0, completed: 0 };
 
   for (const plan of (plans || [])) {
     try {
       const customer = plan.customers || {};
-      const amount = Number(plan.amount || 0);
+      // On the last period of a fixed term this returns the exact remainder so
+      // the payments sum to contract_amount to the cent (never overcharge).
+      const amount = amountForNextCharge(plan);
       if (amount <= 0) { summary.skipped++; continue; }
 
-      // 1. Line items for the generated invoice (fall back to a single line).
-      const items = Array.isArray(plan.line_items) && plan.line_items.length
+      const fixedTerm = isFixedTerm(plan);
+      const periodNo = (Number(plan.periods_billed) || 0) + 1;
+
+      // 1. Line items for the generated invoice. Fixed-term plans always bill a
+      //    single computed line (the final period's amount differs).
+      const items = (!fixedTerm && Array.isArray(plan.line_items) && plan.line_items.length)
         ? plan.line_items
         : [{ name: plan.title, quantity: 1, unitPrice: amount, total: amount }];
       const subtotal = items.reduce((s, it) => s + (Number(it.total) || 0), 0);
@@ -86,7 +92,9 @@ export async function GET(request) {
         items,
         due_date: todayStr,
         public_token: makeToken(),
-        notes: `Recurring: ${plan.title}`,
+        notes: fixedTerm
+          ? `Recurring: ${plan.title} (payment ${periodNo} of ${plan.total_periods})`
+          : `Recurring: ${plan.title}`,
       }).select().single();
       if (invErr || !invoice) {
         console.error('[recurring-billing] invoice insert failed for plan', plan.id, invErr);
@@ -151,13 +159,17 @@ export async function GET(request) {
         summary.invoiced++;
       }
 
-      // 4. Advance the schedule to the next period.
+      // 4. Count the payment and advance — or close out a finished contract.
+      const done = fixedTerm && periodNo >= Number(plan.total_periods);
       await supabase.from('recurring_plans').update({
-        next_run_date: addInterval(plan.next_run_date, plan.interval),
+        periods_billed: periodNo,
+        status: done ? 'completed' : plan.status,
+        next_run_date: done ? plan.next_run_date : addInterval(plan.next_run_date, plan.interval),
         last_run_at: new Date().toISOString(),
         last_invoice_id: invoice.id,
         updated_at: new Date().toISOString(),
       }).eq('id', plan.id);
+      if (done) summary.completed++;
 
       summary.processed++;
     } catch (planErr) {

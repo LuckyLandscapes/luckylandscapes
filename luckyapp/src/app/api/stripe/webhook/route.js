@@ -56,7 +56,7 @@ export async function POST(request) {
           : si.payment_method?.id;
         const { data: plan } = await supabase
           .from('recurring_plans')
-          .select('id, org_id, customer_id, title, amount, interval, customers(first_name, last_name)')
+          .select('id, org_id, customer_id, title, amount, interval, contract_amount, total_periods, customers(first_name, last_name)')
           .eq('id', siMeta.plan_id)
           .maybeSingle();
         if (plan && paymentMethodId) {
@@ -64,7 +64,13 @@ export async function POST(request) {
             stripe_payment_method_id: paymentMethodId,
             payment_mode: 'autopay',
             authorized_at: new Date().toISOString(),
-            authorization_text: authorizationText({ amount: plan.amount, interval: plan.interval, title: plan.title }),
+            authorization_text: authorizationText({
+              amount: plan.amount,
+              interval: plan.interval,
+              title: plan.title,
+              totalPeriods: plan.total_periods,
+              contractAmount: plan.contract_amount,
+            }),
           }).eq('id', plan.id);
           if (si.customer && plan.customer_id) {
             await supabase.from('customers')

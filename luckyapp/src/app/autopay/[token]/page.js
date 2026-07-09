@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import { describeCadence } from '@/lib/recurring';
+import { describeCadence, intervalAdverb } from '@/lib/recurring';
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
@@ -88,7 +88,11 @@ export default function AutopayPage({ params }) {
     );
   }
 
-  const cadence = describeCadence(plan.amount, plan.interval);
+  const fixedTerm = Number(plan.totalPeriods) > 0 && Number(plan.contractAmount) > 0;
+  const cadence = fixedTerm
+    ? `${formatUSD(plan.amount)} ${intervalAdverb(plan.interval)} for ${plan.totalPeriods} payments (${formatUSD(plan.contractAmount)} total)`
+    : describeCadence(plan.amount, plan.interval);
+  const everyLabel = plan.interval === 'biweekly' ? '2 weeks' : plan.interval === 'monthly' ? 'month' : 'week';
 
   return (
     <div style={S.page}>
@@ -106,7 +110,10 @@ export default function AutopayPage({ params }) {
               <div style={{ fontSize: 56 }}>✓</div>
               <h2 style={{ margin: '10px 0 6px', color: '#1f6f3a' }}>You&rsquo;re all set!</h2>
               <p style={{ color: '#374151', fontSize: 15, lineHeight: 1.6 }}>
-                Automatic payments are on for <strong>{plan.title}</strong>. We&rsquo;ll charge your saved card {cadence} and email you a receipt each time. Cancel anytime by calling (402) 405-5475.
+                Automatic payments are on for <strong>{plan.title}</strong>. We&rsquo;ll charge your saved card {cadence} and email you a receipt each time.
+                {fixedTerm
+                  ? ' Charges stop automatically after the final payment.'
+                  : ' Cancel anytime by calling (402) 405-5475.'}
               </p>
             </div>
           ) : (
@@ -121,11 +128,20 @@ export default function AutopayPage({ params }) {
               <div style={S.planBox}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 16, color: '#1f2937' }}>{plan.title}</div>
-                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>Billed automatically</div>
+                  <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
+                    {fixedTerm
+                      ? `${plan.totalPeriods} payments · ${formatUSD(plan.contractAmount)} total`
+                      : 'Billed automatically'}
+                  </div>
+                  {fixedTerm && (
+                    <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
+                      Charges stop automatically after the final payment.
+                    </div>
+                  )}
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: '#2d7a3a', textAlign: 'right' }}>
                   {formatUSD(plan.amount)}
-                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>every {plan.interval === 'biweekly' ? '2 weeks' : plan.interval === 'monthly' ? 'month' : 'week'}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280' }}>every {everyLabel}</div>
                 </div>
               </div>
 

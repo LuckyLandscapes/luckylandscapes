@@ -11,7 +11,7 @@ const TOKEN_RE = /^[a-f0-9]{16,}$/;
 function loadPlan(supabase, token) {
   return supabase
     .from('recurring_plans')
-    .select('id, org_id, customer_id, title, amount, interval, status, authorized_at, payment_mode, customers(first_name, last_name, email, phone, stripe_customer_id)')
+    .select('id, org_id, customer_id, title, amount, interval, status, authorized_at, payment_mode, contract_amount, total_periods, periods_billed, customers(first_name, last_name, email, phone, stripe_customer_id)')
     .eq('public_token', token)
     .maybeSingle();
 }
@@ -37,7 +37,16 @@ export async function GET(request, { params }) {
       status: plan.status,
       authorized: !!plan.authorized_at,
       customerFirstName: c.first_name || '',
-      authorizationText: authorizationText({ amount: plan.amount, interval: plan.interval, title: plan.title }),
+      contractAmount: plan.contract_amount != null ? Number(plan.contract_amount) : null,
+      totalPeriods: plan.total_periods != null ? Number(plan.total_periods) : null,
+      periodsBilled: Number(plan.periods_billed || 0),
+      authorizationText: authorizationText({
+        amount: plan.amount,
+        interval: plan.interval,
+        title: plan.title,
+        totalPeriods: plan.total_periods,
+        contractAmount: plan.contract_amount,
+      }),
     },
   });
 }

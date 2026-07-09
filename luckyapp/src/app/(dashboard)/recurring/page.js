@@ -7,7 +7,10 @@ import {
   Repeat, Plus, X, Pause, Play, SkipForward, Ban, Copy, CheckCircle,
   CreditCard, Mail, Trash2, Loader2, AlertCircle,
 } from 'lucide-react';
-import { RECURRING_INTERVALS, describeCadence, addInterval, intervalLabel } from '@/lib/recurring';
+import {
+  RECURRING_INTERVALS, describeCadence, addInterval, intervalAdverb,
+  perPeriodAmount, finalPeriodAmount, planProgress, isFixedTerm,
+} from '@/lib/recurring';
 
 function formatCurrency(n) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2 }).format(n || 0);
@@ -20,6 +23,7 @@ function formatDate(d) {
 const STATUS = {
   active: { label: 'Active', color: 'var(--status-success)', bg: 'var(--status-success-bg)' },
   paused: { label: 'Paused', color: 'var(--status-warning)', bg: 'var(--status-warning-bg)' },
+  completed: { label: 'Completed', color: 'var(--status-info)', bg: 'var(--status-info-bg)' },
   cancelled: { label: 'Cancelled', color: 'var(--text-tertiary)', bg: 'rgba(255,255,255,0.04)' },
 };
 
@@ -32,7 +36,7 @@ export default function RecurringPage() {
   const showToast = (type, message) => { setToast({ type, message }); setTimeout(() => setToast(null), 4000); };
 
   const plans = [...(recurringPlans || [])].sort((a, b) => {
-    const rank = s => (s === 'active' ? 0 : s === 'paused' ? 1 : 2);
+    const rank = s => (s === 'active' ? 0 : s === 'paused' ? 1 : s === 'completed' ? 2 : 3);
     return rank(a.status) - rank(b.status) || String(a.nextRunDate).localeCompare(String(b.nextRunDate));
   });
 
@@ -96,6 +100,9 @@ export default function RecurringPage() {
             const cust = getCustomer(plan.customerId);
             const cfg = STATUS[plan.status] || STATUS.active;
             const autopay = !!(plan.authorizedAt || plan.stripePaymentMethodId);
+            const fixed = isFixedTerm(plan);
+            const prog = planProgress(plan);
+            const manageable = plan.status === 'active' || plan.status === 'paused';
             return (
               <div key={plan.id} className="card" style={{ opacity: plan.status === 'cancelled' ? 0.6 : 1 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-md)', flexWrap: 'wrap' }}>
@@ -108,9 +115,23 @@ export default function RecurringPage() {
                       {cust ? (
                         <Link href={`/customers/${cust.id}`} style={{ fontWeight: 600 }}>{cust.firstName} {cust.lastName}</Link>
                       ) : 'Unknown customer'}
-                      {' · '}{describeCadence(plan.amount, plan.interval)}
+                      {' · '}
+                      {fixed
+                        ? `${formatCurrency(plan.amount)} ${intervalAdverb(plan.interval)} × ${prog.total} — ${formatCurrency(prog.contractAmount)} total`
+                        : describeCadence(plan.amount, plan.interval)}
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                    {fixed && (
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: 6, maxWidth: 320 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
+                          <span>Payment {Math.min(prog.billed + (plan.status === 'completed' ? 0 : 1), prog.total)} of {prog.total}</span>
+                          <span>{formatCurrency(prog.billedAmount)} / {formatCurrency(prog.contractAmount)}</span>
+                        </div>
+                        <div style={{ height: 5, background: 'var(--bg-elevated)', borderRadius: 3, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${Math.min(100, (prog.billed / prog.total) * 100)}%`, background: plan.status === 'completed' ? 'var(--status-info)' : 'var(--lucky-green)', borderRadius: 3 }} />
+                        </div>
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', marginTop: 6, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                       <span>Next: <strong style={{ color: 'var(--text-secondary)' }}>{plan.status === 'active' ? formatDate(plan.nextRunDate) : '—'}</strong></span>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                         {autopay
@@ -120,7 +141,7 @@ export default function RecurringPage() {
                     </div>
                   </div>
 
-                  {plan.status !== 'cancelled' && (
+                  {manageable && (
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       {!autopay && (
                         <button className="btn btn-secondary btn-sm" onClick={() => copyLink(plan)} title="Copy the link the customer uses to save a card for autopay">
@@ -140,7 +161,7 @@ export default function RecurringPage() {
                       </button>
                     </div>
                   )}
-                  {plan.status === 'cancelled' && (
+                  {!manageable && (
                     <button className="btn btn-ghost btn-sm" onClick={() => removePlan(plan)} title="Delete permanently">
                       <Trash2 size={14} />
                     </button>
@@ -181,27 +202,46 @@ function NewPlanModal({ customers, onClose, onCreate }) {
   const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
   const [customerId, setCustomerId] = useState('');
   const [title, setTitle] = useState('');
+  const [billingType, setBillingType] = useState('term'); // 'term' | 'ongoing'
+  const [contractAmount, setContractAmount] = useState('');
+  const [totalPeriods, setTotalPeriods] = useState('12');
   const [amount, setAmount] = useState('');
-  const [interval, setInterval] = useState('weekly');
+  const [interval, setInterval] = useState('monthly');
   const [startDate, setStartDate] = useState(todayStr);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
-  const amt = parseFloat(amount) || 0;
+  const isTerm = billingType === 'term';
+  const contractAmt = parseFloat(contractAmount) || 0;
+  const periods = parseInt(totalPeriods, 10) || 0;
+  // Fixed term: the per-period charge is the rounded split; the last payment
+  // absorbs the remainder so the payments sum to the agreed total exactly.
+  const perPeriod = isTerm ? perPeriodAmount(contractAmt, periods) : (parseFloat(amount) || 0);
+  const lastPayment = isTerm && periods > 1 ? finalPeriodAmount(contractAmt, periods) : perPeriod;
+  const lastDiffers = isTerm && periods > 1 && Math.abs(lastPayment - perPeriod) > 0.004;
+  const everyLabel = interval === 'biweekly' ? '2 weeks' : interval === 'monthly' ? 'month' : 'week';
 
   const submit = async () => {
     if (!customerId) { setError('Pick a customer.'); return; }
-    if (!title.trim()) { setError('Give the plan a name (e.g. Weekly mowing).'); return; }
-    if (amt <= 0) { setError('Enter the amount to charge each period.'); return; }
+    if (!title.trim()) { setError('Give the plan a name (e.g. Lawn care — 2026 season).'); return; }
+    if (isTerm) {
+      if (contractAmt <= 0) { setError('Enter the total contract amount.'); return; }
+      if (periods < 1) { setError('Enter how many payments the contract is split into.'); return; }
+    } else if (perPeriod <= 0) {
+      setError('Enter the amount to charge each period.'); return;
+    }
     setSaving(true);
     setError(null);
     try {
       await onCreate({
         customerId,
         title: title.trim(),
-        amount: amt,
+        amount: perPeriod,
         interval,
         nextRunDate: startDate,
+        contractAmount: isTerm ? contractAmt : null,
+        totalPeriods: isTerm ? periods : null,
+        periodsBilled: 0,
         paymentMode: 'invoice', // upgrades to 'autopay' when the customer saves a card
         status: 'active',
       });
@@ -211,9 +251,16 @@ function NewPlanModal({ customers, onClose, onCreate }) {
     }
   };
 
+  const typeBtn = (active) => ({
+    flex: 1, padding: '10px', borderRadius: 'var(--radius-sm)', border: 'none', cursor: 'pointer',
+    fontSize: '0.82rem', fontWeight: 600, transition: 'all 0.2s',
+    background: active ? 'var(--lucky-green)' : 'transparent',
+    color: active ? '#fff' : 'var(--text-secondary)',
+  });
+
   return (
     <div className="modal-overlay" onClick={() => !saving && onClose()}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 560 }}>
         <div className="modal-header">
           <h2><Repeat size={20} style={{ marginRight: 8, verticalAlign: 'middle' }} /> New Recurring Plan</h2>
           <button className="btn btn-icon btn-ghost" onClick={() => !saving && onClose()}><X size={20} /></button>
@@ -228,28 +275,80 @@ function NewPlanModal({ customers, onClose, onCreate }) {
           </div>
           <div className="form-group">
             <label className="form-label">Plan name <span className="required">*</span></label>
-            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Weekly mowing" />
+            <input className="form-input" value={title} onChange={e => setTitle(e.target.value)} placeholder="e.g. Lawn care — 2026 season" />
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
-            <div className="form-group">
-              <label className="form-label">Amount each period <span className="required">*</span></label>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }}>$</span>
-                <input className="form-input" type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} style={{ paddingLeft: 24 }} placeholder="55.00" />
+
+          <div className="form-group">
+            <label className="form-label">Billing</label>
+            <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)' }}>
+              <button type="button" onClick={() => setBillingType('term')} style={typeBtn(isTerm)}>Fixed term (contract)</button>
+              <button type="button" onClick={() => setBillingType('ongoing')} style={typeBtn(!isTerm)}>Ongoing</button>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 6 }}>
+              {isTerm
+                ? 'A set total split into equal payments — billing stops on its own at the end.'
+                : 'Bills the same amount every period until you pause or cancel it.'}
+            </div>
+          </div>
+
+          {isTerm ? (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 0.9fr', gap: 'var(--space-md)' }}>
+                <div className="form-group">
+                  <label className="form-label">Total contract <span className="required">*</span></label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }}>$</span>
+                    <input className="form-input" type="number" step="0.01" min="0" value={contractAmount} onChange={e => setContractAmount(e.target.value)} style={{ paddingLeft: 24 }} placeholder="2000.00" />
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Frequency</label>
+                  <select className="form-select" value={interval} onChange={e => setInterval(e.target.value)}>
+                    {RECURRING_INTERVALS.map(i => <option key={i.key} value={i.key}>{i.label}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label"># payments <span className="required">*</span></label>
+                  <input className="form-input" type="number" min="1" step="1" value={totalPeriods} onChange={e => setTotalPeriods(e.target.value)} placeholder="12" />
+                </div>
+              </div>
+
+              {contractAmt > 0 && periods > 0 && (
+                <div style={{ background: 'var(--bg-elevated)', borderRadius: 'var(--radius-md)', padding: 'var(--space-md)', marginBottom: 'var(--space-md)' }}>
+                  <div style={{ fontSize: '0.95rem', fontWeight: 700 }}>
+                    {formatCurrency(perPeriod)} {intervalAdverb(interval)} × {periods} = {formatCurrency(contractAmt)}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                    {lastDiffers && <>Final payment is {formatCurrency(lastPayment)} so the total lands exactly on {formatCurrency(contractAmt)}. </>}
+                    Charges stop automatically after payment {periods}.
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-md)' }}>
+              <div className="form-group">
+                <label className="form-label">Amount each period <span className="required">*</span></label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }}>$</span>
+                  <input className="form-input" type="number" step="0.01" min="0" value={amount} onChange={e => setAmount(e.target.value)} style={{ paddingLeft: 24 }} placeholder="55.00" />
+                </div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">Frequency</label>
+                <select className="form-select" value={interval} onChange={e => setInterval(e.target.value)}>
+                  {RECURRING_INTERVALS.map(i => <option key={i.key} value={i.key}>{i.label}</option>)}
+                </select>
               </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Frequency</label>
-              <select className="form-select" value={interval} onChange={e => setInterval(e.target.value)}>
-                {RECURRING_INTERVALS.map(i => <option key={i.key} value={i.key}>{i.label}</option>)}
-              </select>
-            </div>
-          </div>
+          )}
+
           <div className="form-group">
             <label className="form-label">First bill date</label>
             <input className="form-input" type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
             <div style={{ fontSize: '0.75rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
-              We&rsquo;ll bill {amt > 0 ? formatCurrency(amt) : 'the amount'} on this date, then every {interval === 'biweekly' ? '2 weeks' : interval === 'monthly' ? 'month' : 'week'}.
+              We&rsquo;ll bill {perPeriod > 0 ? formatCurrency(perPeriod) : 'the amount'} on this date, then every {everyLabel}
+              {isTerm && periods > 0 ? ` until all ${periods} payments are made.` : '.'}
             </div>
           </div>
 

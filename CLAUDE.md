@@ -147,7 +147,9 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   `metadata.invoice_id`; the **webhook's existing invoice branch** records the
   `payments` row + marks it paid. Recording in both double-counts cash-basis revenue.
   Card + autopay consent are written by the webhook on `setup_intent.succeeded`, never
-  trusted from the client. Detail in AGENTS.md quick map.
+  trusted from the client. **Fixed-term plans must never overcharge:** the final period
+  bills the exact remainder (`finalPeriodAmount`) so charges sum to `contract_amount`.
+  Detail in AGENTS.md quick map.
 
 ## Working here
 
