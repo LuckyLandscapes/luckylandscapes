@@ -17,8 +17,9 @@
 // without redeploying code.
 
 import { NextResponse } from 'next/server';
-import { getServiceSupabase, getAppOrigin } from '@/lib/stripeServer';
+import { getServiceSupabase, getAppOrigin, getStripe } from '@/lib/stripeServer';
 import { sendInvoiceReminder, computeDaysOver } from '@/lib/invoiceReminder';
+import { runRecurringBilling } from '@/lib/recurringBillingRun';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -104,5 +105,25 @@ export async function GET(request) {
   }
 
   console.log('[auto-dunning] run complete', summary);
-  return NextResponse.json(summary);
+
+  // ── Recurring billing rides along on this daily run ──────────────────────
+  // Vercel's Hobby plan caps a project at 2 cron jobs; vercel.json already
+  // spends both (this + cleanup-quote-media). Adding a third scheduled entry
+  // makes the DEPLOYMENT fail outright, so recurring billing is invoked here
+  // instead of getting its own cron. Wrapped so a billing failure can never
+  // break dunning — and it no-ops harmlessly until migration 049 is applied.
+  let recurring = { skipped: 'not run' };
+  try {
+    recurring = await runRecurringBilling({
+      supabase,
+      stripe: getStripe(), // null if Stripe isn't configured
+      origin,
+    });
+    console.log('[auto-dunning] recurring billing complete', recurring);
+  } catch (err) {
+    console.error('[auto-dunning] recurring billing threw', err);
+    recurring = { ok: false, error: err?.message || 'threw' };
+  }
+
+  return NextResponse.json({ ...summary, recurring });
 }

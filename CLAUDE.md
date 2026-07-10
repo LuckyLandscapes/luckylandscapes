@@ -142,6 +142,11 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   `total`/deposits/revenue — only `unitPrice` (the discounted charge) moves money.
   Legit *because* the regular price is a real off-campaign rate — don't let it become
   a price Lucky never charges (FTC fake-former-price). Detail in AGENTS.md quick map.
+- **Vercel Hobby allows exactly 2 cron jobs, once-daily.** A 3rd entry in
+  `luckyapp/vercel.json` (or a sub-daily schedule) **fails the entire deploy** —
+  Vercel silently keeps serving the old build and the new routes 404. Both slots
+  are taken (`auto-dunning`, `cleanup-quote-media`); piggyback new daily work
+  inside an existing cron instead (recurring billing rides on `auto-dunning`).
 - **Recurring billing: the cron never records payments** (mig 049). The
   `recurring-billing` cron creates the invoice + fires the off-session charge with
   `metadata.invoice_id`; the **webhook's existing invoice branch** records the
