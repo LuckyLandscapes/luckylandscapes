@@ -6,8 +6,8 @@ brief. Deep feature notes live in [docs/dev-notes.md](docs/dev-notes.md)
 (Grep it before touching any feature it covers); app-code invariants live in
 [luckyapp/AGENTS.md](luckyapp/AGENTS.md) (read it before editing luckyapp).
 
-**Last updated:** 2026-07-09 (added campaign-discount "you save" pricing +
-recurring billing — see dev-notes.md).
+**Last updated:** 2026-07-10 (marketing manifest must stay `display: browser` —
+the site was prompting visitors to install a nonexistent app).
 
 ## Business context — read before strategic / non-trivial work
 
@@ -142,6 +142,15 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   `total`/deposits/revenue — only `unitPrice` (the discounted charge) moves money.
   Legit *because* the regular price is a real off-campaign rate — don't let it become
   a price Lucky never charges (FTC fake-former-price). Detail in AGENTS.md quick map.
+- **`marketing/favicon/site.webmanifest` must keep `"display": "browser"`** (fixed
+  2026-07-10). It shipped as `"standalone"` — favicon-generator boilerplate — and
+  every page links it, so Chrome/Edge/Samsung Internet offered visitors "Install
+  app / Add to Home screen" for an app that doesn't exist. There is no service
+  worker and no JS install prompt; the manifest alone causes it. Any value in
+  `standalone` / `fullscreen` / `minimal-ui` makes the brochure site installable
+  again. (Its `icons` srcs `/web-app-manifest-*.png` are also dead — the PNGs sit
+  in `marketing/favicon/`, which Vite never copies into `dist`, so those URLs
+  soft-200 the homepage HTML. Inert while `display: browser`.)
 - **Vercel Hobby allows exactly 2 cron jobs, once-daily.** A 3rd entry in
   `luckyapp/vercel.json` (or a sub-daily schedule) **fails the entire deploy** —
   Vercel silently keeps serving the old build and the new routes 404. Both slots
