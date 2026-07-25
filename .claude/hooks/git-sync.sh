@@ -38,8 +38,9 @@ fi
 if [ "$mode" = "sync" ]; then
   git add -A
   if ! git diff --cached --quiet; then
-    git commit -q -m "chore: auto-sync (end of turn)" \
-      -m "Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>"
+    # No Co-Authored-By trailer here (removed 2026-07-24, Macoy's call) — matches
+    # "includeCoAuthoredBy": false in .claude/settings.json. Don't re-add it.
+    git commit -q -m "chore: auto-sync (end of turn)"
   fi
 fi
 
