@@ -105,9 +105,10 @@ luckyapp `/api/leads/public`. Hero video files are immutable-cached —
   `generateQuotePdf.js`; Stripe server-side only in `stripeServer.js`.
 - **Migrations:** numbered SQL in `luckyapp/supabase/migrations/`, run **in
   order, by hand, in the Supabase SQL editor**. Prefixes are a sort key, not
-  unique (dupes at 006/007/023/024). Latest is `049_recurring_billing` (unrun
-  until Macoy applies it); next is `050_`. `FULL_REBUILD.sql` is deprecated —
-  never use it. Details: `migrations/README.md`.
+  unique (dupes at 006/007/023/024). Latest is `049_recurring_billing`, **applied
+  — confirmed 2026-07-31** against the live schema (`customers.stripe_customer_id`
+  and `recurring_plans` both exist); next is `050_`. `FULL_REBUILD.sql` is
+  deprecated — never use it. Details: `migrations/README.md`.
 - **Backups:** daily encrypted pg_dump + full Storage download via GitHub
   Actions (`.github/workflows/supabase-backup.yml`) — restore notes in the
   workflow header; also keeps the free-tier project from auto-pausing. Don't
